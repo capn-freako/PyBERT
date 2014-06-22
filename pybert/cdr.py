@@ -26,7 +26,7 @@ from enthought.enable.component_editor import \
     ComponentEditor
 from numpy        import arange, real, concatenate, angle, sign, sin, pi, array, float, zeros, repeat
 from numpy.fft    import ifft
-from numpy.random import random
+from numpy.random import randint, random
 from scipy.signal import lfilter, firwin, iirdesign, iirfilter, freqz
 import re
 
@@ -151,8 +151,8 @@ class CDRDemo(HasTraits):
         # the mouse vertically.
         dragzoom1 = DragZoom(plot1, drag_button="right")
         plot1.tools.append(dragzoom1)
-        plot1.active_tool = RangeSelection(plot1, left_button_selects = True)
-        plot1.overlays.append(RangeSelectionOverlay(component=plot1))
+        #plot1.active_tool = RangeSelection(plot1, left_button_selects = True)
+        #plot1.overlays.append(RangeSelectionOverlay(component=plot1))
 
         plot2 = Plot(plotdata)
         plot2.plot(("t_ns", "ui_ests"), type="line", color="blue")
@@ -164,7 +164,7 @@ class CDRDemo(HasTraits):
     # Dependent variable definitions
     @cached_property
     def _get_bits(self):
-        return [int(2 * random()) for i in range(self.nbits)]
+        return [randint(2) for i in range(self.nbits)]
     
     @cached_property
     def _get_t(self):
