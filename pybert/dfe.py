@@ -14,10 +14,10 @@ running in stand-alone mode for preliminary debugging.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from enthought.traits.api \
+from traits.api \
     import HasTraits, Array, Range, Float, Enum, Property, String, List, cached_property
-from enthought.traits.ui.api import View, Item, VSplit, Group, VGroup, HGroup, Label, Action, Handler, DefaultOverride
-from enthought.chaco.chaco_plot_editor import ChacoPlotItem
+from traitsui.api import View, Item, VSplit, Group, VGroup, HGroup, Label, Action, Handler, DefaultOverride
+from chaco.chaco_plot_editor import ChacoPlotItem
 from numpy import arange, real, concatenate, angle, sign, sin, pi, array, float, zeros
 from numpy.fft import ifft
 from numpy.random import random

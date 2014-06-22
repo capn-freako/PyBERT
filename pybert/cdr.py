@@ -14,15 +14,15 @@ running in stand-alone mode for preliminary debugging.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from enthought.traits.api    import \
+from traits.api    import \
     HasTraits, Array, Range, Int, Float, Enum, Property, String, List, cached_property, Instance
-from enthought.traits.ui.api import \
+from traitsui.api import \
     View, Item, VSplit, Group, VGroup, HGroup, Label, Action, Handler, DefaultOverride
-from enthought.chaco.api     import \
+from chaco.api     import \
     Plot, ArrayPlotData, VPlotContainer
-from enthought.chaco.tools.api import \
+from chaco.tools.api import \
     PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom, LineInspector, RangeSelection, RangeSelectionOverlay
-from enthought.enable.component_editor import \
+from enable.component_editor import \
     ComponentEditor
 from numpy        import arange, real, concatenate, angle, sign, sin, pi, array, float, zeros, repeat
 from numpy.fft    import ifft
