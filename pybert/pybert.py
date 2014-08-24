@@ -1,13 +1,13 @@
 #! /usr/bin/env python
 
 """
-GUI demo of DFE class. (See `dfe.py'.)
+Bit error rate tester (BERT) simulator, written in Python.
 
 Original Author: David Banas <capn.freako@gmail.com>
 Original Date:   17 June 2014
 
-This Python script provides a GUI demo of the behavioral model of a
-decision feedback equalizer (DFE) contained in `dfe.py'.
+This Python script provides a GUI interface to a BERT simulator, which
+can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
@@ -22,13 +22,14 @@ from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom,
 from chaco.chaco_plot_editor import ChacoPlotItem
 from enable.component_editor import ComponentEditor
 from numpy        import arange, real, concatenate, angle, sign, sin, pi, array, linspace, meshgrid, \
-                         float, zeros, repeat, histogram, mean, where, diff, log10, transpose, shape
+                         float, zeros, ones, repeat, histogram, mean, where, diff, log10, transpose, shape
 from numpy.fft    import fft, ifft
 from numpy.random import randint, random, normal
 from scipy.signal import lfilter, firwin, iirdesign, iirfilter, freqz
 from dfe          import DFE
 from cdr          import CDR
 import re
+import time
 
 # Default model parameters - Modify these to customize the default simulation.
 gNtaps          = 5
@@ -96,13 +97,23 @@ def get_chnl_in(self):
     return res
 
 class MyHandler(Handler):
+    """This handler is instantiated by the View and handles user button clicks."""
+
+    def do_get_results(self, info):
+        info.object.status = 'Calculating results...'
+        info.object.update_plot_eye()
+        info.object.status = 'Ready.'
 
     def do_run_dfe(self, info):
+        info.object.status = 'Running DFE...'
+        start_time = time.clock()
+
         chnl_out        = info.object.chnl_out
         t               = info.object.t
         delta_t         = info.object.delta_t          # (ps)
         alpha           = info.object.alpha
         ui              = info.object.ui               # (ps)
+        nbits           = info.object.nbits
         nspb            = info.object.nspb
         n_taps          = info.object.n_taps
         gain            = info.object.gain
@@ -118,14 +129,17 @@ class MyHandler(Handler):
 
         info.object.run_result = res
         info.object.adaptation = tap_weights
-#        info.object.plotdata.set_data("tap_weight_index", range(len(tap_weights[0])))
         info.object.ui_ests    = array(ui_ests) * 1.e12 # (ps)
         info.object.clocks     = clocks
         info.object.lockeds    = lockeds
 
-        info.object.update_plot_eye()
+        info.object.dfe_perf = nbits * nspb / (time.clock() - start_time)
+        info.object.status = 'Ready.'
 
     def do_run_cdr(self, info):
+        info.object.status = 'Running CDR...'
+        start_time = time.clock()
+
         chnl_out = info.object.chnl_out
         delta_t  = info.object.delta_t
         alpha    = info.object.alpha
@@ -133,6 +147,7 @@ class MyHandler(Handler):
         rel_lock_tol  = info.object.rel_lock_tol
         lock_sustain  = info.object.lock_sustain
         ui       = info.object.ui
+        nbits    = info.object.nbits
         nspb     = info.object.nspb
         cdr      = CDR(delta_t, alpha, ui, n_lock_ave, rel_lock_tol, lock_sustain)
 
@@ -165,7 +180,13 @@ class MyHandler(Handler):
         info.object.ui_ests = ui_ests
         info.object.lockeds = lockeds
 
+        info.object.cdr_perf = nbits * nspb / (time.clock() - start_time)
+        info.object.status = 'Ready.'
+
     def do_run_channel(self, info):
+        info.object.status = 'Running channel...'
+        start_time = time.clock()
+
         chnl_in = get_chnl_in(info.object)
         a       = info.object.a
         b       = info.object.b
@@ -179,11 +200,21 @@ class MyHandler(Handler):
         info.object.chnl_in                 = chnl_in
         info.object.chnl_out                = res
 
+        info.object.channel_perf = nbits * nspb / (time.clock() - start_time)
+        info.object.status = 'Ready.'
+
 run_channel = Action(name="RunChannel", action="do_run_channel")
 run_cdr     = Action(name="RunCDR",     action="do_run_cdr")
 run_dfe     = Action(name="RunDFE",     action="do_run_dfe")
+get_results = Action(name="GetResults", action="do_get_results")
     
-class DFEDemo(HasTraits):
+class PyBERT(HasTraits):
+    """
+    A serial communication link bit error rate tester (BERT) simulator with a GUI interface.
+    
+    Useful for exploring the concepts of serial communication link design.
+    """
+
     # Independent variables
     ui     = Float(gUI)                                        # (ps)
     gain   = Float(gGain)
@@ -204,11 +235,15 @@ class DFEDemo(HasTraits):
     plot_out = Instance(VPlotContainer)
     plot_in  = Instance(GridPlotContainer)
     plot_dfe = Instance(VPlotContainer)
-    plot_eye = Instance(VPlotContainer)
-    eye_bits = Int(10)
-    ident  = String('PyDFE v0.1 - a DFE design tool, written in Python\n\n \
+    plot_eye = Instance(GridPlotContainer)
+    eye_bits = Int(4000)
+    status       = String("Ready.")
+    channel_perf = Float(1.)
+    cdr_perf     = Float(1.)
+    dfe_perf     = Float(1.)
+    ident  = String('PyBERT v0.1 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    July 29, 2014\n\n \
+    August 24, 2014\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -227,6 +262,7 @@ class DFEDemo(HasTraits):
     tie                     = Property(Array, depends_on=['crossing_times_chnl_out'])
     jitter                  = Property(Array, depends_on=['crossing_times_chnl_out'])
     jitter_spectrum         = Property(Array, depends_on=['jitter'])
+    status_str = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf'])
 
     # Handler set variables
     chnl_in     = Array()
@@ -239,7 +275,7 @@ class DFEDemo(HasTraits):
 
     # Default initialization
     def __init__(self):
-        super(DFEDemo, self).__init__()
+        super(PyBERT, self).__init__()
 
         ui    = self.ui
         nbits = self.nbits
@@ -267,6 +303,11 @@ class DFEDemo(HasTraits):
         x, y = meshgrid(range(10), range(10))
         z = x * y
         plotdata.set_data("imagedata", z)
+        zero_xing_pdf = ones(10)
+        zero_xing_pdf /= zero_xing_pdf.sum()
+        plotdata.set_data("zero_xing_pdf", zero_xing_pdf)
+        plotdata.set_data("bathtub", zero_xing_pdf)
+        plotdata.set_data("eye_index", range(10))
         self.plotdata = plotdata
 
         # Then, generate `chnl_out' and insert its dependencies, manually.
@@ -279,8 +320,8 @@ class DFEDemo(HasTraits):
         self.plotdata.set_data("tie_hist_bins", array(self.tie_hist_bins) * 1.e12)
         self.plotdata.set_data("tie_hist_counts", self.tie_hist_counts)
 
+        # Now, create all the various plots we need for our GUI.
         plot1 = Plot(plotdata)
-        #plot1.plot(("t_ns", "dfe_out"), type="line", color="blue")
         plot1.plot(("t_ns", "chnl_out"), type="line", color="blue")
         plot1.plot(("t_ns", "clocks"), type="line", color="green")
         plot1.plot(("t_ns", "lockeds"), type="line", color="red")
@@ -327,7 +368,6 @@ class DFEDemo(HasTraits):
         plot6.title  = "Jitter Spectrum"
         plot6.index_axis.title = "Frequency (MHz)"
         plot6.value_axis.title = "|FFT(jitter)| (dBui)"
-        #plot6.value_scale = 'log'
         zoom6 = ZoomTool(plot6, tool_mode="range", axis='index', always_on=False)
         plot6.overlays.append(zoom6)
 
@@ -409,6 +449,17 @@ class DFEDemo(HasTraits):
         plot10.x_grid.line_color = 'gray'
         plot10.y_grid.line_color = 'gray'
 
+        plot11 = Plot(plotdata)
+        plot11.plot(("eye_index", "zero_xing_pdf"), type="line", color="blue")
+        plot11.title  = "Zero Crossing Probability Density Function"
+        plot11.index_axis.title = "Time (ps)"
+
+        plot12 = Plot(plotdata)
+        plot12.plot(("eye_index", "bathtub"), type="line", color="blue")
+        plot12.title  = "Bathtub Curves"
+        plot12.index_axis.title = "Time (ps)"
+
+        # And assemble them into the appropriate tabbed containers.
         container_out = VPlotContainer(plot2, plot1)
         self.plot_out = container_out
         container_in  = GridPlotContainer(shape=(2,2))
@@ -419,7 +470,10 @@ class DFEDemo(HasTraits):
         self.plot_in  = container_in
         container_dfe = VPlotContainer(plot8, plot9)
         self.plot_dfe = container_dfe
-        container_eye  = VPlotContainer(plot10, bgcolor='none')
+        container_eye  = GridPlotContainer(shape=(2,2))
+        container_eye.add(plot10)
+        container_eye.add(plot12)
+        container_eye.add(plot11)
         self.plot_eye  = container_eye
 
     # Dependent variable definitions
@@ -468,15 +522,6 @@ class DFEDemo(HasTraits):
         b = self.b
         return lfilter(b, a, x)
 
-#    @cached_property
-#    def _get_chnl_out(self):
-#        res     = self.new_chnl_out
-#        t       = self.t
-#
-#        self.crossing_times_chnl_out = find_crossing_times(t, res, anlg=True)
-#
-#        return res
-
     @cached_property
     def _get_crossing_times_chnl_out(self):
         return find_crossing_times(self.t, self.chnl_out, anlg=True)
@@ -493,7 +538,7 @@ class DFEDemo(HasTraits):
             return tie
             
         ties                 = map(normalize, ties)
-        hist, bin_edges      = histogram(ties, 99, (-ui/4., ui/4.))
+        hist, bin_edges      = histogram(ties, 99, (-ui/2., ui/2.))
         bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
         self.tie_hist_counts = hist
         self.tie_hist_bins   = bin_centers
@@ -524,17 +569,13 @@ class DFEDemo(HasTraits):
 
         return 10. * log10(res)
 
-    # Dynamic behavior definitions.
-#    def _t_ns_changed(self):
-#        self.plotdata.set_data("t_ns", self.t_ns)
-#
-#    def _tbit_ps_changed(self):
-#        self.plotdata.set_data("tbit_ps", self.tbit_ps)
-#
-#    def _chnl_in_changed(self):
-#        self.plotdata.set_data("chnl_in", self.chnl_in)
-#        self.plotdata.set_data("xing_times", self.crossing_times_ideal_ns)
+    @cached_property
+    def _get_status_str(self):
+        return "%-40s Performance (Ms/min.): Channel = %6.3f     CDR = %6.3f     DFE = %6.3f     TOTAL = %6.3f" \
+                % (self.status, self.channel_perf * 60.e-6, self.cdr_perf * 60.e-6, self.dfe_perf * 60.e-6, \
+                   60.e-6 / (1 / self.channel_perf + 1 / self.dfe_perf))
 
+    # Dynamic behavior definitions.
     def _chnl_out_changed(self):
         chnl_out   = self.chnl_out
         nspb       = self.nspb
@@ -570,13 +611,6 @@ class DFEDemo(HasTraits):
 
     def _run_result_changed(self):
         self.plotdata.set_data("dfe_out", self.run_result)
-#        run_result = self.run_result
-#        nspb       = self.nspb
-#
-#        j = 0
-#        for i in where(self.clocks)[0][1 : -1]:
-#            self.plotdata.set_data("bit%d" % j, run_result[i - nspb : i + nspb])
-#            j += 1
 
     def _adaptation_changed(self):
         tap_weights = transpose(array(self.adaptation))
@@ -588,7 +622,6 @@ class DFEDemo(HasTraits):
 
     # Plot updating
     def update_plot_eye(self):
-        self.status = 'Plotting...'
         # Copy globals into local namespace.
         ui            = self.ui * 1.e-12
         samps_per_bit = self.nspb
@@ -604,6 +637,7 @@ class DFEDemo(HasTraits):
         y_offset = height / 2                    # (pixels)
         x_scale  = width  / (2. * samps_per_bit) # (pixels/sample)
         # Do the plotting.
+        # - composite eye "heat" diagram
         img_array    = zeros([height, width])
         tsamp        = ui / samps_per_bit
         for clock_index in where(clocks[-eye_bits * samps_per_bit:])[0] + len(clocks) - eye_bits * samps_per_bit:
@@ -622,8 +656,18 @@ class DFEDemo(HasTraits):
         self.plot_eye.components[0].y_axis.mapper.range.low = ys[0]
         self.plot_eye.components[0].y_axis.mapper.range.high = ys[-1]
         self.plot_eye.components[0].invalidate_draw()
+        # - zero crossing probability density function
+        zero_xing_pdf = array(map(float, img_array[y_offset]))
+        zero_xing_pdf *= 2. / zero_xing_pdf.sum()
+        zero_xing_cdf = zero_xing_pdf.cumsum()
+        bathtub_curve = abs(zero_xing_cdf - 1.)
+        self.plotdata.set_data("zero_xing_pdf", zero_xing_pdf)
+        self.plotdata.set_data("bathtub", bathtub_curve)
+        self.plotdata.set_data("eye_index", xs)
+        self.plot_eye.components[1].invalidate_draw()
+        self.plot_eye.components[2].invalidate_draw()
+        # - container redraw
         self.plot_eye.request_redraw()
-        self.status = 'Finished.'
         
     # Main window layout definition.
     traits_view = View(
@@ -640,7 +684,7 @@ class DFEDemo(HasTraits):
                         Item(name='rj',     label='Rj (ps)', show_label=True, enabled_when='True'),
                         Item(name='sj_mag', label='Pj (ps)', ),
                         Item(name='sj_freq', label='f(Pj) (MHz)', ),
-                        label='Channel Definition', show_border=True,
+                        label='Channel Parameters', show_border=True,
                     ),
                     VGroup(
                         Item(name='delta_t',      label='Delta-t (ps)',   show_label=True, enabled_when='True'),
@@ -659,37 +703,39 @@ class DFEDemo(HasTraits):
                     ),
                     VGroup(
                         Item(name='eye_bits', label='Bits'),
-                        label='Eye Diagram', show_border=True,
+                        label='Results Control', show_border=True,
                     ),
                 ),
                 Group(
                     Group(
                         Item('plot_in', editor=ComponentEditor(), show_label=False,),
-                        label = 'Jitter'
+                        label = 'Channel', id = 'channel'
                     ),
                     Group(
                         Item('plot_out', editor=ComponentEditor(), show_label=False,),
-                        label = 'CDR'
+                        label = 'CDR', id = 'cdr'
                     ),
                     Group(
                         Item('plot_dfe', editor=ComponentEditor(), show_label=False,),
-                        label = 'DFE'
+                        label = 'DFE', id = 'dfe'
                     ),
                     Group(
                         Item('plot_eye', editor=ComponentEditor(), show_label=False,),
-                        label = 'Eye'
+                        label = 'Results', id = 'results'
                     ),
                     Group(
                         Item('ident', style='readonly', show_label=False),
                         label = 'About'
                     ),
-                    layout = 'tabbed', springy = True
+                    layout = 'tabbed', springy = True, id = 'plots',
                 ),
+                id = 'frame',
             ),
         resizable = True,
         handler = MyHandler(),
-        buttons = [run_channel, run_cdr, run_dfe, "OK"],
-        title='DFE Design Tool',
+        buttons = [run_channel, run_cdr, run_dfe, get_results, "OK"],
+        statusbar = "status_str",
+        title='PyBERT',
         width=1200, height=800
     )
 
@@ -718,5 +764,5 @@ def find_crossing_times(t, x, anlg=False):
     return crossing_times
 
 if __name__ == '__main__':
-    DFEDemo().configure_traits()
+    PyBERT().configure_traits()
 
