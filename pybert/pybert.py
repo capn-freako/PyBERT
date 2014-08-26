@@ -101,7 +101,6 @@ class PyBERT(HasTraits):
     status_str = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf'])
 
     # Handler set variables
-    chnl_in     = Array()
     chnl_out    = Array()
     run_result  = Array()
     adaptation  = Array()
@@ -120,7 +119,6 @@ class PyBERT(HasTraits):
 
         # Initialize `self.plotdata' with everything that doesn't depend on `chnl_out'.
         plotdata = ArrayPlotData(t_ns            = self.t_ns,
-                                 tbit_ps         = self.tbit_ps,
                                  clocks          = self.clocks,
                                  lockeds         = self.lockeds,
                                  ui_ests         = self.ui_ests,
@@ -154,14 +152,6 @@ class PyBERT(HasTraits):
         plot2.value_axis.title = "UI (ps)"
 
         plot2.index_range = plot1.index_range # Zoom x-axes in tandem.
-
-        plot3        = Plot(plotdata)
-        plot3.plot(("t_ns", "chnl_in"), type="line", color="blue")
-        plot3.title  = "Channel Input"
-        plot3.index_axis.title = "Time (ns)"
-        plot3.tools.append(PanTool(plot3, constrain=True, constrain_key=None, constrain_direction='x'))
-        zoom3 = ZoomTool(plot3, tool_mode="range", axis='index', always_on=False)
-        plot3.overlays.append(zoom3)
 
         plot4        = Plot(plotdata)
         plot4.plot(("xing_times", "jitter"), type="line", color="blue")
@@ -396,16 +386,8 @@ class PyBERT(HasTraits):
 
     # Dynamic behavior definitions.
     def _chnl_out_changed(self):
-        chnl_out   = self.chnl_out
-        nspb       = self.nspb
-        eye_offset = self.eye_offset
-
-        self.plotdata.set_data("chnl_out", chnl_out)
-        for i in range(self.nbits - 2):
-            self.plotdata.set_data("bit%d" % i, chnl_out[i * nspb + eye_offset : (i + 2) * nspb + eye_offset])
+        self.plotdata.set_data("chnl_out", self.chnl_out)
         self.plotdata.set_data("t_ns", self.t_ns)
-        self.plotdata.set_data("tbit_ps", self.tbit_ps)
-        self.plotdata.set_data("chnl_in", self.chnl_in)
         self.plotdata.set_data("xing_times", self.crossing_times_ideal_ns)
 
     def _clocks_changed(self):
