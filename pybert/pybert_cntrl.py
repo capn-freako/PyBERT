@@ -151,9 +151,7 @@ def my_run_channel(self):
     b       = self.b
     nbits   = self.nbits
     nspb    = self.nspb
-    t       = self.t
 
-    sig_len = nbits * nspb
     res     = lfilter(b, a, chnl_in)[:len(chnl_in)]
 
     self.chnl_in  = chnl_in

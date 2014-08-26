@@ -39,7 +39,7 @@ gNspb           = 32      # samples per bit
 gFc             = 2.0     # default channel cut-off frequency (GHz)
 gFc_min         = 0.001   # min. channel cut-off frequency (GHz)
 gFc_max         = 100.0   # max. channel cut-off frequency (GHz)
-gNch_taps       = 2       # number of taps in IIR filter representing channel
+gNch_taps       = 3       # number of taps in IIR filter representing channel
 gRj             = 0.001   # standard deviation of Gaussian random jitter (ps)
 gSjMag          = 0.      # magnitude of periodic jitter (ps)
 gSjFreq         = 100.    # frequency of periodic jitter (MHz)
@@ -89,7 +89,6 @@ class PyBERT(HasTraits):
     eye_offset = Property(Int, depends_on=['nspb'])
     t        = Property(Array, depends_on=['ui', 'npts', 'nspb'])
     t_ns     = Property(Array, depends_on=['t'])
-    tbit_ps  = Property(Array, depends_on=['t', 'nspb'])
     fs       = Property(Array, depends_on=['ui', 'nspb'])
     a        = Property(Array, depends_on=['fc', 'fs'])
     b        = array([1.]) # Will be set by 'a' handler, upon change in dependencies.
@@ -299,11 +298,6 @@ class PyBERT(HasTraits):
     @cached_property
     def _get_t_ns(self):
         return 1.e9 * array(self.t)
-    
-    @cached_property
-    def _get_tbit_ps(self):
-        eye_offset = self.eye_offset
-        return 1.e12 * array(self.t[eye_offset : 2 * self.nspb + eye_offset]) - self.ui
     
     @cached_property
     def _get_npts(self):
