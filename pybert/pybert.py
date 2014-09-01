@@ -94,7 +94,6 @@ class PyBERT(HasTraits):
     b        = array([1.]) # Will be set by 'a' handler, upon change in dependencies.
     h        = Property(Array, depends_on=['npts', 'a'])
     crossing_times_chnl_out = Property(Array, depends_on=['chnl_out'])
-    tie                     = Property(Array, depends_on=['crossing_times_chnl_out'])
     jitter                  = Property(Array, depends_on=['crossing_times_chnl_out'])
     jitter_spectrum         = Property(Array, depends_on=['jitter'])
     status_str = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf'])
@@ -106,6 +105,7 @@ class PyBERT(HasTraits):
     ui_ests     = Array()
     clocks      = Array()
     lockeds     = Array()
+    t_jitter    = array([0.])
 
     # Default initialization
     def __init__(self):
@@ -122,6 +122,7 @@ class PyBERT(HasTraits):
                                  lockeds         = self.lockeds,
                                  ui_ests         = self.ui_ests,
                                  dfe_out         = self.run_result,
+                                 t_jitter        = self.t_jitter,
                                  # The following are necessary, since we can't run `update_results()', until the plots have been created.
                                  imagedata       = zeros([100, 2 * gNspb]),
                                  eye_index       = linspace(-gUI, gUI, 2 * gNspb),
@@ -135,10 +136,12 @@ class PyBERT(HasTraits):
 
         # Now, create all the various plots we need for our GUI.
         plot1 = Plot(plotdata)
-        plot1.plot(("t_ns", "chnl_out"), type="line", color="blue")
+        #plot1.plot(("t_ns", "chnl_out"), type="line", color="blue")
+        plot1.plot(("t_ns", "dfe_out"), type="line", color="blue")
         plot1.plot(("t_ns", "clocks"), type="line", color="green")
         plot1.plot(("t_ns", "lockeds"), type="line", color="red")
-        plot1.title  = "Channel Output, Recovered Clocks, & Locked"
+        #plot1.title  = "Channel Output, Recovered Clocks, & Locked"
+        plot1.title  = "DFE Output, Recovered Clocks, & Locked"
         plot1.index_axis.title = "Time (ns)"
         plot1.tools.append(PanTool(plot1, constrain=True, constrain_key=None, constrain_direction='x'))
         zoom1 = ZoomTool(plot1, tool_mode="range", axis='index', always_on=False)
@@ -153,16 +156,16 @@ class PyBERT(HasTraits):
         plot2.index_range = plot1.index_range # Zoom x-axes in tandem.
 
         plot4        = Plot(plotdata)
-        plot4.plot(("xing_times", "jitter"), type="line", color="blue")
+        plot4.plot(("t_jitter", "jitter"), type="line", color="blue")
         plot4.title  = "Channel Output Jitter"
         plot4.index_axis.title = "Time (ns)"
         plot4.value_axis.title = "Jitter (ps)"
-        plot4.value_range.high_setting = ui
-        plot4.value_range.low_setting  = -ui
+        plot4.value_range.high_setting = ui / 2.
+        plot4.value_range.low_setting  = -ui / 2.
 
         plot5        = Plot(plotdata)
         plot5.plot(('tie_hist_bins', 'tie_hist_counts'), type="line", color="auto")
-        plot5.title  = "Time Interval Error Distribution"
+        plot5.title  = "Jitter Distribution"
         plot5.index_axis.title = "Time (ps)"
         plot5.value_axis.title = "Count"
         zoom5 = ZoomTool(plot5, tool_mode="range", axis='index', always_on=False)
@@ -287,7 +290,7 @@ class PyBERT(HasTraits):
     # Dependent variable definitions
     @cached_property
     def _get_bits(self):
-        return [randint(2) for i in range(self.nbits)]
+        return [0, 1] + [randint(2) for i in range(self.nbits - 2)]
     
     @cached_property
     def _get_t(self):
@@ -330,47 +333,43 @@ class PyBERT(HasTraits):
         return find_crossing_times(self.t, self.chnl_out, anlg=True)
 
     @cached_property
-    def _get_tie(self):
-        ui       = self.ui * 1.e-12
+    def _get_jitter(self):
+        actual_xings = array(self.crossing_times_chnl_out)
+        ui           = self.ui * 1.e-12
 
-        ties = diff(self.crossing_times_chnl_out) - ui
+        # Calculate jitter.
+        dly           = actual_xings[0] - self.first_ideal_xing
+        jitter        = (actual_xings - dly + ui / 2.) % ui
+        jitter        = jitter - mean(jitter)
+        self.t_jitter = map(lambda x : ui * int((x - dly) / ui + 0.5), actual_xings)
 
-        def normalize(tie):
-            while(tie > ui / 2.):
-                tie -= ui
-            return tie
-            
-        ties                 = map(normalize, ties)
-        hist, bin_edges      = histogram(ties, 99, (-ui/2., ui/2.))
+        # Calculate jitter histogram.
+        hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
         bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
         self.tie_hist_counts = hist
         self.tie_hist_bins   = bin_centers
 
-        return ties
-
-    @cached_property
-    def _get_jitter(self):
-        actual_xings = self.crossing_times_chnl_out
-        ideal_xings  = self.crossing_times_ideal
-
-        # TODO: Make this robust against crossings missed, due to ISI.
-        res = (actual_xings - ideal_xings[:len(actual_xings)])
-        return res - mean(res)
+        return list(jitter)
 
     @cached_property
     def _get_jitter_spectrum(self):
         jitter      = self.jitter
-        t_xings     = self.crossing_times_ideal   
+        t_jitter    = array(self.t_jitter)
         ui          = self.ui * 1.e-12
 
-        run_lengths = map(int, array(t_xings[0] + diff(t_xings)) / ui + 0.5)
-        x           = [jit for run_length, jit in zip(run_lengths, jitter) for i in range(run_length)]
-        f0          = 1. / t_xings[-1]
-        self.f_MHz  = array([i * f0 for i in range(len(x) / 2)]) * 1.e-6
-        res         = fft(x)
-        res         = abs(res[:len(res) / 2]) / (len(x) * ui / 2)
+        run_lengths = map(int, diff(t_jitter) / ui + 0.5)
+        missing     = where(run_lengths > 1)[0]
+        num_insertions = 0
+        for i in missing:
+            for j in range(run_lengths[i] - 1):
+                jitter.insert(i + 1, 0.)
+                num_insertions += 1
+        f0          = 1. / (t_jitter[-1] + ui * num_insertions)
+        self.f_MHz  = array([i * f0 for i in range(len(jitter) / 2)]) * 1.e-6
+        res         = fft(jitter)
+        res         = abs(res[:len(res) / 2])
 
-        return 10. * log10(res)
+        return 10. * log10(res) - 10. * log10(ui * len(jitter) / 2) # Normalize to ui.
 
     @cached_property
     def _get_status_str(self):
@@ -382,7 +381,6 @@ class PyBERT(HasTraits):
     def _chnl_out_changed(self):
         self.plotdata.set_data("chnl_out", self.chnl_out)
         self.plotdata.set_data("t_ns", self.t_ns)
-        self.plotdata.set_data("xing_times", self.crossing_times_ideal_ns)
 
     def _clocks_changed(self):
         self.plotdata.set_data("clocks", self.clocks)
@@ -393,16 +391,15 @@ class PyBERT(HasTraits):
     def _lockeds_changed(self):
         self.plotdata.set_data("lockeds", self.lockeds)
 
-    def _tie_changed(self):
+    def _jitter_changed(self):
+        self.plotdata.set_data("jitter", array(self.jitter) * 1.e12)
+        self.plotdata.set_data("t_jitter", array(self.t_jitter) * 1.e9)
         self.plotdata.set_data("tie_hist_bins", array(self.tie_hist_bins) * 1.e12)
         self.plotdata.set_data("tie_hist_counts", self.tie_hist_counts)
 
-    def _jitter_changed(self):
-        self.plotdata.set_data("jitter", array(self.jitter) * 1.e12)
-
     def _jitter_spectrum_changed(self):
-        self.plotdata.set_data("jitter_spectrum", self.jitter_spectrum)
-        self.plotdata.set_data("f_MHz", self.f_MHz)
+        self.plotdata.set_data("jitter_spectrum", self.jitter_spectrum[1:])
+        self.plotdata.set_data("f_MHz", self.f_MHz[1:])
 
     def _run_result_changed(self):
         self.plotdata.set_data("dfe_out", self.run_result)

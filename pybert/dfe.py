@@ -15,13 +15,56 @@ running in stand-alone mode for preliminary debugging, via the
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from numpy import zeros, sign, array
+from numpy import zeros, sign, array, prod
+from scipy.signal import lfilter, iirfilter
 from cdr   import CDR
+
+gNch_taps = 3 # Number of taps used in summing node filter.
+
+class LfilterSS(object):
+    """A single steppable version of scipy.signal.lfilter()."""
+
+    def __init__(self, b, a):
+        """
+        Inputs:
+            
+            Required:
+
+            - b : coefficients of the numerator of the rational transfer function.
+            
+            - a : coefficients of the denominator of the rational transfer function.
+        """
+        if(a[0] != 1.):
+            b = array(b) / a[0]
+            a = array(a) / a[0]
+
+        self.b = b
+        self.a = a
+        self.xs = [0.] * (len(b)- 1)
+        self.ys = [0.] * (len(a)- 1)
+
+    def step(self, x):
+        """Step the filter, using the supplied next input value, and return the next output value."""
+
+        b  = self.b
+        a  = self.a
+        xs = self.xs
+        ys = self.ys
+
+        #y  = sum(map(prod, zip(b, [x] + xs))) - sum(map(prod, zip(a[1:], ys)))
+        y  = sum(b * ([x] + xs)) - sum(a[1:] * ys)
+        xs = [x] + xs[:-1]
+        ys = [y] + ys[:-1]
+
+        self.xs = xs
+        self.ys = ys
+
+        return y
 
 class DFE(object):
     """Behavioral model of a decision feedback equalizer (DFE)."""
 
-    def __init__(self, n_taps, gain, delta_t, alpha, ui, decision_scaler,
+    def __init__(self, n_taps, gain, delta_t, alpha, ui, n_spb, decision_scaler, bandwidth=12.e9,
                        n_ave=10, n_lock_ave=500, rel_lock_tol=0.01, lock_sustain=500):
         """
         Inputs:
@@ -38,11 +81,15 @@ class DFE(object):
 
           - ui               nominal unit interval (ps)
 
+          - n_spb            # of samples per unit interval
+
           - decision_scaler  multiplicative constant applied to the result of
                              the sign function, when making a "1 vs. 0" decision.
                              Sets the target magnitude for the DFE.
 
           Optional:
+
+          - bandwidth        The bandwidth, at the summing node (Hz).
 
           - n_ave            The number of averages to take, before adapting.
                              (Also, the number of CDR adjustments per DFE adaptation.)
@@ -56,6 +103,12 @@ class DFE(object):
                              lock flagging.
         """
 
+        # Design summing node filter.
+        fs     = n_spb / ui
+        (b, a) = iirfilter(gNch_taps - 1, bandwidth/(fs/2), btype='lowpass')
+        self.summing_filter = LfilterSS(b, a)
+
+        # Initialize class variables.
         self.tap_weights       = [0.0] * n_taps
         self.tap_values        = [0.0] * n_taps
         self.gain              = gain
@@ -73,6 +126,7 @@ class DFE(object):
         tap_values  = self.tap_values
         gain        = self.gain
         n_ave       = self.n_ave
+        summing_filter = self.summing_filter
 
         # Calculate this step's corrections and add to running total.
         corrections = [old + new for (old, new) in zip(self.corrections,
@@ -100,6 +154,7 @@ class DFE(object):
         ui                = self.ui
         decision_scaler   = self.decision_scaler
         n_ave             = self.n_ave
+        summing_filter    = self.summing_filter
 
         clk_cntr           = 0
         smpl_cntr          = 0
@@ -116,7 +171,7 @@ class DFE(object):
         lockeds     = []
         clocks      = zeros(len(sample_times))
         for (t, x) in zip(sample_times, signal):
-            sum_out = x - filter_out
+            sum_out = summing_filter.step(x - filter_out)
             res.append(sum_out)
             if(t >= next_boundary_time):
                 boundary_sample = sum_out

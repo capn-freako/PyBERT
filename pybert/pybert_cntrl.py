@@ -27,8 +27,7 @@ def get_chnl_in(self):
     ts      = 1. / fs
 
     res                          = repeat(2 * array(bits) - 1, nspb)
-    self.crossing_times_ideal    = find_crossing_times(t, res)
-    self.crossing_times_ideal_ns = array(self.crossing_times_ideal) * 1.e9
+    self.first_ideal_xing        = find_crossing_times(t, res)[0]
 
     jitter = [sj_mag * sin(2 * pi * sj_freq * i * ui) + normal(0., rj) for i in range(len(bits) - 1)]
     i = 1
@@ -42,10 +41,6 @@ def get_chnl_in(self):
         else:
             res[i * nspb : i * nspb + int(jit / ts + 0.5)] = res[i * nspb - 1]
         i += 1
-    self.crossing_times_chnl_in = find_crossing_times(t, res)
-
-    ## Introduce a 1/2 UI phase shift, half way through the sequence, to test CDR adaptation.
-    ##res = res[:len(res)/2 - nspb/2] + res[len(res)/2:] + res[len(res)/2 - nspb/2 : len(res)/2]
 
     return res
 
@@ -89,8 +84,8 @@ def my_run_dfe(self):
     n_lock_ave      = self.n_lock_ave
     rel_lock_tol    = self.rel_lock_tol
     lock_sustain    = self.lock_sustain
-    dfe             = DFE(n_taps, gain, delta_t * 1.e-12, alpha, ui * 1.e-12, decision_scaler,
-                          n_ave, n_lock_ave, rel_lock_tol, lock_sustain)
+    dfe             = DFE(n_taps, gain, delta_t * 1.e-12, alpha, ui * 1.e-12, nspb, decision_scaler,
+                          n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain)
 
     (res, tap_weights, ui_ests, clocks, lockeds) = dfe.run(t, chnl_out)
 
@@ -181,9 +176,13 @@ def update_results(self):
     for clock_index in where(clocks[-eye_bits * samps_per_bit:])[0] + len(clocks) - eye_bits * samps_per_bit:
         start = clock_index
         stop  = start + 2 * samps_per_bit
-        i = 0.
+        prev_samp = dfe_output[start]
+        i = 0
         for samp in dfe_output[start : stop]:
             img_array[int(samp * y_scale) + y_offset, int(i * x_scale)] += 1
+            if(sign(samp) != sign(prev_samp)): # Trap zero crossings.
+                img_array[y_offset, int(x_scale * (i - 1 + (samp - 0.) / (samp - prev_samp)))] += 1
+            prev_samp = samp
             i += 1
     self.plotdata.set_data("imagedata", img_array)
     xs = linspace(-ui * 1.e12, ui * 1.e12, width)
