@@ -24,18 +24,12 @@ class MyHandler(Handler):
         my_run_dfe(info.object)
         info.object.status = 'Ready.'
 
-    def do_run_cdr(self, info):
-        info.object.status = 'Running CDR...'
-        my_run_cdr(info.object)
-        info.object.status = 'Ready.'
-
     def do_run_channel(self, info):
         info.object.status = 'Running channel...'
         my_run_channel(info.object)
         info.object.status = 'Ready.'
 
 run_channel = Action(name="RunChannel", action="do_run_channel")
-run_cdr     = Action(name="RunCDR",     action="do_run_cdr")
 run_dfe     = Action(name="RunDFE",     action="do_run_dfe")
 get_results = Action(name="GetResults", action="do_get_results")
     
@@ -82,10 +76,6 @@ traits_view = View(
                     label = 'Channel', id = 'channel'
                 ),
                 Group(
-                    Item('plot_out', editor=ComponentEditor(), show_label=False,),
-                    label = 'CDR', id = 'cdr'
-                ),
-                Group(
                     Item('plot_dfe', editor=ComponentEditor(), show_label=False,),
                     label = 'DFE', id = 'dfe'
                 ),
@@ -103,7 +93,7 @@ traits_view = View(
         ),
     resizable = True,
     handler = MyHandler(),
-    buttons = [run_channel, run_cdr, run_dfe, get_results, "OK"],
+    buttons = [run_channel, run_dfe, get_results, "OK"],
     statusbar = "status_str",
     title='PyBERT',
     width=1200, height=800

@@ -70,7 +70,7 @@ class PyBERT(HasTraits):
     sj_freq = Float(gSjFreq)                                   # (MHz)
     plot_out = Instance(VPlotContainer)
     plot_in  = Instance(GridPlotContainer)
-    plot_dfe = Instance(VPlotContainer)
+    plot_dfe = Instance(GridPlotContainer)
     plot_eye = Instance(GridPlotContainer)
     eye_bits = Int(4000)
     status       = String("Ready.")
@@ -96,6 +96,7 @@ class PyBERT(HasTraits):
     crossing_times_chnl_out = Property(Array, depends_on=['chnl_out'])
     jitter                  = Property(Array, depends_on=['crossing_times_chnl_out'])
     jitter_spectrum         = Property(Array, depends_on=['jitter'])
+    jitter_rejection_ratio  = Property(Array, depends_on=['run_result'])
     status_str = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf'])
 
     # Handler set variables
@@ -152,16 +153,15 @@ class PyBERT(HasTraits):
         plot2.title  = "CDR Adaptation"
         plot2.index_axis.title = "Time (ns)"
         plot2.value_axis.title = "UI (ps)"
-
         plot2.index_range = plot1.index_range # Zoom x-axes in tandem.
 
-        plot4        = Plot(plotdata)
-        plot4.plot(("t_jitter", "jitter"), type="line", color="blue")
-        plot4.title  = "Channel Output Jitter"
-        plot4.index_axis.title = "Time (ns)"
-        plot4.value_axis.title = "Jitter (ps)"
-        plot4.value_range.high_setting = ui / 2.
-        plot4.value_range.low_setting  = -ui / 2.
+        plot3        = Plot(plotdata)
+        plot3.plot(('f_MHz', 'jitter_rejection_ratio'), type="line", color="blue")
+        plot3.title  = "CDR Jitter Rejection Ratio"
+        plot3.index_axis.title = "Frequency (MHz)"
+        plot3.value_axis.title = "Ratio (dB)"
+        zoom3 = ZoomTool(plot3, tool_mode="range", axis='index', always_on=False)
+        plot3.overlays.append(zoom3)
 
         plot5        = Plot(plotdata)
         plot5.plot(('tie_hist_bins', 'tie_hist_counts'), type="line", color="auto")
@@ -187,18 +187,19 @@ class PyBERT(HasTraits):
         zoom7 = ZoomTool(plot7, tool_mode="range", axis='index', always_on=False)
         plot7.overlays.append(zoom7)
 
-        plot8 = Plot(plotdata)
-        plot8.plot(("t_ns", "dfe_out"), type="line", color="blue")
-        plot8.title  = "DFE Output"
-        plot8.index_axis.title = "Time (ns)"
-        plot8.tools.append(PanTool(plot8, constrain=True, constrain_key=None, constrain_direction='x'))
-        zoom8 = ZoomTool(plot8, tool_mode="range", axis='index', always_on=False)
-        plot8.overlays.append(zoom8)
+        plot4        = Plot(plotdata)
+        plot4.plot(("t_jitter", "jitter"), type="line", color="blue")
+        plot4.title  = "Channel Output Jitter"
+        plot4.index_axis.title = "Time (ns)"
+        plot4.value_axis.title = "Jitter (ps)"
+        #plot4.value_range.high_setting = ui / 2.
+        #plot4.value_range.low_setting  = -ui / 2.
+        plot4.index_range = plot7.index_range # Zoom x-axes in tandem.
 
         plot9 = Plot(plotdata)
         for i in range(gNtaps):
             plot9.plot(("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d"%(i+1))
-        plot9.title  = "DFE Tap Weight Adaptation"
+        plot9.title  = "DFE Adaptation"
         plot9.tools.append(PanTool(plot9, constrain=True, constrain_key=None, constrain_direction='x'))
         zoom9 = ZoomTool(plot9, tool_mode="range", axis='index', always_on=False)
         plot9.overlays.append(zoom9)
@@ -268,15 +269,18 @@ class PyBERT(HasTraits):
         plot12.index_axis.title = "Time (ps)"
 
         # And assemble them into the appropriate tabbed containers.
-        container_out = VPlotContainer(plot2, plot1)
-        self.plot_out = container_out
         container_in  = GridPlotContainer(shape=(2,2))
         container_in.add(plot7)
         container_in.add(plot4)
         container_in.add(plot5)
         container_in.add(plot6)
         self.plot_in  = container_in
-        container_dfe = VPlotContainer(plot8, plot9)
+        #container_dfe = VPlotContainer(plot8, plot9)
+        container_dfe = GridPlotContainer(shape=(2,2))
+        container_dfe.add(plot2)
+        container_dfe.add(plot9)
+        container_dfe.add(plot1)
+        container_dfe.add(plot3)
         self.plot_dfe = container_dfe
         container_eye  = GridPlotContainer(shape=(2,2))
         container_eye.add(plot10)
@@ -290,7 +294,7 @@ class PyBERT(HasTraits):
     # Dependent variable definitions
     @cached_property
     def _get_bits(self):
-        return [0, 1] + [randint(2) for i in range(self.nbits - 2)]
+        return [0] * 10 + [1] * 10 + [randint(2) for i in range(self.nbits - 20)]
     
     @cached_property
     def _get_t(self):
@@ -334,11 +338,21 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_jitter(self):
+        ideal_xings  = array(self.ideal_xings)
         actual_xings = array(self.crossing_times_chnl_out)
         ui           = self.ui * 1.e-12
 
+        # Calculate channel delay.
+        assert sign(actual_xings[0]) == sign(ideal_xings[0]) == 1
+        dly           = actual_xings[0] - self.ideal_xings[0]
+
+        # Separate rising and falling edges, correcting for sign and channel delay.
+        ideal_xings_rising   = ideal_xings[where(ideal_xings > 0)[0]]
+        ideal_xings_falling  = ideal_xings[where(ideal_xings < 0)[0]] * -1
+        actual_xings_rising  = actual_xings[where(actual_xings > 0)[0]] - dly
+        actual_xings_falling = actual_xings[where(actual_xings < 0)[0]] * -1 - dly
+
         # Calculate jitter.
-        dly           = actual_xings[0] - self.first_ideal_xing
         jitter        = (actual_xings - dly + ui / 2.) % ui
         jitter        = jitter - mean(jitter)
         self.t_jitter = map(lambda x : ui * int((x - dly) / ui + 0.5), actual_xings)
@@ -356,20 +370,46 @@ class PyBERT(HasTraits):
         jitter      = self.jitter
         t_jitter    = array(self.t_jitter)
         ui          = self.ui * 1.e-12
+        nbits       = self.nbits
 
-        run_lengths = map(int, diff(t_jitter) / ui + 0.5)
-        missing     = where(run_lengths > 1)[0]
-        num_insertions = 0
-        for i in missing:
-            for j in range(run_lengths[i] - 1):
-                jitter.insert(i + 1, 0.)
-                num_insertions += 1
-        f0          = 1. / (t_jitter[-1] + ui * num_insertions)
-        self.f_MHz  = array([i * f0 for i in range(len(jitter) / 2)]) * 1.e-6
-        res         = fft(jitter)
-        res         = abs(res[:len(res) / 2])
+        (f, y) = calc_jitter_spectrum(t_jitter, jitter, ui, nbits)
 
-        return 10. * log10(res) - 10. * log10(ui * len(jitter) / 2) # Normalize to ui.
+        self.f_MHz  = array(f) * 1.e-6
+        return 10. * log10(y)
+
+    @cached_property
+    def _get_jitter_rejection_ratio(self):
+        res    = self.run_result
+        ui     = self.ui * 1.e-12
+        nbits  = self.nbits
+        eye_bits = self.eye_bits
+        t      = self.t
+        clocks = array(t).T[where(array(self.clocks) == 1)[0]]
+
+        xings   = find_crossing_times(t, res, anlg=True)
+        half_ui = ui / 2.
+        ignore_until = (nbits - eye_bits) * ui
+        jitter  = []
+        t       = []
+        i       = 0
+        while(xings[i] < ignore_until):
+            i += 1
+        j = 0
+        for xing in xings[i:]:
+            while(j < len(clocks) and clocks[j] <= xing):
+                j += 1
+            if(j < len(clocks)):
+                t_ref = xing + half_ui
+                jitter.append(clocks[j] - (t_ref))
+                t.append(t_ref)
+        (f, y) = calc_jitter_spectrum(t, jitter, ui, nbits)
+        f_MHz = array(f) * 1.e-6
+        assert f_MHz[1]   == self.f_MHz[1], "%e %e" % (f_MHz[1], self.f_MHz[1])
+        assert len(f_MHz) == len(self.f_MHz)
+        jitter_spectrum = 10. * log10(y)
+
+        #return self.jitter_spectrum - jitter_spectrum
+        return jitter_spectrum
 
     @cached_property
     def _get_status_str(self):
@@ -400,6 +440,9 @@ class PyBERT(HasTraits):
     def _jitter_spectrum_changed(self):
         self.plotdata.set_data("jitter_spectrum", self.jitter_spectrum[1:])
         self.plotdata.set_data("f_MHz", self.f_MHz[1:])
+
+    def _jitter_rejection_ratio_changed(self):
+        self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
     def _run_result_changed(self):
         self.plotdata.set_data("dfe_out", self.run_result)

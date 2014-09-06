@@ -5,8 +5,9 @@
 #
 # Copyright (c) 2014 David Banas; all rights reserved World wide.
 
-from numpy        import sign, sin, pi, array, linspace, float, zeros, repeat, where, diff
+from numpy        import sign, sin, pi, array, linspace, float, zeros, repeat, where, diff, log10
 from numpy.random import normal
+from numpy.fft    import fft
 from scipy.signal import lfilter
 from dfe          import DFE
 from cdr          import CDR
@@ -26,8 +27,8 @@ def get_chnl_in(self):
 
     ts      = 1. / fs
 
-    res                          = repeat(2 * array(bits) - 1, nspb)
-    self.first_ideal_xing        = find_crossing_times(t, res)[0]
+    res              = repeat(2 * array(bits) - 1, nspb)
+    self.ideal_xings = find_crossing_times(t, res)
 
     jitter = [sj_mag * sin(2 * pi * sj_freq * i * ui) + normal(0., rj) for i in range(len(bits) - 1)]
     i = 1
@@ -50,31 +51,87 @@ def find_crossing_times(t, x, anlg=False):
 
     Inputs:
 
-      - t     Vector of sample times. Intervals do NOT need to be uniform.
+      - t     Vector of sample times. Intervals do NOT need to be uniform, but all values must be non-negative.
 
       - x     Sampled input vector.
 
       - anlg  Interpolation flag. When TRUE, use linear interpolation,
               in order to determine zero crossing times more precisely.
+
+    Outputs:
+
+      - xings  The crossing times, where the sign is used to indicate the crossing direction: + = upward, - = downward.
+
     """
 
     assert len(t) == len(x), "len(t) (%d) and len(x) (%d) need to be the same." % (len(t), len(x))
+    assert all(t >= 0), "All times must be non-negative, because we use the sign of the output to indicate crossing direction."
 
-    crossing_indeces     = where(diff(sign(x)))[0] + 1
+    sign_x      = sign(x)
+    sign_x      = where(sign_x, sign_x, ones(sign_x)) # "0"s can produce duplicate xings.
+    diff_sign_x = diff(sign_x)
+    xing_ix     = where(diff_sign_x)[0]
+    xing_sgn    = diff_sign_x[xing_ix] / 2
     if(anlg):
-        crossing_times   = array([t[i - 1] + (t[i] - t[i - 1]) * x[i - 1] / (x[i - 1] - x[i])
-                                   for i in crossing_indeces])
+        xings = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
     else:
-        crossing_times   = [t[i] for i in crossing_indeces]
-    return crossing_times
+        xings = [t[i] for i in xing_ix]
+    return array(xings) * xing_sgn
+
+def calc_jitter_spectrum(t, jitter, ui, nbits):
+    """
+    Calculate the spectral magnitude estimate of the input jitter samples.
+
+    The trick, here, is creating a uniformly sampled input vector for the FFT operation,
+    since the jitter samples are almost certainly not uniformly sampled.
+    We do this by simply zero padding the missing samples.
+
+    The output is normalized, so as to produce a value of 'A / ui' at location 'fj',
+    when the input jitter contains a component 'A * sin(2*pi*fj + phi)'.
+
+    Inputs:
+
+    - t      : The sample times for the 'jitter' vector.
+
+    - jitter : The input jitter samples.
+
+    - ui     : The nominal unit interval.
+
+    - nbits  : The desired number of unit intervals, in the time domain.
+
+    Output:
+
+    - f      : The frequency ordinate for the spectral magnitude output vector.
+
+    - y      : The spectral magnitude estimates vector.
+
+    """
+
+    assert len(t) == len(jitter)
+
+    half_n         = nbits / 2
+    run_lengths    = map(int, diff(t) / ui + 0.5)
+    missing        = where(array(run_lengths) > 1)[0]
+    for i in missing:
+        for j in range(run_lengths[i] - 1):
+            jitter.insert(i + 1, 0.)
+    if(len(jitter) < nbits):
+        jitter.extend([0.] * (nbits - len(jitter)))
+    if(len(jitter) > nbits):
+        jitter = jitter[:nbits]
+    f0  = 1. / (ui * nbits)
+    f   = [i * f0 for i in range(half_n)]
+    y   = fft(jitter)
+    y   = array(abs(y[:half_n])) / half_n / ui
+    return (f, y)
 
 def my_run_dfe(self):
-    start_time = time.clock()
+    start_time      = time.clock()
     chnl_out        = self.chnl_out
     t               = self.t
-    delta_t         = self.delta_t          # (ps)
+    delta_t         = self.delta_t * 1.e-12
     alpha           = self.alpha
-    ui              = self.ui               # (ps)
+    ui              = self.ui * 1.e-12
     nbits           = self.nbits
     nspb            = self.nspb
     n_taps          = self.n_taps
@@ -84,60 +141,17 @@ def my_run_dfe(self):
     n_lock_ave      = self.n_lock_ave
     rel_lock_tol    = self.rel_lock_tol
     lock_sustain    = self.lock_sustain
-    dfe             = DFE(n_taps, gain, delta_t * 1.e-12, alpha, ui * 1.e-12, nspb, decision_scaler,
+    dfe             = DFE(n_taps, gain, delta_t, alpha, ui, nspb, decision_scaler,
                           n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain)
 
-    (res, tap_weights, ui_ests, clocks, lockeds) = dfe.run(t, chnl_out)
+    (res, tap_weights, ui_ests, clocks, lockeds) = dfe.run(t, chnl_out) # Run the DFE on the input signal.
 
-    self.run_result = res
     self.adaptation = tap_weights
     self.ui_ests    = array(ui_ests) * 1.e12 # (ps)
     self.clocks     = clocks
     self.lockeds    = lockeds
+    self.run_result = res
     self.dfe_perf   = nbits * nspb / (time.clock() - start_time)
-
-def my_run_cdr(self):
-    start_time = time.clock()
-    chnl_out      = self.chnl_out
-    delta_t       = self.delta_t
-    alpha         = self.alpha
-    n_lock_ave    = self.n_lock_ave
-    rel_lock_tol  = self.rel_lock_tol
-    lock_sustain  = self.lock_sustain
-    ui            = self.ui
-    nbits         = self.nbits
-    nspb          = self.nspb
-
-    cdr                 = CDR(delta_t, alpha, ui, n_lock_ave, rel_lock_tol, lock_sustain)
-    smpl_time           = ui / nspb
-    t = next_bndry_time = 0.
-    next_clk_time       = ui / 2.
-    last_clk_smpl       = 1
-    ui_est              = ui
-    ui_ests             = []
-    locked              = False
-    lockeds             = []
-    clocks              = zeros(len(chnl_out))
-    clk_ind             = 0
-    for smpl in chnl_out:
-        if(t >= next_bndry_time):
-            last_bndry_smpl  = sign(smpl)
-            next_bndry_time += ui_est
-        if(t >= next_clk_time):
-            clocks[clk_ind] = 1
-            (ui_est, locked) = cdr.adapt([last_clk_smpl, last_bndry_smpl, sign(smpl)])
-            last_clk_smpl   = sign(smpl)
-            next_bndry_time = next_clk_time + ui_est / 2.
-            next_clk_time  += ui_est
-        ui_ests.append(ui_est)
-        lockeds.append(locked)
-        t       += smpl_time
-        clk_ind += 1
-
-    self.clocks  = clocks
-    self.ui_ests = ui_ests
-    self.lockeds = lockeds
-    self.cdr_perf = nbits * nspb / (time.clock() - start_time)
 
 def my_run_channel(self):
     start_time = time.clock()
