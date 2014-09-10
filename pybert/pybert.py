@@ -338,28 +338,26 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_jitter(self):
+        """Calculate channel output jitter."""
+
+        # Grab local copies of class instance variables.
         ideal_xings  = array(self.ideal_xings)
         actual_xings = array(self.crossing_times_chnl_out)
         ui           = self.ui * 1.e-12
 
-        # Calculate channel delay.
-        assert sign(actual_xings[0]) == sign(ideal_xings[0]) == 1
-        dly           = actual_xings[0] - self.ideal_xings[0]
+        # Calculate and correct channel delay.
+        # We insert a "10 '0's / 10 '1's" sequence at the beginning of the bit stream, in order to ensure that this works.
+        dly = actual_xings[0] - ideal_xings[0]
+        actual_xings -= dly
 
-        # Separate rising and falling edges, correcting for sign and channel delay.
-        ideal_xings_rising   = ideal_xings[where(ideal_xings > 0)[0]]
-        ideal_xings_falling  = ideal_xings[where(ideal_xings < 0)[0]] * -1
-        actual_xings_rising  = actual_xings[where(actual_xings > 0)[0]] - dly
-        actual_xings_falling = actual_xings[where(actual_xings < 0)[0]] * -1 - dly
-
-        # Calculate jitter.
-        jitter        = (actual_xings - dly + ui / 2.) % ui
-        jitter        = jitter - mean(jitter)
-        self.t_jitter = map(lambda x : ui * int((x - dly) / ui + 0.5), actual_xings)
-
-        # Calculate jitter histogram.
+        # Calculate jitter and its histogram.
+        (jitter, t_jitter)   = calc_jitter(ui, ideal_xings, actual_xings)
         hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
         bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
+
+        # Store class instance variables.
+        self.channel_delay   = dly
+        self.t_jitter        = t_jitter
         self.tie_hist_counts = hist
         self.tie_hist_bins   = bin_centers
 
@@ -379,37 +377,46 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_jitter_rejection_ratio(self):
+        """Calculate the jitter rejection ratio (JRR) of the CDR/DFE, by comparing
+        the jitter in the signal before and after passage through the DFE."""
+
+        # Copy class instance values into local storage.
         res    = self.run_result
         ui     = self.ui * 1.e-12
         nbits  = self.nbits
         eye_bits = self.eye_bits
         t      = self.t
-        clocks = array(t).T[where(array(self.clocks) == 1)[0]]
+        clocks = array(t)[where(array(self.clocks) == 1)[0]]
+        ideal_xings  = array(self.ideal_xings)
 
+        # Get the actual crossings of interest.
         xings   = find_crossing_times(t, res, anlg=True)
-        half_ui = ui / 2.
+        dly     = xings[0] - ideal_xings[0]
+        xings  -= dly
         ignore_until = (nbits - eye_bits) * ui
-        jitter  = []
-        t       = []
         i       = 0
         while(xings[i] < ignore_until):
             i += 1
-        j = 0
-        for xing in xings[i:]:
-            while(j < len(clocks) and clocks[j] <= xing):
-                j += 1
-            if(j < len(clocks)):
-                t_ref = xing + half_ui
-                jitter.append(clocks[j] - (t_ref))
-                t.append(t_ref)
-        (f, y) = calc_jitter_spectrum(t, jitter, ui, nbits)
-        f_MHz = array(f) * 1.e-6
+        xings = xings[i:]
+
+        # Assemble the corresponding "ideal" crossings, based on the recovered clock times.
+        half_ui     = ui / 2.
+        ideal_xings = []
+        for xing in xings:
+            while(clocks[i] <= xing):
+                i += 1
+            ideal_xings.append(clocks[i] - half_ui)
+
+        # Calculate the jitter and its spectrum.
+        (jitter, t) = calc_jitter(ui, ideal_xings, xings)
+        (f, y)      = calc_jitter_spectrum(t, jitter, ui, nbits)
+        f_MHz       = array(f) * 1.e-6
         assert f_MHz[1]   == self.f_MHz[1], "%e %e" % (f_MHz[1], self.f_MHz[1])
         assert len(f_MHz) == len(self.f_MHz)
         jitter_spectrum = 10. * log10(y)
 
-        #return self.jitter_spectrum - jitter_spectrum
-        return jitter_spectrum
+        return self.jitter_spectrum - jitter_spectrum
+        #return jitter_spectrum
 
     @cached_property
     def _get_status_str(self):

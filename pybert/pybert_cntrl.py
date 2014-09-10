@@ -5,13 +5,14 @@
 #
 # Copyright (c) 2014 David Banas; all rights reserved World wide.
 
-from numpy        import sign, sin, pi, array, linspace, float, zeros, repeat, where, diff, log10
+from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10
 from numpy.random import normal
 from numpy.fft    import fft
 from scipy.signal import lfilter
 from dfe          import DFE
 from cdr          import CDR
 import time
+from pylab import *
 
 def get_chnl_in(self):
     """Generates the channel input, including any user specified jitter."""
@@ -51,7 +52,7 @@ def find_crossing_times(t, x, anlg=False):
 
     Inputs:
 
-      - t     Vector of sample times. Intervals do NOT need to be uniform, but all values must be non-negative.
+      - t     Vector of sample times. Intervals do NOT need to be uniform.
 
       - x     Sampled input vector.
 
@@ -60,23 +61,61 @@ def find_crossing_times(t, x, anlg=False):
 
     Outputs:
 
-      - xings  The crossing times, where the sign is used to indicate the crossing direction: + = upward, - = downward.
+      - xings  The crossing times.
 
     """
 
     assert len(t) == len(x), "len(t) (%d) and len(x) (%d) need to be the same." % (len(t), len(x))
-    assert all(t >= 0), "All times must be non-negative, because we use the sign of the output to indicate crossing direction."
 
     sign_x      = sign(x)
-    sign_x      = where(sign_x, sign_x, ones(sign_x)) # "0"s can produce duplicate xings.
+    sign_x      = where(sign_x, sign_x, ones(len(sign_x))) # "0"s can produce duplicate xings.
     diff_sign_x = diff(sign_x)
     xing_ix     = where(diff_sign_x)[0]
-    xing_sgn    = diff_sign_x[xing_ix] / 2
     if(anlg):
         xings = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
     else:
         xings = [t[i] for i in xing_ix]
-    return array(xings) * xing_sgn
+    return array(xings)
+
+def calc_jitter(ui, ideal_xings, actual_xings):
+    """
+    Calculate the jitter in a set of actual zero crossings, given the ideal crossings and unit interval.
+
+    Inputs:
+
+      - ui           : The nominal unit interval.
+
+      - ideal_xings  : The ideal zero crossing locations.
+
+      - actual_xings : The actual zero crossing locations.
+
+    Outputs:
+
+      - jitter   : The jitter values.
+
+      - t_jitter : The times (taken from 'ideal_xings') corresponding to the returned jitter values.
+
+    Notes:
+
+      - Any delay present in the actual crossings, relative to the ideal crossings,
+        should be removed, before calling this function.
+
+    """
+
+    jitter   = []
+    t_jitter = []
+    i        = 0
+    for actual_xing in actual_xings:
+        while(i < len(ideal_xings) and (actual_xing - ideal_xings[i]) > ui):
+            i += 2 # If we missed one crossing, then we missed two.
+        if(i >= len(ideal_xings)):
+            break
+        jitter.append(actual_xing - ideal_xings[i])
+        t_jitter.append(ideal_xings[i])
+        i += 1
+    jitter = array(jitter)
+    jitter -= mean(jitter)
+    return (jitter, t_jitter)
 
 def calc_jitter_spectrum(t, jitter, ui, nbits):
     """
@@ -112,13 +151,18 @@ def calc_jitter_spectrum(t, jitter, ui, nbits):
     half_n         = nbits / 2
     run_lengths    = map(int, diff(t) / ui + 0.5)
     missing        = where(array(run_lengths) > 1)[0]
+    num_insertions = 0
+    jitter         = list(jitter) # Because we use 'insert'.
     for i in missing:
         for j in range(run_lengths[i] - 1):
-            jitter.insert(i + 1, 0.)
+            jitter.insert(i + 1 + num_insertions, 0.)
+            num_insertions += 1
     if(len(jitter) < nbits):
         jitter.extend([0.] * (nbits - len(jitter)))
     if(len(jitter) > nbits):
         jitter = jitter[:nbits]
+#    plot(jitter)
+#    show()
     f0  = 1. / (ui * nbits)
     f   = [i * f0 for i in range(half_n)]
     y   = fft(jitter)
