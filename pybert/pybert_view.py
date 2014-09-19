@@ -41,6 +41,7 @@ traits_view = View(
                     Item(name='ui', label='UI (ps)', show_label=True, enabled_when='True'), #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
                     Item(name='nbits',  label='Nbits',          show_label=True, enabled_when='True'),
                     Item(name='nspb',   label='Nspb',    show_label=True, enabled_when='True'),
+                    Item(name='pattern_len',   label='PatLen',    show_label=True, enabled_when='True'),
                     label='Simulation Control', show_border=True,
                 ),
                 VGroup(

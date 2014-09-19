@@ -35,14 +35,15 @@ gLockSustain    = 500
 gUI             = 100     # (ps)
 gDecisionScaler = 0.5
 gNbits          = 10000   # number of bits to run
-gNspb           = 32      # samples per bit
-gFc             = 2.0     # default channel cut-off frequency (GHz)
+gPatLen         = 127     # repeating bit pattern length
+gNspb           = 100      # samples per bit
+gFc             = 100.0     # default channel cut-off frequency (GHz)
 gFc_min         = 0.001   # min. channel cut-off frequency (GHz)
 gFc_max         = 100.0   # max. channel cut-off frequency (GHz)
 gNch_taps       = 3       # number of taps in IIR filter representing channel
 gRj             = 0.001   # standard deviation of Gaussian random jitter (ps)
-gSjMag          = 0.      # magnitude of periodic jitter (ps)
-gSjFreq         = 100.    # frequency of periodic jitter (MHz)
+gSjMag          = 5.      # magnitude of periodic jitter (ps)
+gSjFreq         = 5.    # frequency of periodic jitter (MHz)
 
 class PyBERT(HasTraits):
     """
@@ -57,6 +58,7 @@ class PyBERT(HasTraits):
     n_ave  = Float(gNave)
     n_taps = Int(gNtaps)
     nbits  = Int(gNbits)
+    pattern_len = Int(gPatLen)
     nspb   = Int(gNspb)
     decision_scaler = Float(gDecisionScaler)
     delta_t         = Float(gDeltaT)                           # (ps)
@@ -84,7 +86,7 @@ class PyBERT(HasTraits):
     All rights reserved World wide.')
 
     # Dependent variables
-    bits     = Property(Array, depends_on=['nbits'])
+    bits     = Property(Array, depends_on=['nbits', 'pattern_len'])
     npts     = Property(Array, depends_on=['nbits', 'nspb'])
     eye_offset = Property(Int, depends_on=['nspb'])
     t        = Property(Array, depends_on=['ui', 'npts', 'nspb'])
@@ -97,7 +99,7 @@ class PyBERT(HasTraits):
     jitter                  = Property(Array, depends_on=['crossing_times_chnl_out'])
     jitter_spectrum         = Property(Array, depends_on=['jitter'])
     jitter_rejection_ratio  = Property(Array, depends_on=['run_result'])
-    status_str = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf'])
+    status_str = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf', 'jitter'])
 
     # Handler set variables
     chnl_out    = Array()
@@ -294,7 +296,7 @@ class PyBERT(HasTraits):
     # Dependent variable definitions
     @cached_property
     def _get_bits(self):
-        return [0] * 10 + [1] * 10 + [randint(2) for i in range(self.nbits - 20)]
+        return resize(array([0, 1] + [randint(2) for i in range(self.pattern_len - 2)]), self.nbits)
     
     @cached_property
     def _get_t(self):
@@ -341,17 +343,19 @@ class PyBERT(HasTraits):
         """Calculate channel output jitter."""
 
         # Grab local copies of class instance variables.
-        ideal_xings  = array(self.ideal_xings)
-        actual_xings = array(self.crossing_times_chnl_out)
-        ui           = self.ui * 1.e-12
+        ideal_xings     = array(self.ideal_xings)
+        actual_xings    = array(self.crossing_times_chnl_out)
+        ui              = self.ui * 1.e-12
+        nbits           = self.nbits
+        pattern_len     = self.pattern_len
 
         # Calculate and correct channel delay.
         # We insert a "10 '0's / 10 '1's" sequence at the beginning of the bit stream, in order to ensure that this works.
         dly = actual_xings[0] - ideal_xings[0]
-        actual_xings -= dly
+        actual_xings    -= dly
 
         # Calculate jitter and its histogram.
-        (jitter, t_jitter)   = calc_jitter(ui, ideal_xings, actual_xings)
+        (jitter, t_jitter, isi, dcd, pj, rj) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings)
         hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
         bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
 
@@ -360,6 +364,10 @@ class PyBERT(HasTraits):
         self.t_jitter        = t_jitter
         self.tie_hist_counts = hist
         self.tie_hist_bins   = bin_centers
+        self.isi_chnl        = isi
+        self.dcd_chnl        = dcd
+        self.pj_chnl         = pj
+        self.rj_chnl         = rj
 
         return list(jitter)
 
@@ -381,13 +389,14 @@ class PyBERT(HasTraits):
         the jitter in the signal before and after passage through the DFE."""
 
         # Copy class instance values into local storage.
-        res    = self.run_result
-        ui     = self.ui * 1.e-12
-        nbits  = self.nbits
-        eye_bits = self.eye_bits
-        t      = self.t
-        clocks = array(t)[where(array(self.clocks) == 1)[0]]
-        ideal_xings  = array(self.ideal_xings)
+        res         = self.run_result
+        ui          = self.ui * 1.e-12
+        nbits       = self.nbits
+        pattern_len = self.pattern_len
+        eye_bits    = self.eye_bits
+        t           = self.t
+        clocks      = array(t)[where(array(self.clocks) == 1)[0]]
+        ideal_xings = array(self.ideal_xings)
 
         # Get the actual crossings of interest.
         xings   = find_crossing_times(t, res, anlg=True)
@@ -407,9 +416,13 @@ class PyBERT(HasTraits):
                 i += 1
             ideal_xings.append(clocks[i] - half_ui)
 
+        # Offset both vectors to begin at time 0, as required by calc_jitter().
+        ideal_xings = array(ideal_xings) - ignore_until
+        xings       = array(xings)       - ignore_until
+
         # Calculate the jitter and its spectrum.
-        (jitter, t) = calc_jitter(ui, ideal_xings, xings)
-        (f, y)      = calc_jitter_spectrum(t, jitter, ui, nbits)
+        (jitter, t_jitter, isi, dcd, pj, rj) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, xings)
+        (f, y)      = calc_jitter_spectrum(t_jitter, jitter, ui, nbits)
         f_MHz       = array(f) * 1.e-6
         assert f_MHz[1]   == self.f_MHz[1], "%e %e" % (f_MHz[1], self.f_MHz[1])
         assert len(f_MHz) == len(self.f_MHz)
@@ -420,9 +433,12 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        return "%-40s Perf. (Msmpls/min.):     Channel = %4.1f     CDR = %4.1f     DFE = %4.1f     TOTAL = %4.1f" \
+        jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
+                     (self.isi_chnl * 1.e12, self.dcd_chnl * 1.e12, self.pj_chnl * 1.e12, self.rj_chnl * 1.e12)
+        perf_str = "%-20s | Perf. (Msmpls/min.):    Channel = %4.1f    CDR = %4.1f    DFE = %4.1f    TOTAL = %4.1f" \
                 % (self.status, self.channel_perf * 60.e-6, self.cdr_perf * 60.e-6, self.dfe_perf * 60.e-6, \
                    60.e-6 / (1 / self.channel_perf + 1 / self.dfe_perf))
+        return perf_str + jit_str
 
     # Dynamic behavior definitions.
     def _chnl_out_changed(self):

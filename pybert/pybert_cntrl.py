@@ -14,6 +14,8 @@ from cdr          import CDR
 import time
 from pylab import *
 
+debug = True
+
 def get_chnl_in(self):
     """Generates the channel input, including any user specified jitter."""
 
@@ -28,7 +30,7 @@ def get_chnl_in(self):
 
     ts      = 1. / fs
 
-    res              = repeat(2 * array(bits) - 1, nspb)
+    res              = repeat(2 * bits - 1, nspb)
     self.ideal_xings = find_crossing_times(t, res)
 
     jitter = [sj_mag * sin(2 * pi * sj_freq * i * ui) + normal(0., rj) for i in range(len(bits) - 1)]
@@ -61,7 +63,7 @@ def find_crossing_times(t, x, anlg=False):
 
     Outputs:
 
-      - xings  The crossing times.
+      - xings     The crossing times.
 
     """
 
@@ -70,24 +72,28 @@ def find_crossing_times(t, x, anlg=False):
     sign_x      = sign(x)
     sign_x      = where(sign_x, sign_x, ones(len(sign_x))) # "0"s can produce duplicate xings.
     diff_sign_x = diff(sign_x)
-    xing_ix     = where(diff_sign_x)[0]
+    xing_ix     = where(diff_sign_x)[0] + 1
     if(anlg):
-        xings = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
+        xings    = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
     else:
-        xings = [t[i] for i in xing_ix]
+        xings    = [t[i] for i in xing_ix]
     return array(xings)
 
-def calc_jitter(ui, ideal_xings, actual_xings):
+def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     """
     Calculate the jitter in a set of actual zero crossings, given the ideal crossings and unit interval.
 
     Inputs:
 
-      - ui           : The nominal unit interval.
+      - ui               : The nominal unit interval.
 
-      - ideal_xings  : The ideal zero crossing locations.
+      - nbits            : The number of unit intervals spanned by the input signal.
 
-      - actual_xings : The actual zero crossing locations.
+      - pattern_len      : The number of unit intervals, before input bit stream repeats.
+
+      - ideal_xings      : The ideal zero crossing locations of the edges.
+
+      - actual_xings     : The actual zero crossing locations of the edges.
 
     Outputs:
 
@@ -95,7 +101,17 @@ def calc_jitter(ui, ideal_xings, actual_xings):
 
       - t_jitter : The times (taken from 'ideal_xings') corresponding to the returned jitter values.
 
+      - isi      : The jitter due to intersymbol interference.
+
+      - dcd      : The jitter due to duty cycle distortion.
+
+      - pj       : The jitter due to uncorrelated periodic sources.
+
+      - rj       : The jitter due to uncorrelated unbounded random sources.
+
     Notes:
+
+      - It is assumed that the first crossing is a rising edge.
 
       - Any delay present in the actual crossings, relative to the ideal crossings,
         should be removed, before calling this function.
@@ -105,25 +121,151 @@ def calc_jitter(ui, ideal_xings, actual_xings):
     jitter   = []
     t_jitter = []
     i        = 0
+    # Assemble the TIE track.
     for actual_xing in actual_xings:
+        # Check for missed crossings and zero fill, as necessary.
         while(i < len(ideal_xings) and (actual_xing - ideal_xings[i]) > ui):
-            i += 2 # If we missed one crossing, then we missed two.
+            for j in range(2): # If we missed one crossing, then we missed two.
+                if(i >= len(ideal_xings)):
+                    break
+                jitter.append(0.)
+                t_jitter.append(ideal_xings[i])
+                i += 1
         if(i >= len(ideal_xings)):
             break
         jitter.append(actual_xing - ideal_xings[i])
         t_jitter.append(ideal_xings[i])
         i += 1
-    jitter = array(jitter)
+    jitter  = array(jitter)
     jitter -= mean(jitter)
-    return (jitter, t_jitter)
+    # Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
+    # - We have to be careful to keep the last crossing, in the case where there are an odd number of them,
+    #   because we'll be assembling a "repeated average" vector, later, and subtracting it from the original
+    #   jitter vector. So, we can't get sloppy, or we'll end up with misalignment between the two.
+    xings_per_pattern    = where(ideal_xings > pattern_len * ui)[0][0]
+    risings_per_pattern  = int(xings_per_pattern / 2. + 0.5)
+    fallings_per_pattern = xings_per_pattern // 2
+    num_patterns         = nbits // pattern_len - 1
+    jitter = jitter[xings_per_pattern:] # The first pattern period is problematic.
+    if(len(jitter) < xings_per_pattern * num_patterns):
+        jitter = array(list(jitter).append(0.))
+    t_jitter = t_jitter[:len(jitter)]
+    try:
+        tie_risings          = reshape(jitter.take(range(0, num_patterns * risings_per_pattern * 2, 2)),  (num_patterns, risings_per_pattern))
+        tie_fallings         = reshape(jitter.take(range(1, num_patterns * fallings_per_pattern * 2, 2)), (num_patterns, fallings_per_pattern))
+    except:
+        print "ideal_xings[xings_per_pattern - 1]:", ideal_xings[xings_per_pattern - 1], "ideal_xings[-1]:", ideal_xings[-1]
+        print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
+        raise
+    assert len(filter(lambda x: x == None, tie_risings)) == 0, "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
+                                           (num_patterns, risings_per_pattern, len(jitter))
+    assert len(filter(lambda x: x == None, tie_fallings)) == 0, "num_patterns: %d, fallings_per_pattern: %d, len(jitter): %d" % \
+                                           (num_patterns, fallings_per_pattern, len(jitter))
+    # Do the jitter decomposition.
+    # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
+    tie_risings_ave  = tie_risings.mean(axis=0)
+    tie_fallings_ave = tie_fallings.mean(axis=0)
+    try:
+        isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
+    except:
+        print "tie_risings_ave:", tie_risings_ave, "\ntie_fallings_ave:", tie_fallings_ave
+        raise
+    dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
+    # - Subtract the data dependent jitter from the original TIE track.
+    tie_ave  = concatenate(zip(tie_risings_ave, tie_fallings_ave))
+    if(xings_per_pattern % 2): # Correct for odd number of crossings per pattern.
+        print "Did this."
+        tmp = list(tie_ave)
+        tmp.append(tie_risings_ave[-1])
+        tie_ave = array(tmp)
+    tie_ave  = resize(tie_ave, len(jitter))
+    try:
+        tie_ind  = jitter - tie_ave
+    except:
+        print "tie_ave:", tie_ave
+        raise
 
-def calc_jitter_spectrum(t, jitter, ui, nbits):
+    if(debug):
+        #print "jitter:", jitter, "tie_ave:", tie_ave
+        plot(jitter,                                               label="jitter",          color="b")
+        plot(concatenate(zip(tie_risings_ave, tie_fallings_ave)),  label="rise/fall aves.", color="r")
+        title("Original TIE track & Average over one pattern period")
+        legend()
+        show()
+        plot(t_jitter, tie_ind)
+        title("Data Independent Jitter")
+        show()
+
+    # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
+    y        = fft(make_uniform(t_jitter, tie_ind, ui, nbits))
+    y_mag    = abs(y)
+    y_sigma  = sqrt(mean((y_mag - mean(y_mag)) ** 2))
+    # - We'll call any spectral component with a magnitude > 3-sigma a "peak".
+    thresh   = 25 * y_sigma
+    y_per    = where(y_mag > thresh, y, zeros(len(y)))
+
+    if(debug):
+        print "# of spectral peaks detected:", len(where(y_per)[0])
+        print "thresh:", thresh, "max(y_mag):", max(y_mag)
+
+    tie_per  = real(ifft(y_per))
+    pj       = tie_per.ptp()
+
+    if(debug):
+        plot(tie_per)
+        title("Periodic Jitter")
+        show()
+
+    # - Subtract the periodic jitter and calculate the standard deviation of what's left.
+    tie_rnd  = make_uniform(ideal_xings[:len(tie_ind)], tie_ind, ui, nbits) - tie_per
+    rj       = sqrt(mean((tie_rnd - mean(tie_rnd)) ** 2))
+
+    return (jitter, t_jitter, isi, dcd, pj, rj)
+
+def make_uniform(t, jitter, ui, nbits):
     """
-    Calculate the spectral magnitude estimate of the input jitter samples.
+    Make the jitter vector uniformly sampled in time, by zero-filling where necessary.
 
     The trick, here, is creating a uniformly sampled input vector for the FFT operation,
     since the jitter samples are almost certainly not uniformly sampled.
     We do this by simply zero padding the missing samples.
+
+    Inputs:
+
+    - t      : The sample times for the 'jitter' vector.
+
+    - jitter : The input jitter samples.
+
+    - ui     : The nominal unit interval.
+
+    - nbits  : The desired number of unit intervals, in the time domain.
+
+    Output:
+
+    - y      : The FFT of the input jitter.
+
+    """
+
+    assert len(t) == len(jitter)
+
+    half_n         = nbits / 2
+    run_lengths    = map(int, diff(t) / ui + 0.5)
+    missing        = where(array(run_lengths) > 1)[0]
+    num_insertions = 0
+    jitter         = list(jitter) # Because we use 'insert'.
+    for i in missing:
+        for j in range(run_lengths[i] - 1):
+            jitter.insert(i + 1 + num_insertions, 0.)
+            num_insertions += 1
+    if(len(jitter) < nbits):
+        jitter.extend([0.] * (nbits - len(jitter)))
+    if(len(jitter) > nbits):
+        jitter = jitter[:nbits]
+    return jitter
+
+def calc_jitter_spectrum(t, jitter, ui, nbits):
+    """
+    Calculate the spectral magnitude estimate of the input jitter samples.
 
     The output is normalized, so as to produce a value of 'A / ui' at location 'fj',
     when the input jitter contains a component 'A * sin(2*pi*fj + phi)'.
@@ -146,27 +288,11 @@ def calc_jitter_spectrum(t, jitter, ui, nbits):
 
     """
 
-    assert len(t) == len(jitter)
-
-    half_n         = nbits / 2
-    run_lengths    = map(int, diff(t) / ui + 0.5)
-    missing        = where(array(run_lengths) > 1)[0]
-    num_insertions = 0
-    jitter         = list(jitter) # Because we use 'insert'.
-    for i in missing:
-        for j in range(run_lengths[i] - 1):
-            jitter.insert(i + 1 + num_insertions, 0.)
-            num_insertions += 1
-    if(len(jitter) < nbits):
-        jitter.extend([0.] * (nbits - len(jitter)))
-    if(len(jitter) > nbits):
-        jitter = jitter[:nbits]
-#    plot(jitter)
-#    show()
-    f0  = 1. / (ui * nbits)
-    f   = [i * f0 for i in range(half_n)]
-    y   = fft(jitter)
-    y   = array(abs(y[:half_n])) / half_n / ui
+    half_n = nbits / 2
+    f0     = 1. / (ui * nbits)
+    f      = [i * f0 for i in range(half_n)]
+    y      = fft(make_uniform(t, jitter, ui, nbits))
+    y      = array(abs(y[:half_n])) / half_n / ui
     return (f, y)
 
 def my_run_dfe(self):
