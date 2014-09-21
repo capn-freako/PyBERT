@@ -24,26 +24,36 @@ from pybert_view  import *
 from pybert_cntrl import *
 
 # Default model parameters - Modify these to customize the default simulation.
+# - Simulation Control
+gUI             = 100     # (ps)
+gNbits          = 10000   # number of bits to run
+gPatLen         = 127     # repeating bit pattern length
+gNspb           = 32      # samples per bit
+# - Channel Control
+gZ0             = 100.0   # differential channel impedance (Ohms)
+gFc             = 100.0   # default channel cut-off frequency (GHz)
+gNch_taps       = 3       # number of taps in IIR filter representing channel
+gRn             = 0.01    # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+# - Tx
+gVod            = 1.0     # output drive strength (Vp)
+gRs             = 100     # differential source impedance (Ohms)
+gCout           = 0.50    # parasitic output capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
+gPnMag          = 0.1     # magnitude of periodic noise (V)
+gPnFreq         = 5.      # frequency of periodic noise (MHz)
+# - Rx
+gRin            = 100     # differential input resistance
+gCin            = 0.50    # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
+# - DFE
+gDecisionScaler = 0.5
 gNtaps          = 5
 gGain           = 0.1
 gNave           = 100
+# - CDR
 gDeltaT         = 0.1     # (ps)
 gAlpha          = 0.01
 gNLockAve       = 500     # number of UI used to average CDR locked status.
 gRelLockTol     = .1      # relative lock tolerance of CDR.
 gLockSustain    = 500
-gUI             = 100     # (ps)
-gDecisionScaler = 0.5
-gNbits          = 10000   # number of bits to run
-gPatLen         = 127     # repeating bit pattern length
-gNspb           = 100      # samples per bit
-gFc             = 100.0     # default channel cut-off frequency (GHz)
-gFc_min         = 0.001   # min. channel cut-off frequency (GHz)
-gFc_max         = 100.0   # max. channel cut-off frequency (GHz)
-gNch_taps       = 3       # number of taps in IIR filter representing channel
-gRj             = 0.001   # standard deviation of Gaussian random jitter (ps)
-gSjMag          = 5.      # magnitude of periodic jitter (ps)
-gSjFreq         = 5.    # frequency of periodic jitter (MHz)
 
 class PyBERT(HasTraits):
     """
@@ -53,32 +63,47 @@ class PyBERT(HasTraits):
     """
 
     # Independent variables
-    ui     = Float(gUI)                                        # (ps)
-    gain   = Float(gGain)
-    n_ave  = Float(gNave)
-    n_taps = Int(gNtaps)
-    nbits  = Int(gNbits)
-    pattern_len = Int(gPatLen)
-    nspb   = Int(gNspb)
+    # - Simulation Control
+    ui              = Float(gUI)                                            # (ps)
+    nbits           = Int(gNbits)
+    pattern_len     = Int(gPatLen)
+    nspb            = Int(gNspb)
+    eye_bits        = Int(gNbits // 5)
+    # - Channel Control
+    z0              = Float(gZ0)                                            # (Ohms)
+    fc              = Range(low = 0., value = gFc, exclude_low = True)      # (GHz)
+    rn              = Float(gRn)                                            # (V)
+    # - Tx
+    vod             = Float(gVod)                                           # (V)
+    rs              = Float(gRs)                                            # (Ohms)
+    cout            = Float(gCout)                                          # (pF)
+    pn_mag          = Float(gPnMag)                                         # (ps)
+    pn_freq         = Float(gPnFreq)                                        # (MHz)
+    # - Rx
+    rin             = Float(gRin)                                           # (Ohmin)
+    cin             = Float(gCin)                                           # (pF)
+    # - DFE
     decision_scaler = Float(gDecisionScaler)
-    delta_t         = Float(gDeltaT)                           # (ps)
+    gain            = Float(gGain)
+    n_ave           = Float(gNave)
+    n_taps          = Int(gNtaps)
+    # - CDR
+    delta_t         = Float(gDeltaT)                                        # (ps)
     alpha           = Float(gAlpha)
     n_lock_ave      = Int(gNLockAve)
     rel_lock_tol    = Float(gRelLockTol)
     lock_sustain    = Int(gLockSustain)
-    fc      = Range(low = 0., value = gFc, exclude_low = True) # (GHz)
-    rj      = Float(gRj)                                       # (ps)
-    sj_mag  = Float(gSjMag)                                    # (ps)
-    sj_freq = Float(gSjFreq)                                   # (MHz)
-    plot_out = Instance(VPlotContainer)
-    plot_in  = Instance(GridPlotContainer)
-    plot_dfe = Instance(GridPlotContainer)
-    plot_eye = Instance(GridPlotContainer)
-    eye_bits = Int(4000)
-    status       = String("Ready.")
-    channel_perf = Float(1.)
-    cdr_perf     = Float(1.)
-    dfe_perf     = Float(1.)
+    # - Plots
+    plot_out        = Instance(VPlotContainer)
+    plot_in         = Instance(GridPlotContainer)
+    plot_dfe        = Instance(GridPlotContainer)
+    plot_eye        = Instance(GridPlotContainer)
+    # - Status
+    status          = String("Ready.")
+    channel_perf    = Float(1.)
+    cdr_perf        = Float(1.)
+    dfe_perf        = Float(1.)
+    # - About
     ident  = String('PyBERT v0.1 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
     August 24, 2014\n\n \
@@ -86,20 +111,20 @@ class PyBERT(HasTraits):
     All rights reserved World wide.')
 
     # Dependent variables
-    bits     = Property(Array, depends_on=['nbits', 'pattern_len'])
-    npts     = Property(Array, depends_on=['nbits', 'nspb'])
-    eye_offset = Property(Int, depends_on=['nspb'])
-    t        = Property(Array, depends_on=['ui', 'npts', 'nspb'])
-    t_ns     = Property(Array, depends_on=['t'])
-    fs       = Property(Array, depends_on=['ui', 'nspb'])
-    a        = Property(Array, depends_on=['fc', 'fs'])
-    b        = array([1.]) # Will be set by 'a' handler, upon change in dependencies.
-    h        = Property(Array, depends_on=['npts', 'a'])
+    bits                    = Property(Array, depends_on=['nbits', 'pattern_len'])
+    npts                    = Property(Array, depends_on=['nbits', 'nspb'])
+    eye_offset              = Property(Int,   depends_on=['nspb'])
+    t                       = Property(Array, depends_on=['ui', 'npts', 'nspb'])
+    t_ns                    = Property(Array, depends_on=['t'])
+    fs                      = Property(Array, depends_on=['ui', 'nspb'])
+    a                       = Property(Array, depends_on=['fc', 'fs'])
+    b                       = array([1.]) # Will be set by 'a' handler, upon change in dependencies.
+    h                       = Property(Array, depends_on=['npts', 'a'])
     crossing_times_chnl_out = Property(Array, depends_on=['chnl_out'])
     jitter                  = Property(Array, depends_on=['crossing_times_chnl_out'])
     jitter_spectrum         = Property(Array, depends_on=['jitter'])
     jitter_rejection_ratio  = Property(Array, depends_on=['run_result'])
-    status_str = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf', 'jitter'])
+    status_str              = Property(String, depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf', 'jitter'])
 
     # Handler set variables
     chnl_out    = Array()
@@ -336,7 +361,13 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_crossing_times_chnl_out(self):
-        return find_crossing_times(self.t, self.chnl_out, anlg=True)
+        ui = self.ui * 1.e-12
+
+        xings = find_crossing_times(self.t, self.chnl_out, anlg=True)
+        if(xings[0] < ui):
+            xings = xings[1:]
+
+        return xings
 
     @cached_property
     def _get_jitter(self):
@@ -388,6 +419,9 @@ class PyBERT(HasTraits):
         """Calculate the jitter rejection ratio (JRR) of the CDR/DFE, by comparing
         the jitter in the signal before and after passage through the DFE."""
 
+        # TEMPORARY DEBUGGING:
+        #return [0. for i in range(self.nbits)]
+
         # Copy class instance values into local storage.
         res         = self.run_result
         ui          = self.ui * 1.e-12
@@ -412,8 +446,10 @@ class PyBERT(HasTraits):
         half_ui     = ui / 2.
         ideal_xings = []
         for xing in xings:
-            while(clocks[i] <= xing):
+            while(i < len(clocks) and clocks[i] <= xing):
                 i += 1
+            if(i >= len(clocks)):
+                break
             ideal_xings.append(clocks[i] - half_ui)
 
         # Offset both vectors to begin at time 0, as required by calc_jitter().
@@ -435,8 +471,8 @@ class PyBERT(HasTraits):
     def _get_status_str(self):
         jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
                      (self.isi_chnl * 1.e12, self.dcd_chnl * 1.e12, self.pj_chnl * 1.e12, self.rj_chnl * 1.e12)
-        perf_str = "%-20s | Perf. (Msmpls/min.):    Channel = %4.1f    CDR = %4.1f    DFE = %4.1f    TOTAL = %4.1f" \
-                % (self.status, self.channel_perf * 60.e-6, self.cdr_perf * 60.e-6, self.dfe_perf * 60.e-6, \
+        perf_str = "%-20s | Perf. (Msmpls/min.):    Channel = %4.1f    DFE = %4.1f    TOTAL = %4.1f" \
+                % (self.status, self.channel_perf * 60.e-6, self.dfe_perf * 60.e-6, \
                    60.e-6 / (1 / self.channel_perf + 1 / self.dfe_perf))
         return perf_str + jit_str
 

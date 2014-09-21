@@ -8,47 +8,74 @@
 from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10
 from numpy.random import normal
 from numpy.fft    import fft
-from scipy.signal import lfilter
+from scipy.signal import lfilter, iirfilter
 from dfe          import DFE
 from cdr          import CDR
 import time
 from pylab import *
 
-debug = True
+debug = False
 
 def get_chnl_in(self):
-    """Generates the channel input, including any user specified jitter."""
+    """Generates the channel input."""
 
     bits    = self.bits
+    nbits   = self.nbits
     nspb    = self.nspb
     fs      = self.fs
-    rj      = self.rj * 1.e-12
-    sj_mag  = self.sj_mag * 1.e-12
-    sj_freq = self.sj_freq * 1.e6
+    rn      = self.rn
+    pn_mag  = self.pn_mag
+    pn_freq = self.pn_freq * 1.e6
     t       = self.t
     ui      = self.ui * 1.e-12
+    z0      = self.z0
+    cout    = self.cout * 1.e-12
+    pattern_len = self.pattern_len
 
     ts      = 1. / fs
 
-    res              = repeat(2 * bits - 1, nspb)
-    self.ideal_xings = find_crossing_times(t, res)
+    # Generate the ideal over-sampled signal.
+    res         = repeat(2 * bits - 1, nspb)
+    ideal_xings = find_crossing_times(t, res, anlg=False)
+    # Filter it.
+    fc     = 1./(pi * z0 * cout)
+    (b, a) = iirfilter(2, fc/(fs/2), btype='lowpass')
+    res    = lfilter(b, a, res)[:len(res)]
+    # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
+    # - Generate the ideal rectangular aggressor waveform.
+    pn_period          = 1. / pn_freq
+    pn_samps           = int(pn_period / ts + 0.5)
+    pn                 = zeros(pn_samps)
+    pn[pn_samps // 2:] = 1
+    pn                 = resize(pn, len(res))
+    # - High pass filter it. (Simulating capacitive coupling.)
+    (b, a) = iirfilter(2, fc/(fs/2), btype='highpass')
+    pn     = lfilter(b, a, pn)[:len(pn)]
+    # Add the uncorrelated periodic and the random noise to the Tx output.
+    res += pn + normal(scale=rn, size=(len(res),))
+    # Calculate the jitter.
+    tx_xings                             = find_crossing_times(t, res)
+    if(tx_xings[0] < ui):
+        tx_xings = tx_xings[1:]
+    (jitter, t_jitter, isi, dcd, pj, rj) = calc_jitter(ui, nbits, pattern_len, ideal_xings, tx_xings)
 
-    jitter = [sj_mag * sin(2 * pi * sj_freq * i * ui) + normal(0., rj) for i in range(len(bits) - 1)]
-    i = 1
-    for jit in jitter:
-        if(jit < -ui):
-            jit = -ui
-        if(jit > ui):
-            jit = ui
-        if(jit < 0.):
-            res[i * nspb + int(jit / ts - 0.5) : i * nspb] = res[i * nspb]
-        else:
-            res[i * nspb : i * nspb + int(jit / ts + 0.5)] = res[i * nspb - 1]
-        i += 1
+    if(debug):
+        print "Tx output jitter:"
+        print "\tISI:", isi * 1.e12, "ps"
+        print "\tDCD:", dcd * 1.e12, "ps"
+        print "\tPj:", pj * 1.e12, "ps"
+        print "\tRj:", rj * 1.e12, "ps"
+
+    self.ideal_xings = ideal_xings
+    self.tx_xings    = tx_xings
+    self.isi_tx      = isi
+    self.dcd_tx      = dcd
+    self.pj_tx       = pj
+    self.rj_tx       = rj
 
     return res
 
-def find_crossing_times(t, x, anlg=False):
+def find_crossing_times(t, x, anlg=True):
     """
     Finds the zero crossing times of the input signal.
 
@@ -72,11 +99,15 @@ def find_crossing_times(t, x, anlg=False):
     sign_x      = sign(x)
     sign_x      = where(sign_x, sign_x, ones(len(sign_x))) # "0"s can produce duplicate xings.
     diff_sign_x = diff(sign_x)
-    xing_ix     = where(diff_sign_x)[0] + 1
+    xing_ix     = where(diff_sign_x)[0]
     if(anlg):
-        xings    = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
+        try:
+            xings    = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
+        except:
+            print "len(t):", len(t), "len(x):", len(x), "i:", i
+            raise
     else:
-        xings    = [t[i] for i in xing_ix]
+        xings    = [t[i + 1] for i in xing_ix]
     return array(xings)
 
 def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
@@ -149,13 +180,17 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     jitter = jitter[xings_per_pattern:] # The first pattern period is problematic.
     if(len(jitter) < xings_per_pattern * num_patterns):
         jitter = array(list(jitter).append(0.))
-    t_jitter = t_jitter[:len(jitter)]
+    try:
+        t_jitter = t_jitter[:len(jitter)]
+    except:
+        print "jitter:", jitter
     try:
         tie_risings          = reshape(jitter.take(range(0, num_patterns * risings_per_pattern * 2, 2)),  (num_patterns, risings_per_pattern))
         tie_fallings         = reshape(jitter.take(range(1, num_patterns * fallings_per_pattern * 2, 2)), (num_patterns, fallings_per_pattern))
     except:
         print "ideal_xings[xings_per_pattern - 1]:", ideal_xings[xings_per_pattern - 1], "ideal_xings[-1]:", ideal_xings[-1]
         print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
+        print "nbits:", nbits, "pattern_len:", pattern_len
         raise
     assert len(filter(lambda x: x == None, tie_risings)) == 0, "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
                                            (num_patterns, risings_per_pattern, len(jitter))
@@ -174,7 +209,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     # - Subtract the data dependent jitter from the original TIE track.
     tie_ave  = concatenate(zip(tie_risings_ave, tie_fallings_ave))
     if(xings_per_pattern % 2): # Correct for odd number of crossings per pattern.
-        print "Did this."
+        #print "Odd # of xings per pattern detected."
         tmp = list(tie_ave)
         tmp.append(tie_risings_ave[-1])
         tie_ave = array(tmp)
@@ -201,10 +236,11 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     y_mag    = abs(y)
     y_sigma  = sqrt(mean((y_mag - mean(y_mag)) ** 2))
     # - We'll call any spectral component with a magnitude > 3-sigma a "peak".
-    thresh   = 25 * y_sigma
+    thresh   = 6 * y_sigma
     y_per    = where(y_mag > thresh, y, zeros(len(y)))
 
-    if(debug):
+    #if(debug):
+    if(True):
         print "# of spectral peaks detected:", len(where(y_per)[0])
         print "thresh:", thresh, "max(y_mag):", max(y_mag)
 

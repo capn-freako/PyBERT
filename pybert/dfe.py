@@ -19,7 +19,8 @@ from numpy import zeros, sign, array, prod
 from scipy.signal import lfilter, iirfilter
 from cdr   import CDR
 
-gNch_taps = 3 # Number of taps used in summing node filter.
+gNch_taps       = 3           # Number of taps used in summing node filter.
+gLimitBandwidth = True        # True = Bandwidth limit the summing node.
 
 class LfilterSS(object):
     """A single steppable version of scipy.signal.lfilter()."""
@@ -64,7 +65,7 @@ class LfilterSS(object):
 class DFE(object):
     """Behavioral model of a decision feedback equalizer (DFE)."""
 
-    def __init__(self, n_taps, gain, delta_t, alpha, ui, n_spb, decision_scaler, bandwidth=12.e9,
+    def __init__(self, n_taps, gain, delta_t, alpha, ui, n_spb, decision_scaler, bandwidth=100.e9,
                        n_ave=10, n_lock_ave=500, rel_lock_tol=0.01, lock_sustain=500):
         """
         Inputs:
@@ -171,7 +172,10 @@ class DFE(object):
         lockeds     = []
         clocks      = zeros(len(sample_times))
         for (t, x) in zip(sample_times, signal):
-            sum_out = summing_filter.step(x - filter_out)
+            if(gLimitBandwidth):
+                sum_out = summing_filter.step(x - filter_out)
+            else:
+                sum_out = x - filter_out
             res.append(sum_out)
             if(t >= next_boundary_time):
                 boundary_sample = sum_out
