@@ -91,6 +91,10 @@ traits_view = View(
                     label = 'Results', id = 'results'
                 ),
                 Group(
+                    Item('jitter_info', style='readonly', show_label=False),
+                    label = 'Jitter'
+                ),
+                Group(
                     Item('ident', style='readonly', show_label=False),
                     label = 'About'
                 ),

@@ -20,7 +20,7 @@ from scipy.signal import lfilter, iirfilter
 from cdr   import CDR
 
 gNch_taps       = 3           # Number of taps used in summing node filter.
-gLimitBandwidth = True        # True = Bandwidth limit the summing node.
+gLimitBandwidth = False        # True = Bandwidth limit the summing node.
 
 class LfilterSS(object):
     """A single steppable version of scipy.signal.lfilter()."""
@@ -52,7 +52,6 @@ class LfilterSS(object):
         xs = self.xs
         ys = self.ys
 
-        #y  = sum(map(prod, zip(b, [x] + xs))) - sum(map(prod, zip(a[1:], ys)))
         y  = sum(b * ([x] + xs)) - sum(a[1:] * ys)
         xs = [x] + xs[:-1]
         ys = [y] + ys[:-1]
@@ -171,6 +170,7 @@ class DFE(object):
         ui_ests     = []
         lockeds     = []
         clocks      = zeros(len(sample_times))
+        clock_times = [next_clock_time]
         for (t, x) in zip(sample_times, signal):
             if(gLimitBandwidth):
                 sum_out = summing_filter.step(x - filter_out)
@@ -180,7 +180,7 @@ class DFE(object):
             if(t >= next_boundary_time):
                 boundary_sample = sum_out
                 filter_out = nxt_filter_out
-                next_boundary_time += ui
+                next_boundary_time += ui # Necessary, in order to prevent premature reentry.
             if(t >= next_clock_time):
                 clk_cntr += 1
                 clocks[smpl_cntr] = 1
@@ -196,12 +196,13 @@ class DFE(object):
                 tap_weights.append(self.tap_weights)
                 last_clock_sample  = sum_out
                 next_boundary_time = next_clock_time + ui / 2.
-                next_clock_time    = next_clock_time + ui
+                next_clock_time   += ui
+                clock_times.append(next_clock_time)
             ui_ests.append(ui)
             lockeds.append(locked)
             smpl_cntr += 1
 
         self.ui                = ui               
 
-        return (res, tap_weights, ui_ests, clocks, lockeds)
+        return (res, tap_weights, ui_ests, clocks, lockeds, clock_times)
 
