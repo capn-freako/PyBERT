@@ -1,0 +1,9 @@
+*.swp
+*.pyc
+*.DS_Store
+MANIFEST
+PKG-INFO
+*.egg-info
+dist/*
+*prof*
+
