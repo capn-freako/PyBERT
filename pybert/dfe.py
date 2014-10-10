@@ -1,5 +1,3 @@
-#! /usr/bin/env python
-
 """
 Behavioral model of a decision feedback equalizer (DFE).
 
@@ -8,9 +6,7 @@ Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a decision feedback
 equalizer (DFE). The class defined, here, is intended for integration
-into the larger `PyBERT' framework, but is also capable of
-running in stand-alone mode for preliminary debugging, via the
-`dfe_demo.py' script.
+into the larger `PyBERT' framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
@@ -20,7 +16,6 @@ from scipy.signal import lfilter, iirfilter
 from cdr   import CDR
 
 gNch_taps       = 3           # Number of taps used in summing node filter.
-gLimitBandwidth = False        # True = Bandwidth limit the summing node.
 
 class LfilterSS(object):
     """A single steppable version of scipy.signal.lfilter()."""
@@ -65,7 +60,7 @@ class DFE(object):
     """Behavioral model of a decision feedback equalizer (DFE)."""
 
     def __init__(self, n_taps, gain, delta_t, alpha, ui, n_spb, decision_scaler, bandwidth=100.e9,
-                       n_ave=10, n_lock_ave=500, rel_lock_tol=0.01, lock_sustain=500):
+                       n_ave=10, n_lock_ave=500, rel_lock_tol=0.01, lock_sustain=500, ideal=True):
         """
         Inputs:
 
@@ -101,6 +96,8 @@ class DFE(object):
 
           - lock_sustain     Length of the histerysis vector used for
                              lock flagging.
+
+          - ideal            Boolean flag. When true, use an ideal summing node.
         """
 
         # Design summing node filter.
@@ -117,6 +114,7 @@ class DFE(object):
         self.cdr               = CDR(delta_t, alpha, ui, n_lock_ave, rel_lock_tol, lock_sustain)
         self.n_ave             = n_ave
         self.corrections       = zeros(n_taps)
+        self.ideal             = ideal
 
     def step(self, decision, error, update):
         """Step the DFE, according to the new decision and error inputs."""
@@ -155,6 +153,7 @@ class DFE(object):
         decision_scaler   = self.decision_scaler
         n_ave             = self.n_ave
         summing_filter    = self.summing_filter
+        ideal             = self.ideal
 
         clk_cntr           = 0
         smpl_cntr          = 0
@@ -172,7 +171,7 @@ class DFE(object):
         clocks      = zeros(len(sample_times))
         clock_times = [next_clock_time]
         for (t, x) in zip(sample_times, signal):
-            if(gLimitBandwidth):
+            if(not ideal):
                 sum_out = summing_filter.step(x - filter_out)
             else:
                 sum_out = x - filter_out

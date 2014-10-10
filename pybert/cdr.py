@@ -1,5 +1,3 @@
-#! /usr/bin/env python
-
 """
 Behavioral model of a "bang-bang" clock data recovery (CDR) unit.
 
@@ -8,9 +6,7 @@ Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a "bang-bang" clock
 data recovery (CDR) unit. The class defined, here, is intended for
-integration into the larger `PyBERT' framework, but is also capable of
-running in stand-alone mode for preliminary debugging, via the
-`cdr_demo.py' script.
+integration into the larger `PyBERT' framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
