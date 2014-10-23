@@ -119,6 +119,8 @@ class PyBERT(HasTraits):
     pn_mag          = Float(gPnMag)                                         # (ps)
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
+    pretap          = Float(0.0)
+    posttap         = Float(0.0)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
@@ -150,9 +152,9 @@ class PyBERT(HasTraits):
     dfe_perf        = Float(1.)
     total_perf      = Float(0.)
     # - About
-    ident  = String('PyBERT v0.1 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v0.2 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    August 24, 2014\n\n \
+    October 22, 2014\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 

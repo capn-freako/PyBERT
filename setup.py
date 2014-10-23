@@ -1,14 +1,14 @@
 ''' setup.py - Distutils setup file for PyBERT package
 
     David Banas
-    October 9, 2014
+    October 22, 2014
 '''
 
 from distutils.core import setup
 
 setup(
     name='PyBERT',
-    version='0.1',
+    version='0.2',
     packages=['pybert',],
     license='BSD',
     long_description=open('README.txt').read(),

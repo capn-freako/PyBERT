@@ -43,6 +43,8 @@ def my_run_channel(self):
     Theta0  = self.Theta0
     w       = self.w
     l_ch    = self.l_ch
+    pretap  = self.pretap
+    posttap = self.posttap
     pattern_len = self.pattern_len
 
     # Generate the impulse response of the channel.
@@ -73,7 +75,11 @@ def my_run_channel(self):
 
     # Generate the ideal over-sampled signal.
     bits        = resize(array([0, 1] + [randint(2) for i in range(pattern_len - 2)]), nbits)
-    x           = repeat(2 * bits - 1, nspb)
+    bits        = 2 * bits - 1
+    ffe         = [pretap, 1.0, posttap]
+    #ffe         = [1.0, posttap]
+    bits        = convolve(ffe, bits, mode='same')
+    x           = repeat(bits, nspb)
     ideal_xings = find_crossing_times(t, x, anlg=False)
 
     # Filter it.

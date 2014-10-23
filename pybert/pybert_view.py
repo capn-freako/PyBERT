@@ -23,6 +23,7 @@ run_simulation = Action(name="Run", action="do_run_simulation")
     
 # Main window layout definition.
 traits_view = View(
+    Group(
         VGroup(
             HGroup(
                 VGroup(
@@ -40,6 +41,8 @@ traits_view = View(
                     Item(name='cout',    label='Cout (pF)',   width=-75,  tooltip="Tx parasitic output capacitance (each pin)", ),
                     Item(name='pn_mag',  label='Pn (V)',      width=-75,  tooltip="peak magnitude of periodic noise", ),
                     Item(name='pn_freq', label='f(Pn) (MHz)', width=-75,  tooltip="frequency of periodic noise", ),
+                    Item(name='pretap',  label='Pre-tap',     width=-75,  tooltip="pre-cursor tap weight", ),
+                    Item(name='posttap', label='Post-tap',    width=-75,  tooltip="post-cursor tap weight", ),
                     label='Tx Parameters', show_border=True,
                 ),
                 VGroup(
@@ -75,35 +78,35 @@ traits_view = View(
                     label='DFE Parameters', show_border=True,
                 ),
             ),
-            Group(
-                Group(
-                    Item('plot_in', editor=ComponentEditor(), show_label=False,),
-                    label = 'Channel', id = 'channel'
-                ),
-                Group(
-                    Item('plot_dfe', editor=ComponentEditor(), show_label=False,),
-                    label = 'DFE', id = 'dfe'
-                ),
-                Group(
-                    Item('plot_eye', editor=ComponentEditor(), show_label=False,),
-                    label = 'Eye Diagrams', id = 'results'
-                ),
-                Group(
-                    Item('plot_jitter', editor=ComponentEditor(), show_label=False,),
-                    label = 'Jitter', id = 'jitter'
-                ),
-                Group(
-                    Item('jitter_info', style='readonly', show_label=False),
-                    label = 'Jitter Info'
-                ),
-                Group(
-                    Item('ident', style='readonly', show_label=False),
-                    label = 'About'
-                ),
-                layout = 'tabbed', springy = True, id = 'plots',
-            ),
-            id = 'frame',
+            Item(label='Instructions', springy=True, ),
+            label = 'Config.', id = 'config'
         ),
+        Group(
+            Item('plot_in', editor=ComponentEditor(), show_label=False,),
+            label = 'Channel', id = 'channel'
+        ),
+        Group(
+            Item('plot_dfe', editor=ComponentEditor(), show_label=False,),
+            label = 'DFE', id = 'dfe'
+        ),
+        Group(
+            Item('plot_eye', editor=ComponentEditor(), show_label=False,),
+            label = 'Eye Diagrams', id = 'results'
+        ),
+        Group(
+            Item('plot_jitter', editor=ComponentEditor(), show_label=False,),
+            label = 'Jitter', id = 'jitter'
+        ),
+        Group(
+            Item('jitter_info', style='readonly', show_label=False),
+            label = 'Jitter Info'
+        ),
+        Group(
+            Item('ident', style='readonly', show_label=False),
+            label = 'About'
+        ),
+        layout = 'tabbed', springy = True, id = 'tabs',
+    ),
     resizable = True,
     handler = MyHandler(),
     buttons = [run_simulation, "OK"],
