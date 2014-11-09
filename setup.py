@@ -11,6 +11,7 @@ setup(
     version='0.3',
     packages=['pybert',],
     license='BSD',
+    description='Serial communication link bit error rate tester simulator, written in Python.',
     long_description=open('README.txt').read(),
     url='https://github.com/capn-freako/PyBERT/wiki',
     author='David Banas',
