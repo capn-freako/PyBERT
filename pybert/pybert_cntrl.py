@@ -29,6 +29,7 @@ def my_run_channel(self):
     pn_mag  = self.pn_mag
     pn_freq = self.pn_freq * 1.e6
     t       = self.t
+    t_ns    = self.t_ns
     Vod     = self.vod
     Rs      = self.rs
     Cs      = self.cout * 1.e-12
@@ -46,12 +47,38 @@ def my_run_channel(self):
     pretap  = self.pretap
     posttap = self.posttap
     pattern_len = self.pattern_len
+    rx_bw     = self.rx_bw * 1.e9
+    peak_freq = self.peak_freq * 1.e9
+    peak_mag  = self.peak_mag
 
-    # Generate the impulse response of the channel.
+    # Generate the impulse response of the channel and CTLE, if selected.
+    # - channel
     gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
     H         = exp(-l_ch * gamma)
     G         = calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w)
-    g         = 2 * Vod * real(ifft(G))
+    # - ctle
+    w, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
+    H         = H / abs(H[0])  # Scale to force d.c. component of '1'.
+
+    if(False):
+        subplot(211)
+        semilogx(w / 2. / pi, 20. * log10(abs(H)))
+        ylabel("|H(f)| (dB)")
+        axis(xmin = 1.e8)
+        grid()
+        title("CTLE Frequency Response")
+        subplot(212)
+        semilogx(w / 2. / pi, 180. * angle(H) / pi)
+        ylabel("Phase (H) (deg.)")
+        xlabel("f (Hz)")
+        axis(xmin = 1.e8)
+        grid()
+        show()
+        #raise Exception("Quitting, now.")
+
+    G        *= H
+    # - impulse response
+    g         = 2. * Vod * real(ifft(G))
 
     # Trim impulse response, in order to shorten convolution processing time, by:
     #  - eliminating 90% of the overall delay from the beginning, and
@@ -65,19 +92,19 @@ def my_run_channel(self):
     while(P < Pt):
         P += g[i] ** 2
         i += 1
-    t_ns_chnl = self.t_ns[start_ix : i]
+    t_ns_chnl = t_ns[start_ix : i]
     g         = g[start_ix : i]
-    s         = g.cumsum()
-    if(False):
-        plot(self.t_ns[start_ix : i], g)
-        plot(self.t_ns[start_ix : i], s)
-        show()
+
+    # Calculate the channel step response and delay.
+    s            = g.cumsum()
+    step_xing_ix = where(s  > (s[-1] / 2.))[0][0]
+    chnl_dly     = t_ns_chnl[step_xing_ix] * 1.e-9
+    out_dly      = t_ns[step_xing_ix] * 1.e-9
 
     # Generate the ideal over-sampled signal.
     bits        = resize(array([0, 1] + [randint(2) for i in range(pattern_len - 2)]), nbits)
     bits        = 2 * bits - 1
     ffe         = [pretap, 1.0, posttap]
-    #ffe         = [1.0, posttap]
     bits        = convolve(ffe, bits, mode='same')
     x           = repeat(bits, nspb)
     ideal_xings = find_crossing_times(t, x, anlg=False)
@@ -86,19 +113,18 @@ def my_run_channel(self):
     y   = convolve(g, x)
     res = y[:len(x)]
 
-    if(True):
-        # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
-        # - Generate the ideal rectangular aggressor waveform.
-        pn_period          = 1. / pn_freq
-        pn_samps           = int(pn_period / Ts + 0.5)
-        pn                 = zeros(pn_samps)
-        pn[pn_samps // 2:] = pn_mag
-        pn                 = resize(pn, len(res))
-        # - High pass filter it. (Simulating capacitive coupling.)
-        (b, a) = iirfilter(2, gFc/(fs/2), btype='highpass')
-        pn     = lfilter(b, a, pn)[:len(pn)]
-        # Add the uncorrelated periodic and the random noise to the Tx output.
-        res += pn + normal(scale=rn, size=(len(res),))
+    # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
+    # - Generate the ideal rectangular aggressor waveform.
+    pn_period          = 1. / pn_freq
+    pn_samps           = int(pn_period / Ts + 0.5)
+    pn                 = zeros(pn_samps)
+    pn[pn_samps // 2:] = pn_mag
+    pn                 = resize(pn, len(res))
+    # - High pass filter it. (Simulating capacitive coupling.)
+    (b, a) = iirfilter(2, gFc/(fs/2), btype='highpass')
+    pn     = lfilter(b, a, pn)[:len(pn)]
+    # - Add the uncorrelated periodic and the random noise to the Tx output.
+    res += pn + normal(scale=rn, size=(len(res),))
     
     self.ideal_xings  = ideal_xings
     self.t_ns_chnl    = t_ns_chnl
@@ -106,6 +132,9 @@ def my_run_channel(self):
     self.ch_f_GHz     = w[1 : len(G) // 2] / (2 * pi) / 1.e9
     self.ch_imp_resp  = g
     self.ch_step_resp = s
+    self.chnl_dly     = chnl_dly
+    self.out_dly      = out_dly
+    self.chnl_in      = x
     self.chnl_out     = res         # Must come last, since what it triggers requires 'ideal_xings' be defined.
 
     self.channel_perf = nbits * nspb / (time.clock() - start_time)
@@ -130,9 +159,14 @@ def my_run_dfe(self):
     bandwidth       = self.sum_bw * 1.e9
     ideal           = self.sum_ideal
 
-    dfe             = DFE(n_taps, gain, delta_t, alpha, ui, nspb, decision_scaler,
-                          n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
-                          bandwidth=bandwidth, ideal=ideal)
+    if(self.use_dfe):
+        dfe = DFE(n_taps, gain, delta_t, alpha, ui, nspb, decision_scaler,
+                    n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
+                    bandwidth=bandwidth, ideal=ideal)
+    else:
+        dfe = DFE(n_taps,   0., delta_t, alpha, ui, nspb, decision_scaler,
+                    n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
+                    bandwidth=bandwidth, ideal=True)
 
     (res, tap_weights, ui_ests, clocks, lockeds, clock_times) = dfe.run(t, chnl_out) # Run the DFE on the input signal.
     assert len(filter(lambda x: x == None, res)) == 0, "len(t): %d, len(chnl_out): %d\nchnl_out:" % (len(t), len(chnl_out))
@@ -152,6 +186,7 @@ def update_results(self):
 
     # Direct transfers.
     self.plotdata.set_data("chnl_out", self.chnl_out)
+    self.plotdata.set_data("chnl_in", self.chnl_in)
     self.plotdata.set_data("t_ns", self.t_ns)
     self.plotdata.set_data("t_ns_chnl", self.t_ns_chnl)
     self.plotdata.set_data("ch_imp_resp", self.ch_imp_resp * 1.e-9 * self.fs ) # Need to scale from V/Ts to V/ns.
@@ -263,9 +298,8 @@ def my_run_simulation(self):
     nspb  = self.nspb
 
     my_run_channel(self)
-    if(self.use_dfe):
-        self.status = 'Running DFE...'
-        my_run_dfe(self)
+    self.status = 'Running DFE/CDR...'
+    my_run_dfe(self)
     self.status = 'Calculating results...'
     update_results(self)
     update_eyes(self)

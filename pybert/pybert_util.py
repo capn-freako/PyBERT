@@ -8,7 +8,7 @@
 from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, sqrt, power, exp
 from numpy.random import normal
 from numpy.fft    import fft
-from scipy.signal import lfilter, iirfilter
+from scipy.signal import lfilter, iirfilter, invres, freqs
 from dfe          import DFE
 from cdr          import CDR
 import time
@@ -94,13 +94,25 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     jitter   = []
     t_jitter = []
     i        = 0
+
     # Assemble the TIE track.
     for actual_xing in actual_xings:
+        tie = actual_xing - ideal_xings[i]
         # Check for multiple crossings and skip them.
-        if(actual_xing < (ideal_xings[i] - ui / 2.)):
+        if(tie < (-ui / 2.)):
             continue
         # Check for missed crossings and zero fill, as necessary.
-        while(i < len(ideal_xings) and (actual_xing - ideal_xings[i]) > (ui / 2.)):
+        #while(i < len(ideal_xings) and tie > (ui / 2.)):
+        while(i < len(ideal_xings) and tie > ui):
+
+            if(debug):
+                print "Just entered missed crossing detection with:"
+                print "i:", i
+                print "tie:", tie
+                print "ideal_xing:", ideal_xing[i]
+                print "actual_xing:", actual_xing
+                print
+
             for j in range(2): # If we missed one crossing, then we missed two.
                 if(i >= len(ideal_xings)):
                     if(debug):
@@ -109,8 +121,10 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
                 jitter.append(0.)
                 t_jitter.append(ideal_xings[i])
                 i += 1
+            tie = actual_xing - ideal_xings[i]
+            assert tie >= (-ui / 2.)
         if(i < len(ideal_xings)):
-            jitter.append(actual_xing - ideal_xings[i])
+            jitter.append(tie)
             t_jitter.append(ideal_xings[i])
         i += 1
         if(i >= len(ideal_xings)):
@@ -118,8 +132,19 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
                 print "Oops! Ran out of 'ideal_xings' entries. (i = %d, len(ideal_xings) = %d, len(jitter) = %d, len(actual_xings) = %d)" \
                         % (i, len(ideal_xings), len(jitter), len(actual_xings))
                 print "\tLast ideal xing: %e;   last actual xing: %e." % (ideal_xings[-1], actual_xings[-1])
+                print "\tLast edge just processed occured at time, %e." % t_jitter[-1]
             break
+
+    assert (len(jitter) == len(t_jitter)), "Error: Somehow, the lengths of the jitter vector and its time index are different!"
+
     jitter  = array(jitter)
+
+#    # DEBUG
+#    ixs = where(abs(jitter) > ui)[0]
+#    if(len(ixs)):
+#        ix = ixs[0]
+#        print "xings near large jitter:", actual_xings[ix - 5 : ix + 5]
+
     if(debug):
         print "mean(jitter):", mean(jitter)
         print "len(jitter):", len(jitter)
@@ -142,6 +167,8 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
         jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
     try:
         t_jitter = t_jitter[:len(jitter)]
+        if(len(jitter) > len(t_jitter)):
+            jitter = jitter[:len(t_jitter)]
     except:
         print "jitter:", jitter
         raise
@@ -424,4 +451,56 @@ def calc_eye(ui, samps_per_bit, height, ys, clock_times=None):
             start_ix += samps_per_bit
 
     return img_array
+
+def make_ctle(rx_bw, peak_freq, peak_mag, w):
+    """
+    Generate the frequency response of a continuous time linear
+    equalizer (CTLE), given the:
+     - signal path bandwidth,
+     - peaking specification, and
+     - list of frequencies of interest.
+
+    We use the 'invres()' function from scipy.signal, as it suggests
+    itself as a natural approach, given our chosen use model of having
+    the user provide the peaking frequency and degree of peaking.
+
+    That is, we define our desired frequency response using one zero
+    and two poles, where:
+    - The pole locations are equal to:
+       - the signal path natural bandwidth, and
+       - the user specified peaking frequency.
+    - The zero location is chosen, so as to provide the desired degree
+      of peaking.
+
+    Inputs:
+
+      - rx_bw        The natural (or, unequalized) signal path bandwidth (Hz).
+
+      - peak_freq    The location of the desired peak in the frequency
+                     response (Hz).
+
+      - peak_mag     The desired relative magnitude of the peak (dB). (|H(0)| = 1)
+
+      - w            The list of frequencies of interest (rads./s).
+
+    Outputs:
+
+      - w, H         The resultant complex frequency response, at the
+                     given frequencies.
+
+    """
+
+    p2   = -2. * pi * rx_bw
+    p1   = -2. * pi * peak_freq
+    #z    = -p2 / peak_mag / 2.
+    z    = p1 / pow(10., peak_mag / 20.)
+    if(p2 != p1):
+        r1   = (z - p1) / (p2 - p1)
+        r2   = 1 - r1
+    else:
+        r1   = -1.
+        r2   = z - p1
+    b, a = invres([r1, r2], [p1, p2], [])
+
+    return freqs(b, a, w)
 

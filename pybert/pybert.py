@@ -47,12 +47,15 @@ from pybert_view  import *
 from pybert_cntrl import *
 from pybert_util  import *
 
+debug = False
+
+
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
 gUI             = 100     # (ps)
-gNbits          = 10000   # number of bits to run
+gNbits          = 8000    # number of bits to run
 gPatLen         = 127     # repeating bit pattern length
-gNspb           = 100     # samples per bit
+gNspb           = 32      # samples per bit
 # - Channel Control
 #     - parameters for Howard Johnson's "Metallic Transmission Model"
 #     - (See "High Speed Signal Propagation", Sec. 3.1.)
@@ -63,7 +66,7 @@ gR0             = 1.452   # skin-effect resistance (Ohms/m)
 gTheta0         = .02     # loss tangent
 gZ0             = 100.    # characteristic impedance in LC region (Ohms)
 gv0             = 0.67    # relative propagation velocity (c)
-gl_ch           = 0.1     # cable length (m)
+gl_ch           = 1.0     # cable length (m)
 gRn             = 0.01    # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
 # - Tx
 gVod            = 1.0     # output drive strength (Vp)
@@ -75,12 +78,16 @@ gPnFreq         = 5.      # frequency of periodic noise (MHz)
 gRin            = 100     # differential input resistance
 gCin            = 0.50    # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
 gCac            = 1.      # a.c. coupling capacitance (uF) (Assumed to exist at both 'P' and 'N' nodes.)
+gBW             = 12.     # Rx signal path bandwidth, assuming no CTLE action. (GHz)
+gUseCtle        = True    # Include CTLE when running simulation.
 gUseDfe         = True    # Include DFE when running simulation.
 gDfeIdeal       = True    # DFE ideal summing node selector
+gPeakFreq       = 5.      # CTLE peaking frequency (GHz)
+gPeakMag        = 10.      # CTLE peaking magnitude (dB)
 # - DFE
 gDecisionScaler = 0.5
 gNtaps          = 5
-gGain           = 0.0
+gGain           = 0.1
 gNave           = 100
 gDfeBW          = 12.     # DFE summing node bandwidth (GHz)
 # - CDR
@@ -125,8 +132,11 @@ class PyBERT(HasTraits):
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
     cac             = Float(gCac)                                           # (uF)
+    rx_bw           = Float(gBW)                                            # (GHz)
     use_dfe         = Bool(gUseDfe)
     sum_ideal       = Bool(gDfeIdeal)
+    peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
+    peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
     # - DFE
     decision_scaler = Float(gDecisionScaler)
     gain            = Float(gGain)
@@ -152,9 +162,9 @@ class PyBERT(HasTraits):
     dfe_perf        = Float(1.)
     total_perf      = Float(0.)
     # - About
-    ident  = String('PyBERT v0.2 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v0.3 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    October 22, 2014\n\n \
+    November 8, 2014\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -191,6 +201,9 @@ class PyBERT(HasTraits):
     jitter_rx             = array([0.])          # Set by '_get_jitter_rejection_ratio()'.
     tie_ind_rx            = array([0.])          # Set by '_get_jitter_rejection_ratio()'.
     tie_ind_spectrum_rx   = array([0.])          # Set by '_get_jitter_rejection_ratio()'.
+    chnl_dly              = 0.                   # Set by 'my_run_channel()'.
+    out_dly               = 0.                   # Set by 'my_run_channel()'.
+    chnl_in               = array([0.])          # Set by 'my_run_channel()'.
 
     # Default initialization
     def __init__(self):
@@ -216,9 +229,11 @@ class PyBERT(HasTraits):
         self.plotdata = plotdata
 
         # Then, run the channel and the DFE, which includes the CDR implicitly, to generate the rest.
+        start_time = time.clock()
         my_run_channel(self)
         my_run_dfe(self)
         update_results(self)
+        self.total_perf   = nbits * nspb / (time.clock() - start_time)
 
         # Now, create all the various plots we need for our GUI.
         plot1 = Plot(plotdata)
@@ -249,7 +264,7 @@ class PyBERT(HasTraits):
         plot5        = Plot(plotdata)
         plot5.plot(('tie_hist_bins', 'tie_hist_counts'),         type="line", color="blue", name="Total")
         plot5.plot(('tie_ind_hist_bins', 'tie_ind_hist_counts'), type="line", color="red",  name="Data Independent")
-        plot5.title  = "Rx Input Jitter Distribution"
+        plot5.title  = "DFE Input Jitter Distribution"
         plot5.index_axis.title = "Time (ps)"
         plot5.value_axis.title = "Count"
         plot5.tools.append(PanTool(plot5, constrain=True, constrain_key=None, constrain_direction='x'))
@@ -261,7 +276,7 @@ class PyBERT(HasTraits):
         plot19        = Plot(plotdata)
         plot19.plot(('tie_hist_bins_rx', 'tie_hist_counts_rx'),         type="line", color="blue", name="Total")
         plot19.plot(('tie_ind_hist_bins_rx', 'tie_ind_hist_counts_rx'), type="line", color="red",  name="Data Independent")
-        plot19.title  = "Rx Output Jitter Distribution"
+        plot19.title  = "DFE Output Jitter Distribution"
         plot19.index_axis.title = "Time (ps)"
         plot19.value_axis.title = "Count"
         plot19.index_range = plot5.index_range # Zoom x-axes in tandem.
@@ -271,7 +286,7 @@ class PyBERT(HasTraits):
         plot6        = Plot(plotdata)
         plot6.plot(('f_MHz', 'jitter_spectrum'),       type="line", color="blue", name="Total")
         plot6.plot(('f_MHz', 'tie_ind_spectrum_chnl'), type="line", color="red",  name="Data Independent")
-        plot6.title  = "Rx Input Jitter Spectrum"
+        plot6.title  = "DFE Input Jitter Spectrum"
         plot6.index_axis.title = "Frequency (MHz)"
         plot6.value_axis.title = "|FFT(jitter)| (dBui)"
         plot6.tools.append(PanTool(plot6, constrain=True, constrain_key=None, constrain_direction='x'))
@@ -283,7 +298,7 @@ class PyBERT(HasTraits):
         plot20        = Plot(plotdata)
         plot20.plot(('f_MHz', 'jitter_spectrum_rx'),       type="line", color="blue", name="Total")
         plot20.plot(('f_MHz', 'tie_ind_spectrum_rx'), type="line", color="red",  name="Data Independent")
-        plot20.title  = "Rx Output Jitter Spectrum"
+        plot20.title  = "DFE Output Jitter Spectrum"
         plot20.index_axis.title = "Frequency (MHz)"
         plot20.value_axis.title = "|FFT(jitter)| (dBui)"
         plot20.index_range = plot6.index_range # Zoom x-axes in tandem.
@@ -292,6 +307,7 @@ class PyBERT(HasTraits):
 
         plot7 = Plot(plotdata)
         plot7.plot(("t_ns", "chnl_out"), type="line", color="blue")
+        #plot7.plot(("t_ns", "chnl_in"),  type="line", color="lightgray")
         plot7.title  = "Channel Output"
         plot7.index_axis.title = "Time (ns)"
         plot7.tools.append(PanTool(plot7, constrain=True, constrain_key=None, constrain_direction='x'))
@@ -385,7 +401,7 @@ class PyBERT(HasTraits):
         )
         plot10.y_direction = 'normal'
         plot10.components[0].y_direction = 'normal'
-        plot10.title  = "Rx Output"
+        plot10.title  = "DFE Output"
         plot10.x_axis.title = "Time (ps)"
         plot10.x_axis.orientation = "bottom"
         plot10.y_axis.title = "Rx Output (V)"
@@ -400,7 +416,7 @@ class PyBERT(HasTraits):
         )
         plot16.y_direction = 'normal'
         plot16.components[0].y_direction = 'normal'
-        plot16.title  = "Rx Input"
+        plot16.title  = "DFE Input"
         plot16.x_axis.title = "Time (ps)"
         plot16.x_axis.orientation = "bottom"
         plot16.y_axis.title = "Rx Input (V)"
@@ -436,6 +452,7 @@ class PyBERT(HasTraits):
         plot18.title            = "Channel Frequency Response"
         plot18.index_axis.title = "Frequency (GHz)"
         plot18.y_axis.title     = "Frequency Response (dB)"
+        plot18.value_range.low_setting  = -40
         zoom18 = ZoomTool(plot18, tool_mode="range", axis='index', always_on=False)
         plot18.overlays.append(zoom18)
 
@@ -529,15 +546,18 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_crossing_times_chnl_out(self):
-        ui = self.ui * 1.e-12
+        ui      = self.ui * 1.e-12
+        out_dly = self.out_dly
 
         xings = find_crossing_times(self.t, self.chnl_out)
         i = 0
-        while(xings[i] < ui / 2.):
+        while(xings[i] < (out_dly + ui / 2.)):
             i += 1
-        xings = xings[i:]
 
-        return xings
+        if(debug):
+            print "out_dly:", out_dly, "xings[i]:", xings[i]
+
+        return xings[i:]
 
     @cached_property
     def _get_jitter(self):
@@ -556,6 +576,7 @@ class PyBERT(HasTraits):
 
         # Calculate jitter and its histogram.
         (jitter, t_jitter, isi, dcd, pj, rj, tie_ind) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings)
+
         hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
         bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
         self.tie_hist_counts = hist
@@ -673,14 +694,22 @@ class PyBERT(HasTraits):
         pj_rx         = self.pj_rx * 1.e12
         rj_rx         = self.rj_rx * 1.e12
 
-        isi_rej = isi_chnl / isi_rx
-        dcd_rej = dcd_chnl / dcd_rx
-        pj_rej  = pj_chnl  / pj_rx
-        rj_rej  = rj_chnl  / rj_rx
+        isi_rej = 1.e20
+        dcd_rej = 1.e20
+        pj_rej  = 1.e20
+        rj_rej  = 1.e20
+        if(isi_rx):
+            isi_rej = isi_chnl / isi_rx
+        if(dcd_rx):
+            dcd_rej = dcd_chnl / dcd_rx
+        if(pj_rx):
+            pj_rej  = pj_chnl  / pj_rx
+        if(rj_rx):
+            rj_rej  = rj_chnl  / rj_rx
 
         info_str = '<TABLE border="1">\n'
         info_str += '<TR align="center">\n'
-        info_str += "<TH>Component</TH><TH>Channel Output (ps)</TH><TH>Rx Output (ps)</TH><TH>Rejection (dB)</TH>\n"
+        info_str += "<TH>Component</TH><TH>DFE Input (ps)</TH><TH>DFE Output (ps)</TH><TH>Rejection (dB)</TH>\n"
         info_str += "</TR>\n"
         info_str += '<TR align="right">\n'
         info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
@@ -704,11 +733,12 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
-                     (self.isi_rx * 1.e12, self.dcd_rx * 1.e12, self.pj_rx * 1.e12, self.rj_rx * 1.e12)
         perf_str = "%-20s | Perf. (Msmpls/min.):    Channel = %4.1f    DFE = %4.1f    TOTAL = %4.1f" % \
                      (self.status, self.channel_perf * 60.e-6, self.dfe_perf * 60.e-6, self.total_perf * 60.e-6)
-        return perf_str + jit_str
+        jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
+                     (self.isi_rx * 1.e12, self.dcd_rx * 1.e12, self.pj_rx * 1.e12, self.rj_rx * 1.e12)
+        dly_str  = "         | Channel Delay (ns):    %5.3f" % (self.chnl_dly * 1.e9)
+        return perf_str + dly_str + jit_str
 
 if __name__ == '__main__':
     PyBERT().configure_traits(view=traits_view)
