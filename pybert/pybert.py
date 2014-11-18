@@ -286,6 +286,7 @@ class PyBERT(HasTraits):
         plot6        = Plot(plotdata)
         plot6.plot(('f_MHz', 'jitter_spectrum'),       type="line", color="blue", name="Total")
         plot6.plot(('f_MHz', 'tie_ind_spectrum_chnl'), type="line", color="red",  name="Data Independent")
+        plot6.plot(('f_MHz', 'thresh_chnl'),           type="line", color="cyan", name="Pj Threshold")
         plot6.title  = "DFE Input Jitter Spectrum"
         plot6.index_axis.title = "Frequency (MHz)"
         plot6.value_axis.title = "|FFT(jitter)| (dBui)"
@@ -298,6 +299,7 @@ class PyBERT(HasTraits):
         plot20        = Plot(plotdata)
         plot20.plot(('f_MHz', 'jitter_spectrum_rx'),       type="line", color="blue", name="Total")
         plot20.plot(('f_MHz', 'tie_ind_spectrum_rx'), type="line", color="red",  name="Data Independent")
+        plot20.plot(('f_MHz', 'thresh_rx'),           type="line", color="cyan", name="Pj Threshold")
         plot20.title  = "DFE Output Jitter Spectrum"
         plot20.index_axis.title = "Frequency (MHz)"
         plot20.value_axis.title = "|FFT(jitter)| (dBui)"
@@ -575,7 +577,7 @@ class PyBERT(HasTraits):
         actual_xings -= dly
 
         # Calculate jitter and its histogram.
-        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings)
+        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, thresh) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings)
 
         hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
         bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
@@ -593,6 +595,7 @@ class PyBERT(HasTraits):
         self.dcd_chnl        = dcd
         self.pj_chnl         = pj
         self.rj_chnl         = rj
+        self.thresh_chnl     = thresh
         self.tie_ind_chnl    = list(tie_ind)
 
         return list(jitter)
@@ -653,7 +656,7 @@ class PyBERT(HasTraits):
         xings       = array(xings)       - ignore_until
 
         # Calculate the jitter and its spectrum.
-        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, xings)
+        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, thresh) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, xings)
         hist, bin_edges             = histogram(jitter, 99, (-ui/2., ui/2.))
         bin_centers                 = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
         self.tie_hist_counts_rx     = hist
@@ -680,6 +683,7 @@ class PyBERT(HasTraits):
         self.dcd_rx        = dcd
         self.pj_rx         = pj
         self.rj_rx         = rj
+        self.thresh_rx     = thresh
 
         return jrr
 

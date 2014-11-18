@@ -8,7 +8,7 @@
 from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, sqrt, power, exp
 from numpy.random import normal
 from numpy.fft    import fft
-from scipy.signal import lfilter, iirfilter, invres, freqs
+from scipy.signal import lfilter, iirfilter, invres, freqs, medfilt
 from dfe          import DFE
 from cdr          import CDR
 import time
@@ -83,6 +83,8 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
       - rj       : The standard deviation of the jitter due to uncorrelated unbounded random sources.
 
       - tie_ind  : The data independent jitter.
+
+      - thresh   : Threshold for determining periodic components.
 
     Notes:
 
@@ -214,18 +216,26 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
         show()
 
     # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
-    y        = fft(make_uniform(t_jitter, tie_ind, ui, nbits))
+    y        = fft(make_uniform(t_jitter, tie_ind, ui, nbits)) / sqrt(len(tie_ind)) # Normalized, in order to make power correct.
     y_mag    = abs(y)
-    y_sigma  = sqrt(mean((y_mag - mean(y_mag)) ** 2))
-    # - We'll call any spectral component with a magnitude > 6-sigma a "peak".
-    thresh   = 6 * y_sigma
+    # - Form moving 3-sigma average threshold vector.
+    #y_sigma  = sqrt(mean((y_mag - mean(y_mag)) ** 2))
+    y_mean   = mean(y_mag)
+    y_var    = (y_mag - y_mean) ** 2
+    y_sigma  = sqrt(y_var)
+#    win      = ones(9) / 3. # Yields a magnification of 3.
+#    thresh   = convolve(win, y_sigma, mode='same')
+    #thresh   = 3. * medfilt(y_sigma, 31)
+    thresh   = 3. * medfilt(y_mag, 31)
     y_per    = where(y_mag > thresh, y, zeros(len(y)))
 
     if(debug):
+        plot(y_mag)
+        plot(thresh)
+        show()
         print "# of spectral peaks detected:", len(where(y_per)[0])
-        print "thresh:", thresh, "max(y_mag):", max(y_mag)
 
-    tie_per  = real(ifft(y_per))
+    tie_per  = real(ifft(y_per)) * sqrt(len(tie_ind)) 
     pj       = tie_per.ptp()
 
     if(debug):
@@ -237,7 +247,17 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     tie_rnd  = make_uniform(ideal_xings[:len(tie_ind)], tie_ind, ui, nbits) - tie_per
     rj       = sqrt(mean((tie_rnd - mean(tie_rnd)) ** 2))
 
-    return (jitter, t_jitter, isi, dcd, pj, rj, tie_ind)
+    # - Fit the appropriate model to the distribution.
+    #   - Count the peaks.
+
+    hist, bin_edges             = histogram(tie_ind, 99, (-ui/2., ui/2.))
+    bin_centers                 = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
+
+    if(debug):
+        plot(bin_centers, hist)
+        show()
+
+    return (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, thresh)
 
 def make_uniform(t, jitter, ui, nbits):
     """

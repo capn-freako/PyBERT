@@ -209,6 +209,8 @@ def update_results(self):
     self.plotdata.set_data("jitter_spectrum", self.jitter_spectrum[1:])
     self.plotdata.set_data("tie_ind_spectrum_chnl", self.tie_ind_spectrum_chnl[1:])
     self.plotdata.set_data("tie_ind_spectrum_rx", self.tie_ind_spectrum_rx[1:])
+    self.plotdata.set_data("thresh_chnl", 10. * log10(self.thresh_chnl[1:]))
+    self.plotdata.set_data("thresh_rx", 10. * log10(self.thresh_rx[1:]))
     self.plotdata.set_data("f_MHz", self.f_MHz[1:])
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
     self.plotdata.set_data("jitter_rx", self.jitter_rx[1:] * 1.e12)
