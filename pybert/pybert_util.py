@@ -96,73 +96,44 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     jitter   = []
     t_jitter = []
     i        = 0
-
     # Assemble the TIE track.
-    for actual_xing in actual_xings:
-        tie = actual_xing - ideal_xings[i]
-        # Check for multiple crossings and skip them.
-        if(tie < (-ui / 2.)):
-            continue
-        # Check for missed crossings and zero fill, as necessary.
-        #while(i < len(ideal_xings) and tie > (ui / 2.)):
-        while(i < len(ideal_xings) and tie > ui):
-
-            if(debug):
-                print "Just entered missed crossing detection with:"
-                print "i:", i
-                print "tie:", tie
-                print "ideal_xing:", ideal_xing[i]
-                print "actual_xing:", actual_xing
-                print
-
-            for j in range(2): # If we missed one crossing, then we missed two.
-                if(i >= len(ideal_xings)):
-                    if(debug):
-                        print "Oops! Ran out of 'ideal_xings' entries while correcting for missed crossings."
-                    break
-                jitter.append(0.)
-                t_jitter.append(ideal_xings[i])
-                i += 1
-            tie = actual_xing - ideal_xings[i]
-            assert tie >= (-ui / 2.)
-        if(i < len(ideal_xings)):
-            jitter.append(tie)
-            t_jitter.append(ideal_xings[i])
-        i += 1
-        if(i >= len(ideal_xings)):
-            if(debug):
-                print "Oops! Ran out of 'ideal_xings' entries. (i = %d, len(ideal_xings) = %d, len(jitter) = %d, len(actual_xings) = %d)" \
-                        % (i, len(ideal_xings), len(jitter), len(actual_xings))
-                print "\tLast ideal xing: %e;   last actual xing: %e." % (ideal_xings[-1], actual_xings[-1])
-                print "\tLast edge just processed occured at time, %e." % t_jitter[-1]
+    for ideal_xing in ideal_xings:
+        # Find the first actual crossing occuring within [-ui/2, ui/2]
+        # of the ideal crossing, checking for missing crossings.
+        min_t = ideal_xing - ui / 2.
+        max_t = ideal_xing + ui / 2.
+        while(i < len(actual_xings) and actual_xings[i] < min_t):
+            i += 1
+        if(i == len(actual_xings)):  # We've exhausted the list of actual crossings; we're done.
             break
-
-    assert (len(jitter) == len(t_jitter)), "Error: Somehow, the lengths of the jitter vector and its time index are different!"
-
+        if(actual_xings[i] > max_t): # Means the xing we're looking for didn't occur, in the actual signal.
+            jitter.append(0.)        # Zero pad jitter vector for missing crossings.
+        else:
+            jitter.append(actual_xings[i] - ideal_xing)
+            i += 1
+        t_jitter.append(ideal_xing)
     jitter  = array(jitter)
-
-#    # DEBUG
-#    ixs = where(abs(jitter) > ui)[0]
-#    if(len(ixs)):
-#        ix = ixs[0]
-#        print "xings near large jitter:", actual_xings[ix - 5 : ix + 5]
 
     if(debug):
         print "mean(jitter):", mean(jitter)
         print "len(jitter):", len(jitter)
     jitter -= mean(jitter)
+
     # Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
     # - We have to be careful to keep the last crossing, in the case where there are an odd number of them,
     #   because we'll be assembling a "repeated average" vector, later, and subtracting it from the original
     #   jitter vector. So, we can't get sloppy, or we'll end up with misalignment between the two.
     try:
-        xings_per_pattern    = where(ideal_xings > pattern_len * ui)[0][0]
+        xings_per_pattern = where(ideal_xings > pattern_len * ui + ui / 2.)[0][0]
     except:
         print "ideal_xings:", ideal_xings
         raise
-    assert not (xings_per_pattern % 2), "Odd number of crossings per pattern detected!"
-    risings_per_pattern  = xings_per_pattern // 2
-    fallings_per_pattern = xings_per_pattern // 2
+
+    if(xings_per_pattern % 2):
+        print "Odd number of crossings per pattern detected!"
+        print "ideal_xings[0]:", ideal_xings[0], "actual_xings[0]:", actual_xings[0]
+
+    risings_per_pattern  = fallings_per_pattern = xings_per_pattern // 2
     num_patterns         = nbits // pattern_len - 1
     jitter = jitter[xings_per_pattern:] # The first pattern period is problematic.
     if(len(jitter) < xings_per_pattern * num_patterns):
