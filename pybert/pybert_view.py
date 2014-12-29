@@ -85,9 +85,13 @@ traits_view = View(
                 Item(name='sum_bw',    label='BW (GHz)', tooltip="summing node bandwidth", ),
                 label='DFE Parameters', show_border=True,
             ),
+            VGroup(
+                Item(name='thresh',          label='Pj Thresh.',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
+                label='Analysis Parameters', show_border=True,
+            ),
             label = 'Config.', id = 'config',
             layout = 'flow',
-            columns = 2,
+#            columns = 2,
         ),
         Group(
             Item('plot_in', editor=ComponentEditor(), show_label=False,),

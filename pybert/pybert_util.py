@@ -5,17 +5,24 @@
 #
 # Copyright (c) 2014 David Banas; all rights reserved World wide.
 
-from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, sqrt, power, exp
+from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, sqrt, power, exp, cumsum
 from numpy.random import normal
 from numpy.fft    import fft
 from scipy.signal import lfilter, iirfilter, invres, freqs, medfilt
+#from scipy.stats  import norm
 from dfe          import DFE
 from cdr          import CDR
 import time
 from pylab import *
 import numpy as np
+import scipy.stats as ss
 
 debug = False
+
+def moving_average(a, n=3) :
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return np.insert(ret[n - 1:], 0, ret[n - 1] * ones(n - 1)) / n
 
 def find_crossing_times(t, x, anlg=True):
     """
@@ -52,7 +59,7 @@ def find_crossing_times(t, x, anlg=True):
         xings    = [t[i + 1] for i in xing_ix]
     return array(xings)
 
-def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
+def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4):
     """
     Calculate the jitter in a set of actual zero crossings, given the ideal crossings and unit interval.
 
@@ -67,6 +74,8 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
       - ideal_xings      : The ideal zero crossing locations of the edges.
 
       - actual_xings     : The actual zero crossing locations of the edges.
+
+      - rel_thresh       : (optional) The threshold for determining periodic jitter spectral components (sigma).
 
     Outputs:
 
@@ -85,6 +94,18 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
       - tie_ind  : The data independent jitter.
 
       - thresh   : Threshold for determining periodic components.
+
+      - jitter_spectrum  : The spectral magnitude of the total jitter.
+
+      - tie_ind_spectrum : The spectral magnitude of the data independent jitter.
+
+      - spectrum_freqs   : The frequencies corresponding to the spectrum components.
+
+      - hist        : The histogram of the actual jitter.
+
+      - hist_synth  : The histogram of the extrapolated jitter.
+
+      - bin_centers : The bin center values for both histograms.
 
     Notes:
 
@@ -117,6 +138,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     if(debug):
         print "mean(jitter):", mean(jitter)
         print "len(jitter):", len(jitter)
+
     jitter -= mean(jitter)
 
     # Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
@@ -138,6 +160,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     jitter = jitter[xings_per_pattern:] # The first pattern period is problematic.
     if(len(jitter) < xings_per_pattern * num_patterns):
         jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
+
     try:
         t_jitter = t_jitter[:len(jitter)]
         if(len(jitter) > len(t_jitter)):
@@ -145,6 +168,13 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
     except:
         print "jitter:", jitter
         raise
+
+    x, valid_ix     = make_uniform(t_jitter, jitter, ui, nbits)
+    y               = fft(x)
+    jitter_spectrum = abs(y[:len(y) / 2]) / sqrt(len(jitter)) # Normalized, in order to make power correct.
+    f0              = 1. / (ui * nbits)
+    spectrum_freqs  = [i * f0 for i in range(len(y) / 2)]
+
     try:
         tie_risings          = reshape(jitter.take(range(0, num_patterns * risings_per_pattern * 2, 2)),  (num_patterns, risings_per_pattern))
         tie_fallings         = reshape(jitter.take(range(1, num_patterns * fallings_per_pattern * 2, 2)), (num_patterns, fallings_per_pattern))
@@ -153,6 +183,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
         print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
         print "nbits:", nbits, "pattern_len:", pattern_len
         raise
+
     assert len(filter(lambda x: x == None, tie_risings)) == 0, "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
                                            (num_patterns, risings_per_pattern, len(jitter))
     assert len(filter(lambda x: x == None, tie_fallings)) == 0, "num_patterns: %d, fallings_per_pattern: %d, len(jitter): %d" % \
@@ -176,6 +207,48 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
         print "tie_ave:", tie_ave
         raise
 
+    # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
+    tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nbits)
+    # -- Normalized, in order to make power correct, since we grab Rj from the freq. domain.
+    # -- (I'm using the length of the vector before zero padding, because zero padding doesn't add energy.)
+    y        = fft(tie_ind_uniform) / sqrt(len(tie_ind))
+    y_mag    = abs(y)
+    tie_ind_spectrum = y_mag[:len(y_mag) / 2]
+    y_mean   = moving_average(y_mag, n = len(y_mag) / 10)
+    y_var    = moving_average((y_mag - y_mean) ** 2, n = len(y_mag) / 10)
+    y_sigma  = sqrt(y_var)
+    thresh   = y_mean + rel_thresh * y_sigma
+    y_per    = where(y_mag > thresh, y, zeros(len(y)))
+    y_rnd    = abs(where(y_mag > thresh, zeros(len(y)), y))
+    rj       = sqrt(mean((y_rnd - mean(y_rnd)) ** 2))
+    tie_per  = real(ifft(y_per)).take(valid_ix) * sqrt(len(tie_ind))
+    pj       = tie_per.ptp()
+
+    # - Reassemble the jitter, excluding the Rj.
+    jitter_synth         = tie_ave + tie_per
+
+    # - Calculate the histogram of original, for comparison.
+    hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
+    bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
+
+    # - Calculate the histogram of everything, except Rj.
+    hist_synth, bin_edges = histogram(jitter_synth, 99, (-ui/2., ui/2.))
+
+    # - Extrapolate the tails by convolving w/ complete Gaussian.
+    rv         = ss.norm(loc = 0., scale = rj)
+    rj_pdf     = rv.pdf(bin_centers)
+    rj_pdf     = rj_pdf / sum(rj_pdf)
+
+    hist_synth_orig = hist_synth
+    hist_synth = convolve(hist_synth, rj_pdf, mode='same')
+
+    # TEMPORARY DEBUGGING
+#    plot(bin_centers, rj_pdf, label="Rj")
+#    plot(bin_centers, hist_synth_orig, label="Dj")
+#    plot(bin_centers, hist_synth, label="Conv.")
+#    legend()
+#    show()
+
     if(debug):
         plot(jitter,                                               label="jitter",          color="b")
         plot(concatenate(zip(tie_risings_ave, tie_fallings_ave)),  label="rise/fall aves.", color="r")
@@ -185,50 +258,23 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings):
         plot(t_jitter, tie_ind)
         title("Data Independent Jitter")
         show()
-
-    # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
-    y        = fft(make_uniform(t_jitter, tie_ind, ui, nbits)) / sqrt(len(tie_ind)) # Normalized, in order to make power correct.
-    y_mag    = abs(y)
-    # - Form moving 3-sigma average threshold vector.
-    #y_sigma  = sqrt(mean((y_mag - mean(y_mag)) ** 2))
-    y_mean   = mean(y_mag)
-    y_var    = (y_mag - y_mean) ** 2
-    y_sigma  = sqrt(y_var)
-#    win      = ones(9) / 3. # Yields a magnification of 3.
-#    thresh   = convolve(win, y_sigma, mode='same')
-    #thresh   = 3. * medfilt(y_sigma, 31)
-    thresh   = 3. * medfilt(y_mag, 31)
-    y_per    = where(y_mag > thresh, y, zeros(len(y)))
-
-    if(debug):
         plot(y_mag)
         plot(thresh)
+        title("Data Independed Jitter Spectral Magnitude and Pj Threshold")
         show()
         print "# of spectral peaks detected:", len(where(y_per)[0])
-
-    tie_per  = real(ifft(y_per)) * sqrt(len(tie_ind)) 
-    pj       = tie_per.ptp()
-
-    if(debug):
         plot(tie_per)
         title("Periodic Jitter")
         show()
-
-    # - Subtract the periodic jitter and calculate the standard deviation of what's left.
-    tie_rnd  = make_uniform(ideal_xings[:len(tie_ind)], tie_ind, ui, nbits) - tie_per
-    rj       = sqrt(mean((tie_rnd - mean(tie_rnd)) ** 2))
-
-    # - Fit the appropriate model to the distribution.
-    #   - Count the peaks.
-
-    hist, bin_edges             = histogram(tie_ind, 99, (-ui/2., ui/2.))
-    bin_centers                 = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
-
-    if(debug):
+        hist, bin_edges             = histogram(tie_ind, 99, (-ui/2., ui/2.))
+        bin_centers                 = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
         plot(bin_centers, hist)
+        title("Data Independent Jitter Distribution")
         show()
 
-    return (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, thresh)
+    return (jitter, t_jitter, isi, dcd, pj, rj, tie_ind,
+            thresh[:len(thresh) / 2], jitter_spectrum, tie_ind_spectrum, spectrum_freqs,
+            hist, hist_synth, bin_centers)
 
 def make_uniform(t, jitter, ui, nbits):
     """
@@ -250,26 +296,37 @@ def make_uniform(t, jitter, ui, nbits):
 
     Output:
 
-    - y      : The FFT of the input jitter.
+    - y      : The uniformly sampled, zero padded jitter vector.
+
+    - y_ix   : The indices where y is valid (i.e. - not zero padded).
 
     """
 
     assert len(t) == len(jitter), "Length of t (%d) and jitter (%d) must be equal!" % (len(t), len(jitter))
 
-    half_n         = nbits / 2
     run_lengths    = map(int, diff(t) / ui + 0.5)
+    valid_ix       = [0] + list(cumsum(run_lengths))
+    valid_ix       = filter(lambda x: x < nbits, valid_ix)
     missing        = where(array(run_lengths) > 1)[0]
     num_insertions = 0
     jitter         = list(jitter) # Because we use 'insert'.
+
     for i in missing:
         for j in range(run_lengths[i] - 1):
             jitter.insert(i + 1 + num_insertions, 0.)
             num_insertions += 1
+
     if(len(jitter) < nbits):
         jitter.extend([0.] * (nbits - len(jitter)))
     if(len(jitter) > nbits):
         jitter = jitter[:nbits]
-    return jitter
+
+    return jitter, valid_ix
+
+def extrapolate_histogram(hist, rj, ber=1.e-15):
+    """
+    Extrapolate the tails of a histogram by convolving it
+    """
 
 def calc_jitter_spectrum(t, jitter, ui, nbits):
     """
@@ -428,7 +485,8 @@ def calc_eye(ui, samps_per_bit, height, ys, clock_times=None):
                 last_y = y
                 i += 1
     else:
-        start_ix      = where(diff(sign(ys)))[0][1] + 1 + samps_per_bit // 2 # The first crossing can be "off"; so, I use the second.
+#        start_ix      = where(diff(sign(ys)))[0][1] + 1 + samps_per_bit // 2 # The first crossing can be "off"; so, I use the second.
+        start_ix      = (where(diff(sign(ys)))[0] % samps_per_bit).mean() + samps_per_bit // 2 
         last_start_ix = len(ys) - 2 * samps_per_bit
         while(start_ix < last_start_ix):
             last_y = ys[start_ix]

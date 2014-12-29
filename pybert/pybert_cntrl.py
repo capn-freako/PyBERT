@@ -184,6 +184,16 @@ def my_run_dfe(self):
 def update_results(self):
     """Updates all plot data used by GUI."""
 
+    # Copy globals into local namespace.
+    ui            = self.ui * 1.e-12
+    samps_per_bit = self.nspb
+    eye_bits      = self.eye_bits
+    num_bits      = self.nbits
+    chnl_output   = self.chnl_out
+    dfe_output    = self.run_result
+    clocks        = self.clocks
+    clock_times   = self.clock_times
+
     # Direct transfers.
     self.plotdata.set_data("chnl_out", self.chnl_out)
     self.plotdata.set_data("chnl_in", self.chnl_in)
@@ -206,18 +216,18 @@ def update_results(self):
     self.plotdata.set_data("tie_hist_counts_rx", self.tie_hist_counts_rx)
     self.plotdata.set_data("tie_ind_hist_bins_rx", array(self.tie_ind_hist_bins_rx) * 1.e12)
     self.plotdata.set_data("tie_ind_hist_counts_rx", self.tie_ind_hist_counts_rx)
-    self.plotdata.set_data("jitter_spectrum", self.jitter_spectrum[1:])
-    self.plotdata.set_data("tie_ind_spectrum_chnl", self.tie_ind_spectrum_chnl[1:])
-    self.plotdata.set_data("tie_ind_spectrum_rx", self.tie_ind_spectrum_rx[1:])
-    self.plotdata.set_data("thresh_chnl", 10. * log10(self.thresh_chnl[1:]))
-    self.plotdata.set_data("thresh_rx", 10. * log10(self.thresh_rx[1:]))
+    self.plotdata.set_data("jitter_spectrum",       10. * (log10(self.jitter_spectrum[1:])       - log10(ui)))
+    self.plotdata.set_data("tie_ind_spectrum_chnl", 10. * (log10(self.tie_ind_spectrum_chnl[1:]) - log10(ui)))
+    self.plotdata.set_data("thresh_chnl",           10. * (log10(self.thresh_chnl[1:])           - log10(ui)))
+    self.plotdata.set_data("jitter_spectrum_rx",    10. * (log10(self.jitter_spectrum_rx[1:])    - log10(ui)))
+    self.plotdata.set_data("tie_ind_spectrum_rx",   10. * (log10(self.tie_ind_spectrum_rx[1:])   - log10(ui)))
+    self.plotdata.set_data("thresh_rx",             10. * (log10(self.thresh_rx[1:])             - log10(ui)))
     self.plotdata.set_data("f_MHz", self.f_MHz[1:])
+    self.plotdata.set_data("f_MHz_rx", self.f_MHz_rx[1:])
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
     self.plotdata.set_data("jitter_rx", self.jitter_rx[1:] * 1.e12)
     self.plotdata.set_data("t_jitter_rx", array(self.t_jitter_rx) * 1.e9)
     self.plotdata.set_data("tie_ind_rx", self.tie_ind_rx[1:] * 1.e12)
-    self.plotdata.set_data("jitter_spectrum_rx", self.jitter_spectrum_rx[1:])
-    self.plotdata.set_data("tie_ind_spectrum_rx", self.tie_ind_spectrum_rx[1:])
     self.plotdata.set_data("dfe_out", self.run_result)
     # DFE tap weights.
     tap_weights = transpose(array(self.adaptation))
@@ -228,15 +238,6 @@ def update_results(self):
     self.plotdata.set_data("tap_weight_index", range(len(tap_weight)))
 
     # Calculated results.
-    #  - Copy globals into local namespace.
-    ui            = self.ui * 1.e-12
-    samps_per_bit = self.nspb
-    eye_bits      = self.eye_bits
-    num_bits      = self.nbits
-    chnl_output   = self.chnl_out
-    dfe_output    = self.run_result
-    clocks        = self.clocks
-    clock_times   = self.clock_times
     #  - Adjust the scaling.
     width    = 2 * samps_per_bit
     height   = 100

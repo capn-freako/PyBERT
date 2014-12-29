@@ -12,11 +12,11 @@ can be used to explore the concepts of serial communication link design.
 The application source is divided among several files, as follows:
 
     pybert.py       - This file. It contains:
-      - independent variable declarations
-      - default initialization
-      - the definitions of those dependent variables, which are handled
-        automatically by the Traits/UI machinery.
-
+                      - independent variable declarations
+                      - default initialization
+                      - the definitions of those dependent variables, which are handled
+                        automatically by the Traits/UI machinery.
+                
     pybert_view.py  - Contains the main window layout definition, as
                       well as the definitions of user invoked actions
                       (i.e.- buttons).
@@ -73,7 +73,7 @@ gVod            = 1.0     # output drive strength (Vp)
 gRs             = 100     # differential source impedance (Ohms)
 gCout           = 0.50    # parasitic output capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
 gPnMag          = 0.1     # magnitude of periodic noise (V)
-gPnFreq         = 5.      # frequency of periodic noise (MHz)
+gPnFreq         = 0.437   # frequency of periodic noise (MHz)
 # - Rx
 gRin            = 100     # differential input resistance
 gCin            = 0.50    # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
@@ -83,7 +83,7 @@ gUseCtle        = True    # Include CTLE when running simulation.
 gUseDfe         = True    # Include DFE when running simulation.
 gDfeIdeal       = True    # DFE ideal summing node selector
 gPeakFreq       = 5.      # CTLE peaking frequency (GHz)
-gPeakMag        = 10.      # CTLE peaking magnitude (dB)
+gPeakMag        = 10.     # CTLE peaking magnitude (dB)
 # - DFE
 gDecisionScaler = 0.5
 gNtaps          = 5
@@ -96,6 +96,8 @@ gAlpha          = 0.01
 gNLockAve       = 500     # number of UI used to average CDR locked status.
 gRelLockTol     = .1      # relative lock tolerance of CDR.
 gLockSustain    = 500
+# - Analysis
+gThresh         = 4       # threshold for identifying periodic jitter spectral elements (sigma)
 
 class PyBERT(HasTraits):
     """
@@ -149,7 +151,10 @@ class PyBERT(HasTraits):
     n_lock_ave      = Int(gNLockAve)
     rel_lock_tol    = Float(gRelLockTol)
     lock_sustain    = Int(gLockSustain)
-    # - Plots
+    # - Analysis
+    thresh          = Int(gThresh)
+    # - Plots (plot containers, actually)
+    # ToDo: These names are outdated and will confuse people attempting to contribute. Update them.
     plot_out        = Instance(VPlotContainer)
     plot_in         = Instance(GridPlotContainer)
     plot_dfe        = Instance(GridPlotContainer)
@@ -162,13 +167,14 @@ class PyBERT(HasTraits):
     dfe_perf        = Float(1.)
     total_perf      = Float(0.)
     # - About
-    ident  = String('PyBERT v0.3 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v0.4 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    November 8, 2014\n\n \
+    December 25, 2014\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
     # Dependent variables
+    # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
     npts                    = Property(Array, depends_on=['nbits', 'nspb'])
     eye_offset              = Property(Int,   depends_on=['nspb'])
     t                       = Property(Array, depends_on=['ui', 'npts', 'nspb'])
@@ -178,26 +184,25 @@ class PyBERT(HasTraits):
     fs                      = Property(Array, depends_on=['ui', 'nspb'])
     crossing_times_chnl_out = Property(Array, depends_on=['chnl_out'])
     jitter                  = Property(Array, depends_on=['crossing_times_chnl_out'])
-    jitter_spectrum         = Property(Array, depends_on=['jitter'])
     jitter_rejection_ratio  = Property(Array, depends_on=['run_result'])
     jitter_info             = Property(HTML,  depends_on=['jitter_rejection_ratio'])
     status_str              = Property(String,  depends_on=['status', 'channel_perf', 'cdr_perf', 'dfe_perf', 'jitter'])
-
-    # Handler set variables
-    #  - These require "_changed()" handlers.
-    t_ns_chnl    = Array()
-    ch_imp_resp  = Array()
-    ch_step_resp = Array()
-    chnl_out    = Array()
-    run_result  = Array()
-    adaptation  = Array()
-    ui_ests     = Array()
-    clocks      = Array()
-    lockeds     = Array()
-    #  - These do not.
-    t_jitter              = array([0.])          # Set by '_get_jitter()'.
+    # - Handled by pybert_cntrl.py, upon user button clicks. (May contain "large overhead" variables.)
+    #   - These are dependencies. So, they must be Array()s.
+    chnl_out    = Array()                        # Set by 'my_run_channel()'.
+    run_result  = Array()                        # Set by 'my_run_dfe()'.
+    #   - These are not.
+    t_ns_chnl             = array([0.])          # Set by 'my_run_channel()'.
+    ch_imp_resp           = array([0.])          # Set by 'my_run_channel()'.
+    ch_step_resp          = array([0.])          # Set by 'my_run_channel()'.
+    adaptation            = array([0.])          # Set by 'my_run_dfe()'.
+    ui_ests               = array([0.])          # Set by 'my_run_dfe()'.
+    clocks                = array([0.])          # Set by 'my_run_dfe()'.
+    lockeds               = array([0.])          # Set by 'my_run_dfe()'.
+    t_jitter              = array([0.])          # Set by '_get_jitter()' (This is okay, since the getter isn't triggered until 'chnl_out' is updated.
     tie_ind_chnl          = array([0.])          # Set by '_get_jitter()'.
-    tie_ind_spectrum_chnl = array([0.])          # Set by '_get_jitter_spectrum()'.
+    jitter_spectrum       = array([0.])          # Set by '_get_jitter()'.
+    tie_ind_spectrum_chnl = array([0.])          # Set by '_get_jitter()'.
     jitter_rx             = array([0.])          # Set by '_get_jitter_rejection_ratio()'.
     tie_ind_rx            = array([0.])          # Set by '_get_jitter_rejection_ratio()'.
     tie_ind_spectrum_rx   = array([0.])          # Set by '_get_jitter_rejection_ratio()'.
@@ -262,8 +267,8 @@ class PyBERT(HasTraits):
         plot3.overlays.append(zoom3)
 
         plot5        = Plot(plotdata)
-        plot5.plot(('tie_hist_bins', 'tie_hist_counts'),         type="line", color="blue", name="Total")
-        plot5.plot(('tie_ind_hist_bins', 'tie_ind_hist_counts'), type="line", color="red",  name="Data Independent")
+        plot5.plot(('tie_hist_bins', 'tie_hist_counts'),         type="line", color="blue", name="Measured")
+        plot5.plot(('tie_ind_hist_bins', 'tie_ind_hist_counts'), type="line", color="red",  name="Extrapolated")
         plot5.title  = "DFE Input Jitter Distribution"
         plot5.index_axis.title = "Time (ps)"
         plot5.value_axis.title = "Count"
@@ -274,8 +279,8 @@ class PyBERT(HasTraits):
         plot5.legend.align   = 'ur'
 
         plot19        = Plot(plotdata)
-        plot19.plot(('tie_hist_bins_rx', 'tie_hist_counts_rx'),         type="line", color="blue", name="Total")
-        plot19.plot(('tie_ind_hist_bins_rx', 'tie_ind_hist_counts_rx'), type="line", color="red",  name="Data Independent")
+        plot19.plot(('tie_hist_bins_rx', 'tie_hist_counts_rx'),         type="line", color="blue", name="Measured")
+        plot19.plot(('tie_ind_hist_bins_rx', 'tie_ind_hist_counts_rx'), type="line", color="red",  name="Extrapolated")
         plot19.title  = "DFE Output Jitter Distribution"
         plot19.index_axis.title = "Time (ps)"
         plot19.value_axis.title = "Count"
@@ -286,7 +291,7 @@ class PyBERT(HasTraits):
         plot6        = Plot(plotdata)
         plot6.plot(('f_MHz', 'jitter_spectrum'),       type="line", color="blue", name="Total")
         plot6.plot(('f_MHz', 'tie_ind_spectrum_chnl'), type="line", color="red",  name="Data Independent")
-        plot6.plot(('f_MHz', 'thresh_chnl'),           type="line", color="cyan", name="Pj Threshold")
+        plot6.plot(('f_MHz', 'thresh_chnl'),           type="line", color="magenta", name="Pj Threshold")
         plot6.title  = "DFE Input Jitter Spectrum"
         plot6.index_axis.title = "Frequency (MHz)"
         plot6.value_axis.title = "|FFT(jitter)| (dBui)"
@@ -297,9 +302,9 @@ class PyBERT(HasTraits):
         plot6.legend.align = 'lr'
 
         plot20        = Plot(plotdata)
-        plot20.plot(('f_MHz', 'jitter_spectrum_rx'),       type="line", color="blue", name="Total")
-        plot20.plot(('f_MHz', 'tie_ind_spectrum_rx'), type="line", color="red",  name="Data Independent")
-        plot20.plot(('f_MHz', 'thresh_rx'),           type="line", color="cyan", name="Pj Threshold")
+        plot20.plot(('f_MHz_rx', 'jitter_spectrum_rx'),       type="line", color="blue", name="Total")
+        plot20.plot(('f_MHz_rx', 'tie_ind_spectrum_rx'), type="line", color="red",  name="Data Independent")
+        plot20.plot(('f_MHz_rx', 'thresh_rx'),           type="line", color="magenta", name="Pj Threshold")
         plot20.title  = "DFE Output Jitter Spectrum"
         plot20.index_axis.title = "Frequency (MHz)"
         plot20.value_axis.title = "|FFT(jitter)| (dBui)"
@@ -577,15 +582,13 @@ class PyBERT(HasTraits):
         actual_xings -= dly
 
         # Calculate jitter and its histogram.
-        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, thresh) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings)
+        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, \
+         thresh, jitter_spectrum, tie_ind_spectrum, spectrum_freqs, \
+         hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, self.thresh)
 
-        hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
-        bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
-        self.tie_hist_counts = hist
-        self.tie_hist_bins   = bin_centers
-        hist, bin_edges      = histogram(tie_ind, 99, (-ui/2., ui/2.))
-        bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
-        self.tie_ind_hist_counts = hist
+        self.tie_hist_counts     = hist
+        self.tie_hist_bins       = bin_centers
+        self.tie_ind_hist_counts = hist_synth
         self.tie_ind_hist_bins   = bin_centers
 
         # Store class instance variables.
@@ -597,24 +600,11 @@ class PyBERT(HasTraits):
         self.rj_chnl         = rj
         self.thresh_chnl     = thresh
         self.tie_ind_chnl    = list(tie_ind)
+        self.jitter_spectrum       = jitter_spectrum
+        self.tie_ind_spectrum_chnl = tie_ind_spectrum
+        self.f_MHz                 = array(spectrum_freqs) * 1.e-6
 
         return list(jitter)
-
-    @cached_property
-    def _get_jitter_spectrum(self):
-        jitter      = self.jitter
-        tie_ind_chnl = self.tie_ind_chnl 
-        t_jitter    = array(self.t_jitter)
-        ui          = self.ui * 1.e-12
-        nbits       = self.nbits
-
-        (f, y) = calc_jitter_spectrum(t_jitter, tie_ind_chnl, ui, nbits)
-        self.tie_ind_spectrum_chnl = 10. * log10(y)
-
-        (f, y) = calc_jitter_spectrum(t_jitter, jitter, ui, nbits)
-
-        self.f_MHz  = array(f) * 1.e-6
-        return 10. * log10(y)
 
     @cached_property
     def _get_jitter_rejection_ratio(self):
@@ -656,35 +646,27 @@ class PyBERT(HasTraits):
         xings       = array(xings)       - ignore_until
 
         # Calculate the jitter and its spectrum.
-        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, thresh) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, xings)
-        hist, bin_edges             = histogram(jitter, 99, (-ui/2., ui/2.))
-        bin_centers                 = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
+        (jitter, t_jitter, isi, dcd, pj, rj, tie_ind, \
+         thresh, jitter_spectrum, tie_ind_spectrum, spectrum_freqs, \
+         hist, hist_synth, bin_centers) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, xings, self.thresh)
+
         self.tie_hist_counts_rx     = hist
         self.tie_hist_bins_rx       = bin_centers
-        hist, bin_edges             = histogram(tie_ind, 99, (-ui/2., ui/2.))
-        bin_centers                 = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
-        self.tie_ind_hist_counts_rx = hist
+        self.tie_ind_hist_counts_rx = hist_synth
         self.tie_ind_hist_bins_rx   = bin_centers
         self.jitter_rx              = jitter
         self.t_jitter_rx            = t_jitter
         self.tie_ind_rx             = tie_ind
+        self.jitter_spectrum_rx     = jitter_spectrum
+        self.tie_ind_spectrum_rx    = tie_ind_spectrum
+        self.f_MHz_rx               = array(spectrum_freqs) * 1.e-6
+        self.isi_rx                 = isi
+        self.dcd_rx                 = dcd
+        self.pj_rx                  = pj
+        self.rj_rx                  = rj
+        self.thresh_rx              = thresh
 
-        (f, y)      = calc_jitter_spectrum(t_jitter, jitter, ui, nbits)
-        f_MHz       = array(f) * 1.e-6
-        jitter_spectrum = 10. * log10(y)
-        self.jitter_spectrum_rx = jitter_spectrum
-        jrr = self.jitter_spectrum - jitter_spectrum
-
-        (f, y)      = calc_jitter_spectrum(t_jitter, tie_ind, ui, nbits)
-        jitter_spectrum = 10. * log10(y)
-        self.tie_ind_spectrum_rx = jitter_spectrum
-
-        self.isi_rx        = isi
-        self.dcd_rx        = dcd
-        self.pj_rx         = pj
-        self.rj_rx         = rj
-        self.thresh_rx     = thresh
-
+        jrr = ones(len(self.jitter_spectrum))
         return jrr
 
     @cached_property
