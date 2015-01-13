@@ -1,4 +1,6 @@
 *.swp
+*.pdf
+*.key
 *.pyc
 *.DS_Store
 MANIFEST

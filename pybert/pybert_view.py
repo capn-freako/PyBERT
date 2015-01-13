@@ -32,6 +32,7 @@ traits_view = View(
                 Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit", ),
                 Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream", ),
                 Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams", ),
+                Item(name='fft_conv',    label='FftConv',  tooltip="Use frequency domain signal processing.", ),
                 label='Simulation Control', show_border=True,
             ),
             VGroup(
@@ -91,23 +92,42 @@ traits_view = View(
             ),
             label = 'Config.', id = 'config',
             layout = 'flow',
-#            columns = 2,
         ),
         Group(
-            Item('plot_in', editor=ComponentEditor(), show_label=False,),
-            label = 'Channel', id = 'channel'
+            Item('plots_dfe', editor=ComponentEditor(), show_label=False,),
+            label = 'DFE', id = 'plots_dfe'
         ),
         Group(
-            Item('plot_dfe', editor=ComponentEditor(), show_label=False,),
-            label = 'DFE', id = 'dfe'
+            Item('plots_h', editor=ComponentEditor(), show_label=False,),
+            label = 'Impulse Responses', id = 'plots_h'
         ),
         Group(
-            Item('plot_eye', editor=ComponentEditor(), show_label=False,),
-            label = 'Eye Diagrams', id = 'results'
+            Item('plots_s', editor=ComponentEditor(), show_label=False,),
+            label = 'Step Responses', id = 'plots_s'
         ),
         Group(
-            Item('plot_jitter', editor=ComponentEditor(), show_label=False,),
-            label = 'Jitter', id = 'jitter'
+            Item('plots_H', editor=ComponentEditor(), show_label=False,),
+            label = 'Frequency Responses', id = 'plots_H'
+        ),
+        Group(
+            Item('plots_out', editor=ComponentEditor(), show_label=False,),
+            label = 'Outputs', id = 'plots_out'
+        ),
+        Group(
+            Item('plots_eye', editor=ComponentEditor(), show_label=False,),
+            label = 'Eye Diagrams', id = 'plots_eye'
+        ),
+        Group(
+            Item('plots_jitter_dist', editor=ComponentEditor(), show_label=False,),
+            label = 'Jitter Distributions', id = 'plots_jitter_dist'
+        ),
+        Group(
+            Item('plots_jitter_spec', editor=ComponentEditor(), show_label=False,),
+            label = 'Jitter Spectrums', id = 'plots_jitter_spec'
+        ),
+        Group(
+            Item('plots_bathtub', editor=ComponentEditor(), show_label=False,),
+            label = 'Bathtub Curves', id = 'plots_bathtub'
         ),
         Group(
             Item('jitter_info', style='readonly', show_label=False),
@@ -115,6 +135,7 @@ traits_view = View(
         ),
         Group(
             Item('ident', style='readonly', show_label=False),
+            Item('perf_info', style='readonly', show_label=False),
             label = 'About'
         ),
         Group(

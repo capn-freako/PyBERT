@@ -24,22 +24,37 @@ def moving_average(a, n=3) :
     ret[n:] = ret[n:] - ret[:-n]
     return np.insert(ret[n - 1:], 0, ret[n - 1] * ones(n - 1)) / n
 
-def find_crossing_times(t, x, anlg=True):
+def find_crossing_times(t, x, min_delay=0., anlg=True, peak_search=True):
     """
     Finds the zero crossing times of the input signal.
 
     Inputs:
 
-      - t     Vector of sample times. Intervals do NOT need to be uniform.
+      - t          Vector of sample times. Intervals do NOT need to be uniform.
 
-      - x     Sampled input vector.
+      - x          Sampled input vector.
 
-      - anlg  Interpolation flag. When TRUE, use linear interpolation,
-              in order to determine zero crossing times more precisely.
+      - min_delay  Minimum delay required, before allowing crossings.
+                   (Helps avoid false crossings at beginning of signal.)
+                   Optional. Default = 0.
+
+      - anlg       Interpolation flag. When TRUE, use linear interpolation,
+                   in order to determine zero crossing times more precisely.
+                   Optional. Default = True.
+
+      - peak_search When TRUE, use curvature analysis to detect the first
+                    negative peak, and beging searching for crossings
+                    immediately afterward.
+                    Optional. Default = True.
+                    When this option is True, the first rising edge crossing
+                    is the first crossing returned. This is the desired
+                    behavior for PyBERT, because we always initialize the
+                    bit stream with [0, 1, 1], in order to provide a known
+                    synchronization point for jitter analysis.
 
     Outputs:
 
-      - xings     The crossing times.
+      - xings      The crossing times.
 
     """
 
@@ -57,7 +72,32 @@ def find_crossing_times(t, x, anlg=True):
             raise
     else:
         xings    = [t[i + 1] for i in xing_ix]
-    return array(xings)
+
+    i = 0
+    if(min_delay):
+        assert min_delay < t[-1], "Error: min_delay must be less than final time value."
+        while(i < len(t) and t[i] < min_delay):
+            i += 1
+        min_time = t[i]
+
+    if(peak_search):
+        slope_x        = diff(x)
+        half_min_slope = 0.5 * min(slope_x)
+        assert half_min_slope < 0., "Woops! My calculated half minimum slope wasn't negative."
+        while(slope_x[i] > half_min_slope):
+            i += 1
+        while(slope_x[i] < 0.):
+            i += 1
+        min_time = t[i]
+
+    i = 0
+    while(xings[i] < min_time):
+        i += 1
+
+    if(debug):
+        print "find_crossing_times(): min_delay:", min_delay, "; first crossing returned:", xings[i]
+
+    return array(xings[i:])
 
 def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4):
     """
@@ -107,17 +147,14 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
 
       - bin_centers : The bin center values for both histograms.
 
-    Notes:
-
-      - Any delay present in the actual crossings, relative to the ideal crossings,
-        should be removed, before calling this function.
-
     """
 
     jitter   = []
     t_jitter = []
     i        = 0
     # Assemble the TIE track.
+    ideal_xings  = array(ideal_xings)  - (ideal_xings[0] - ui / 2.)
+    actual_xings = array(actual_xings) - (actual_xings[0] - ideal_xings[0])
     for ideal_xing in ideal_xings:
         # Find the first actual crossing occuring within [-ui/2, ui/2]
         # of the ideal crossing, checking for missing crossings.
@@ -142,18 +179,17 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     jitter -= mean(jitter)
 
     # Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    # - We have to be careful to keep the last crossing, in the case where there are an odd number of them,
-    #   because we'll be assembling a "repeated average" vector, later, and subtracting it from the original
-    #   jitter vector. So, we can't get sloppy, or we'll end up with misalignment between the two.
     try:
-        xings_per_pattern = where(ideal_xings > pattern_len * ui + ui / 2.)[0][0]
+#        xings_per_pattern = where(ideal_xings > pattern_len * ui + ui / 2.)[0][0]
+        xings_per_pattern = where(ideal_xings >= pattern_len * ui)[0][0]
     except:
         print "ideal_xings:", ideal_xings
         raise
 
-    if(xings_per_pattern % 2):
-        print "Odd number of crossings per pattern detected!"
-        print "ideal_xings[0]:", ideal_xings[0], "actual_xings[0]:", actual_xings[0]
+    assert(not (xings_per_pattern % 2)), "Odd number of crossings per pattern detected! ideal_xings[0]: %e; actual_xings[0]: %e." % (ideal_xings[0], actual_xings[0])
+#    if(xings_per_pattern % 2):
+#        print "Odd number of crossings per pattern detected!"
+#        print "ideal_xings[0]:", ideal_xings[0], "actual_xings[0]:", actual_xings[0]
 
     risings_per_pattern  = fallings_per_pattern = xings_per_pattern // 2
     num_patterns         = nbits // pattern_len - 1
@@ -168,6 +204,9 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     except:
         print "jitter:", jitter
         raise
+
+    # TEMPORARY DEBUGGING
+    print "max(abs(jitter)):", max(abs(jitter))
 
     x, valid_ix     = make_uniform(t_jitter, jitter, ui, nbits)
     y               = fft(x)
@@ -207,6 +246,15 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
         print "tie_ave:", tie_ave
         raise
 
+    # TEMPORARY DEBUGGING
+    print "max(abs(tie_ave)):", max(abs(tie_ave))
+    print "max(abs(tie_ind)):", max(abs(tie_ind))
+#    plot(jitter, label="jitter")
+#    plot(tie_ave, label="tie_ave")
+    plot(tie_ind, label="tie_ind")
+    legend()
+    show()
+
     # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
     tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nbits)
     # -- Normalized, in order to make power correct, since we grab Rj from the freq. domain.
@@ -217,6 +265,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     y_mean   = moving_average(y_mag, n = len(y_mag) / 10)
     y_var    = moving_average((y_mag - y_mean) ** 2, n = len(y_mag) / 10)
     y_sigma  = sqrt(y_var)
+
     thresh   = y_mean + rel_thresh * y_sigma
     y_per    = where(y_mag > thresh, y, zeros(len(y)))
     y_rnd    = abs(where(y_mag > thresh, zeros(len(y)), y))
@@ -360,7 +409,7 @@ def calc_jitter_spectrum(t, jitter, ui, nbits):
     y      = array(abs(y[:half_n])) / half_n / ui
     return (f, y)
 
-def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w):
+def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
     """
     Calculates propagation constant from cross-sectional parameters.
 
@@ -374,12 +423,14 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w):
       - Z0          characteristic impedance in LC region (Ohms)
       - v0          propagation velocity (m/s)
       - Theta0      loss tangent
-      - w           frequency sample points vector
+      - ws          frequency sample points vector
 
     Outputs:
       - gamma       frequency dependent propagation constant
       - Zc          frequency dependent characteristic impedance
     """
+
+    w = array(ws).copy()
 
     # Guard against /0.
     if(w[0] == 0):
@@ -395,7 +446,7 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w):
 
     return (gamma, Zc)
 
-def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w):
+def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
     """
     Calculates fully loaded transfer function of complete channel.
 
@@ -407,11 +458,13 @@ def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w):
       - RL    load resistance (differential)
       - Cp    load parallel (parasitic) capacitance (single ended)
       - CL    load series (d.c. blocking) capacitance (single ended)
-      - w     frequency sample points vector
+      - ws    frequency sample points vector
 
     Outputs:
       - G     frequency dependent transfer function of channel
     """
+
+    w = array(ws).copy()
 
     # Guard against /0.
     if(w[0] == 0):
@@ -457,6 +510,9 @@ def calc_eye(ui, samps_per_bit, height, ys, clock_times=None):
 
     """
 
+    # List/array necessities.
+    ys = array(ys)
+
     # Intermediate variable calculation.
     tsamp = ui / samps_per_bit
 
@@ -485,7 +541,6 @@ def calc_eye(ui, samps_per_bit, height, ys, clock_times=None):
                 last_y = y
                 i += 1
     else:
-#        start_ix      = where(diff(sign(ys)))[0][1] + 1 + samps_per_bit // 2 # The first crossing can be "off"; so, I use the second.
         start_ix      = (where(diff(sign(ys)))[0] % samps_per_bit).mean() + samps_per_bit // 2 
         last_start_ix = len(ys) - 2 * samps_per_bit
         while(start_ix < last_start_ix):
@@ -552,4 +607,37 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
     b, a = invres([r1, r2], [p1, p2], [])
 
     return freqs(b, a, w)
+
+def trim_impulse(g, Ts, chnl_dly=0.):
+    """
+    Trim impulse response, for more useful display, by:
+      - eliminating 90% of the overall delay from the beginning, and
+      - clipping off the tail, after 99.9% of the total power has been captured.
+
+    Inputs:
+    
+      - g         impulse response
+
+      - Ts        sample interval (same units as 'chnl_dly')
+
+      - chnl_dly  (optional) channel delay
+
+    Outputs:
+    
+      - g_trim    trimmed impulse response
+
+      - start_ix  index of first returned sample
+
+    """
+
+    g         = array(g)
+    start_ix  = int(0.9 * chnl_dly / Ts)
+    Pt        = 0.999 * sum(g ** 2)
+    i         = 0
+    P         = 0
+    while(P < Pt):
+        P += g[i] ** 2
+        i += 1
+
+    return (g[start_ix : i], start_ix)
 
