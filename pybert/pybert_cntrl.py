@@ -15,7 +15,8 @@ import time
 from pylab import *
 from pybert_util import *
 
-DEBUG    = False
+DEBUG           = False
+MIN_BATHTUB_VAL = 1.e-18
 
 gFc = 1.e6 # corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
 
@@ -96,7 +97,7 @@ def my_run_simulation(self, initial_run=False):
     bits        = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
     bits        = 2 * bits - 1
     x           = repeat(bits, nspb)
-    ideal_xings = find_crossing_times(t, x, min_delay = ui / 2., anlg = False)
+    ideal_xings = find_crossing_times(t, x, min_delay = ui / 2.)
 
     # Generate the output from, and the impulse/step/frequency responses of, the channel.
     gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
@@ -228,7 +229,6 @@ def my_run_simulation(self, initial_run=False):
     # Analyze the jitter.
     # - channel output
     actual_xings  = find_crossing_times(t, chnl_out)
-    print "Channel jitter:"
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
         hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -241,13 +241,11 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_chnl              = hist
     self.jitter_ext_chnl          = hist_synth
     self.jitter_bins              = bin_centers
-#    self.tie_ind_chnl    = list(tie_ind)
     self.jitter_spectrum_chnl     = jitter_spectrum
     self.jitter_ind_spectrum_chnl = jitter_ind_spectrum
     self.f_MHz                    = array(spectrum_freqs) * 1.e-6
     # - Tx output
     actual_xings  = find_crossing_times(t, tx_out)
-    print "Tx jitter:"
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
         hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -427,27 +425,35 @@ def update_results(self):
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
     # Bathtubs
+    half_len = len(jitter_ext_chnl) / 2
+    #  - Channel
     jitter_ext_chnl = array(map(float, jitter_ext_chnl)) / sum(jitter_ext_chnl) # Make it a PMF.
-    half_len        = len(jitter_ext_chnl) / 2
     bathtub_chnl    = list(cumsum(jitter_ext_chnl[-1 : -(half_len + 1) : -1]))
     bathtub_chnl.reverse()
-    bathtub_chnl    = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[:half_len])))
-    self.plotdata.set_data("bathtub_chnl", bathtub_chnl)
-    jitter_ext_tx   = array(map(float, jitter_ext_tx)) / sum(jitter_ext_tx) # Make it a PMF.
-    bathtub_tx      = list(cumsum(jitter_ext_tx[-1 : -(half_len + 1) : -1]))
+    bathtub_chnl    = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[:half_len + 1])))
+    bathtub_chnl    = where(bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl) # To avoid Chaco log scale plot wierdness.
+    self.plotdata.set_data("bathtub_chnl", log10(bathtub_chnl))
+    #  - Tx
+    jitter_ext_tx = array(map(float, jitter_ext_tx)) / sum(jitter_ext_tx) # Make it a PMF.
+    bathtub_tx    = list(cumsum(jitter_ext_tx[-1 : -(half_len + 1) : -1]))
     bathtub_tx.reverse()
-    bathtub_tx      = array(bathtub_tx + list(cumsum(jitter_ext_tx[:half_len])))
-    self.plotdata.set_data("bathtub_tx", bathtub_tx)
+    bathtub_tx    = array(bathtub_tx + list(cumsum(jitter_ext_tx[:half_len + 1])))
+    bathtub_tx    = where(bathtub_tx < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_tx)), bathtub_tx) # To avoid Chaco log scale plot wierdness.
+    self.plotdata.set_data("bathtub_tx", log10(bathtub_tx))
+    #  - CTLE
     jitter_ext_ctle = array(map(float, jitter_ext_ctle)) / sum(jitter_ext_ctle) # Make it a PMF.
     bathtub_ctle    = list(cumsum(jitter_ext_ctle[-1 : -(half_len + 1) : -1]))
     bathtub_ctle.reverse()
-    bathtub_ctle    = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[:half_len])))
-    self.plotdata.set_data("bathtub_ctle", bathtub_ctle)
-    jitter_ext_dfe  = array(map(float, jitter_ext_dfe)) / sum(jitter_ext_dfe) # Make it a PMF.
-    bathtub_dfe     = list(cumsum(jitter_ext_dfe[-1 : -(half_len + 1) : -1]))
+    bathtub_ctle    = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[:half_len + 1])))
+    bathtub_ctle    = where(bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle) # To avoid Chaco log scale plot wierdness.
+    self.plotdata.set_data("bathtub_ctle", log10(bathtub_ctle))
+    #  - DFE
+    jitter_ext_dfe = array(map(float, jitter_ext_dfe)) / sum(jitter_ext_dfe) # Make it a PMF.
+    bathtub_dfe    = list(cumsum(jitter_ext_dfe[-1 : -(half_len + 1) : -1]))
     bathtub_dfe.reverse()
-    bathtub_dfe     = array(bathtub_dfe + list(cumsum(jitter_ext_dfe[:half_len])))
-    self.plotdata.set_data("bathtub_dfe", bathtub_dfe)
+    bathtub_dfe    = array(bathtub_dfe + list(cumsum(jitter_ext_dfe[:half_len + 1])))
+    bathtub_dfe    = where(bathtub_dfe < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_dfe)), bathtub_dfe) # To avoid Chaco log scale plot wierdness.
+    self.plotdata.set_data("bathtub_dfe", log10(bathtub_dfe))
 
     # Eyes
     width    = 2 * samps_per_bit

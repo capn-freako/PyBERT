@@ -24,7 +24,7 @@ def moving_average(a, n=3) :
     ret[n:] = ret[n:] - ret[:-n]
     return np.insert(ret[n - 1:], 0, ret[n - 1] * ones(n - 1)) / n
 
-def find_crossing_times(t, x, min_delay=0., anlg=True, peak_search=True):
+def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1):
     """
     Finds the zero crossing times of the input signal.
 
@@ -38,19 +38,17 @@ def find_crossing_times(t, x, min_delay=0., anlg=True, peak_search=True):
                    (Helps avoid false crossings at beginning of signal.)
                    Optional. Default = 0.
 
-      - anlg       Interpolation flag. When TRUE, use linear interpolation,
-                   in order to determine zero crossing times more precisely.
-                   Optional. Default = True.
+      - rising_first When True, start with the first rising edge found.
+                     Optional. Default = True.
+                     When this option is True, the first rising edge crossing
+                     is the first crossing returned. This is the desired
+                     behavior for PyBERT, because we always initialize the
+                     bit stream with [0, 1, 1], in order to provide a known
+                     synchronization point for jitter analysis.
 
-      - peak_search When TRUE, use curvature analysis to detect the first
-                    negative peak, and beging searching for crossings
-                    immediately afterward.
-                    Optional. Default = True.
-                    When this option is True, the first rising edge crossing
-                    is the first crossing returned. This is the desired
-                    behavior for PyBERT, because we always initialize the
-                    bit stream with [0, 1, 1], in order to provide a known
-                    synchronization point for jitter analysis.
+      - min_init_dev The minimum initial deviation from zero, which must
+                     be detected, before searching for crossings.
+                     Normalized to maximum input signal magnitude.
 
     Outputs:
 
@@ -60,38 +58,37 @@ def find_crossing_times(t, x, min_delay=0., anlg=True, peak_search=True):
 
     assert len(t) == len(x), "len(t) (%d) and len(x) (%d) need to be the same." % (len(t), len(x))
 
+    t = array(t)
+    x = array(x)
+
+    max_mag_x = max(abs(x))
+    min_mag_x = min_init_dev * max_mag_x
+    i = 0
+    while(abs(x[i]) < min_mag_x):
+        i += 1
+        assert i < len(x), "ERROR: find_crossing_times(): Input signal minimum deviation not detected!"
+    x = x[i:]
+    t = t[i:]
+
     sign_x      = sign(x)
     sign_x      = where(sign_x, sign_x, ones(len(sign_x))) # "0"s can produce duplicate xings.
     diff_sign_x = diff(sign_x)
     xing_ix     = where(diff_sign_x)[0]
-    if(anlg):
-        try:
-            xings    = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
-        except:
-            print "len(t):", len(t), "len(x):", len(x), "i:", i
-            raise
-    else:
-        xings    = [t[i + 1] for i in xing_ix]
+    xings       = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
 
-    i = 0
+    min_time = t[0]
     if(min_delay):
         assert min_delay < t[-1], "Error: min_delay must be less than final time value."
+        i = 0
         while(i < len(t) and t[i] < min_delay):
-            i += 1
-        min_time = t[i]
-
-    if(peak_search):
-        slope_x        = diff(x)
-        half_min_slope = 0.5 * min(slope_x)
-        assert half_min_slope < 0., "Woops! My calculated half minimum slope wasn't negative."
-        while(slope_x[i] > half_min_slope):
-            i += 1
-        while(slope_x[i] < 0.):
             i += 1
         min_time = t[i]
 
     i = 0
     while(xings[i] < min_time):
+        i += 1
+
+    if(rising_first and diff_sign_x[i] < 0.):
         i += 1
 
     if(debug):
@@ -149,12 +146,22 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
 
     """
 
+    # Check alignment between actual and ideal crossings.
+    if(len(ideal_xings) > len(actual_xings)):
+        if(max(abs(diff(actual_xings) - diff(ideal_xings[:len(actual_xings)]))) > ui):
+            print "INFO: calc_jitter(): Possibly missing actual crossings."
+    else:
+        if(max(abs(diff(actual_xings[:len(ideal_xings)]) - diff(ideal_xings))) > ui):
+            print "WARNING: calc_jitter(): Potential misalignment between actual and ideal crossings!"
+
     jitter   = []
     t_jitter = []
     i        = 0
+    zero_pads = 0
     # Assemble the TIE track.
     ideal_xings  = array(ideal_xings)  - (ideal_xings[0] - ui / 2.)
     actual_xings = array(actual_xings) - (actual_xings[0] - ideal_xings[0])
+
     for ideal_xing in ideal_xings:
         # Find the first actual crossing occuring within [-ui/2, ui/2]
         # of the ideal crossing, checking for missing crossings.
@@ -166,6 +173,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
             break
         if(actual_xings[i] > max_t): # Means the xing we're looking for didn't occur, in the actual signal.
             jitter.append(0.)        # Zero pad jitter vector for missing crossings.
+            zero_pads += 1
         else:
             jitter.append(actual_xings[i] - ideal_xing)
             i += 1
@@ -176,7 +184,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
         print "mean(jitter):", mean(jitter)
         print "len(jitter):", len(jitter)
 
-    jitter -= mean(jitter)
+    #jitter -= mean(jitter)
 
     # Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
     try:
@@ -196,19 +204,19 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     jitter = jitter[xings_per_pattern:] # The first pattern period is problematic.
     if(len(jitter) < xings_per_pattern * num_patterns):
         jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
+        print "Added %d zeros to 'jitter'." % (xings_per_pattern * num_patterns - len(jitter))
 
     try:
         t_jitter = t_jitter[:len(jitter)]
         if(len(jitter) > len(t_jitter)):
             jitter = jitter[:len(t_jitter)]
+            print "Had to shorten 'jitter', due to 't_jitter'."
     except:
         print "jitter:", jitter
         raise
 
-    # TEMPORARY DEBUGGING
-    print "max(abs(jitter)):", max(abs(jitter))
-
     x, valid_ix     = make_uniform(t_jitter, jitter, ui, nbits)
+
     y               = fft(x)
     jitter_spectrum = abs(y[:len(y) / 2]) / sqrt(len(jitter)) # Normalized, in order to make power correct.
     f0              = 1. / (ui * nbits)
@@ -246,17 +254,9 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
         print "tie_ave:", tie_ave
         raise
 
-    # TEMPORARY DEBUGGING
-    print "max(abs(tie_ave)):", max(abs(tie_ave))
-    print "max(abs(tie_ind)):", max(abs(tie_ind))
-#    plot(jitter, label="jitter")
-#    plot(tie_ave, label="tie_ave")
-    plot(tie_ind, label="tie_ind")
-    legend()
-    show()
-
     # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
     tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nbits)
+
     # -- Normalized, in order to make power correct, since we grab Rj from the freq. domain.
     # -- (I'm using the length of the vector before zero padding, because zero padding doesn't add energy.)
     y        = fft(tie_ind_uniform) / sqrt(len(tie_ind))
@@ -271,6 +271,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     y_rnd    = abs(where(y_mag > thresh, zeros(len(y)), y))
     rj       = sqrt(mean((y_rnd - mean(y_rnd)) ** 2))
     tie_per  = real(ifft(y_per)).take(valid_ix) * sqrt(len(tie_ind))
+
     pj       = tie_per.ptp()
 
     # - Reassemble the jitter, excluding the Rj.
@@ -290,13 +291,6 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
 
     hist_synth_orig = hist_synth
     hist_synth = convolve(hist_synth, rj_pdf, mode='same')
-
-    # TEMPORARY DEBUGGING
-#    plot(bin_centers, rj_pdf, label="Rj")
-#    plot(bin_centers, hist_synth_orig, label="Dj")
-#    plot(bin_centers, hist_synth, label="Conv.")
-#    legend()
-#    show()
 
     if(debug):
         plot(jitter,                                               label="jitter",          color="b")

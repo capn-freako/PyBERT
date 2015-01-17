@@ -626,24 +626,40 @@ class PyBERT(HasTraits):
 
         # - Bathtub Curves tab
         plot_bathtub_chnl = Plot(plotdata)
-        plot_bathtub_chnl.plot(("eye_index", "bathtub_chnl"), type="line", color="blue", value_scale="log")
-        plot_bathtub_chnl.title  = "Channel"
-        plot_bathtub_chnl.index_axis.title = "Time (ps)"
+        plot_bathtub_chnl.plot(("jitter_bins", "bathtub_chnl"), type="line", color="blue")
+        plot_bathtub_chnl.value_range.high_setting =   0
+        plot_bathtub_chnl.value_range.low_setting  = -18
+        plot_bathtub_chnl.value_axis.tick_interval =   3
+        plot_bathtub_chnl.title             = "Channel"
+        plot_bathtub_chnl.index_axis.title  = "Time (ps)"
+        plot_bathtub_chnl.value_axis.title  = "Log10(P(Transition occurs inside.))"
 
         plot_bathtub_tx = Plot(plotdata)
-        plot_bathtub_tx.plot(("eye_index", "bathtub_tx"), type="line", color="blue", value_scale="log")
-        plot_bathtub_tx.title  = "Channel + Tx Preemphasis (Noise added here.)"
-        plot_bathtub_tx.index_axis.title = "Time (ps)"
+        plot_bathtub_tx.plot(("jitter_bins", "bathtub_tx"), type="line", color="blue")
+        plot_bathtub_tx.value_range.high_setting =   0
+        plot_bathtub_tx.value_range.low_setting  = -18
+        plot_bathtub_tx.value_axis.tick_interval =   3
+        plot_bathtub_tx.title             = "Channel + Tx Preemphasis"
+        plot_bathtub_tx.index_axis.title  = "Time (ps)"
+        plot_bathtub_tx.value_axis.title  = "Log10(P(Transition occurs inside.))"
 
         plot_bathtub_ctle = Plot(plotdata)
-        plot_bathtub_ctle.plot(("eye_index", "bathtub_ctle"), type="line", color="blue", value_scale="log")
-        plot_bathtub_ctle.title  = "Channel + Tx Preemphasis + CTLE"
-        plot_bathtub_ctle.index_axis.title = "Time (ps)"
+        plot_bathtub_ctle.plot(("jitter_bins", "bathtub_ctle"), type="line", color="blue")
+        plot_bathtub_ctle.value_range.high_setting =   0
+        plot_bathtub_ctle.value_range.low_setting  = -18
+        plot_bathtub_ctle.value_axis.tick_interval =   3
+        plot_bathtub_ctle.title             = "Channel + Tx Preemphasis + CTLE"
+        plot_bathtub_ctle.index_axis.title  = "Time (ps)"
+        plot_bathtub_ctle.value_axis.title  = "Log10(P(Transition occurs inside.))"
 
         plot_bathtub_dfe = Plot(plotdata)
-        plot_bathtub_dfe.plot(("eye_index", "bathtub_dfe"), type="line", color="blue", value_scale="log")
-        plot_bathtub_dfe.title  = "Channel + Tx Preemphasis + CTLE + DFE"
-        plot_bathtub_dfe.index_axis.title = "Time (ps)"
+        plot_bathtub_dfe.plot(("jitter_bins", "bathtub_dfe"), type="line", color="blue")
+        plot_bathtub_dfe.value_range.high_setting =   0
+        plot_bathtub_dfe.value_range.low_setting  = -18
+        plot_bathtub_dfe.value_axis.tick_interval =   3
+        plot_bathtub_dfe.title             = "Channel + Tx Preemphasis + CTLE + DFE"
+        plot_bathtub_dfe.index_axis.title  = "Time (ps)"
+        plot_bathtub_dfe.value_axis.title  = "Log10(P(Transition occurs inside.))"
 
         container_bathtub = GridPlotContainer(shape=(2,2))
         container_bathtub.add(plot_bathtub_chnl)
