@@ -639,7 +639,7 @@ class PyBERT(HasTraits):
         plot_bathtub_tx.value_range.high_setting =   0
         plot_bathtub_tx.value_range.low_setting  = -18
         plot_bathtub_tx.value_axis.tick_interval =   3
-        plot_bathtub_tx.title             = "Channel + Tx Preemphasis"
+        plot_bathtub_tx.title             = "Channel + Tx Preemphasis (Noise added here.)"
         plot_bathtub_tx.index_axis.title  = "Time (ps)"
         plot_bathtub_tx.value_axis.title  = "Log10(P(Transition occurs inside.))"
 

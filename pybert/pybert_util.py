@@ -96,7 +96,7 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1)
 
     return array(xings[i:])
 
-def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4):
+def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4, num_bins=99):
     """
     Calculate the jitter in a set of actual zero crossings, given the ideal crossings and unit interval.
 
@@ -113,6 +113,8 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
       - actual_xings     : The actual zero crossing locations of the edges.
 
       - rel_thresh       : (optional) The threshold for determining periodic jitter spectral components (sigma).
+
+      - num_bins         : (optional) The number of bins to use, when forming histograms.
 
     Outputs:
 
@@ -157,7 +159,8 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     jitter   = []
     t_jitter = []
     i        = 0
-    zero_pads = 0
+#    zero_pads = 0
+    pads     = 0
     # Assemble the TIE track.
     ideal_xings  = array(ideal_xings)  - (ideal_xings[0] - ui / 2.)
     actual_xings = array(actual_xings) - (actual_xings[0] - ideal_xings[0])
@@ -165,17 +168,24 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     for ideal_xing in ideal_xings:
         # Find the first actual crossing occuring within [-ui/2, ui/2]
         # of the ideal crossing, checking for missing crossings.
-        min_t = ideal_xing - ui / 2.
-        max_t = ideal_xing + ui / 2.
+        min_t = ideal_xing - 1.2 * ui / 2.
+        max_t = ideal_xing + 1.2 * ui / 2.
         while(i < len(actual_xings) and actual_xings[i] < min_t):
             i += 1
         if(i == len(actual_xings)):  # We've exhausted the list of actual crossings; we're done.
             break
         if(actual_xings[i] > max_t): # Means the xing we're looking for didn't occur, in the actual signal.
-            jitter.append(0.)        # Zero pad jitter vector for missing crossings.
-            zero_pads += 1
+            jitter.append(ui / 2 * (-1) ** pads) # Pad the jitter w/ alternating +/- UI/2.
+            pads += 1
+#            jitter.append(0.)        # Zero pad jitter vector for missing crossings.
+#            zero_pads += 1
         else:
-            jitter.append(actual_xings[i] - ideal_xing)
+            tie = actual_xings[i] - ideal_xing
+            if(tie < -ui / 2.):
+                tie = -ui / 2.
+            elif(tie > ui / 2.):
+                tie = ui / 2.
+            jitter.append(tie)
             i += 1
         t_jitter.append(ideal_xing)
     jitter  = array(jitter)
@@ -200,8 +210,9 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
 #        print "ideal_xings[0]:", ideal_xings[0], "actual_xings[0]:", actual_xings[0]
 
     risings_per_pattern  = fallings_per_pattern = xings_per_pattern // 2
-    num_patterns         = nbits // pattern_len - 1
-    jitter = jitter[xings_per_pattern:] # The first pattern period is problematic.
+    num_patterns         = nbits // pattern_len
+#    num_patterns         = nbits // pattern_len - 1
+#    jitter = jitter[xings_per_pattern:] # The first pattern period is problematic.
     if(len(jitter) < xings_per_pattern * num_patterns):
         jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
         print "Added %d zeros to 'jitter'." % (xings_per_pattern * num_patterns - len(jitter))
@@ -254,6 +265,9 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
         print "tie_ave:", tie_ave
         raise
 
+    # TEMPORARY DEBUGGING
+    #print "", jitter
+
     # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
     tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nbits)
 
@@ -278,18 +292,20 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=4)
     jitter_synth         = tie_ave + tie_per
 
     # - Calculate the histogram of original, for comparison.
-    hist, bin_edges      = histogram(jitter, 99, (-ui/2., ui/2.))
+    hist, bin_edges      = histogram(jitter, num_bins, (-ui/2., ui/2.))
     bin_centers          = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
+#    hist[where(abs(array(bin_centers)) < ui / num_bins / 2)[0]] -= zero_pads
+    hist = array(map(float, hist)) / sum(hist) # Make it a PMF.
 
     # - Calculate the histogram of everything, except Rj.
-    hist_synth, bin_edges = histogram(jitter_synth, 99, (-ui/2., ui/2.))
+    hist_synth, bin_edges = histogram(jitter_synth, num_bins, (-ui/2., ui/2.))
+#    hist_synth[where(abs(array(bin_centers)) < ui / num_bins / 2)[0]] -= zero_pads
+    hist_synth = array(map(float, hist_synth)) / sum(hist_synth) # Make it a PMF.
 
     # - Extrapolate the tails by convolving w/ complete Gaussian.
     rv         = ss.norm(loc = 0., scale = rj)
     rj_pdf     = rv.pdf(bin_centers)
     rj_pdf     = rj_pdf / sum(rj_pdf)
-
-    hist_synth_orig = hist_synth
     hist_synth = convolve(hist_synth, rj_pdf, mode='same')
 
     if(debug):

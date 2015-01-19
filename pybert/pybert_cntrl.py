@@ -427,28 +427,28 @@ def update_results(self):
     # Bathtubs
     half_len = len(jitter_ext_chnl) / 2
     #  - Channel
-    jitter_ext_chnl = array(map(float, jitter_ext_chnl)) / sum(jitter_ext_chnl) # Make it a PMF.
+#    jitter_ext_chnl = array(map(float, jitter_ext_chnl)) / sum(jitter_ext_chnl) # Make it a PMF.
     bathtub_chnl    = list(cumsum(jitter_ext_chnl[-1 : -(half_len + 1) : -1]))
     bathtub_chnl.reverse()
     bathtub_chnl    = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[:half_len + 1])))
     bathtub_chnl    = where(bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_chnl", log10(bathtub_chnl))
     #  - Tx
-    jitter_ext_tx = array(map(float, jitter_ext_tx)) / sum(jitter_ext_tx) # Make it a PMF.
+#    jitter_ext_tx = array(map(float, jitter_ext_tx)) / sum(jitter_ext_tx) # Make it a PMF.
     bathtub_tx    = list(cumsum(jitter_ext_tx[-1 : -(half_len + 1) : -1]))
     bathtub_tx.reverse()
     bathtub_tx    = array(bathtub_tx + list(cumsum(jitter_ext_tx[:half_len + 1])))
     bathtub_tx    = where(bathtub_tx < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_tx)), bathtub_tx) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_tx", log10(bathtub_tx))
     #  - CTLE
-    jitter_ext_ctle = array(map(float, jitter_ext_ctle)) / sum(jitter_ext_ctle) # Make it a PMF.
+#    jitter_ext_ctle = array(map(float, jitter_ext_ctle)) / sum(jitter_ext_ctle) # Make it a PMF.
     bathtub_ctle    = list(cumsum(jitter_ext_ctle[-1 : -(half_len + 1) : -1]))
     bathtub_ctle.reverse()
     bathtub_ctle    = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[:half_len + 1])))
     bathtub_ctle    = where(bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_ctle", log10(bathtub_ctle))
     #  - DFE
-    jitter_ext_dfe = array(map(float, jitter_ext_dfe)) / sum(jitter_ext_dfe) # Make it a PMF.
+#    jitter_ext_dfe = array(map(float, jitter_ext_dfe)) / sum(jitter_ext_dfe) # Make it a PMF.
     bathtub_dfe    = list(cumsum(jitter_ext_dfe[-1 : -(half_len + 1) : -1]))
     bathtub_dfe.reverse()
     bathtub_dfe    = array(bathtub_dfe + list(cumsum(jitter_ext_dfe[:half_len + 1])))
