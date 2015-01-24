@@ -32,7 +32,6 @@ traits_view = View(
                 Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit", ),
                 Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream", ),
                 Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams", ),
-                Item(name='fft_conv',    label='FftConv',  tooltip="Use frequency domain signal processing.", ),
                 label='Simulation Control', show_border=True,
             ),
             VGroup(

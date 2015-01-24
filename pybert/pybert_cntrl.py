@@ -34,7 +34,6 @@ def my_run_simulation(self, initial_run=False):
     start_time = time.clock()
     self.status = 'Running channel...'
 
-    fft_conv = self.fft_conv
     nbits   = self.nbits
     nspb    = self.nspb
     rn      = self.rn
@@ -107,10 +106,7 @@ def my_run_simulation(self, initial_run=False):
     t_ns_chnl        = t_ns[start_ix : start_ix + len(chnl_h)]
     self.t_ns_chnl   = t_ns_chnl
     self.chnl_s      = chnl_h.cumsum()
-    if(fft_conv):
-        chnl_out     = real(ifft(chnl_H * fft(x)))
-    else:
-        chnl_out     = convolve(x, chnl_h)[:len(x)]
+    chnl_out         = convolve(x, chnl_h)[:len(x)]
     self.chnl_H      = chnl_H
     self.chnl_h      = chnl_h * 1.e-9 / Ts # Scaled to units of "V/ns" for later display. DON'T DO THIS TO THE LOCAL COPY!
     self.chnl_out    = chnl_out
@@ -121,19 +117,18 @@ def my_run_simulation(self, initial_run=False):
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     # - Generate the ideal, post-preemphasis signal.
-#    ffe    = [pretap, 1.0, posttap]                                                 # FIR filter numerator, for fs = fbit.
     ffe    = [pretap, 1.0 - abs(pretap) - abs(posttap), posttap]                    # FIR filter numerator, for fs = fbit.
     bits   = convolve(bits, ffe)[:len(bits)]
     tx_out = repeat(bits, nspb)                                                     # oversampled output
-    ffe    = reduce(lambda x, y: x + y, [[x] + list(zeros(nspb - 1)) for x in ffe]) # FIR filter numerator, for fs = 1 / Ts.
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
     #    This is partly due to the out of order nature in which we combine the Tx and channel,
     #    and partly due to the fact that we're adding noise to the Tx output.)
-    wN            = pi / Ts                                                         # Nyquist, in rads./sec.
-    ws            = w / wN                                                          # Our system frequencies, normalized to Nyquist.
-    w_calc, tx_H  = freqz(ffe, worN = ws)
-
+    tx_h   = concatenate([[x] + list(zeros(nspb - 1)) for x in ffe])
+    tx_h.resize(len(chnl_h))
+    temp   = tx_h.copy()
+    temp.resize(len(w))
+    tx_H   = fft(temp)
     # - Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
     #   - Generate the ideal rectangular aggressor waveform.
     pn_period          = 1. / pn_freq
@@ -144,22 +139,17 @@ def my_run_simulation(self, initial_run=False):
     #   - High pass filter it. (Simulating capacitive coupling.)
     (b, a) = iirfilter(2, gFc/(fs/2), btype='highpass')
     pn     = lfilter(b, a, pn)[:len(pn)]
-    # - Add the uncorrelated periodic and the random noise to the Tx output.
-    tx_out += pn + normal(scale=rn, size=(len(tx_out),))
+    # - Add the uncorrelated periodic noise to the Tx output.
+    tx_out += pn
     # - Convolve w/ channel.
-    tx_h           = real(ifft(tx_H))[:len(chnl_h)]
+    tx_out_h   = convolve(tx_h, chnl_h)[:len(chnl_h)]
+    temp       = tx_out_h.copy()
+    temp.resize(len(w))
+    tx_out_H   = fft(temp)
+    tx_out     = convolve(tx_out, chnl_h)[:len(tx_out)]
+    # - Add the random noise to the Rx input.
+    tx_out    += normal(scale=rn, size=(len(tx_out),))
     self.tx_s      = tx_h.cumsum()
-    if(fft_conv):
-        tx_out_H   = chnl_H * tx_H
-        tx_out_h   = real(ifft(tx_out_H))[start_ix : start_ix + len(chnl_h)]
-        tx_out     = fftconvolve(tx_out, chnl_h, mode = 'same')
-        fft_tx_out = fft(tx_out)
-    else:
-        tx_out_h   = convolve(tx_h, chnl_h)[:len(chnl_h)]
-        temp       = tx_out_h.copy()
-        temp.resize(len(ws))
-        tx_out_H   = fft(temp)
-        tx_out     = convolve(tx_out, chnl_h)[:len(tx_out)]
     self.tx_out    = tx_out
     self.tx_out_s  = tx_out_h.cumsum()
     self.tx_H      = tx_H
@@ -176,16 +166,11 @@ def my_run_simulation(self, initial_run=False):
     ctle_H          = H / abs(H[0])  # Scale to force d.c. component of '1'.
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
     self.ctle_s     = ctle_h.cumsum()
-    if(fft_conv):
-        ctle_out_H  = tx_out_H * ctle_H
-        ctle_out_h  = real(ifft(ctle_out_H))[start_ix : start_ix + len(chnl_h)]
-        ctle_out    = real(ifft(ctle_out_H * fft_tx_out))
-    else:
-        ctle_out_h  = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
-        temp        = ctle_out_h.copy()
-        temp.resize(len(ws))
-        ctle_out_H  = fft(temp)
-        ctle_out    = convolve(tx_out, ctle_h)[:len(tx_out)]
+    ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
+    temp            = ctle_out_h.copy()
+    temp.resize(len(w))
+    ctle_out_H      = fft(temp)
+    ctle_out        = convolve(tx_out, ctle_h)[:len(tx_out)]
     self.ctle_out_s = ctle_out_h.cumsum()
     self.ctle_H     = ctle_H
     self.ctle_h     = ctle_h * 1.e-9 / Ts
@@ -208,18 +193,19 @@ def my_run_simulation(self, initial_run=False):
                     bandwidth=bandwidth, ideal=True)
     (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times) = dfe.run(t, ctle_out)
 
-    fir_num        = reduce(lambda x, y: x + y, [[x] + list(zeros(nspb - 1)) for x in tap_weights[-1]])
-    w_calc, dfe_H  = freqz(fir_num, worN = ws)
-    dfe_H          = ones(len(dfe_H)) - dfe_H
-    dfe_h          = real(ifft(dfe_H))[:len(chnl_h)] * sqrt(len(dfe_H))
-    self.dfe_s     = dfe_h.cumsum() * Ts
+    dfe_h          = array([1.] + list(zeros(nspb - 1)) + list(concatenate([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]])))
+    dfe_h.resize(len(ctle_out_h))
+    temp           = dfe_h.copy()
+    temp.resize(len(w))
+    dfe_H          = fft(temp)
+    self.dfe_s     = dfe_h.cumsum()
     dfe_out_H      = ctle_out_H * dfe_H
-    dfe_out_h      = real(ifft(dfe_out_H))[start_ix : start_ix + len(chnl_h)] * sqrt(len(dfe_out_H))
-    self.dfe_out_s = dfe_out_h.cumsum() * Ts
+    dfe_out_h      = convolve(ctle_out_h, dfe_h)[:len(ctle_out_h)]
+    self.dfe_out_s = dfe_out_h.cumsum()
     self.dfe_H     = dfe_H
-    self.dfe_h     = dfe_h
+    self.dfe_h     = dfe_h * 1.e-9 / Ts
     self.dfe_out_H = dfe_out_H
-    self.dfe_out_h = dfe_out_h
+    self.dfe_out_h = dfe_out_h * 1.e-9 / Ts
     self.dfe_out   = dfe_out
 
     self.dfe_perf  = nbits * nspb / (time.clock() - split_time)
@@ -289,7 +275,7 @@ def my_run_simulation(self, initial_run=False):
         ideal_xings.append(clock_times[i] - half_ui)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
-        hist, hist_synth, bin_centers) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        hist, hist_synth, bin_centers) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, actual_xings, rel_thresh, zero_mean=False)
     self.isi_dfe                 = isi
     self.dcd_dfe                 = dcd
     self.pj_dfe                  = pj
@@ -300,7 +286,12 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_spectrum_dfe     = jitter_spectrum
     self.jitter_ind_spectrum_dfe = jitter_ind_spectrum
     self.f_MHz_dfe               = array(spectrum_freqs) * 1.e-6
-    self.jitter_rejection_ratio  = ones(len(self.jitter_spectrum_dfe))
+    skip_factor                  = nbits / eye_bits
+    ctle_spec                    = self.jitter_spectrum_ctle
+    dfe_spec                     = self.jitter_spectrum_dfe
+    ctle_spec_condensed          = array([ctle_spec.take(range(i, i + skip_factor)).mean() for i in range(0, len(ctle_spec), skip_factor)])
+    window_width                 = len(dfe_spec) / 10
+    self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
 
     self.jitter_perf = nbits * nspb / (time.clock() - split_time)
     split_time       = time.clock()
@@ -308,8 +299,6 @@ def my_run_simulation(self, initial_run=False):
 
     self.ideal_xings  = ideal_xings
     self.chnl_dly     = chnl_dly
-#    self.out_dly      = out_dly
-#    self.chnl_in      = x
     self.adaptation = tap_weights
     self.ui_ests    = array(ui_ests) * 1.e12 # (ps)
     self.clocks     = clocks
@@ -427,28 +416,24 @@ def update_results(self):
     # Bathtubs
     half_len = len(jitter_ext_chnl) / 2
     #  - Channel
-#    jitter_ext_chnl = array(map(float, jitter_ext_chnl)) / sum(jitter_ext_chnl) # Make it a PMF.
     bathtub_chnl    = list(cumsum(jitter_ext_chnl[-1 : -(half_len + 1) : -1]))
     bathtub_chnl.reverse()
     bathtub_chnl    = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[:half_len + 1])))
     bathtub_chnl    = where(bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_chnl", log10(bathtub_chnl))
     #  - Tx
-#    jitter_ext_tx = array(map(float, jitter_ext_tx)) / sum(jitter_ext_tx) # Make it a PMF.
     bathtub_tx    = list(cumsum(jitter_ext_tx[-1 : -(half_len + 1) : -1]))
     bathtub_tx.reverse()
     bathtub_tx    = array(bathtub_tx + list(cumsum(jitter_ext_tx[:half_len + 1])))
     bathtub_tx    = where(bathtub_tx < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_tx)), bathtub_tx) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_tx", log10(bathtub_tx))
     #  - CTLE
-#    jitter_ext_ctle = array(map(float, jitter_ext_ctle)) / sum(jitter_ext_ctle) # Make it a PMF.
     bathtub_ctle    = list(cumsum(jitter_ext_ctle[-1 : -(half_len + 1) : -1]))
     bathtub_ctle.reverse()
     bathtub_ctle    = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[:half_len + 1])))
     bathtub_ctle    = where(bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_ctle", log10(bathtub_ctle))
     #  - DFE
-#    jitter_ext_dfe = array(map(float, jitter_ext_dfe)) / sum(jitter_ext_dfe) # Make it a PMF.
     bathtub_dfe    = list(cumsum(jitter_ext_dfe[-1 : -(half_len + 1) : -1]))
     bathtub_dfe.reverse()
     bathtub_dfe    = array(bathtub_dfe + list(cumsum(jitter_ext_dfe[:half_len + 1])))

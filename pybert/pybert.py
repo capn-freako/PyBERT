@@ -49,14 +49,12 @@ from pybert_util  import *
 
 debug = False
 
-
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
 gUI             = 100     # (ps)
 gNbits          = 8000    # number of bits to run
 gPatLen         = 127     # repeating bit pattern length
 gNspb           = 32      # samples per bit
-gFftConv        = False   # True = Use frequency domain signal processing.
 # - Channel Control
 #     - parameters for Howard Johnson's "Metallic Transmission Model"
 #     - (See "High Speed Signal Propagation", Sec. 3.1.)
@@ -98,7 +96,7 @@ gNLockAve       = 500     # number of UI used to average CDR locked status.
 gRelLockTol     = .1      # relative lock tolerance of CDR.
 gLockSustain    = 500
 # - Analysis
-gThresh         = 4       # threshold for identifying periodic jitter spectral elements (sigma)
+gThresh         = 6       # threshold for identifying periodic jitter spectral elements (sigma)
 
 class PyBERT(HasTraits):
     """
@@ -114,7 +112,6 @@ class PyBERT(HasTraits):
     pattern_len     = Int(gPatLen)
     nspb            = Int(gNspb)
     eye_bits        = Int(gNbits // 5)
-    fft_conv        = Bool(gFftConv)
     # - Channel Control
     Rdc             = Float(gRdc)
     w0              = Float(gw0)
@@ -130,8 +127,8 @@ class PyBERT(HasTraits):
     pn_mag          = Float(gPnMag)                                         # (ps)
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
-    pretap          = Float(0.0)
-    posttap         = Float(0.0)
+    pretap          = Float(-0.05)
+    posttap         = Float(-0.10)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
@@ -167,15 +164,12 @@ class PyBERT(HasTraits):
     plots_bathtub     = Instance(GridPlotContainer)
     # - Status
     status          = String("Ready.")
-#    channel_perf    = Float(1.)
-#    cdr_perf        = Float(1.)
-#    dfe_perf        = Float(1.)
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
     # - About
-    ident  = String('PyBERT v0.4 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.0 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    December 25, 2014\n\n \
+    January 24, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -221,9 +215,9 @@ class PyBERT(HasTraits):
         plot2.index_range = plot1.index_range # Zoom x-axes in tandem.
 
         plot3        = Plot(plotdata)
-        plot3.plot(('f_GHz', 'jitter_rejection_ratio'), type="line", color="blue")
-        plot3.title  = "CDR Jitter Rejection Ratio"
-        plot3.index_axis.title = "Frequency (GHz)"
+        plot3.plot(('f_MHz_dfe', 'jitter_rejection_ratio'), type="line", color="blue")
+        plot3.title  = "CDR/DFE Jitter Rejection Ratio"
+        plot3.index_axis.title = "Frequency (MHz)"
         plot3.value_axis.title = "Ratio (dB)"
         zoom3 = ZoomTool(plot3, tool_mode="range", axis='index', always_on=False)
         plot3.overlays.append(zoom3)
@@ -253,31 +247,22 @@ class PyBERT(HasTraits):
         plot_h_chnl.y_axis.title     = "Impulse Response (V/ns)"
 
         plot_h_tx = Plot(plotdata)
-#        plot_h_tx.plot(("t_ns_chnl", "tx_h"),     type="line", color="blue", name="Incremental")
         plot_h_tx.plot(("t_ns_chnl", "tx_out_h"), type="line", color="red",  name="Cumulative")
         plot_h_tx.title            = "Channel + Tx Preemphasis"
         plot_h_tx.index_axis.title = "Time (ns)"
         plot_h_tx.y_axis.title     = "Impulse Response (V/ns)"
-#        plot_h_tx.legend.visible   = True
-#        plot_h_tx.legend.align     = 'ur'
 
         plot_h_ctle = Plot(plotdata)
-#        plot_h_ctle.plot(("t_ns_chnl", "ctle_h"),     type="line", color="blue", name="Incremental")
         plot_h_ctle.plot(("t_ns_chnl", "ctle_out_h"), type="line", color="red",  name="Cumulative")
         plot_h_ctle.title            = "Channel + Tx Preemphasis + CTLE"
         plot_h_ctle.index_axis.title = "Time (ns)"
         plot_h_ctle.y_axis.title     = "Impulse Response (V/ns)"
-#        plot_h_ctle.legend.visible   = True
-#        plot_h_ctle.legend.align     = 'ur'
 
         plot_h_dfe = Plot(plotdata)
-#        plot_h_dfe.plot(("t_ns_chnl", "dfe_h"),     type="line", color="blue", name="Incremental")
         plot_h_dfe.plot(("t_ns_chnl", "dfe_out_h"), type="line", color="red",  name="Cumulative")
         plot_h_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
         plot_h_dfe.index_axis.title = "Time (ns)"
         plot_h_dfe.y_axis.title     = "Impulse Response (V/ns)"
-#        plot_h_dfe.legend.visible   = True
-#        plot_h_dfe.legend.align     = 'ur'
 
         container_h = GridPlotContainer(shape=(2,2))
         container_h.add(plot_h_chnl)
@@ -741,9 +726,9 @@ class PyBERT(HasTraits):
         if(dcd_dfe):
             dcd_rej_total = dcd_chnl / dcd_dfe
         if(pj_dfe):
-            pj_rej_total  = pj_chnl  / pj_dfe
+            pj_rej_total  = pj_tx  / pj_dfe
         if(rj_dfe):
-            rj_rej_total  = rj_chnl  / rj_dfe
+            rj_rej_total  = rj_tx  / rj_dfe
 
         info_str = '<H1>Jitter Rejection by Equalization Component</H1>\n'
 
@@ -761,12 +746,12 @@ class PyBERT(HasTraits):
                       (dcd_chnl, dcd_tx, 10. * log10(dcd_rej_tx))
         info_str += "</TR>\n"
         info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (pj_chnl, pj_tx, 10. * log10(pj_rej_tx))
+        info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % \
+                      (pj_chnl, pj_tx)
         info_str += "</TR>\n"
         info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (rj_chnl, rj_tx, 10. * log10(rj_rej_tx))
+        info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % \
+                      (rj_chnl, rj_tx)
         info_str += "</TR>\n"
         info_str += "</TABLE>\n"
 
@@ -831,11 +816,11 @@ class PyBERT(HasTraits):
         info_str += "</TR>\n"
         info_str += '<TR align="right">\n'
         info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (pj_chnl, pj_dfe, 10. * log10(pj_rej_total))
+                      (pj_tx, pj_dfe, 10. * log10(pj_rej_total))
         info_str += "</TR>\n"
         info_str += '<TR align="right">\n'
         info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (rj_chnl, rj_dfe, 10. * log10(rj_rej_total))
+                      (rj_tx, rj_dfe, 10. * log10(rj_rej_total))
         info_str += "</TR>\n"
         info_str += "</TABLE>\n"
 
