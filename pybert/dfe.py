@@ -170,6 +170,7 @@ class DFE(object):
         lockeds     = []
         clocks      = zeros(len(sample_times))
         clock_times = [next_clock_time]
+        bits        = []
         for (t, x) in zip(sample_times, signal):
             if(not ideal):
                 sum_out = summing_filter.step(x - filter_out)
@@ -186,6 +187,10 @@ class DFE(object):
                 current_clock_sample = sum_out
                 ui, locked = self.cdr.adapt([last_clock_sample, boundary_sample, current_clock_sample])
                 decision = sign(x)
+                if(decision > 0):
+                    bits.append(1)
+                else:
+                    bits.append(0)
                 error = sum_out - decision * decision_scaler
                 update = locked and (clk_cntr % n_ave) == 0
                 if(locked): # We only want error accumulation to happen, when we're locked.
@@ -203,5 +208,5 @@ class DFE(object):
 
         self.ui                = ui               
 
-        return (res, tap_weights, ui_ests, clocks, lockeds, clock_times)
+        return (res, tap_weights, ui_ests, clocks, lockeds, clock_times, bits)
 

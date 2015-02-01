@@ -5,7 +5,7 @@
 #
 # Copyright (c) 2014 David Banas; all rights reserved World wide.
 
-from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10
+from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, correlate
 from numpy.random import normal
 from numpy.fft    import fft
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
@@ -94,8 +94,8 @@ def my_run_simulation(self, initial_run=False):
 
     # Generate the ideal over-sampled signal.
     bits        = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
-    bits        = 2 * bits - 1
-    x           = repeat(bits, nspb)
+    symbols     = 2 * bits - 1
+    x           = repeat(symbols, nspb)
     ideal_xings = find_crossing_times(t, x, min_delay = ui / 2.)
 
     # Generate the output from, and the impulse/step/frequency responses of, the channel.
@@ -118,8 +118,8 @@ def my_run_simulation(self, initial_run=False):
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     # - Generate the ideal, post-preemphasis signal.
     ffe    = [pretap, 1.0 - abs(pretap) - abs(posttap), posttap]                    # FIR filter numerator, for fs = fbit.
-    bits   = convolve(bits, ffe)[:len(bits)]
-    tx_out = repeat(bits, nspb)                                                     # oversampled output
+    ffe_out= convolve(symbols, ffe)[:len(symbols)]
+    tx_out = repeat(ffe_out, nspb)                                                     # oversampled output
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
     #    This is partly due to the out of order nature in which we combine the Tx and channel,
@@ -183,6 +183,7 @@ def my_run_simulation(self, initial_run=False):
     self.status     = 'Running DFE/CDR...'
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
+    eye_bits      = self.eye_bits
     if(self.use_dfe):
         dfe = DFE(n_taps, gain, delta_t, alpha, ui, nspb, decision_scaler,
                     n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
@@ -191,7 +192,11 @@ def my_run_simulation(self, initial_run=False):
         dfe = DFE(n_taps,   0., delta_t, alpha, ui, nspb, decision_scaler,
                     n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
                     bandwidth=bandwidth, ideal=True)
-    (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times) = dfe.run(t, ctle_out)
+    (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
+    auto_corr     = correlate(bits_out, bits, mode='same')
+    auto_corr     = auto_corr[len(auto_corr) // 2 :]
+    bit_dly       = where(auto_corr == max(auto_corr))[0][0]
+    self.bit_errs = len(where(bits_out[-(eye_bits - bit_dly):] != bits[-eye_bits : -bit_dly])[0])
 
     dfe_h          = array([1.] + list(zeros(nspb - 1)) + list(concatenate([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]])))
     dfe_h.resize(len(ctle_out_h))
@@ -259,7 +264,6 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_spectrum_ctle     = jitter_spectrum
     self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
     # - DFE output
-    eye_bits      = self.eye_bits
     ignore_until  = (nbits - eye_bits) * ui + 0.1 * chnl_dly
     actual_xings  = find_crossing_times(t, dfe_out, min_delay = ignore_until + ui / 2.)
     #   - Assemble the corresponding "ideal" crossings, based on the recovered clock times.

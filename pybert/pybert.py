@@ -864,7 +864,8 @@ class PyBERT(HasTraits):
         jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
                      (self.isi_dfe * 1.e12, self.dcd_dfe * 1.e12, self.pj_dfe * 1.e12, self.rj_dfe * 1.e12)
         dly_str  = "         | Channel Delay (ns):    %5.3f" % (self.chnl_dly * 1.e9)
-        return perf_str + dly_str + jit_str
+        err_str  = "         | Bit errors detected: %d" % self.bit_errs
+        return perf_str + dly_str + jit_str + err_str
 
 if __name__ == '__main__':
     PyBERT().configure_traits(view=traits_view)
