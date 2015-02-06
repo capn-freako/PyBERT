@@ -112,6 +112,7 @@ class PyBERT(HasTraits):
     pattern_len     = Int(gPatLen)
     nspb            = Int(gNspb)
     eye_bits        = Int(gNbits // 5)
+    mod_type        = List([0])
     # - Channel Control
     Rdc             = Float(gRdc)
     w0              = Float(gw0)
@@ -167,9 +168,9 @@ class PyBERT(HasTraits):
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
     # - About
-    ident  = String('PyBERT v1.0 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.1 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    January 24, 2015\n\n \
+    February 5, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -368,6 +369,7 @@ class PyBERT(HasTraits):
         # - Outputs tab
         plot_out_chnl = Plot(plotdata)
         plot_out_chnl.plot(("t_ns", "chnl_out"), type="line", color="blue")
+        plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="gray")
         plot_out_chnl.title            = "Channel"
         plot_out_chnl.index_axis.title = "Time (ns)"
         plot_out_chnl.y_axis.title     = "Output (V)"

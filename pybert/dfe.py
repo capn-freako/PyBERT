@@ -11,9 +11,9 @@ into the larger `PyBERT' framework.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from numpy import zeros, sign, array, prod
+from numpy        import zeros, sign, array, prod
 from scipy.signal import lfilter, iirfilter
-from cdr   import CDR
+from cdr          import CDR
 
 gNch_taps       = 3           # Number of taps used in summing node filter.
 
@@ -59,7 +59,7 @@ class LfilterSS(object):
 class DFE(object):
     """Behavioral model of a decision feedback equalizer (DFE)."""
 
-    def __init__(self, n_taps, gain, delta_t, alpha, ui, n_spb, decision_scaler, bandwidth=100.e9,
+    def __init__(self, n_taps, gain, delta_t, alpha, ui, n_spb, decision_scaler, mod_type=0, bandwidth=100.e9,
                        n_ave=10, n_lock_ave=500, rel_lock_tol=0.01, lock_sustain=500, ideal=True):
         """
         Inputs:
@@ -83,6 +83,11 @@ class DFE(object):
                              Sets the target magnitude for the DFE.
 
           Optional:
+
+          - mod_type         The modulation type:
+                             - 0: NRZ
+                             - 1: Duo-binary
+                             - 2: PAM-4
 
           - bandwidth        The bandwidth, at the summing node (Hz).
 
@@ -111,10 +116,22 @@ class DFE(object):
         self.gain              = gain
         self.ui                = ui
         self.decision_scaler   = decision_scaler
+        self.mod_type          = mod_type
         self.cdr               = CDR(delta_t, alpha, ui, n_lock_ave, rel_lock_tol, lock_sustain)
         self.n_ave             = n_ave
         self.corrections       = zeros(n_taps)
         self.ideal             = ideal
+
+        thresholds = []
+        if  (mod_type == 0): # NRZ
+            pass
+        elif(mod_type == 1): # Duo-binary
+            thresholds.append(-decision_scaler / 2.)
+            thresholds.append( decision_scaler / 2.)
+        #elif(mod_type == 2): # PAM-4
+        else:
+            raise Exception("ERROR: DFE.__init__(): Unrecognized modulation type requested!")
+        self.thresholds = thresholds
 
     def step(self, decision, error, update):
         """Step the DFE, according to the new decision and error inputs."""
@@ -146,6 +163,43 @@ class DFE(object):
 
         return filter_out
 
+    def decide(self, x):
+        """
+        Make the bit decision, according to modulation type.
+
+        Inputs:
+          - x: The signal value, at the decision time.
+
+        Outputs:
+          - decision: One of {-1, 0, +1}, according to what the ideal
+                      signal level should have been.
+                      ('decision_scaler' normalized)
+
+          - bit:      One of {0, 1}, indicating the logical bit recovered.
+        """
+
+        mod_type   = self.mod_type
+        thresholds = self.thresholds
+
+        if  (mod_type == 0): # NRZ
+            decision = sign(x)
+            if(decision > 0):
+                bit = 1
+            else:
+                bit = 0
+        elif(mod_type == 1): # Duo-binary
+            if((x > self.thresholds[0]) ^ (x > self.thresholds[1])):
+                decision = 0
+                bit      = 1
+            else:
+                decision = sign(x)
+                bit      = 0
+        #elif(mod_type == 2): # PAM-4
+        else:
+            raise Exception("ERROR: DFE.decide(): Unrecognized modulation type requested!")
+
+        return decision, bit
+
     def run(self, sample_times, signal):
         """Run the DFE on the input signal."""
 
@@ -154,6 +208,8 @@ class DFE(object):
         n_ave             = self.n_ave
         summing_filter    = self.summing_filter
         ideal             = self.ideal
+        mod_type          = self.mod_type
+        thresholds        = self.thresholds
 
         clk_cntr           = 0
         smpl_cntr          = 0
@@ -185,12 +241,21 @@ class DFE(object):
                 clk_cntr += 1
                 clocks[smpl_cntr] = 1
                 current_clock_sample = sum_out
-                ui, locked = self.cdr.adapt([last_clock_sample, boundary_sample, current_clock_sample])
-                decision = sign(x)
-                if(decision > 0):
-                    bits.append(1)
+                samples = [last_clock_sample, boundary_sample, current_clock_sample]
+                if  (mod_type == 0): # NRZ
+                    pass
+                elif(mod_type == 1): # Duo-binary
+                    samples = array(samples)
+                    if(samples.mean() < 0.):
+                        samples -= thresholds[0]
+                    else:
+                        samples -= thresholds[1]
+                    samples = list(samples)
                 else:
-                    bits.append(0)
+                    raise Exception("ERROR: DFE.run(): Unrecognized modulation type!")
+                ui, locked = self.cdr.adapt(samples)
+                decision, bit = self.decide(x)
+                bits.append(bit)
                 error = sum_out - decision * decision_scaler
                 update = locked and (clk_cntr % n_ave) == 0
                 if(locked): # We only want error accumulation to happen, when we're locked.

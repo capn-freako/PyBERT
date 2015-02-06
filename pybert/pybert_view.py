@@ -5,7 +5,7 @@
 #
 # Copyright (c) 2014 David Banas; all rights reserved World wide.
 
-from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride
+from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor
 from enable.component_editor import ComponentEditor
 import time
 
@@ -32,6 +32,8 @@ traits_view = View(
                 Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit", ),
                 Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream", ),
                 Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams", ),
+                Item(name='mod_type',    label='Modulation', tooltip="line signalling/modulation scheme",
+                                                             editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])),
                 label='Simulation Control', show_border=True,
             ),
             VGroup(

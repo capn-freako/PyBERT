@@ -23,9 +23,9 @@ def moving_average(a, n=3) :
     ret[n:] = ret[n:] - ret[:-n]
     return np.insert(ret[n - 1:], 0, ret[n - 1] * ones(n - 1)) / n
 
-def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1):
+def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1, thresh = 0.):
     """
-    Finds the zero crossing times of the input signal.
+    Finds the threshold crossing times of the input signal.
 
     Inputs:
 
@@ -48,6 +48,9 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1)
       - min_init_dev The minimum initial deviation from zero, which must
                      be detected, before searching for crossings.
                      Normalized to maximum input signal magnitude.
+                     Optional. Default = 0.1.
+
+      - thresh       Vertical crossing threshold.
 
     Outputs:
 
@@ -66,7 +69,7 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1)
     while(abs(x[i]) < min_mag_x):
         i += 1
         assert i < len(x), "ERROR: find_crossing_times(): Input signal minimum deviation not detected!"
-    x = x[i:]
+    x = x[i:] - thresh
     t = t[i:]
 
     sign_x      = sign(x)
@@ -87,13 +90,70 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1)
     while(xings[i] < min_time):
         i += 1
 
-    if(rising_first and diff_sign_x[i] < 0.):
+    if(rising_first and diff_sign_x[xing_ix[i]] < 0.):
         i += 1
 
     if(debug):
-        print "find_crossing_times(): min_delay:", min_delay, "; first crossing returned:", xings[i]
+        print "find_crossing_times(): min_delay:", min_delay, "; first crossing returned:", xings[i], "rising_first:", rising_first
 
     return array(xings[i:])
+
+def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_init_dev = 0.1, mod_type = 0):
+    """
+    Finds the crossing times in a signal, according to the modulation type.
+
+    Inputs:
+
+      Required:
+
+      - t:                   The times associated with each signal sample.
+
+      - x:                   The signal samples.
+
+      - amplitude:           The nominal signal amplitude.
+                             (Used for determining thresholds, in the case of some modulation types.)
+
+      Optional:
+
+      - min_delay:           The earliest possible sample time we want returned.
+                             Default = 0.
+
+      - rising_first         When True, start with the first rising edge found.
+                             When this option is True, the first rising edge crossing
+                             is the first crossing returned. This is the desired
+                             behavior for PyBERT, because we always initialize the
+                             bit stream with [0, 1, 1], in order to provide a known
+                             synchronization point for jitter analysis.
+                             Default = True.
+
+      - min_init_dev         The minimum initial deviation from zero, which must
+                             be detected, before searching for crossings.
+                             Normalized to maximum input signal magnitude.
+                             Default = 0.1.
+
+      - mod_type:            The modulation type. Allowed values are:
+                               - 0: NRZ
+                               - 1: Duo-binary
+                               - 2: PAM-4
+                             Default = 0.
+
+    Outputs:
+
+      - xings:               The crossing times.
+
+    """
+
+    if  (mod_type == 0):                         # NRZ
+        xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
+    elif(mod_type == 1):                         # Duo-binary
+        xings_low  = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh = -amplitude / 2.))
+        xings_high = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh =  amplitude / 2.))
+        xings      = (xings_low + xings_high)
+        xings.sort()
+    else:                                        # PAM-4
+        raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
+
+    return array(xings)
 
 def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
     """
@@ -148,14 +208,6 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
       - bin_centers : The bin center values for both histograms.
 
     """
-
-    # Check alignment between actual and ideal crossings.
-    if(len(ideal_xings) > len(actual_xings)):
-        if(max(abs(diff(actual_xings) - diff(ideal_xings[:len(actual_xings)]))) > ui):
-            print "INFO: calc_jitter(): Possibly missing actual crossings."
-    else:
-        if(max(abs(diff(actual_xings[:len(ideal_xings)]) - diff(ideal_xings))) > ui):
-            print "WARNING: calc_jitter(): Potential misalignment between actual and ideal crossings!"
 
     jitter   = []
     t_jitter = []
@@ -217,13 +269,12 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
         print "ideal_xings:", ideal_xings
         raise
 
-    assert(not (xings_per_pattern % 2)), "Odd number of crossings per pattern detected! ideal_xings[0]: %e; actual_xings[0]: %e." % (ideal_xings[0], actual_xings[0])
-
-    risings_per_pattern  = fallings_per_pattern = xings_per_pattern // 2
+    fallings_per_pattern = xings_per_pattern // 2
+    risings_per_pattern  = xings_per_pattern - fallings_per_pattern
     num_patterns         = nbits // pattern_len
     if(len(jitter) < xings_per_pattern * num_patterns):
-        jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
         print "Added %d zeros to 'jitter'." % (xings_per_pattern * num_patterns - len(jitter))
+        jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
 
     try:
         t_jitter = t_jitter[:len(jitter)]

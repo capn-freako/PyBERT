@@ -70,6 +70,7 @@ def my_run_simulation(self, initial_run=False):
     lock_sustain    = self.lock_sustain
     bandwidth       = self.sum_bw * 1.e9
     rel_thresh      = self.thresh
+    mod_type        = self.mod_type[0]
 
     # Calculate system time vector.
     t0   = ui / nspb
@@ -94,9 +95,22 @@ def my_run_simulation(self, initial_run=False):
 
     # Generate the ideal over-sampled signal.
     bits        = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
-    symbols     = 2 * bits - 1
+    if  (mod_type == 0):                         # NRZ
+        symbols = 2 * bits - 1
+    elif(mod_type == 1):                         # Duo-binary
+        symbols = [0, bits[0]]                     # Extra leading zero is required, due to shifted addition, below.
+        for bit in bits[1:]:                       # XOR pre-coding prevents infinite error propagation.
+            symbols.append(bit ^ symbols[-1])
+        symbols = (2 * array(symbols) - 1) / 2.    # These 2 lines do the actual duo-binary encoding.
+        symbols = symbols[:-1] + symbols[1:]
+    #elif(mod_type == 2):                        # PAM-4
+    else:
+        raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
     x           = repeat(symbols, nspb)
-    ideal_xings = find_crossing_times(t, x, min_delay = ui / 2.)
+    self.ideal_signal = x
+
+    # Find the ideal crossing times.
+    ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
 
     # Generate the output from, and the impulse/step/frequency responses of, the channel.
     gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
@@ -184,12 +198,13 @@ def my_run_simulation(self, initial_run=False):
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
     eye_bits      = self.eye_bits
+    mod_type      = self.mod_type[0]
     if(self.use_dfe):
-        dfe = DFE(n_taps, gain, delta_t, alpha, ui, nspb, decision_scaler,
+        dfe = DFE(n_taps, gain, delta_t, alpha, ui, nspb, decision_scaler, mod_type,
                     n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
                     bandwidth=bandwidth, ideal=self.sum_ideal)
     else:
-        dfe = DFE(n_taps,   0., delta_t, alpha, ui, nspb, decision_scaler,
+        dfe = DFE(n_taps,   0., delta_t, alpha, ui, nspb, decision_scaler, mod_type,
                     n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
                     bandwidth=bandwidth, ideal=True)
     (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
@@ -219,7 +234,7 @@ def my_run_simulation(self, initial_run=False):
 
     # Analyze the jitter.
     # - channel output
-    actual_xings  = find_crossing_times(t, chnl_out)
+    actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type = mod_type)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
         hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -236,7 +251,7 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_ind_spectrum_chnl = jitter_ind_spectrum
     self.f_MHz                    = array(spectrum_freqs) * 1.e-6
     # - Tx output
-    actual_xings  = find_crossing_times(t, tx_out)
+    actual_xings = find_crossings(t, tx_out, decision_scaler, mod_type = mod_type)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
         hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -250,7 +265,7 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_spectrum_tx     = jitter_spectrum
     self.jitter_ind_spectrum_tx = jitter_ind_spectrum
     # - CTLE output
-    actual_xings  = find_crossing_times(t, ctle_out)
+    actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type = mod_type)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
         hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -265,7 +280,7 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
     # - DFE output
     ignore_until  = (nbits - eye_bits) * ui + 0.1 * chnl_dly
-    actual_xings  = find_crossing_times(t, dfe_out, min_delay = ignore_until + ui / 2.)
+    actual_xings  = find_crossings(t, dfe_out, decision_scaler, min_delay = ignore_until + ui / 2., mod_type = mod_type)
     #   - Assemble the corresponding "ideal" crossings, based on the recovered clock times.
     half_ui     = ui / 2.
     ideal_xings = []
@@ -370,6 +385,7 @@ def update_results(self):
     self.plotdata.set_data("dfe_out_s",  self.dfe_out_s)
 
     # Outputs
+    self.plotdata.set_data("ideal_signal",   self.ideal_signal)
     self.plotdata.set_data("chnl_out",   self.chnl_out)
     self.plotdata.set_data("tx_out",     self.tx_out)
     self.plotdata.set_data("ctle_out",   self.ctle_out)
