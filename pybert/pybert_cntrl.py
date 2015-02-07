@@ -179,18 +179,22 @@ def my_run_simulation(self, initial_run=False):
     w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
     ctle_H          = H / abs(H[0])  # Scale to force d.c. component of '1'.
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
+    ctle_out        = convolve(tx_out, ctle_h)[:len(tx_out)]
     self.ctle_s     = ctle_h.cumsum()
     ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
+    conv_dly        = t[where(ctle_out_h == max(ctle_out_h))[0][0]]
+    ctle_out_s      = ctle_out_h.cumsum()
     temp            = ctle_out_h.copy()
     temp.resize(len(w))
     ctle_out_H      = fft(temp)
-    ctle_out        = convolve(tx_out, ctle_h)[:len(tx_out)]
-    self.ctle_out_s = ctle_out_h.cumsum()
+    # - Store local variables to class instance.
+    self.ctle_out_s = ctle_out_s
     self.ctle_H     = ctle_H
     self.ctle_h     = ctle_h * 1.e-9 / Ts
     self.ctle_out_H = ctle_out_H
     self.ctle_out_h = ctle_out_h * 1.e-9 / Ts
     self.ctle_out   = ctle_out
+    self.conv_dly   = conv_dly
 
     self.ctle_perf  = nbits * nspb / (time.clock() - split_time)
     split_time      = time.clock()
@@ -279,22 +283,13 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_spectrum_ctle     = jitter_spectrum
     self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
     # - DFE output
-    ignore_until  = (nbits - eye_bits) * ui + 0.1 * chnl_dly
-    actual_xings  = find_crossings(t, dfe_out, decision_scaler, min_delay = ignore_until + ui / 2., mod_type = mod_type)
-    #   - Assemble the corresponding "ideal" crossings, based on the recovered clock times.
-    half_ui     = ui / 2.
-    ideal_xings = []
-    i = 0
-    for xing in actual_xings:
-        while(i < len(clock_times) and clock_times[i] <= xing):
-            i += 1
-        if(i >= len(clock_times)):
-            print "Oops! Ran out of 'clock_times' entries."
-            break
-        ideal_xings.append(clock_times[i] - half_ui)
+    ignore_until  = (nbits - eye_bits) * ui + ui / 2.
+    ideal_xings   = array(filter(lambda x: x > ignore_until, list(ideal_xings)))
+    min_delay     = ignore_until + conv_dly
+    actual_xings  = find_crossings(t, dfe_out, decision_scaler, min_delay = min_delay, mod_type = mod_type, rising_first = False)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
-        hist, hist_synth, bin_centers) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, actual_xings, rel_thresh, zero_mean=False)
+        hist, hist_synth, bin_centers) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, actual_xings, rel_thresh)
     self.isi_dfe                 = isi
     self.dcd_dfe                 = dcd
     self.pj_dfe                  = pj
