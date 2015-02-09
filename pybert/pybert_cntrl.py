@@ -35,6 +35,7 @@ def my_run_simulation(self, initial_run=False):
     self.status = 'Running channel...'
 
     nbits   = self.nbits
+    eye_bits = self.eye_bits
     nspb    = self.nspb
     rn      = self.rn
     pn_mag  = self.pn_mag
@@ -93,6 +94,17 @@ def my_run_simulation(self, initial_run=False):
     Ts         = 1. / fs
     chnl_dly   = l_ch / v0
 
+    # Correct unit interval for PAM-4 modulation, if necessary.
+    nui      = nbits
+    eye_uis  = eye_bits
+    nspui    = nspb
+    mod_type = self.mod_type[0]
+    if(mod_type == 2):                           # PAM-4 uses 2 UI per transmitted symbol.
+        ui      *= 2.
+        nui     /= 2
+        eye_uis /= 2
+        nspui   *= 2
+
     # Generate the ideal over-sampled signal.
     bits        = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
     if  (mod_type == 0):                         # NRZ
@@ -103,10 +115,12 @@ def my_run_simulation(self, initial_run=False):
             symbols.append(bit ^ symbols[-1])
         symbols = (2 * array(symbols) - 1) / 2.    # These 2 lines do the actual duo-binary encoding.
         symbols = symbols[:-1] + symbols[1:]
-    #elif(mod_type == 2):                        # PAM-4
+    elif(mod_type == 2):                        # PAM-4
+        symbols = array(map(lambda x: (x[0] << 1) + x[1], zip(bits[0::2], bits[1::2]))) * 2./3. - 1.
+        symbols = repeat(symbols, 2)
     else:
         raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
-    x           = repeat(symbols, nspb)
+    x                 = repeat(symbols, nspb)
     self.ideal_signal = x
 
     # Find the ideal crossing times.
@@ -201,21 +215,23 @@ def my_run_simulation(self, initial_run=False):
     self.status     = 'Running DFE/CDR...'
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
-    eye_bits      = self.eye_bits
-    mod_type      = self.mod_type[0]
     if(self.use_dfe):
-        dfe = DFE(n_taps, gain, delta_t, alpha, ui, nspb, decision_scaler, mod_type,
+        dfe = DFE(n_taps, gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
                     n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
                     bandwidth=bandwidth, ideal=self.sum_ideal)
     else:
-        dfe = DFE(n_taps,   0., delta_t, alpha, ui, nspb, decision_scaler, mod_type,
+        dfe = DFE(n_taps,   0., delta_t, alpha, ui, nspui, decision_scaler, mod_type,
                     n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol, lock_sustain=lock_sustain,
                     bandwidth=bandwidth, ideal=True)
     (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
-    auto_corr     = correlate(bits_out, bits, mode='same')
-    auto_corr     = auto_corr[len(auto_corr) // 2 :]
-    bit_dly       = where(auto_corr == max(auto_corr))[0][0]
-    self.bit_errs = len(where(bits_out[-(eye_bits - bit_dly):] != bits[-eye_bits : -bit_dly])[0])
+    bits_out = array(bits_out)
+    auto_corr       = 1. * correlate(bits_out[(nbits - eye_bits):], bits[(nbits - eye_bits):], mode='same') / sum(bits[(nbits - eye_bits):])
+    auto_corr       = auto_corr[len(auto_corr) // 2 :]
+    self.auto_corr  = auto_corr
+    bit_dly         = where(auto_corr == max(auto_corr))[0][0]
+    n_extra         = len(bits) - len(bits_out)
+    bit_errs        = where(bits_out[(nbits - eye_bits + bit_dly):] ^ bits[(nbits - eye_bits) : len(bits_out) - bit_dly])[0]
+    self.bit_errs   = len(bit_errs)
 
     dfe_h          = array([1.] + list(zeros(nspb - 1)) + list(concatenate([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]])))
     dfe_h.resize(len(ctle_out_h))
@@ -241,7 +257,7 @@ def my_run_simulation(self, initial_run=False):
     actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type = mod_type)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
-        hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
     self.t_jitter                 = t_jitter
     self.isi_chnl                 = isi
     self.dcd_chnl                 = dcd
@@ -258,7 +274,7 @@ def my_run_simulation(self, initial_run=False):
     actual_xings = find_crossings(t, tx_out, decision_scaler, mod_type = mod_type)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
-        hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
     self.isi_tx                 = isi
     self.dcd_tx                 = dcd
     self.pj_tx                  = pj
@@ -272,7 +288,7 @@ def my_run_simulation(self, initial_run=False):
     actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type = mod_type)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
-        hist, hist_synth, bin_centers) = calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
     self.isi_ctle                 = isi
     self.dcd_ctle                 = dcd
     self.pj_ctle                  = pj
@@ -283,13 +299,13 @@ def my_run_simulation(self, initial_run=False):
     self.jitter_spectrum_ctle     = jitter_spectrum
     self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
     # - DFE output
-    ignore_until  = (nbits - eye_bits) * ui + ui / 2.
+    ignore_until  = (nui - eye_uis) * ui + ui / 2.
     ideal_xings   = array(filter(lambda x: x > ignore_until, list(ideal_xings)))
     min_delay     = ignore_until + conv_dly
     actual_xings  = find_crossings(t, dfe_out, decision_scaler, min_delay = min_delay, mod_type = mod_type, rising_first = False)
     (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
         thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
-        hist, hist_synth, bin_centers) = calc_jitter(ui, eye_bits, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        hist, hist_synth, bin_centers) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings, actual_xings, rel_thresh)
     self.isi_dfe                 = isi
     self.dcd_dfe                 = dcd
     self.pj_dfe                  = pj
@@ -306,6 +322,7 @@ def my_run_simulation(self, initial_run=False):
     ctle_spec_condensed          = array([ctle_spec.take(range(i, i + skip_factor)).mean() for i in range(0, len(ctle_spec), skip_factor)])
     window_width                 = len(dfe_spec) / 10
     self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
+    #self.jitter_rejection_ratio  = zeros(len(dfe_spec))
 
     self.jitter_perf = nbits * nspb / (time.clock() - split_time)
     split_time       = time.clock()
@@ -341,6 +358,13 @@ def update_results(self):
     f             = self.f
     t_ns          = self.t_ns
     t_ns_chnl     = self.t_ns_chnl
+    mod_type      = self.mod_type[0]
+
+    # Correct for PAM-4, if necessary.
+    ignore_until  = (num_bits - eye_bits) * ui
+    if(mod_type == 2):
+        ui            *= 2.
+        samps_per_bit *= 2.
 
     # Misc.
     f_GHz         = f[:len(f) // 2] / 1.e9
@@ -385,6 +409,7 @@ def update_results(self):
     self.plotdata.set_data("tx_out",     self.tx_out)
     self.plotdata.set_data("ctle_out",   self.ctle_out)
     self.plotdata.set_data("dfe_out",    self.dfe_out)
+    self.plotdata.set_data("auto_corr",  self.auto_corr)
 
     # Frequency responses
     self.plotdata.set_data("chnl_H",     20. * log10(abs(self.chnl_H    [1 : len_f_GHz])))
@@ -463,7 +488,6 @@ def update_results(self):
     eye_tx   = calc_eye(ui, samps_per_bit, height, self.tx_out)
     eye_ctle = calc_eye(ui, samps_per_bit, height, self.ctle_out)
     i = 0
-    ignore_until = (num_bits - eye_bits) * ui
     while(clock_times[i] <= ignore_until):
         i += 1
         assert i < len(clock_times), "ERROR: Insufficient coverage in 'clock_times' vector."
@@ -478,6 +502,12 @@ def update_eyes(self):
     ui            = self.ui * 1.e-12
     samps_per_bit = self.nspb
     dfe_output    = array(self.dfe_out)
+    mod_type      = self.mod_type[0]
+
+    # Correct for PAM-4, if necessary.
+    if(mod_type == 2):
+        ui            *= 2.
+        samps_per_bit *= 2.
 
     width    = 2 * samps_per_bit
     height   = 100

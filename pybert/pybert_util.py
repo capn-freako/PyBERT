@@ -150,7 +150,14 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
         xings_high = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh =  amplitude / 2.))
         xings      = (xings_low + xings_high)
         xings.sort()
-    else:                                        # PAM-4
+    elif(mod_type == 2):                         # PAM-4
+        xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
+#        xings_low  = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh = -amplitude * 2. / 3.))
+#        xings_mid  = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh = 0.))
+#        xings_high = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh =  amplitude * 2. / 3.))
+#        xings      = (xings_low + xings_mid + xings_high)
+#        xings.sort()
+    else:                                        # Unknown
         raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
 
     return array(xings)
@@ -209,10 +216,20 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
 
     """
 
+    def my_hist(x):
+        """
+        Calculates the probability mass function (PMF) of the input vector,
+        enforcing an output range of [-UI/2, +UI/2], sweeping everything in [-UI, -UI/2] into the first bin,
+        and everything in [UI/2, UI] into the last bin.
+        """
+        hist, bin_edges      = histogram(x, [-ui] + [-ui / 2. + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui])
+        bin_centers          = [-ui / 2.] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) for i in range(len(bin_edges) - 3)] + [ui / 2.]
+        return (array(map(float, hist)) / sum(hist), bin_centers)
+
+    # Assemble the TIE track.
     jitter   = []
     t_jitter = []
     i        = 0
-    # Assemble the TIE track.
     ideal_xings  = array(ideal_xings)  - (ideal_xings[0] - ui / 2.)
     actual_xings = array(actual_xings) - (actual_xings[0] - ideal_xings[0])
 
@@ -262,36 +279,28 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
         jitter.insert(pad_ix,  3. * ui / 4.)
     jitter = array(jitter)
 
-    # Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    try:
-        xings_per_pattern = where(ideal_xings >= pattern_len * ui)[0][0]
-    except:
-        print "ideal_xings:", ideal_xings
-        raise
-
+    # Do the jitter decomposition.
+    # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
+    xings_per_pattern    = where(ideal_xings >= pattern_len * ui)[0][0]
     fallings_per_pattern = xings_per_pattern // 2
     risings_per_pattern  = xings_per_pattern - fallings_per_pattern
     num_patterns         = nbits // pattern_len
-    if(len(jitter) < xings_per_pattern * num_patterns):
-        print "Added %d zeros to 'jitter'." % (xings_per_pattern * num_patterns - len(jitter))
-        jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
 
-    try:
-        t_jitter = t_jitter[:len(jitter)]
-        if(len(jitter) > len(t_jitter)):
-            jitter = jitter[:len(t_jitter)]
-            print "Had to shorten 'jitter', due to 't_jitter'."
-    except:
-        print "jitter:", jitter
-        raise
+    # -- Check and adjust vector lengths, reporting out if any modifications were necessary.
+    if(False):
+        if(len(jitter) < xings_per_pattern * num_patterns):
+            print "Added %d zeros to 'jitter'." % (xings_per_pattern * num_patterns - len(jitter))
+            jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
+        try:
+            t_jitter = t_jitter[:len(jitter)]
+            if(len(jitter) > len(t_jitter)):
+                jitter = jitter[:len(t_jitter)]
+                print "Had to shorten 'jitter', due to 't_jitter'."
+        except:
+            print "jitter:", jitter
+            raise
 
-    x, valid_ix     = make_uniform(t_jitter, jitter, ui, nbits)
-
-    y               = fft(x)
-    jitter_spectrum = abs(y[:len(y) / 2]) / sqrt(len(jitter)) # Normalized, in order to make power correct.
-    f0              = 1. / (ui * nbits)
-    spectrum_freqs  = [i * f0 for i in range(len(y) / 2)]
-
+    # -- Do the reshaping and check results thoroughly.
     try:
         tie_risings          = reshape(jitter.take(range(0, num_patterns * risings_per_pattern * 2, 2)),  (num_patterns, risings_per_pattern))
         tie_fallings         = reshape(jitter.take(range(1, num_patterns * fallings_per_pattern * 2, 2)), (num_patterns, fallings_per_pattern))
@@ -300,66 +309,59 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
         print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
         print "nbits:", nbits, "pattern_len:", pattern_len
         raise
-
     assert len(filter(lambda x: x == None, tie_risings)) == 0, "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
                                            (num_patterns, risings_per_pattern, len(jitter))
     assert len(filter(lambda x: x == None, tie_fallings)) == 0, "num_patterns: %d, fallings_per_pattern: %d, len(jitter): %d" % \
                                            (num_patterns, fallings_per_pattern, len(jitter))
-    # Do the jitter decomposition.
+
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
     tie_risings_ave  = tie_risings.mean(axis=0)
     tie_fallings_ave = tie_fallings.mean(axis=0)
-    try:
-        isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
-        isi = min(isi, ui) # Cap the ISI at the unit interval.
-    except:
-        print "tie_risings_ave:", tie_risings_ave, "\ntie_fallings_ave:", tie_fallings_ave
-        raise
+    isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
+    isi = min(isi, ui) # Cap the ISI at the unit interval.
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
-    # - Subtract the data dependent jitter from the original TIE track.
+
+    # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
     tie_ave  = concatenate(zip(tie_risings_ave, tie_fallings_ave))
     tie_ave  = resize(tie_ave, len(jitter))
-    try:
-        tie_ind  = jitter - tie_ave
-    except:
-        print "tie_ave:", tie_ave
-        raise
+    tie_ind  = jitter - tie_ave
 
     # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
-    # -- Make data independent TIE track uniformly sampled in time, via zero padding where necessary.
-    # -- It's necessary to keep track of those elements in the resultant vector, which aren't paddings; hence, 'valid_ix'.
+    # -- Calculate the total jitter spectrum, for display purposes only.
+    # --- Make vector uniformly sampled in time, via zero padding where necessary.
+    # --- (It's necessary to keep track of those elements in the resultant vector, which aren't paddings; hence, 'valid_ix'.)
+    x, valid_ix     = make_uniform(t_jitter, jitter, ui, nbits)
+    y               = fft(x)
+    jitter_spectrum = abs(y[:len(y) / 2]) / sqrt(len(jitter)) # Normalized, in order to make power correct.
+    f0              = 1. / (ui * nbits)
+    spectrum_freqs  = [i * f0 for i in range(len(y) / 2)]
+
+    # -- Use the data independent jitter spectrum for our calculations.
     tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nbits)
-    # -- Normalized, in order to make power correct, since we grab Rj from the freq. domain.
-    # -- (I'm using the length of the vector before zero padding, because zero padding doesn't add energy.)
+
+    # --- Normalized, in order to make power correct, since we grab Rj from the freq. domain.
+    # --- (I'm using the length of the vector before zero padding, because zero padding doesn't add energy.)
+    # --- (This has the effect of making our final Rj estimate more conservative.)
     y        = fft(tie_ind_uniform) / sqrt(len(tie_ind))
     y_mag    = abs(y)
-    tie_ind_spectrum = y_mag[:len(y_mag) / 2]
     y_mean   = moving_average(y_mag, n = len(y_mag) / 10)
     y_var    = moving_average((y_mag - y_mean) ** 2, n = len(y_mag) / 10)
     y_sigma  = sqrt(y_var)
-
     thresh   = y_mean + rel_thresh * y_sigma
-    y_per    = where(y_mag > thresh, y, zeros(len(y)))      # Periodic components are those lying above the threshold.
-    y_rnd    = abs(where(y_mag > thresh, zeros(len(y)), y)) # Random components are those lying below.
+    y_per    = where(y_mag > thresh, y,             zeros(len(y)))   # Periodic components are those lying above the threshold.
+    y_rnd    = where(y_mag > thresh, zeros(len(y)), y)               # Random components are those lying below.
+    y_rnd    = abs(y_rnd)
     rj       = sqrt(mean((y_rnd - mean(y_rnd)) ** 2))
     tie_per  = real(ifft(y_per)).take(valid_ix) * sqrt(len(tie_ind)) # Restoring shape of vector to its original, non-uniformly sampled state.
-
     pj       = tie_per.ptp()
+
+    # --- Save the spectrum, for display purposes.
+    tie_ind_spectrum = y_mag[:len(y_mag) / 2]
 
     # - Reassemble the jitter, excluding the Rj.
     # -- Here, we see why it was necessary to keep track of the non-padded elements with 'valid_ix':
     # -- It was so that we could add the average and periodic components back together, maintaining correct alignment between them.
     jitter_synth = tie_ave + tie_per
-
-    def my_hist(x):
-        """
-        Calculates the probability mass function (PMF) of the input vector,
-        enforcing an output range of [-UI/2, +UI/2], sweeping everything in [-UI, -UI/2] into the first bin,
-        and everything in [UI/2, UI] into the last bin.
-        """
-        hist, bin_edges      = histogram(x, [-ui] + [-ui / 2. + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui])
-        bin_centers          = [-ui / 2.] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) for i in range(len(bin_edges) - 3)] + [ui / 2.]
-        return (array(map(float, hist)) / sum(hist), bin_centers) # Make it a PMF.
 
     # - Calculate the histogram of original, for comparison.
     hist,       bin_centers = my_hist(jitter)
@@ -374,29 +376,6 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
     hist_synth = convolve(hist_synth, rj_pmf)
     tail_len   = (len(bin_centers) - 1) / 2
     hist_synth = [sum(hist_synth[: tail_len + 1])] + list(hist_synth[tail_len + 1 : len(hist_synth) - tail_len - 1]) + [sum(hist_synth[len(hist_synth) - tail_len - 1 :])]
-
-    if(debug):
-        plot(jitter,                                               label="jitter",          color="b")
-        plot(concatenate(zip(tie_risings_ave, tie_fallings_ave)),  label="rise/fall aves.", color="r")
-        title("Original TIE track & Average over one pattern period")
-        legend()
-        show()
-        plot(t_jitter, tie_ind)
-        title("Data Independent Jitter")
-        show()
-        plot(y_mag)
-        plot(thresh)
-        title("Data Independed Jitter Spectral Magnitude and Pj Threshold")
-        show()
-        print "# of spectral peaks detected:", len(where(y_per)[0])
-        plot(tie_per)
-        title("Periodic Jitter")
-        show()
-        hist, bin_edges             = histogram(tie_ind, 99, (-ui/2., ui/2.))
-        bin_centers                 = [mean([bin_edges[i], bin_edges[i + 1]]) for i in range(len(bin_edges) - 1)]
-        plot(bin_centers, hist)
-        title("Data Independent Jitter Distribution")
-        show()
 
     return (jitter, t_jitter, isi, dcd, pj, rj, tie_ind,
             thresh[:len(thresh) / 2], jitter_spectrum, tie_ind_spectrum, spectrum_freqs,
@@ -528,19 +507,22 @@ def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
                                                            # (i.e. - We're interested in what appears across RL.)
     return G
 
-def calc_eye(ui, samps_per_bit, height, ys, clock_times=None):
+def calc_eye(ui, samps_per_ui, height, ys, clock_times=None):
     """
     Calculates the "eye" diagram of the input signal vector.
 
     Inputs:
       - ui             unit interval (s)
-      - samps_per_bit  # of samples per bit
+      - samps_per_ui   # of samples per unit interval
       - height         height of output image data array
       - ys             signal vector of interest
-      - clock_times    (optional) vector of clock times to use for eye centers.
-                       If not provided, just locate second zero-crossing (The first can be problematic.),
-                       and assume constant UI and no phase jumps.
-                       (This allows the same function to be used for eye diagram creation, for both pre and post-CDR signals.)
+      - clock_times    (optional)
+                       vector of clock times to use for eye centers.
+                       If not provided, just use mean zero-crossing and
+                       assume constant UI and no phase jumps.
+                       (This allows the same function to be used for
+                        eye diagram creation,
+                        for both pre and post-CDR signals.)
 
     Outputs:
       - img_array      The "heat map" representing the eye diagram.
@@ -554,10 +536,10 @@ def calc_eye(ui, samps_per_bit, height, ys, clock_times=None):
     ys = array(ys)
 
     # Intermediate variable calculation.
-    tsamp = ui / samps_per_bit
+    tsamp = ui / samps_per_ui
 
     # Adjust the scaling.
-    width    = 2 * samps_per_bit
+    width    = 2 * samps_per_ui
     y_max    = 1.1 * max(abs(ys))
     y_scale  = height / (2 * y_max)          # (pixels/V)
     y_offset = height / 2                    # (pixels)
@@ -569,30 +551,32 @@ def calc_eye(ui, samps_per_bit, height, ys, clock_times=None):
             start_time = clock_time - ui
             stop_time  = clock_time + ui
             start_ix   = int(start_time / tsamp)
+            if(start_ix + 2 * samps_per_ui > len(ys)):
+                break
             interp_fac = (start_time - start_ix * tsamp) / tsamp
             last_y     = ys[start_ix]
             i = 0
-            for (samp1, samp2) in zip(ys[start_ix : start_ix + 2 * samps_per_bit],
-                                      ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_bit]):
+            for (samp1, samp2) in zip(ys[start_ix : start_ix + 2 * samps_per_ui],
+                                      ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-                if(sign(y) != sign(last_y)): # Trap zero crossings.
-                    img_array[y_offset, int(i - 1 + y / (y - last_y) + 0.5)] += 1
+#                if(sign(y) != sign(last_y)): # Trap zero crossings.
+#                    img_array[y_offset, int(i - 1 + y / (y - last_y) + 0.5)] += 1
                 last_y = y
                 i += 1
     else:
-        start_ix      = (where(diff(sign(ys)))[0] % samps_per_bit).mean() + samps_per_bit // 2 
-        last_start_ix = len(ys) - 2 * samps_per_bit
+        start_ix      = (where(diff(sign(ys)))[0] % samps_per_ui).mean() + samps_per_ui // 2 
+        last_start_ix = len(ys) - 2 * samps_per_ui
         while(start_ix < last_start_ix):
             last_y = ys[start_ix]
             i      = 0
-            for y in ys[start_ix : start_ix + 2 * samps_per_bit]:
+            for y in ys[start_ix : start_ix + 2 * samps_per_ui]:
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-                if(sign(y) != sign(last_y)): # Trap zero crossings.
-                    img_array[y_offset, int(i - 1 + y / (y - last_y) + 0.5)] += 1
+#                if(sign(y) != sign(last_y)): # Trap zero crossings.
+#                    img_array[y_offset, int(i - 1 + y / (y - last_y) + 0.5)] += 1
                 last_y = y
                 i += 1
-            start_ix += samps_per_bit
+            start_ix += samps_per_ui
 
     return img_array
 

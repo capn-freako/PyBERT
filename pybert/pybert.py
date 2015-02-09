@@ -170,7 +170,7 @@ class PyBERT(HasTraits):
     # - About
     ident  = String('PyBERT v1.1 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    February 5, 2015\n\n \
+    February 9, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -222,6 +222,16 @@ class PyBERT(HasTraits):
         plot3.value_axis.title = "Ratio (dB)"
         zoom3 = ZoomTool(plot3, tool_mode="range", axis='index', always_on=False)
         plot3.overlays.append(zoom3)
+
+        plot4        = Plot(plotdata)
+        plot4.plot(('auto_corr'), type="line", color="blue")
+        plot4.title  = "Received to Transmitted Bits Correlation"
+        plot4.index_axis.title = "Offset (bits)"
+        plot4.value_axis.title = "Correlation"
+        plot4.value_range.high_setting = 1
+        plot4.value_range.low_setting  = 0
+        zoom4 = ZoomTool(plot4, tool_mode="range", axis='index', always_on=False)
+        plot4.overlays.append(zoom4)
 
         plot9 = Plot(plotdata, auto_colors=['red', 'orange', 'yellow', 'green', 'blue', 'purple'])
         for i in range(gNtaps):
@@ -368,8 +378,8 @@ class PyBERT(HasTraits):
 
         # - Outputs tab
         plot_out_chnl = Plot(plotdata)
-        plot_out_chnl.plot(("t_ns", "chnl_out"), type="line", color="blue")
-        plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="gray")
+        plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="lightgrey")
+        plot_out_chnl.plot(("t_ns", "chnl_out"),     type="line", color="blue")
         plot_out_chnl.title            = "Channel"
         plot_out_chnl.index_axis.title = "Time (ns)"
         plot_out_chnl.y_axis.title     = "Output (V)"
@@ -657,8 +667,6 @@ class PyBERT(HasTraits):
 
         # These various plot customizing functions are left, for future reference.
         # plot19.index_range = plot5.index_range # Zoom x-axes in tandem.
-        # plot4.value_range.high_setting = ui / 2.
-        # plot4.value_range.low_setting  = -ui / 2.
 
         update_eyes(self)
 

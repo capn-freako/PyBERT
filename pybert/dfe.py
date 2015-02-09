@@ -128,7 +128,10 @@ class DFE(object):
         elif(mod_type == 1): # Duo-binary
             thresholds.append(-decision_scaler / 2.)
             thresholds.append( decision_scaler / 2.)
-        #elif(mod_type == 2): # PAM-4
+        elif(mod_type == 2): # PAM-4
+            thresholds.append(-decision_scaler * 2. / 3.)
+            thresholds.append(0.)
+            thresholds.append( decision_scaler * 2. / 3.)
         else:
             raise Exception("ERROR: DFE.__init__(): Unrecognized modulation type requested!")
         self.thresholds = thresholds
@@ -165,17 +168,20 @@ class DFE(object):
 
     def decide(self, x):
         """
-        Make the bit decision, according to modulation type.
+        Make the bit decisions, according to modulation type.
 
         Inputs:
           - x: The signal value, at the decision time.
 
         Outputs:
-          - decision: One of {-1, 0, +1}, according to what the ideal
-                      signal level should have been.
-                      ('decision_scaler' normalized)
+          - decision: One of:
+                        {-1, 1}              (NRZ)
+                        {-1, 0, +1}          (Duo-binary)
+                        {-1, -1/3, +1/3, +1} (PAM-4)
+                      , according to what the ideal signal level should
+                      have been. ('decision_scaler' normalized)
 
-          - bit:      One of {0, 1}, indicating the logical bit recovered.
+          - bits:     The list of bits recovered.
         """
 
         mod_type   = self.mod_type
@@ -184,21 +190,33 @@ class DFE(object):
         if  (mod_type == 0): # NRZ
             decision = sign(x)
             if(decision > 0):
-                bit = 1
+                bits = [1]
             else:
-                bit = 0
+                bits = [0]
         elif(mod_type == 1): # Duo-binary
             if((x > self.thresholds[0]) ^ (x > self.thresholds[1])):
                 decision = 0
-                bit      = 1
+                bits     = [1]
             else:
                 decision = sign(x)
-                bit      = 0
-        #elif(mod_type == 2): # PAM-4
+                bits     = [0]
+        elif(mod_type == 2): # PAM-4
+            if  (x > self.thresholds[2]):
+                decision = 1
+                bits     = [1, 1]
+            elif(x > self.thresholds[1]):
+                decision = 1. / 3.
+                bits     = [1, 0]
+            elif(x > self.thresholds[0]):
+                decision = -1. / 3.
+                bits     = [0, 1]
+            else:
+                decision = -1
+                bits     = [0, 0]
         else:
             raise Exception("ERROR: DFE.decide(): Unrecognized modulation type requested!")
 
-        return decision, bit
+        return decision, bits
 
     def run(self, sample_times, signal):
         """Run the DFE on the input signal."""
@@ -251,12 +269,14 @@ class DFE(object):
                     else:
                         samples -= thresholds[1]
                     samples = list(samples)
+                elif(mod_type == 2): # PAM-4
+                    pass
                 else:
                     raise Exception("ERROR: DFE.run(): Unrecognized modulation type!")
-                ui, locked = self.cdr.adapt(samples)
-                decision, bit = self.decide(x)
-                bits.append(bit)
-                error = sum_out - decision * decision_scaler
+                ui, locked     = self.cdr.adapt(samples)
+                decision, new_bits = self.decide(x)
+                bits.extend(new_bits)
+                error  = sum_out - decision * decision_scaler
                 update = locked and (clk_cntr % n_ave) == 0
                 if(locked): # We only want error accumulation to happen, when we're locked.
                     nxt_filter_out = self.step(decision, error, update)
