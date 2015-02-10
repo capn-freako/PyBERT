@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# PyBERT documentation build configuration file, created by
-# sphinx-quickstart on Tue Feb 10 06:17:20 2015.
+# PyBERT Developer Guide documentation build configuration file, created by
+# sphinx-quickstart on Tue Feb 10 10:04:12 2015.
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.
@@ -30,7 +30,6 @@ import os
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.doctest',
     'sphinx.ext.viewcode',
 ]
 
@@ -47,7 +46,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'PyBERT'
+project = u'PyBERT Developer Guide'
 copyright = u'2015, David Banas'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -74,7 +73,7 @@ language = None
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = []
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -197,7 +196,7 @@ html_static_path = ['_static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'PyBERTdoc'
+htmlhelp_basename = 'PyBERTDeveloperGuidedoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -219,7 +218,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'PyBERT.tex', u'PyBERT Documentation',
+  ('index', 'PyBERTDeveloperGuide.tex', u'PyBERT Developer Guide Documentation',
    u'David Banas', 'manual'),
 ]
 
@@ -249,7 +248,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'pybert', u'PyBERT Documentation',
+    ('index', 'pybertdeveloperguide', u'PyBERT Developer Guide Documentation',
      [u'David Banas'], 1)
 ]
 
@@ -263,8 +262,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'PyBERT', u'PyBERT Documentation',
-   u'David Banas', 'PyBERT', 'One line description of project.',
+  ('index', 'PyBERTDeveloperGuide', u'PyBERT Developer Guide Documentation',
+   u'David Banas', 'PyBERTDeveloperGuide', 'One line description of project.',
    'Miscellaneous'),
 ]
 
