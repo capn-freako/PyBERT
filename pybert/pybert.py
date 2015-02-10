@@ -5,6 +5,7 @@ Bit error rate tester (BERT) simulator, written in Python.
 
 Original Author: David Banas <capn.freako@gmail.com>
 Original Date:   17 June 2014
+Testing by: Mark Marlett <mark.marlett@gmail.com>
 
 This Python script provides a GUI interface to a BERT simulator, which
 can be used to explore the concepts of serial communication link design.
