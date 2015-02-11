@@ -140,7 +140,7 @@ traits_view = View(
             label = 'About'
         ),
         Group(
-            Item(label='Instructions', springy=True, ),
+            Item('instructions', style='readonly', show_label=False),
             label = 'Help'
         ),
         layout = 'tabbed', springy = True, id = 'tabs',

@@ -6,7 +6,7 @@ Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a decision feedback
 equalizer (DFE). The class defined, here, is intended for integration
-into the larger `PyBERT' framework.
+into the larger 'PyBERT' framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
@@ -175,9 +175,11 @@ class DFE(object):
 
         Outputs:
           - decision: One of:
+
                         {-1, 1}              (NRZ)
                         {-1, 0, +1}          (Duo-binary)
                         {-1, -1/3, +1/3, +1} (PAM-4)
+
                       , according to what the ideal signal level should
                       have been. ('decision_scaler' normalized)
 

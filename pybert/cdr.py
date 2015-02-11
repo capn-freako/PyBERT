@@ -6,7 +6,7 @@ Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a "bang-bang" clock
 data recovery (CDR) unit. The class defined, here, is intended for
-integration into the larger `PyBERT' framework.
+integration into the larger 'PyBERT' framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
@@ -89,7 +89,8 @@ class CDR(object):
 
           - ui       the new unit interval estimate
 
-          - locked   Boolean flag indicating `locked' status
+          - locked   Boolean flag indicating 'locked' status
+
         """
 
         integral_corrections     = self.integral_corrections

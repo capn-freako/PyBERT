@@ -1,0 +1,5 @@
+recursive-include pybert/doc *
+global-exclude *.swp
+global-exclude *.DS_Store
+global-exclude *.buildinfo
+

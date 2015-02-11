@@ -19,6 +19,8 @@ import scipy.stats as ss
 debug = False
 
 def moving_average(a, n=3) :
+    """Calculates a sliding average over the input vector."""
+
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return np.insert(ret[n - 1:], 0, ret[n - 1] * ones(n - 1)) / n
@@ -131,11 +133,10 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
                              Normalized to maximum input signal magnitude.
                              Default = 0.1.
 
-      - mod_type:            The modulation type. Allowed values are:
+      - mod_type:            The modulation type. Allowed values are: (Default = 0.)
                                - 0: NRZ
                                - 1: Duo-binary
                                - 2: PAM-4
-                             Default = 0.
 
     Outputs:
 
@@ -521,8 +522,8 @@ def calc_eye(ui, samps_per_ui, height, ys, clock_times=None):
                        If not provided, just use mean zero-crossing and
                        assume constant UI and no phase jumps.
                        (This allows the same function to be used for
-                        eye diagram creation,
-                        for both pre and post-CDR signals.)
+                       eye diagram creation,
+                       for both pre and post-CDR signals.)
 
     Outputs:
       - img_array      The "heat map" representing the eye diagram.
@@ -584,9 +585,10 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
     """
     Generate the frequency response of a continuous time linear
     equalizer (CTLE), given the:
-     - signal path bandwidth,
-     - peaking specification, and
-     - list of frequencies of interest.
+
+    - signal path bandwidth,
+    - peaking specification, and
+    - list of frequencies of interest.
 
     We use the 'invres()' function from scipy.signal, as it suggests
     itself as a natural approach, given our chosen use model of having
@@ -594,9 +596,11 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
 
     That is, we define our desired frequency response using one zero
     and two poles, where:
+
     - The pole locations are equal to:
        - the signal path natural bandwidth, and
        - the user specified peaking frequency.
+
     - The zero location is chosen, so as to provide the desired degree
       of peaking.
 
@@ -607,7 +611,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
       - peak_freq    The location of the desired peak in the frequency
                      response (Hz).
 
-      - peak_mag     The desired relative magnitude of the peak (dB). (|H(0)| = 1)
+      - peak_mag     The desired relative magnitude of the peak (dB). (mag(H(0)) = 1)
 
       - w            The list of frequencies of interest (rads./s).
 
