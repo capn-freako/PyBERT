@@ -169,11 +169,13 @@ class PyBERT(HasTraits):
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
     # - About
-    ident  = String('PyBERT v1.1 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.2 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    February 9, 2015\n\n \
+    February 10, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
+    # - Help
+    instructions = Property(HTML)
 
     # Dependent variables
     # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
@@ -190,6 +192,8 @@ class PyBERT(HasTraits):
 
     # Default initialization
     def __init__(self):
+        """Plot setup occurs here."""
+
         super(PyBERT, self).__init__()
 
         plotdata = self.plotdata
@@ -877,6 +881,20 @@ class PyBERT(HasTraits):
         dly_str  = "         | Channel Delay (ns):    %5.3f" % (self.chnl_dly * 1.e9)
         err_str  = "         | Bit errors detected: %d" % self.bit_errs
         return perf_str + dly_str + jit_str + err_str
+
+    @cached_property
+    def _get_instructions(self):
+        help_str  = "<H2>PyBERT User's Guide</H2>\n"
+        help_str += "  <H3>Note to developers</H3>\n"
+        help_str += "    This is NOT for you. Instead, open 'pybert/doc/build/html/index.html' in a browser.\n"
+        help_str += "  <H3>PyBERT User Help Options</H3>\n"
+        help_str += "    <UL>\n"
+        help_str += "      <LI>Hover over any user-settable value in the <em>Config.</em> tab, for help message.</LI>\n"
+        help_str += '      <LI>Visit the PyBERT FAQ at: https://github.com/capn-freako/PyBERT/wiki/pybert_faq.</LI>\n'
+        help_str += '      <LI>Send e-mail to David Banas at capn.freako@gmail.com.</LI>\n'
+        help_str += "    </UL>\n"
+
+        return help_str
 
 if __name__ == '__main__':
     PyBERT().configure_traits(view=traits_view)

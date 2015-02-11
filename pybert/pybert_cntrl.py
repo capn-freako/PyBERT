@@ -499,6 +499,8 @@ def update_results(self):
     self.plotdata.set_data("eye_dfe",   eye_dfe)
 
 def update_eyes(self):
+    """ Update the heat plots representing the eye diagrams."""
+
     ui            = self.ui * 1.e-12
     samps_per_bit = self.nspb
     dfe_output    = array(self.dfe_out)
