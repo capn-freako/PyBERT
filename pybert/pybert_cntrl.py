@@ -92,7 +92,6 @@ def my_run_simulation(self, initial_run=False):
     eye_offset = nspb / 2
     fs         = nspb / ui
     Ts         = 1. / fs
-    chnl_dly   = l_ch / v0
 
     # Correct unit interval for PAM-4 modulation, if necessary.
     nui      = nbits
@@ -105,7 +104,7 @@ def my_run_simulation(self, initial_run=False):
         eye_uis /= 2
         nspui   *= 2
 
-    # Generate the ideal over-sampled signal.
+    # Generate the symbol stream.
     bits        = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
     if  (mod_type == 0):                         # NRZ
         symbols = 2 * bits - 1
@@ -116,10 +115,17 @@ def my_run_simulation(self, initial_run=False):
         symbols = (2 * array(symbols) - 1) / 2.    # These 2 lines do the actual duo-binary encoding.
         symbols = symbols[:-1] + symbols[1:]
     elif(mod_type == 2):                        # PAM-4
+        # Change this:
+        # - '00' = -1
+        # - '01' = -1/3
+        # - '11' = +1/3
+        # - '10' = +1
         symbols = array(map(lambda x: (x[0] << 1) + x[1], zip(bits[0::2], bits[1::2]))) * 2./3. - 1.
         symbols = repeat(symbols, 2)
     else:
         raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
+
+    # Generate the ideal over-sampled signal.
     x                 = repeat(symbols, nspb)
     self.ideal_signal = x
 
@@ -127,17 +133,29 @@ def my_run_simulation(self, initial_run=False):
     ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
 
     # Generate the output from, and the impulse/step/frequency responses of, the channel.
-    gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-    H                = exp(-l_ch * gamma)
-    chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-    chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
-    t_ns_chnl        = t_ns[start_ix : start_ix + len(chnl_h)]
+    if(self.use_ch_file):
+        chnl_h           = import_qucs_csv(self.ch_file, Ts)
+        chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
+        chnl_h.resize(len(t))
+        chnl_H           = fft(chnl_h)
+        chnl_H          /= abs(chnl_H[0])
+        chnl_h, start_ix = trim_impulse(chnl_h)
+    else:
+        chnl_dly         = l_ch / v0
+        gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+        H                = exp(-l_ch * gamma)
+        chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
+        chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
+    chnl_h   /= sum(chnl_h)
+    t_ns_chnl = t_ns[start_ix : start_ix + len(chnl_h)]
+    chnl_out  = convolve(x, chnl_h)[:len(x)]
+
     self.t_ns_chnl   = t_ns_chnl
     self.chnl_s      = chnl_h.cumsum()
-    chnl_out         = convolve(x, chnl_h)[:len(x)]
     self.chnl_H      = chnl_H
     self.chnl_h      = chnl_h * 1.e-9 / Ts # Scaled to units of "V/ns" for later display. DON'T DO THIS TO THE LOCAL COPY!
     self.chnl_out    = chnl_out
+    self.chnl_dly    = chnl_dly
 
     self.channel_perf = nbits * nspb / (time.clock() - start_time)
     split_time        = time.clock()
@@ -145,6 +163,7 @@ def my_run_simulation(self, initial_run=False):
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     # - Generate the ideal, post-preemphasis signal.
+    # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
     ffe    = [pretap, 1.0 - abs(pretap) - abs(posttap), posttap]                    # FIR filter numerator, for fs = fbit.
     ffe_out= convolve(symbols, ffe)[:len(symbols)]
     tx_out = repeat(ffe_out, nspb)                                                     # oversampled output
@@ -196,7 +215,8 @@ def my_run_simulation(self, initial_run=False):
     ctle_out        = convolve(tx_out, ctle_h)[:len(tx_out)]
     self.ctle_s     = ctle_h.cumsum()
     ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
-    conv_dly        = t[where(ctle_out_h == max(ctle_out_h))[0][0]]
+    conv_dly_ix     = where(ctle_out_h == max(ctle_out_h))[0][0]
+    conv_dly        = t[conv_dly_ix]
     ctle_out_s      = ctle_out_h.cumsum()
     temp            = ctle_out_h.copy()
     temp.resize(len(w))
@@ -209,6 +229,7 @@ def my_run_simulation(self, initial_run=False):
     self.ctle_out_h = ctle_out_h * 1.e-9 / Ts
     self.ctle_out   = ctle_out
     self.conv_dly   = conv_dly
+    self.conv_dly_ix = conv_dly_ix
 
     self.ctle_perf  = nbits * nspb / (time.clock() - split_time)
     split_time      = time.clock()
@@ -321,15 +342,14 @@ def my_run_simulation(self, initial_run=False):
     dfe_spec                     = self.jitter_spectrum_dfe
     ctle_spec_condensed          = array([ctle_spec.take(range(i, i + skip_factor)).mean() for i in range(0, len(ctle_spec), skip_factor)])
     window_width                 = len(dfe_spec) / 10
-    self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
-    #self.jitter_rejection_ratio  = zeros(len(dfe_spec))
+    #self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
+    self.jitter_rejection_ratio  = zeros(len(dfe_spec))
 
     self.jitter_perf = nbits * nspb / (time.clock() - split_time)
     split_time       = time.clock()
     self.status = 'Updating plots...'
 
     self.ideal_xings  = ideal_xings
-    self.chnl_dly     = chnl_dly
     self.adaptation = tap_weights
     self.ui_ests    = array(ui_ests) * 1.e12 # (ps)
     self.clocks     = clocks
@@ -359,6 +379,7 @@ def update_results(self):
     t_ns          = self.t_ns
     t_ns_chnl     = self.t_ns_chnl
     mod_type      = self.mod_type[0]
+    conv_dly_ix   = self.conv_dly_ix
 
     # Correct for PAM-4, if necessary.
     ignore_until  = (num_bits - eye_bits) * ui
@@ -484,14 +505,15 @@ def update_results(self):
     width    = 2 * samps_per_bit
     xs       = linspace(-ui * 1.e12, ui * 1.e12, width)
     height   = 100
-    eye_chnl = calc_eye(ui, samps_per_bit, height, self.chnl_out)
-    eye_tx   = calc_eye(ui, samps_per_bit, height, self.tx_out)
-    eye_ctle = calc_eye(ui, samps_per_bit, height, self.ctle_out)
+    y_max    = 1.1 * max([max(abs(array(self.chnl_out))), max(abs(array(self.tx_out))), max(abs(array(self.ctle_out))), max(abs(array(self.dfe_out)))])
+    eye_chnl = calc_eye(ui, samps_per_bit, height, self.chnl_out[conv_dly_ix:], y_max)
+    eye_tx   = calc_eye(ui, samps_per_bit, height, self.tx_out[conv_dly_ix:],   y_max)
+    eye_ctle = calc_eye(ui, samps_per_bit, height, self.ctle_out[conv_dly_ix:], y_max)
     i = 0
     while(clock_times[i] <= ignore_until):
         i += 1
         assert i < len(clock_times), "ERROR: Insufficient coverage in 'clock_times' vector."
-    eye_dfe  = calc_eye(ui, samps_per_bit, height, self.dfe_out, clock_times[i:])
+    eye_dfe  = calc_eye(ui, samps_per_bit, height, self.dfe_out, y_max, clock_times[i:])
     self.plotdata.set_data("eye_index", xs)
     self.plotdata.set_data("eye_chnl",  eye_chnl)
     self.plotdata.set_data("eye_tx",    eye_tx)

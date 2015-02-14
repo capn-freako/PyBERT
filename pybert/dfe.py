@@ -2,6 +2,7 @@
 Behavioral model of a decision feedback equalizer (DFE).
 
 Original Author: David Banas <capn.freako@gmail.com>
+
 Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a decision feedback

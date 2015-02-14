@@ -29,7 +29,7 @@ pybert_util - Various utilities used by other modules.
 ******************************************************
 
 .. automodule:: pybert.pybert_util
-   :members: moving_average, find_crossing_times, find_crossings, calc_jitter, make_uniform, calc_gamma, calc_G, calc_eye, make_ctle, trim_impulse
+   :members: moving_average, find_crossing_times, find_crossings, calc_jitter, make_uniform, calc_gamma, calc_G, calc_eye, make_ctle, trim_impulse, import_qucs_csv
 
 dfe - DFE behavioral model.
 ***************************

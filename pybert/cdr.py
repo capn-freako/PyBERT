@@ -2,6 +2,7 @@
 Behavioral model of a "bang-bang" clock data recovery (CDR) unit.
 
 Original Author: David Banas <capn.freako@gmail.com>
+
 Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a "bang-bang" clock
@@ -37,12 +38,12 @@ class CDR(object):
           - n_lock_ave    Number of unit intervals to use for determining
                           lock.
 
-          - rel_lock_tol  Lock tolerance, relative to `delta_t'.
+          - rel_lock_tol  Lock tolerance, relative to 'delta_t'.
 
           - lock_sustain  Length of lock sustain vector used to provide histerysis.
 
-        Note that the code doesn't care what units are actually used
-        for `delta_t' and `ui'; only that they are the same.
+        Note that the code does not care what units are actually used
+        for 'delta_t' and 'ui'; only that they are the same.
         """
 
         self.delta_t             = delta_t

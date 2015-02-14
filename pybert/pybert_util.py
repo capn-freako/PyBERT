@@ -89,8 +89,12 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
         min_time = t[i]
 
     i = 0
-    while(xings[i] < min_time):
-        i += 1
+    try:
+        while(xings[i] < min_time):
+            i += 1
+    except:
+        print "i:", i, "min_time:", min_time, "xings[i-3:]:", xings[i-3:]
+        raise
 
     if(rising_first and diff_sign_x[xing_ix[i]] < 0.):
         i += 1
@@ -508,7 +512,7 @@ def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
                                                            # (i.e. - We're interested in what appears across RL.)
     return G
 
-def calc_eye(ui, samps_per_ui, height, ys, clock_times=None):
+def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
     """
     Calculates the "eye" diagram of the input signal vector.
 
@@ -517,6 +521,7 @@ def calc_eye(ui, samps_per_ui, height, ys, clock_times=None):
       - samps_per_ui   # of samples per unit interval
       - height         height of output image data array
       - ys             signal vector of interest
+      - y_max          max. +/- vertical extremity of plot
       - clock_times    (optional)
                        vector of clock times to use for eye centers.
                        If not provided, just use mean zero-crossing and
@@ -541,7 +546,7 @@ def calc_eye(ui, samps_per_ui, height, ys, clock_times=None):
 
     # Adjust the scaling.
     width    = 2 * samps_per_ui
-    y_max    = 1.1 * max(abs(ys))
+#    y_max    = 1.1 * max(abs(ys))
     y_scale  = height / (2 * y_max)          # (pixels/V)
     y_offset = height / 2                    # (pixels)
 
@@ -561,8 +566,6 @@ def calc_eye(ui, samps_per_ui, height, ys, clock_times=None):
                                       ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-#                if(sign(y) != sign(last_y)): # Trap zero crossings.
-#                    img_array[y_offset, int(i - 1 + y / (y - last_y) + 0.5)] += 1
                 last_y = y
                 i += 1
     else:
@@ -573,8 +576,6 @@ def calc_eye(ui, samps_per_ui, height, ys, clock_times=None):
             i      = 0
             for y in ys[start_ix : start_ix + 2 * samps_per_ui]:
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-#                if(sign(y) != sign(last_y)): # Trap zero crossings.
-#                    img_array[y_offset, int(i - 1 + y / (y - last_y) + 0.5)] += 1
                 last_y = y
                 i += 1
             start_ix += samps_per_ui
@@ -635,7 +636,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
 
     return freqs(b, a, w)
 
-def trim_impulse(g, Ts, chnl_dly=0.):
+def trim_impulse(g, Ts=0, chnl_dly=0):
     """
     Trim impulse response, for more useful display, by:
       - eliminating 90% of the overall delay from the beginning, and
@@ -645,7 +646,7 @@ def trim_impulse(g, Ts, chnl_dly=0.):
     
       - g         impulse response
 
-      - Ts        sample interval (same units as 'chnl_dly')
+      - Ts        (optional) sample interval (same units as 'chnl_dly')
 
       - chnl_dly  (optional) channel delay
 
@@ -658,7 +659,14 @@ def trim_impulse(g, Ts, chnl_dly=0.):
     """
 
     g         = array(g)
-    start_ix  = int(0.9 * chnl_dly / Ts)
+    if(Ts and chnl_dly):
+        start_ix  = int(0.9 * chnl_dly / Ts)
+    else:
+        min_mag = 0.01 * max(abs(g))
+        i = 0
+        while(abs(g[i]) < min_mag):
+            i += 1
+        start_ix = int(0.9 * i)
     Pt        = 0.999 * sum(g ** 2)
     i         = 0
     P         = 0
@@ -667,4 +675,39 @@ def trim_impulse(g, Ts, chnl_dly=0.):
         i += 1
 
     return (g[start_ix : i], start_ix)
+
+def import_qucs_csv(filename, sample_per):
+    """ Read in a CSV waveform file exported by QUCS,
+        resampling as appropriate, via linear interpolation.
+
+        Inputs:
+        - filename:   Name of waveform file to read in.
+        - sample_per: New sample interval
+
+        Outputs:
+        - res:        Resampled waveform.
+    """
+
+    # Read in original data from file.
+    ts = []
+    xs = []
+    with open(filename, mode='rU') as csv_file:
+        line = csv_file.readline()               # We don't use the header.
+        for line in csv_file:
+            tmp = map (float, line.split(';'))   # QUCS uses the semicolon as the field separator.
+            ts.append(tmp[0])
+            xs.append(tmp[1])
+
+    # Resample data, using linear interpolation.
+    tmax = ts[-1]
+    res  = []
+    t    = 0.0
+    i    = 0
+    while(t < tmax):
+        while(ts[i] <= t):
+            i = i + 1
+        res.append(xs[i - 1] + (xs[i] - xs[i - 1]) * (t - ts[i - 1]) / (ts[i] - ts[i - 1]))
+        t += sample_per
+
+    return array(res)
 

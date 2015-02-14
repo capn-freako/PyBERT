@@ -4,7 +4,9 @@
 Bit error rate tester (BERT) simulator, written in Python.
 
 Original Author: David Banas <capn.freako@gmail.com>
+
 Original Date:   17 June 2014
+
 Testing by: Mark Marlett <mark.marlett@gmail.com>
 
 This Python script provides a GUI interface to a BERT simulator, which
@@ -36,7 +38,7 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool
+from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
 from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape
@@ -115,6 +117,8 @@ class PyBERT(HasTraits):
     eye_bits        = Int(gNbits // 5)
     mod_type        = List([0])
     # - Channel Control
+    use_ch_file     = Bool(False)
+    ch_file         = File('', entries=5, filter=['*.csv'])
     Rdc             = Float(gRdc)
     w0              = Float(gw0)
     R0              = Float(gR0)
@@ -336,7 +340,6 @@ class PyBERT(HasTraits):
         plot_H_chnl.y_axis.title     = "Frequency Response (dB)"
         plot_H_chnl.index_range.low_setting  = 0.1
         plot_H_chnl.index_range.high_setting = 40.
-        plot_H_chnl.value_range.low_setting  = -40.
 
         plot_H_tx = Plot(plotdata)
         plot_H_tx.plot(("f_GHz", "tx_H"),     type="line", color="blue", name="Incremental", index_scale='log')
@@ -346,7 +349,6 @@ class PyBERT(HasTraits):
         plot_H_tx.y_axis.title     = "Frequency Response (dB)"
         plot_H_tx.index_range.low_setting  = 0.1
         plot_H_tx.index_range.high_setting = 40.
-        plot_H_tx.value_range.low_setting  = -40.
         plot_H_tx.legend.visible   = True
         plot_H_tx.legend.align     = 'll'
 
@@ -362,6 +364,9 @@ class PyBERT(HasTraits):
         plot_H_ctle.legend.visible   = True
         plot_H_ctle.legend.align     = 'll'
 
+        plot_H_chnl.value_range = plot_H_ctle.value_range 
+        plot_H_tx.value_range   = plot_H_ctle.value_range 
+
         plot_H_dfe = Plot(plotdata)
         plot_H_dfe.plot(("f_GHz", "dfe_H"),     type="line", color="blue", name="Incremental", index_scale='log')
         plot_H_dfe.plot(("f_GHz", "dfe_out_H"), type="line", color="red",  name="Cumulative", index_scale='log')
@@ -370,7 +375,7 @@ class PyBERT(HasTraits):
         plot_H_dfe.y_axis.title     = "Frequency Response (dB)"
         plot_H_dfe.index_range.low_setting  = 0.1
         plot_H_dfe.index_range.high_setting = 40.
-        plot_H_dfe.value_range.low_setting  = -40.
+        plot_H_dfe.value_range = plot_H_ctle.value_range 
         plot_H_dfe.legend.visible   = True
         plot_H_dfe.legend.align     = 'll'
 

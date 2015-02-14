@@ -37,6 +37,7 @@ traits_view = View(
                 label='Simulation Control', show_border=True,
             ),
             VGroup(
+                Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse response from file.', ),
                 Item(name='Theta0',  label='Loss Tan.',   tooltip="dielectric loss tangent", ),
                 Item(name='Z0',      label='Z0 (Ohms)',   tooltip="characteristic differential impedance", ),
                 Item(name='v0',      label='v_rel (c)',   tooltip="normalized propagation velocity", ),
@@ -90,6 +91,10 @@ traits_view = View(
             VGroup(
                 Item(name='thresh',          label='Pj Thresh.',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
                 label='Analysis Parameters', show_border=True,
+            ),
+            VGroup(
+                Item(name='ch_file', label='Filename', enabled_when='use_ch_file == True'),
+                label='Channel Impulse Response File', show_border=True,
             ),
             label = 'Config.', id = 'config',
             layout = 'flow',
