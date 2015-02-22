@@ -36,19 +36,24 @@ traits_view = View(
                                                              editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])),
                 label='Simulation Control', show_border=True,
             ),
-            VGroup(
-                Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse response from file.', ),
-                Item(name='Theta0',  label='Loss Tan.',   tooltip="dielectric loss tangent", ),
-                Item(name='Z0',      label='Z0 (Ohms)',   tooltip="characteristic differential impedance", ),
-                Item(name='v0',      label='v_rel (c)',   tooltip="normalized propagation velocity", ),
-                Item(name='l_ch',    label='Length (m)',  tooltip="interconnect length", ),
-                Item(name='rn',      label='Rn (V)',      tooltip="standard deviation of random noise", ),
+            HGroup(
+                VGroup(
+                    Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse response from file.', ),
+                    Item(name='Theta0',  label='Loss Tan.',   enabled_when='use_ch_file == False', tooltip="dielectric loss tangent", ),
+                    Item(name='Z0',      label='Z0 (Ohms)',   enabled_when='use_ch_file == False', tooltip="characteristic differential impedance", ),
+                    Item(name='v0',      label='v_rel (c)',   enabled_when='use_ch_file == False', tooltip="normalized propagation velocity", ),
+                    Item(name='l_ch',    label='Length (m)',  enabled_when='use_ch_file == False', tooltip="interconnect length", ),
+                    Item(name='rn',      label='Rn (V)',      enabled_when='use_ch_file == False', tooltip="standard deviation of random noise", ),
+                ),
+                VGroup(
+                    Item(name='ch_file', label='Filename', enabled_when='use_ch_file == True'),
+                ),
                 label='Channel Parameters', show_border=True,
             ),
             VGroup(
                 Item(name='vod',     label='Vod (V)',      tooltip="Tx output voltage into matched load", ),
-                Item(name='rs',      label='Rs (Ohms)',    tooltip="Tx differential source impedance", ),
-                Item(name='cout',    label='Cout (pF)',    tooltip="Tx parasitic output capacitance (each pin)", ),
+                Item(name='rs',      label='Rs (Ohms)',    enabled_when='use_ch_file == False', tooltip="Tx differential source impedance", ),
+                Item(name='cout',    label='Cout (pF)',    enabled_when='use_ch_file == False', tooltip="Tx parasitic output capacitance (each pin)", ),
                 Item(name='pn_mag',  label='Pn (V)',       tooltip="peak magnitude of periodic noise", ),
                 Item(name='pn_freq', label='f(Pn) (MHz)',  tooltip="frequency of periodic noise", ),
                 label='Tx Analog', show_border=True,
@@ -59,9 +64,9 @@ traits_view = View(
                 label='Tx Equalization', show_border=True,
             ),
             VGroup(
-                Item(name='rin',     label='Rin (Ohms)',  tooltip="Rx differential input impedance", ),
-                Item(name='cin',     label='Cin (pF)',    tooltip="Rx parasitic input capacitance (each pin)", ),
-                Item(name='cac',     label='Cac (uF)',    tooltip="Rx a.c. coupling capacitance (each pin)", ),
+                Item(name='rin',     label='Rin (Ohms)',  enabled_when='use_ch_file == False', tooltip="Rx differential input impedance", ),
+                Item(name='cin',     label='Cin (pF)',    enabled_when='use_ch_file == False', tooltip="Rx parasitic input capacitance (each pin)", ),
+                Item(name='cac',     label='Cac (uF)',    enabled_when='use_ch_file == False', tooltip="Rx a.c. coupling capacitance (each pin)", ),
                 Item(name='rx_bw',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
                 label='Rx Analog', show_border=True,
             ),
@@ -91,10 +96,6 @@ traits_view = View(
             VGroup(
                 Item(name='thresh',          label='Pj Thresh.',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
                 label='Analysis Parameters', show_border=True,
-            ),
-            VGroup(
-                Item(name='ch_file', label='Filename', enabled_when='use_ch_file == True'),
-                label='Channel Impulse Response File', show_border=True,
             ),
             label = 'Config.', id = 'config',
             layout = 'flow',
