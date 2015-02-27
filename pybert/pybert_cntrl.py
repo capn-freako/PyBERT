@@ -18,9 +18,57 @@ from pybert_util import *
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.e-18
 
-gFc = 1.e6 # corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
+gFc     = 1.e6     # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
 
-def my_run_simulation(self, initial_run=False):
+def my_run_sweeps(self):
+    """
+    Runs the simulation sweeps.
+
+    """
+
+    pretap        = self.pretap
+    pretap_sweep  = self.pretap_sweep
+    pretap_steps  = self.pretap_steps
+    pretap_final  = self.pretap_final
+    posttap       = self.posttap
+    posttap_sweep = self.posttap_sweep  
+    posttap_steps = self.posttap_steps
+    posttap_final = self.posttap_final
+    sweep_aves    = self.sweep_aves
+    do_sweep      = self.do_sweep
+
+    if(do_sweep):
+        # Assemble the list of desired values for each sweepable parameter.
+        pretap_vals  = [pretap]
+        posttap_vals = [posttap]
+        if(pretap_sweep):
+            pretap_step = (pretap_final - pretap) / pretap_steps
+            pretap_vals.extend([pretap + (i + 1) * pretap_step for i in range(pretap_steps)])
+        if(posttap_sweep):
+            posttap_step = (posttap_final - posttap) / posttap_steps
+            posttap_vals.extend([posttap + (i + 1) * posttap_step for i in range(posttap_steps)])
+
+        # Run the sweep, using the lists assembled, above.
+        sweeps          = [(pretap_vals[j], posttap_vals[i]) for i in range(len(posttap_vals)) for j in range(len(pretap_vals))]
+        num_sweeps      = sweep_aves * len(sweeps)
+        self.num_sweeps = num_sweeps
+        sweep_results   = []
+        sweep_num       = 1
+        for (pretap_val, posttap_val) in sweeps:
+            self.pretap    = pretap_val
+            self.posttap   = posttap_val
+            bit_errs       = []
+            for i in range(sweep_aves):
+                self.sweep_num = sweep_num
+                my_run_simulation(self, update_plots=False)
+                bit_errs.append(self.bit_errs)
+                sweep_num += 1
+            sweep_results.append((pretap_val, posttap_val, mean(bit_errs), std(bit_errs)))
+        self.sweep_results = sweep_results
+    else:
+        my_run_simulation(self)
+
+def my_run_simulation(self, initial_run=False, update_plots=True):
     """
     Runs the simulation.
 
@@ -31,8 +79,11 @@ def my_run_simulation(self, initial_run=False):
 
     """
 
+    num_sweeps = self.num_sweeps
+    sweep_num  = self.sweep_num
+
     start_time = time.clock()
-    self.status = 'Running channel...'
+    self.status = 'Running channel...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     nbits   = self.nbits
     eye_bits = self.eye_bits
@@ -159,7 +210,7 @@ def my_run_simulation(self, initial_run=False):
 
     self.channel_perf = nbits * nspb / (time.clock() - start_time)
     split_time        = time.clock()
-    self.status       = 'Running Tx...'
+    self.status       = 'Running Tx...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     # - Generate the ideal, post-preemphasis signal.
@@ -206,13 +257,16 @@ def my_run_simulation(self, initial_run=False):
 
     self.tx_perf   = nbits * nspb / (time.clock() - split_time)
     split_time     = time.clock()
-    self.status    = 'Running CTLE...'
+    self.status    = 'Running CTLE...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
     w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
-    ctle_H          = H / abs(H[0])  # Scale to force d.c. component of '1'.
+    ctle_H          = H / abs(H[0])              # Scale to force d.c. component of '1'.
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
     ctle_out        = convolve(tx_out, ctle_h)[:len(tx_out)]
+    ctle_out       -= mean(ctle_out)             # Force zero mean.
+    if(self.use_agc):                            # Automatic gain control engaged?
+        ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
     self.ctle_s     = ctle_h.cumsum()
     ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
     conv_dly_ix     = where(ctle_out_h == max(ctle_out_h))[0][0]
@@ -233,7 +287,7 @@ def my_run_simulation(self, initial_run=False):
 
     self.ctle_perf  = nbits * nspb / (time.clock() - split_time)
     split_time      = time.clock()
-    self.status     = 'Running DFE/CDR...'
+    self.status     = 'Running DFE/CDR...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
     if(self.use_dfe):
@@ -271,7 +325,7 @@ def my_run_simulation(self, initial_run=False):
 
     self.dfe_perf  = nbits * nspb / (time.clock() - split_time)
     split_time     = time.clock()
-    self.status    = 'Analyzing jitter...'
+    self.status    = 'Analyzing jitter...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Analyze the jitter.
     # - channel output
@@ -347,7 +401,7 @@ def my_run_simulation(self, initial_run=False):
 
     self.jitter_perf = nbits * nspb / (time.clock() - split_time)
     split_time       = time.clock()
-    self.status = 'Updating plots...'
+    self.status      = 'Updating plots...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     self.ideal_xings  = ideal_xings
     self.adaptation = tap_weights
@@ -357,9 +411,10 @@ def my_run_simulation(self, initial_run=False):
     self.clock_times = clock_times
 
     # Update plots.
-    update_results(self)
-    if(not initial_run):
-        update_eyes(self)
+    if(update_plots):
+        update_results(self)
+        if(not initial_run):
+            update_eyes(self)
 
     self.plotting_perf = nbits * nspb / (time.clock() - split_time)
     self.total_perf    = nbits * nspb / (time.clock() - start_time)
@@ -535,7 +590,7 @@ def update_eyes(self):
 
     width    = 2 * samps_per_bit
     height   = 100
-    y_max    = 1.1 * max(abs(dfe_output))
+    y_max    = 1.1 * max([max(abs(array(self.chnl_out))), max(abs(array(self.tx_out))), max(abs(array(self.ctle_out))), max(abs(array(self.dfe_out)))])
     xs       = linspace(-ui * 1.e12, ui * 1.e12, width)
     ys       = linspace(-y_max, y_max, height)
 

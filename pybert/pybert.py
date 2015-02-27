@@ -58,6 +58,7 @@ gUI             = 100     # (ps)
 gNbits          = 8000    # number of bits to run
 gPatLen         = 127     # repeating bit pattern length
 gNspb           = 32      # samples per bit
+gNumAve         = 1       # Number of bit error samples to average, when sweeping.
 # - Channel Control
 #     - parameters for Howard Johnson's "Metallic Transmission Model"
 #     - (See "High Speed Signal Propagation", Sec. 3.1.)
@@ -116,6 +117,10 @@ class PyBERT(HasTraits):
     nspb            = Int(gNspb)
     eye_bits        = Int(gNbits // 5)
     mod_type        = List([0])
+    num_sweeps      = Int(1)
+    sweep_num       = Int(1)
+    sweep_aves      = Int(gNumAve)
+    do_sweep        = Bool(False)
     # - Channel Control
     use_ch_file     = Bool(False)
     ch_file         = File('', entries=5, filter=['*.csv'])
@@ -134,12 +139,19 @@ class PyBERT(HasTraits):
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
     pretap          = Float(-0.05)
+    pretap_sweep    = Bool(False)
+    pretap_final    = Float(-0.05)
+    pretap_steps    = Int(5)
     posttap         = Float(-0.10)
+    posttap_sweep   = Bool(False)
+    posttap_final   = Float(-0.10)
+    posttap_steps   = Int(10)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
     cac             = Float(gCac)                                           # (uF)
     rx_bw           = Float(gBW)                                            # (GHz)
+    use_agc         = Bool(True)
     use_dfe         = Bool(gUseDfe)
     sum_ideal       = Bool(gDfeIdeal)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
@@ -172,6 +184,7 @@ class PyBERT(HasTraits):
     status          = String("Ready.")
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
+    sweep_results   = List([])
     # - About
     ident  = String('PyBERT v1.2 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
@@ -186,6 +199,7 @@ class PyBERT(HasTraits):
     jitter_info     = Property(HTML,    depends_on=['jitter_perf'])
     perf_info       = Property(HTML,    depends_on=['total_perf'])
     status_str      = Property(String,  depends_on=['status'])
+    sweep_info      = Property(HTML,    depends_on=['sweep_results'])
     # - Handled by pybert_cntrl.py, upon user button clicks. (May contain "large overhead" variables.)
     #   - These are dependencies. So, they must be Array()s.
     #   - These are not.
@@ -874,6 +888,25 @@ class PyBERT(HasTraits):
         info_str += '    <TR align="right">\n'
         info_str += '      <TD align="center">TOTAL</TD><TD>%6.3f</TD>\n'           % (self.total_perf * 60.e-6)
         info_str += '    </TR>\n'
+        info_str += '  </TABLE>\n'
+
+        return info_str
+
+    @cached_property
+    def _get_sweep_info(self):
+        sweep_results = self.sweep_results
+
+        info_str  = '<H2>Sweep Results</H2>\n'
+        info_str += '  <TABLE border="1">\n'
+        info_str += '    <TR align="center">\n'
+        info_str += '      <TH>Pretap</TH><TH>Posttap</TH><TH>Mean(bit errors)</TH><TH>StdDev(bit errors)</TH>\n'
+        info_str += '    </TR>\n'
+
+        for item in sweep_results:
+            info_str += '    <TR align="center">\n'
+            info_str += '      <TD>%+06.3f</TD><TD>%+06.3f</TD><TD>%d</TD><TD>%d</TD>\n' % (item[0], item[1], item[2], item[3])
+            info_str += '    </TR>\n'
+
         info_str += '  </TABLE>\n'
 
         return info_str

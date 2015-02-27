@@ -366,6 +366,10 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
     # - Reassemble the jitter, excluding the Rj.
     # -- Here, we see why it was necessary to keep track of the non-padded elements with 'valid_ix':
     # -- It was so that we could add the average and periodic components back together, maintaining correct alignment between them.
+    if(len(tie_per) > len(tie_ave)):
+        tie_per = tie_per[:len(tie_ave)]
+    if(len(tie_per) < len(tie_ave)):
+        tie_ave = tie_ave[:len(tie_per)]
     jitter_synth = tie_ave + tie_per
 
     # - Calculate the histogram of original, for comparison.
@@ -412,7 +416,8 @@ def make_uniform(t, jitter, ui, nbits):
 
     """
 
-    assert len(t) == len(jitter), "Length of t (%d) and jitter (%d) must be equal!" % (len(t), len(jitter))
+    if(len(t) < len(jitter)):
+        jitter = jitter[:len(t)]
 
     run_lengths    = map(int, diff(t) / ui + 0.5)
     valid_ix       = [0] + list(cumsum(run_lengths))
@@ -546,7 +551,6 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     # Adjust the scaling.
     width    = 2 * samps_per_ui
-#    y_max    = 1.1 * max(abs(ys))
     y_scale  = height / (2 * y_max)          # (pixels/V)
     y_offset = height / 2                    # (pixels)
 
@@ -572,11 +576,9 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
         start_ix      = (where(diff(sign(ys)))[0] % samps_per_ui).mean() + samps_per_ui // 2 
         last_start_ix = len(ys) - 2 * samps_per_ui
         while(start_ix < last_start_ix):
-            last_y = ys[start_ix]
-            i      = 0
+            i = 0
             for y in ys[start_ix : start_ix + 2 * samps_per_ui]:
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-                last_y = y
                 i += 1
             start_ix += samps_per_ui
 

@@ -16,7 +16,7 @@ class MyHandler(Handler):
 
     def do_run_simulation(self, info):
         info.object.status = 'Running channel...'
-        my_run_simulation(info.object)
+        my_run_sweeps(info.object)
         info.object.status = 'Ready.'
 
 run_simulation = Action(name="Run", action="do_run_simulation")
@@ -24,81 +24,102 @@ run_simulation = Action(name="Run", action="do_run_simulation")
 # Main window layout definition.
 traits_view = View(
     Group(
-        HGroup(
-            VGroup(
-                Item(name='ui',          label='UI (ps)',  tooltip="unit interval", show_label=True, enabled_when='True'),
-                #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
-                Item(name='nbits',       label='Nbits',    tooltip="# of bits to run", ),
-                Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit", ),
-                Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream", ),
-                Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams", ),
-                Item(name='mod_type',    label='Modulation', tooltip="line signalling/modulation scheme",
-                                                             editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])),
-                label='Simulation Control', show_border=True,
+        VGroup(
+            HGroup(
+                HGroup(
+                    VGroup(
+                        Item(name='ui',          label='UI (ps)',  tooltip="unit interval", show_label=True, enabled_when='True'),
+                        #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
+                        Item(name='nbits',       label='Nbits',    tooltip="# of bits to run", ),
+                        Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit", ),
+                        Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream", ),
+                        Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams", ),
+                        Item(name='mod_type',    label='Modulation', tooltip="line signalling/modulation scheme",
+                                                                    editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])),
+                    ),
+                    VGroup(
+                        Item(name='do_sweep',    label='Do Sweep',    tooltip="Run parameter sweeps.", ),
+                        Item(name='sweep_aves',  label='SweepAves',   tooltip="# of trials, per sweep, for averaging.", enabled_when='do_sweep == True'),
+                        Item(name='vod',         label='Vod (V)',     tooltip="Tx output voltage into matched load", ),
+                        Item(name='rn',          label='Rn (V)',      tooltip="standard deviation of random noise", ),
+                        Item(name='pn_mag',      label='Pn (V)',      tooltip="peak magnitude of periodic noise", ),
+                        Item(name='pn_freq',     label='f(Pn) (MHz)', tooltip="frequency of periodic noise", ),
+                    ),
+                    label='Simulation Control', show_border=True,
+                ),
+                HGroup(
+                    VGroup(
+                        Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse response from file.', ),
+                        Item(name='ch_file', label='Filename',    enabled_when='use_ch_file == True'),
+                        Item(name='Theta0',  label='Loss Tan.',   enabled_when='use_ch_file == False', tooltip="dielectric loss tangent", ),
+                        Item(name='Z0',      label='Z0 (Ohms)',   enabled_when='use_ch_file == False', tooltip="characteristic differential impedance", ),
+                        Item(name='v0',      label='v_rel (c)',   enabled_when='use_ch_file == False', tooltip="normalized propagation velocity", ),
+                        Item(name='l_ch',    label='Length (m)',  enabled_when='use_ch_file == False', tooltip="interconnect length", ),
+                    ),
+                    VGroup(
+                        Item(name='rs',      label='Tx_Rs (Ohms)',   enabled_when='use_ch_file == False', tooltip="Tx differential source impedance", ),
+                        Item(name='cout',    label='Tx_Cout (pF)',   enabled_when='use_ch_file == False', tooltip="Tx parasitic output capacitance (each pin)", ),
+                        Item(name='rin',     label='Rx_Rin (Ohms)',  enabled_when='use_ch_file == False', tooltip="Rx differential input impedance", ),
+                        Item(name='cin',     label='Rx_Cin (pF)',    enabled_when='use_ch_file == False', tooltip="Rx parasitic input capacitance (each pin)", ),
+                        Item(name='cac',     label='Rx_Cac (uF)',    enabled_when='use_ch_file == False', tooltip="Rx a.c. coupling capacitance (each pin)", ),
+                    ),
+                    label='Channel Parameters', show_border=True,
+                ),
             ),
             HGroup(
                 VGroup(
-                    Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse response from file.', ),
-                    Item(name='Theta0',  label='Loss Tan.',   enabled_when='use_ch_file == False', tooltip="dielectric loss tangent", ),
-                    Item(name='Z0',      label='Z0 (Ohms)',   enabled_when='use_ch_file == False', tooltip="characteristic differential impedance", ),
-                    Item(name='v0',      label='v_rel (c)',   enabled_when='use_ch_file == False', tooltip="normalized propagation velocity", ),
-                    Item(name='l_ch',    label='Length (m)',  enabled_when='use_ch_file == False', tooltip="interconnect length", ),
-                    Item(name='rn',      label='Rn (V)',      enabled_when='use_ch_file == False', tooltip="standard deviation of random noise", ),
+                    HGroup(
+                        Item(name='pretap',       label='Pre-tap',    tooltip="pre-cursor tap weight", ),
+                        Item(name='pretap_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
+                        Item(name='pretap_final', show_label=False,   tooltip="final pretap value",                 enabled_when='pretap_sweep == True'),
+                        Item(name='pretap_steps', label='# of Steps', tooltip="number of pretap steps",             enabled_when='pretap_sweep == True'),
+                    ),
+                    HGroup(
+                        Item(name='posttap',       label='Post-tap',   tooltip="post-cursor tap weight", ),
+                        Item(name='posttap_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
+                        Item(name='posttap_final', show_label=False,   tooltip="final posttap value",                 enabled_when='posttap_sweep == True'),
+                        Item(name='posttap_steps', label='# of Steps', tooltip="number of posttap steps",             enabled_when='posttap_sweep == True'),
+                    ),
+                    label='Tx Equalization', show_border=True,
+                ),
+                HGroup(
+                    VGroup(
+                        Item(name='peak_freq', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
+                        Item(name='peak_mag',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
+                        Item(name='rx_bw',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
+                    ),
+                    VGroup(
+                        Item(name='use_agc',   label='Use AGC',              tooltip="Include automatic gain control.", ),
+                        Item(name='use_dfe',   label='Use DFE',              tooltip="Include DFE in simulation.", ),
+                        Item(name='sum_ideal', label='Ideal DFE',            tooltip="Use ideal DFE. (performance boost)", ),
+                    ),
+                    label='Rx Equalization', show_border=True,
+                ),
+            ),
+            HGroup(
+                VGroup(
+                    Item(name='delta_t',      label='Delta-t (ps)',  tooltip="magnitude of CDR proportional branch", ),
+                    Item(name='alpha',        label='Alpha',         tooltip="relative magnitude of CDR integral branch", ),
+                    Item(name='n_lock_ave',   label='Lock Nave.',    tooltip="# of UI estimates to average, when determining lock", ),
+                    Item(name='rel_lock_tol', label='Lock Tol.',     tooltip="relative tolerance for determining lock", ),
+                    Item(name='lock_sustain', label='Lock Sus.',     tooltip="length of lock determining hysteresis vector", ),
+                    label='CDR Parameters', show_border=True,
                 ),
                 VGroup(
-                    Item(name='ch_file', label='Filename', enabled_when='use_ch_file == True'),
+                    Item(name='gain',            label='Gain',   tooltip="error feedback gain", ),
+                    Item(name='n_taps',          label='Taps',   tooltip="# of taps", ),
+                    Item(name='decision_scaler', label='Level',  tooltip="target output magnitude", ),
+                    Item(name='n_ave',           label='Nave.',  tooltip="# of CDR adaptations per DFE adaptation", ),
+                    Item(name='sum_bw',    label='BW (GHz)', tooltip="summing node bandwidth", ),
+                    label='DFE Parameters', show_border=True,
                 ),
-                label='Channel Parameters', show_border=True,
-            ),
-            VGroup(
-                Item(name='vod',     label='Vod (V)',      tooltip="Tx output voltage into matched load", ),
-                Item(name='rs',      label='Rs (Ohms)',    enabled_when='use_ch_file == False', tooltip="Tx differential source impedance", ),
-                Item(name='cout',    label='Cout (pF)',    enabled_when='use_ch_file == False', tooltip="Tx parasitic output capacitance (each pin)", ),
-                Item(name='pn_mag',  label='Pn (V)',       tooltip="peak magnitude of periodic noise", ),
-                Item(name='pn_freq', label='f(Pn) (MHz)',  tooltip="frequency of periodic noise", ),
-                label='Tx Analog', show_border=True,
-            ),
-            VGroup(
-                Item(name='pretap',  label='Pre-tap',      tooltip="pre-cursor tap weight", ),
-                Item(name='posttap', label='Post-tap',     tooltip="post-cursor tap weight", ),
-                label='Tx Equalization', show_border=True,
-            ),
-            VGroup(
-                Item(name='rin',     label='Rin (Ohms)',  enabled_when='use_ch_file == False', tooltip="Rx differential input impedance", ),
-                Item(name='cin',     label='Cin (pF)',    enabled_when='use_ch_file == False', tooltip="Rx parasitic input capacitance (each pin)", ),
-                Item(name='cac',     label='Cac (uF)',    enabled_when='use_ch_file == False', tooltip="Rx a.c. coupling capacitance (each pin)", ),
-                Item(name='rx_bw',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
-                label='Rx Analog', show_border=True,
-            ),
-            VGroup(
-                Item(name='peak_freq', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
-                Item(name='peak_mag',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
-                Item(name='use_dfe',   label='Use DFE',              tooltip="Include DFE in simulation.", ),
-                Item(name='sum_ideal', label='Ideal DFE',            tooltip="Use ideal DFE. (performance boost)", ),
-                label='Rx Equalization', show_border=True,
-            ),
-            VGroup(
-                Item(name='delta_t',      label='Delta-t (ps)',  tooltip="magnitude of CDR proportional branch", ),
-                Item(name='alpha',        label='Alpha',         tooltip="relative magnitude of CDR integral branch", ),
-                Item(name='n_lock_ave',   label='Lock Nave.',    tooltip="# of UI estimates to average, when determining lock", ),
-                Item(name='rel_lock_tol', label='Lock Tol.',     tooltip="relative tolerance for determining lock", ),
-                Item(name='lock_sustain', label='Lock Sus.',     tooltip="length of lock determining hysteresis vector", ),
-                label='CDR Parameters', show_border=True,
-            ),
-            VGroup(
-                Item(name='gain',            label='Gain',   tooltip="error feedback gain", ),
-                Item(name='n_taps',          label='Taps',   tooltip="# of taps", ),
-                Item(name='decision_scaler', label='Level',  tooltip="target output magnitude", ),
-                Item(name='n_ave',           label='Nave.',  tooltip="# of CDR adaptations per DFE adaptation", ),
-                Item(name='sum_bw',    label='BW (GHz)', tooltip="summing node bandwidth", ),
-                label='DFE Parameters', show_border=True,
-            ),
-            VGroup(
-                Item(name='thresh',          label='Pj Thresh.',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
-                label='Analysis Parameters', show_border=True,
+                VGroup(
+                    Item(name='thresh',          label='Pj Thresh.',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
+                    label='Analysis Parameters', show_border=True,
+                ),
             ),
             label = 'Config.', id = 'config',
-            layout = 'flow',
+            #layout = 'flow',
         ),
         Group(
             Item('plots_dfe', editor=ComponentEditor(), show_label=False,),
@@ -139,6 +160,10 @@ traits_view = View(
         Group(
             Item('jitter_info', style='readonly', show_label=False),
             label = 'Jitter Info'
+        ),
+        Group(
+            Item('sweep_info', style='readonly', show_label=False),
+            label = 'Sweep Info'
         ),
         Group(
             Item('ident', style='readonly', show_label=False),
