@@ -146,6 +146,14 @@ class PyBERT(HasTraits):
     posttap_sweep   = Bool(False)
     posttap_final   = Float(-0.10)
     posttap_steps   = Int(10)
+    posttap2        = Float(0.0)
+    posttap2_sweep  = Bool(False)
+    posttap2_final  = Float(0.0)
+    posttap2_steps  = Int(10)
+    posttap3        = Float(0.0)
+    posttap3_sweep  = Bool(False)
+    posttap3_final  = Float(0.0)
+    posttap3_steps  = Int(10)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
@@ -276,27 +284,36 @@ class PyBERT(HasTraits):
         # - Impulse Responses tab
         plot_h_chnl = Plot(plotdata)
         plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue")
+        plot_h_chnl.plot(("t_ns_chnl", "chnl_g"), type="line", color="gray")
         plot_h_chnl.title            = "Channel"
         plot_h_chnl.index_axis.title = "Time (ns)"
         plot_h_chnl.y_axis.title     = "Impulse Response (V/ns)"
+        zoom_chnl = ZoomTool(plot_h_chnl, tool_mode="range", axis='index', always_on=False)
+        plot_h_chnl.overlays.append(zoom_chnl)
 
         plot_h_tx = Plot(plotdata)
         plot_h_tx.plot(("t_ns_chnl", "tx_out_h"), type="line", color="red",  name="Cumulative")
+        plot_h_tx.plot(("t_ns_chnl", "tx_out_g"), type="line", color="gray")
         plot_h_tx.title            = "Channel + Tx Preemphasis"
         plot_h_tx.index_axis.title = "Time (ns)"
         plot_h_tx.y_axis.title     = "Impulse Response (V/ns)"
+        plot_h_tx.index_range      = plot_h_chnl.index_range         # Zoom x-axes in tandem.
 
         plot_h_ctle = Plot(plotdata)
         plot_h_ctle.plot(("t_ns_chnl", "ctle_out_h"), type="line", color="red",  name="Cumulative")
+        plot_h_ctle.plot(("t_ns_chnl", "ctle_out_g"), type="line", color="gray")
         plot_h_ctle.title            = "Channel + Tx Preemphasis + CTLE"
         plot_h_ctle.index_axis.title = "Time (ns)"
         plot_h_ctle.y_axis.title     = "Impulse Response (V/ns)"
+        plot_h_ctle.index_range      = plot_h_chnl.index_range         # Zoom x-axes in tandem.
 
         plot_h_dfe = Plot(plotdata)
         plot_h_dfe.plot(("t_ns_chnl", "dfe_out_h"), type="line", color="red",  name="Cumulative")
+        plot_h_dfe.plot(("t_ns_chnl", "dfe_out_g"), type="line", color="gray")
         plot_h_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
         plot_h_dfe.index_axis.title = "Time (ns)"
         plot_h_dfe.y_axis.title     = "Impulse Response (V/ns)"
+        plot_h_dfe.index_range      = plot_h_chnl.index_range         # Zoom x-axes in tandem.
 
         container_h = GridPlotContainer(shape=(2,2))
         container_h.add(plot_h_chnl)
@@ -345,6 +362,47 @@ class PyBERT(HasTraits):
         container_s.add(plot_s_ctle)
         container_s.add(plot_s_dfe)
         self.plots_s  = container_s
+
+        # - Pulse Responses tab
+        plot_p_chnl = Plot(plotdata)
+        plot_p_chnl.plot(("t_ns_chnl", "chnl_p"), type="line", color="blue")
+        plot_p_chnl.title            = "Channel"
+        plot_p_chnl.index_axis.title = "Time (ns)"
+        plot_p_chnl.y_axis.title     = "Pulse Response (V)"
+
+        plot_p_tx = Plot(plotdata)
+#        plot_p_tx.plot(("t_ns_chnl", "tx_p"),     type="line", color="blue", name="Incremental")
+        plot_p_tx.plot(("t_ns_chnl", "tx_out_p"), type="line", color="red",  name="Cumulative")
+        plot_p_tx.title            = "Channel + Tx Preemphasis"
+        plot_p_tx.index_axis.title = "Time (ns)"
+        plot_p_tx.y_axis.title     = "Pulse Response (V)"
+#        plot_p_tx.legend.visible   = True
+        plot_p_tx.legend.align     = 'lr'
+
+        plot_p_ctle = Plot(plotdata)
+#        plot_p_ctle.plot(("t_ns_chnl", "ctle_p"),     type="line", color="blue", name="Incremental")
+        plot_p_ctle.plot(("t_ns_chnl", "ctle_out_p"), type="line", color="red",  name="Cumulative")
+        plot_p_ctle.title            = "Channel + Tx Preemphasis + CTLE"
+        plot_p_ctle.index_axis.title = "Time (ns)"
+        plot_p_ctle.y_axis.title     = "Pulse Response (V)"
+#        plot_p_ctle.legend.visible   = True
+        plot_p_ctle.legend.align     = 'lr'
+
+        plot_p_dfe = Plot(plotdata)
+#        plot_p_dfe.plot(("t_ns_chnl", "dfe_p"),     type="line", color="blue", name="Incremental")
+        plot_p_dfe.plot(("t_ns_chnl", "dfe_out_p"), type="line", color="red",  name="Cumulative")
+        plot_p_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
+        plot_p_dfe.index_axis.title = "Time (ns)"
+        plot_p_dfe.y_axis.title     = "Pulse Response (V)"
+#        plot_p_dfe.legend.visible   = True
+        plot_p_dfe.legend.align     = 'lr'
+
+        container_p = GridPlotContainer(shape=(2,2))
+        container_p.add(plot_p_chnl)
+        container_p.add(plot_p_tx)
+        container_p.add(plot_p_ctle)
+        container_p.add(plot_p_dfe)
+        self.plots_p  = container_p
 
         # - Frequency Responses tab
         plot_H_chnl = Plot(plotdata)

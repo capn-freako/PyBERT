@@ -80,6 +80,18 @@ traits_view = View(
                         Item(name='posttap_final', show_label=False,   tooltip="final posttap value",                 enabled_when='posttap_sweep == True'),
                         Item(name='posttap_steps', label='# of Steps', tooltip="number of posttap steps",             enabled_when='posttap_sweep == True'),
                     ),
+                    HGroup(
+                        Item(name='posttap2',       label='Post-tap2',  tooltip="2nd post-cursor tap weight", ),
+                        Item(name='posttap2_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
+                        Item(name='posttap2_final', show_label=False,   tooltip="final value",                 enabled_when='posttap_sweep == True'),
+                        Item(name='posttap2_steps', label='# of Steps', tooltip="number of steps",             enabled_when='posttap_sweep == True'),
+                    ),
+                    HGroup(
+                        Item(name='posttap3',       label='Post-tap3',  tooltip="3rd post-cursor tap weight", ),
+                        Item(name='posttap3_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
+                        Item(name='posttap3_final', show_label=False,   tooltip="final value",                 enabled_when='posttap_sweep == True'),
+                        Item(name='posttap3_steps', label='# of Steps', tooltip="number of steps",             enabled_when='posttap_sweep == True'),
+                    ),
                     label='Tx Equalization', show_border=True,
                 ),
                 HGroup(
@@ -127,15 +139,19 @@ traits_view = View(
         ),
         Group(
             Item('plots_h', editor=ComponentEditor(), show_label=False,),
-            label = 'Impulse Responses', id = 'plots_h'
+            label = 'Impulses', id = 'plots_h'
         ),
         Group(
             Item('plots_s', editor=ComponentEditor(), show_label=False,),
-            label = 'Step Responses', id = 'plots_s'
+            label = 'Steps', id = 'plots_s'
+        ),
+        Group(
+            Item('plots_p', editor=ComponentEditor(), show_label=False,),
+            label = 'Pulses', id = 'plots_p'
         ),
         Group(
             Item('plots_H', editor=ComponentEditor(), show_label=False,),
-            label = 'Frequency Responses', id = 'plots_H'
+            label = 'Freq. Resp.', id = 'plots_H'
         ),
         Group(
             Item('plots_out', editor=ComponentEditor(), show_label=False,),
@@ -143,19 +159,19 @@ traits_view = View(
         ),
         Group(
             Item('plots_eye', editor=ComponentEditor(), show_label=False,),
-            label = 'Eye Diagrams', id = 'plots_eye'
+            label = 'Eyes', id = 'plots_eye'
         ),
         Group(
             Item('plots_jitter_dist', editor=ComponentEditor(), show_label=False,),
-            label = 'Jitter Distributions', id = 'plots_jitter_dist'
+            label = 'Jitter Dist.', id = 'plots_jitter_dist'
         ),
         Group(
             Item('plots_jitter_spec', editor=ComponentEditor(), show_label=False,),
-            label = 'Jitter Spectrums', id = 'plots_jitter_spec'
+            label = 'Jitter Spec.', id = 'plots_jitter_spec'
         ),
         Group(
             Item('plots_bathtub', editor=ComponentEditor(), show_label=False,),
-            label = 'Bathtub Curves', id = 'plots_bathtub'
+            label = 'Bathtubs', id = 'plots_bathtub'
         ),
         Group(
             Item('jitter_info', style='readonly', show_label=False),

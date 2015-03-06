@@ -94,6 +94,7 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
             i += 1
     except:
         print "i:", i, "min_time:", min_time, "xings[i-3:]:", xings[i-3:]
+        print "xing_ix:", xing_ix
         raise
 
     if(rising_first and diff_sign_x[xing_ix[i]] < 0.):
@@ -157,11 +158,6 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
         xings.sort()
     elif(mod_type == 2):                         # PAM-4
         xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
-#        xings_low  = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh = -amplitude * 2. / 3.))
-#        xings_mid  = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh = 0.))
-#        xings_high = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh =  amplitude * 2. / 3.))
-#        xings      = (xings_low + xings_mid + xings_high)
-#        xings.sort()
     else:                                        # Unknown
         raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
 
@@ -642,7 +638,8 @@ def trim_impulse(g, Ts=0, chnl_dly=0):
     """
     Trim impulse response, for more useful display, by:
       - eliminating 90% of the overall delay from the beginning, and
-      - clipping off the tail, after 99.9% of the total power has been captured.
+      - clipping off the tail, after 99.8% of the total power has been captured.
+        (Using 99.9% was causing problems; I don't know why.)
 
     Inputs:
     
@@ -669,7 +666,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0):
         while(abs(g[i]) < min_mag):
             i += 1
         start_ix = int(0.9 * i)
-    Pt        = 0.999 * sum(g ** 2)
+    Pt        = 0.998 * sum(g ** 2)
     i         = 0
     P         = 0
     while(P < Pt):
