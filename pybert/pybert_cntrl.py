@@ -163,6 +163,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     f         = array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
     self.f    = f
     w         = 2 * pi * f
+    self.w    = w
     
     # Calculate misc. values.
     eye_offset = nspb / 2
@@ -179,6 +180,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         nui     /= 2
         eye_uis /= 2
         nspui   *= 2
+    self.nspui = nspui
 
     # Generate the symbol stream.
     bits        = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
@@ -209,14 +211,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
 
     # Generate the ideal impulse responses.
-    def trim_shift_scale(ideal_h, actual_h):
-        corr_res = correlate(ideal_h, actual_h, mode='valid')
-        offset   = where(corr_res == max(corr_res))[0][0]
-        return ideal_h[offset : offset + len(actual_h)] * max(actual_h) / max(ideal_h)
-
     ideal_h  = sinc((array(t) - t[-1] / 2.) / ui)
     if(mod_type == 1):       # Duo-binary
         ideal_h = ideal_h[nspui:] + ideal_h[:-nspui]
+    self.ideal_h = ideal_h
 
     # Generate the output from, and the impulse/step/frequency responses of, the channel.
     if(self.use_ch_file):
@@ -256,12 +254,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
     ffe    = [pretap, main_tap, posttap, posttap2, posttap3]                    # FIR filter numerator, for fs = fbit.
     ffe_out= convolve(symbols, ffe)[:len(symbols)]
-    tx_out = repeat(ffe_out, nspb)                                                     # oversampled output
+    tx_out = repeat(ffe_out, nspui)                                             # oversampled output
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
     #    This is partly due to the out of order nature in which we combine the Tx and channel,
     #    and partly due to the fact that we're adding noise to the Tx output.)
-    tx_h   = concatenate([[x] + list(zeros(nspb - 1)) for x in ffe])
+    tx_h   = concatenate([[x] + list(zeros(nspui - 1)) for x in ffe])
     tx_h.resize(len(chnl_h))
     temp   = tx_h.copy()
     temp.resize(len(w))
@@ -479,6 +477,14 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.total_perf    = nbits * nspb / (time.clock() - start_time)
     self.status = 'Ready.'
 
+#    self.pretap_tune    = pretap
+#    self.posttap_tune   = posttap
+#    self.posttap2_tune  = posttap2
+#    self.posttap3_tune  = posttap3
+#    self.rx_bw_tune     = rx_bw
+#    self.peak_freq_tune = peak_freq
+#    self.peak_mag_tune  = peak_mag
+
 # Plot updating
 def update_results(self):
     """Updates all plot data used by GUI."""
@@ -519,6 +525,10 @@ def update_results(self):
     self.plotdata.set_data("ui_ests",  self.ui_ests)
     self.plotdata.set_data("clocks",   self.clocks)
     self.plotdata.set_data("lockeds",  self.lockeds)
+
+    # EQ Tune
+    self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
+    self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
     # Impulse responses
     self.plotdata.set_data("chnl_h",     self.chnl_h)

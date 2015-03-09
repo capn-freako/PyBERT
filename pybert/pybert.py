@@ -154,6 +154,10 @@ class PyBERT(HasTraits):
     posttap3_sweep  = Bool(False)
     posttap3_final  = Float(0.0)
     posttap3_steps  = Int(10)
+    pretap_tune     = Float(0.0)
+    posttap_tune    = Float(0.0)
+    posttap2_tune   = Float(0.0)
+    posttap3_tune   = Float(0.0)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
@@ -164,6 +168,9 @@ class PyBERT(HasTraits):
     sum_ideal       = Bool(gDfeIdeal)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
     peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
+    rx_bw_tune      = Float(gBW)
+    peak_freq_tune  = Float(gPeakFreq)
+    peak_mag_tune   = Float(gPeakMag)
     # - DFE
     decision_scaler = Float(gDecisionScaler)
     gain            = Float(gGain)
@@ -208,6 +215,9 @@ class PyBERT(HasTraits):
     perf_info       = Property(HTML,    depends_on=['total_perf'])
     status_str      = Property(String,  depends_on=['status'])
     sweep_info      = Property(HTML,    depends_on=['sweep_results'])
+    tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune'])
+    ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune'])
+    ctle_out_h_tune = Property(Array,   depends_on=['chnl_h', 'tx_h_tune', 'ctle_h_tune'])
     # - Handled by pybert_cntrl.py, upon user button clicks. (May contain "large overhead" variables.)
     #   - These are dependencies. So, they must be Array()s.
     #   - These are not.
@@ -280,6 +290,17 @@ class PyBERT(HasTraits):
         container_dfe.add(plot1)
         container_dfe.add(plot3)
         self.plots_dfe = container_dfe
+
+        # - EQ Tune tab
+        plot_h_tune = Plot(plotdata)
+        plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="red",  name="Cumulative")
+        plot_h_tune.plot(("t_ns_chnl", "ctle_out_g_tune"), type="line", color="gray")
+        plot_h_tune.title            = "Channel + Tx Preemphasis + CTLE"
+        plot_h_tune.index_axis.title = "Time (ns)"
+        plot_h_tune.y_axis.title     = "Impulse Response (V/ns)"
+        zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis='index', always_on=False)
+        plot_h_tune.overlays.append(zoom_tune)
+        self.plot_h_tune = plot_h_tune
 
         # - Impulse Responses tab
         plot_h_chnl = Plot(plotdata)
@@ -991,6 +1012,51 @@ class PyBERT(HasTraits):
         help_str += "    </UL>\n"
 
         return help_str
+
+    @cached_property
+    def _get_tx_h_tune(self):
+        nspui     = self.nspui
+        pretap    = self.pretap_tune
+        posttap   = self.posttap_tune
+        posttap2  = self.posttap2_tune
+        posttap3  = self.posttap3_tune
+
+        main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
+        ffe      = [pretap, main_tap, posttap, posttap2, posttap3]                    # FIR filter numerator, for fs = fbit.
+
+        return concatenate([[x] + list(zeros(nspui - 1)) for x in ffe])
+
+    @cached_property
+    def _get_ctle_h_tune(self):
+        w         = self.w
+        chnl_h    = self.chnl_h
+        rx_bw     = self.rx_bw_tune     * 1.e9
+        peak_freq = self.peak_freq_tune * 1.e9
+        peak_mag  = self.peak_mag_tune
+
+        w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w)
+        ctle_H     = H / abs(H[0])              # Scale to force d.c. component of '1'.
+
+        return real(ifft(ctle_H))[:len(chnl_h)]
+
+    @cached_property
+    def _get_ctle_out_h_tune(self):
+        ideal_h   = self.ideal_h
+        chnl_h    = self.chnl_h
+        tx_h      = self.tx_h_tune.copy()
+        ctle_h    = self.ctle_h_tune
+
+        tx_h.resize(len(chnl_h))
+        tx_out_h   = convolve(tx_h,   chnl_h)  [:len(chnl_h)]
+        ctle_out_h = convolve(ctle_h, tx_out_h)[:len(chnl_h)]
+
+        self.ctle_out_g_tune = trim_shift_scale(ideal_h, ctle_out_h)
+
+        return ctle_out_h
+
+    def _ctle_out_h_tune_changed(self):
+        self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
+        self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
 if __name__ == '__main__':
     PyBERT().configure_traits(view=traits_view)

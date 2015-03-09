@@ -710,3 +710,8 @@ def import_qucs_csv(filename, sample_per):
 
     return array(res)
 
+def trim_shift_scale(ideal_h, actual_h):
+    corr_res = correlate(ideal_h, actual_h, mode='valid')
+    offset   = where(corr_res == max(corr_res))[0][0]
+    return ideal_h[offset : offset + len(actual_h)] * max(actual_h) / max(ideal_h)
+

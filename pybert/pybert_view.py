@@ -19,7 +19,28 @@ class MyHandler(Handler):
         my_run_sweeps(info.object)
         info.object.status = 'Ready.'
 
+    def do_tune_save(self, info):
+        info.object.pretap    = info.object.pretap_tune
+        info.object.posttap   = info.object.posttap_tune
+        info.object.posttap2  = info.object.posttap2_tune
+        info.object.posttap3  = info.object.posttap3_tune
+        info.object.peak_freq = info.object.peak_freq_tune
+        info.object.peak_mag  = info.object.peak_mag_tune
+        info.object.rx_bw     = info.object.rx_bw_tune
+
+    def do_tune_revert(self, info):
+        info.object.pretap_tune    = info.object.pretap
+        info.object.posttap_tune   = info.object.posttap
+        info.object.posttap2_tune  = info.object.posttap2
+        info.object.posttap3_tune  = info.object.posttap3
+        info.object.peak_freq_tune = info.object.peak_freq
+        info.object.peak_mag_tune  = info.object.peak_mag
+        info.object.rx_bw_tune     = info.object.rx_bw
+
 run_simulation = Action(name="Run", action="do_run_simulation")
+tune_save      = Action(name="Save",  action="do_tune_save")
+tune_revert    = Action(name="Reset", action="do_tune_revert")
+
     
 # Main window layout definition.
 traits_view = View(
@@ -137,6 +158,23 @@ traits_view = View(
             Item('plots_dfe', editor=ComponentEditor(), show_label=False,),
             label = 'DFE', id = 'plots_dfe'
         ),
+        VGroup(
+            HGroup(
+                Item(name='pretap_tune',       label='Pre-tap',    tooltip="pre-cursor tap weight", ),
+                Item(name='posttap_tune',      label='Post-tap',   tooltip="post-cursor tap weight", ),
+                Item(name='posttap2_tune',     label='Post-tap2',  tooltip="2nd post-cursor tap weight", ),
+                Item(name='posttap3_tune',     label='Post-tap3',  tooltip="3rd post-cursor tap weight", ),
+                label='Tx Equalization', show_border=True,
+            ),
+            HGroup(
+                Item(name='peak_freq_tune', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
+                Item(name='peak_mag_tune',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
+                Item(name='rx_bw_tune',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
+                label = 'Rx Equalization', show_border = True,
+            ),
+            Item('plot_h_tune', editor=ComponentEditor(), show_label=False,),
+            label = 'EQ Tune', id = 'eq_tune',
+        ),
         Group(
             Item('plots_h', editor=ComponentEditor(), show_label=False,),
             label = 'Impulses', id = 'plots_h'
@@ -194,7 +232,7 @@ traits_view = View(
     ),
     resizable = True,
     handler = MyHandler(),
-    buttons = [run_simulation, "OK"],
+    buttons = [tune_revert, tune_save, run_simulation, "OK"],
     statusbar = "status_str",
     title='PyBERT',
     width=1200, height=800
