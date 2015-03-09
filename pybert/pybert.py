@@ -201,9 +201,9 @@ class PyBERT(HasTraits):
     total_perf      = Float(0.)
     sweep_results   = List([])
     # - About
-    ident  = String('PyBERT v1.2 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.4 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    February 10, 2015\n\n \
+    March 8, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
