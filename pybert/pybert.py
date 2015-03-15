@@ -41,8 +41,8 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
-from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape
-from numpy.fft       import fft
+from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real
+from numpy.fft       import fft, ifft
 from numpy.random    import randint
 from scipy.signal    import lfilter, iirfilter
 
@@ -202,17 +202,23 @@ class PyBERT(HasTraits):
 
     # Default initialization
     def __init__(self):
-        """Plot setup occurs here."""
+        """
+        Initial plot setup occurs here.
 
+        In order to populate the data structure we need to
+        construct the plots, we must run the simulation.
+
+        """
+
+        # Super-class initialization is ABSOLUTELY NECESSARY, in order
+        # to get all the Traits/UI machinery setup correctly.
         super(PyBERT, self).__init__()
 
-        plotdata = self.plotdata
-
-        # Running the simulation will fill in the 'plotdata' structure.
+        # Running the simulation will fill in the required data structure.
         my_run_simulation(self, initial_run=True)
 
-        # Once the 'plotdata' structure is filled in, we can create the plots.
-        make_plots(self)
+        # Once the required data structure is filled in, we can create the plots.
+        make_plots(self, n_dfe_taps = gNtaps)
 
     # Dependent variable definitions
 #    @cached_property
