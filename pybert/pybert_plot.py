@@ -70,6 +70,17 @@ def make_plots(self, n_dfe_taps):
     container_dfe.add(plot3)
     self.plots_dfe = container_dfe
 
+    # - EQ Tune tab
+    plot_h_tune = Plot(plotdata)
+    plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="red",  name="Cumulative")
+    plot_h_tune.plot(("t_ns_chnl", "ctle_out_g_tune"), type="line", color="gray")
+    plot_h_tune.title            = "Channel + Tx Preemphasis + CTLE"
+    plot_h_tune.index_axis.title = "Time (ns)"
+    plot_h_tune.y_axis.title     = "Impulse Response (V/ns)"
+    zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis='index', always_on=False)
+    plot_h_tune.overlays.append(zoom_tune)
+    self.plot_h_tune = plot_h_tune
+
     # - Impulse Responses tab
     plot_h_chnl = Plot(plotdata)
     plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue")
@@ -142,6 +153,41 @@ def make_plots(self, n_dfe_taps):
     container_s.add(plot_s_ctle)
     container_s.add(plot_s_dfe)
     self.plots_s  = container_s
+
+    # - Pulse Responses tab
+    plot_p_chnl = Plot(plotdata)
+    plot_p_chnl.plot(("t_ns_chnl", "chnl_p"), type="line", color="blue")
+    plot_p_chnl.title            = "Channel"
+    plot_p_chnl.index_axis.title = "Time (ns)"
+    plot_p_chnl.y_axis.title     = "Pulse Response (V)"
+
+    plot_p_tx = Plot(plotdata)
+    plot_p_tx.plot(("t_ns_chnl", "tx_out_p"), type="line", color="red",  name="Cumulative")
+    plot_p_tx.title            = "Channel + Tx Preemphasis"
+    plot_p_tx.index_axis.title = "Time (ns)"
+    plot_p_tx.y_axis.title     = "Pulse Response (V)"
+    plot_p_tx.legend.align     = 'lr'
+
+    plot_p_ctle = Plot(plotdata)
+    plot_p_ctle.plot(("t_ns_chnl", "ctle_out_p"), type="line", color="red",  name="Cumulative")
+    plot_p_ctle.title            = "Channel + Tx Preemphasis + CTLE"
+    plot_p_ctle.index_axis.title = "Time (ns)"
+    plot_p_ctle.y_axis.title     = "Pulse Response (V)"
+    plot_p_ctle.legend.align     = 'lr'
+
+    plot_p_dfe = Plot(plotdata)
+    plot_p_dfe.plot(("t_ns_chnl", "dfe_out_p"), type="line", color="red",  name="Cumulative")
+    plot_p_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
+    plot_p_dfe.index_axis.title = "Time (ns)"
+    plot_p_dfe.y_axis.title     = "Pulse Response (V)"
+    plot_p_dfe.legend.align     = 'lr'
+
+    container_p = GridPlotContainer(shape=(2,2))
+    container_p.add(plot_p_chnl)
+    container_p.add(plot_p_tx)
+    container_p.add(plot_p_ctle)
+    container_p.add(plot_p_dfe)
+    self.plots_p  = container_p
 
     # - Frequency Responses tab
     plot_H_chnl = Plot(plotdata)

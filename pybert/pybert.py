@@ -38,6 +38,8 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
+from pylab           import *
+
 from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
@@ -48,7 +50,7 @@ from scipy.signal    import lfilter, iirfilter
 
 from pybert_view     import traits_view
 from pybert_cntrl    import my_run_simulation, update_results, update_eyes
-from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv
+from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale
 from pybert_plot     import make_plots
 
 debug = False
@@ -59,6 +61,7 @@ gUI             = 100     # (ps)
 gNbits          = 8000    # number of bits to run
 gPatLen         = 127     # repeating bit pattern length
 gNspb           = 32      # samples per bit
+gNumAve         = 1       # Number of bit error samples to average, when sweeping.
 # - Channel Control
 #     - parameters for Howard Johnson's "Metallic Transmission Model"
 #     - (See "High Speed Signal Propagation", Sec. 3.1.)
@@ -117,6 +120,10 @@ class PyBERT(HasTraits):
     nspb            = Int(gNspb)
     eye_bits        = Int(gNbits // 5)
     mod_type        = List([0])
+    num_sweeps      = Int(1)
+    sweep_num       = Int(1)
+    sweep_aves      = Int(gNumAve)
+    do_sweep        = Bool(False)
     # - Channel Control
     use_ch_file     = Bool(False)
     ch_file         = File('', entries=5, filter=['*.csv'])
@@ -135,16 +142,38 @@ class PyBERT(HasTraits):
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
     pretap          = Float(-0.05)
+    pretap_sweep    = Bool(False)
+    pretap_final    = Float(-0.05)
+    pretap_steps    = Int(5)
     posttap         = Float(-0.10)
+    posttap_sweep   = Bool(False)
+    posttap_final   = Float(-0.10)
+    posttap_steps   = Int(10)
+    posttap2        = Float(0.0)
+    posttap2_sweep  = Bool(False)
+    posttap2_final  = Float(0.0)
+    posttap2_steps  = Int(10)
+    posttap3        = Float(0.0)
+    posttap3_sweep  = Bool(False)
+    posttap3_final  = Float(0.0)
+    posttap3_steps  = Int(10)
+    pretap_tune     = Float(0.0)
+    posttap_tune    = Float(0.0)
+    posttap2_tune   = Float(0.0)
+    posttap3_tune   = Float(0.0)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
     cac             = Float(gCac)                                           # (uF)
     rx_bw           = Float(gBW)                                            # (GHz)
+    use_agc         = Bool(True)
     use_dfe         = Bool(gUseDfe)
     sum_ideal       = Bool(gDfeIdeal)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
     peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
+    rx_bw_tune      = Float(gBW)
+    peak_freq_tune  = Float(gPeakFreq)
+    peak_mag_tune   = Float(gPeakMag)
     # - DFE
     decision_scaler = Float(gDecisionScaler)
     gain            = Float(gGain)
@@ -173,10 +202,11 @@ class PyBERT(HasTraits):
     status          = String("Ready.")
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
+    sweep_results   = List([])
     # - About
-    ident  = String('PyBERT v1.4 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.5 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    February 15, 2015\n\n \
+    March 15, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -187,6 +217,10 @@ class PyBERT(HasTraits):
     jitter_info     = Property(HTML,    depends_on=['jitter_perf'])
     perf_info       = Property(HTML,    depends_on=['total_perf'])
     status_str      = Property(String,  depends_on=['status'])
+    sweep_info      = Property(HTML,    depends_on=['sweep_results'])
+    tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune'])
+    ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune'])
+    ctle_out_h_tune = Property(Array,   depends_on=['chnl_h', 'tx_h_tune', 'ctle_h_tune'])
     # - Handled by pybert_cntrl.py, upon user button clicks. (May contain "large overhead" variables.)
     #   - These are dependencies. So, they must be Array()s.
     #   - These are not.
@@ -197,8 +231,8 @@ class PyBERT(HasTraits):
     # This is an experiment at bringing channel impulse definition back.
 #    chnl_h          = Property(Array, depends_on=['use_ch_file', 'ch_file', 'Rdc', 'w0', 'R0', 'Theta0', 'Z0', 'v0', 'l_ch'])
 #    t_ns_chnl       = Property(Array, depends_on=['t_ns', 'chnl_h'])
-    chnl_h          = Property(Array)
-    t_ns_chnl       = Property(Array)
+#    chnl_h          = Property(Array)
+#    t_ns_chnl       = Property(Array)
 
     # Default initialization
     def __init__(self):
@@ -222,54 +256,54 @@ class PyBERT(HasTraits):
 
     # Dependent variable definitions
 #    @cached_property
-    def _get_chnl_h(self):
-        print "Just entered _get_chnl_h()."
-        if(self.use_ch_file):
-            t                = self.t
+#    def _get_chnl_h(self):
+#        print "Just entered _get_chnl_h()."
+#        if(self.use_ch_file):
+#            t                = self.t
+#
+#            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
+#            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
+#            chnl_h.resize(len(t))
+#            chnl_H           = fft(chnl_h)
+#            chnl_H          /= abs(chnl_H[0])
+#            chnl_h, start_ix = trim_impulse(chnl_h)
+#        else:
+#            l_ch             = self.l_ch
+#            v0               = self.v0 * 3.e8
+#            R0               = self.R0
+#            w0               = self.w0
+#            Rdc              = self.Rdc
+#            Z0               = self.Z0
+#            Theta0           = self.Theta0
+#            w                = self.w
+#            Rs               = self.rs
+#            Cs               = self.cout * 1.e-12
+#            RL               = self.rin
+#            Cp               = self.cin * 1.e-12
+#            CL               = self.cac * 1.e-6
+#            Ts               = self.Ts
+#
+#            chnl_dly         = l_ch / v0
+#            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+#            H                = exp(-l_ch * gamma)
+#            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
+#            chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
+#
+#        chnl_h   /= sum(chnl_h)
+#
+#        self.chnl_dly        = chnl_dly
+#        self.chnl_H          = chnl_H
+#        self.start_ix        = start_ix
+#
+#        return chnl_h
 
-            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
-            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
-            chnl_h.resize(len(t))
-            chnl_H           = fft(chnl_h)
-            chnl_H          /= abs(chnl_H[0])
-            chnl_h, start_ix = trim_impulse(chnl_h)
-        else:
-            l_ch             = self.l_ch
-            v0               = self.v0 * 3.e8
-            R0               = self.R0
-            w0               = self.w0
-            Rdc              = self.Rdc
-            Z0               = self.Z0
-            Theta0           = self.Theta0
-            w                = self.w
-            Rs               = self.rs
-            Cs               = self.cout * 1.e-12
-            RL               = self.rin
-            Cp               = self.cin * 1.e-12
-            CL               = self.cac * 1.e-6
-            Ts               = self.Ts
-
-            chnl_dly         = l_ch / v0
-            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-            H                = exp(-l_ch * gamma)
-            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-            chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
-
-        chnl_h   /= sum(chnl_h)
-
-        self.chnl_dly        = chnl_dly
-        self.chnl_H          = chnl_H
-        self.start_ix        = start_ix
-
-        return chnl_h
-
-    @cached_property
-    def _get_t_ns_chnl(self):
-        start_ix  = self.start_ix
-        t_ns      = self.t_ns
-        chnl_h    = self.chnl_h
-
-        return t_ns[start_ix : start_ix + len(chnl_h)]
+#    @cached_property
+#    def _get_t_ns_chnl(self):
+#        start_ix  = self.start_ix
+#        t_ns      = self.t_ns
+#        chnl_h    = self.chnl_h
+#
+#        return t_ns[start_ix : start_ix + len(chnl_h)]
 
     @cached_property
     def _get_jitter_info(self):
@@ -469,6 +503,25 @@ class PyBERT(HasTraits):
         return info_str
 
     @cached_property
+    def _get_sweep_info(self):
+        sweep_results = self.sweep_results
+
+        info_str  = '<H2>Sweep Results</H2>\n'
+        info_str += '  <TABLE border="1">\n'
+        info_str += '    <TR align="center">\n'
+        info_str += '      <TH>Pretap</TH><TH>Posttap</TH><TH>Mean(bit errors)</TH><TH>StdDev(bit errors)</TH>\n'
+        info_str += '    </TR>\n'
+
+        for item in sweep_results:
+            info_str += '    <TR align="center">\n'
+            info_str += '      <TD>%+06.3f</TD><TD>%+06.3f</TD><TD>%d</TD><TD>%d</TD>\n' % (item[0], item[1], item[2], item[3])
+            info_str += '    </TR>\n'
+
+        info_str += '  </TABLE>\n'
+
+        return info_str
+
+    @cached_property
     def _get_status_str(self):
         perf_str = "%-20s | Perf. (Msmpls/min.):    %4.1f" % (self.status, self.total_perf * 60.e-6)
         jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
@@ -490,6 +543,51 @@ class PyBERT(HasTraits):
         help_str += "    </UL>\n"
 
         return help_str
+
+    @cached_property
+    def _get_tx_h_tune(self):
+        nspui     = self.nspui
+        pretap    = self.pretap_tune
+        posttap   = self.posttap_tune
+        posttap2  = self.posttap2_tune
+        posttap3  = self.posttap3_tune
+
+        main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
+        ffe      = [pretap, main_tap, posttap, posttap2, posttap3]                    # FIR filter numerator, for fs = fbit.
+
+        return concatenate([[x] + list(zeros(nspui - 1)) for x in ffe])
+
+    @cached_property
+    def _get_ctle_h_tune(self):
+        w         = self.w
+        chnl_h    = self.chnl_h
+        rx_bw     = self.rx_bw_tune     * 1.e9
+        peak_freq = self.peak_freq_tune * 1.e9
+        peak_mag  = self.peak_mag_tune
+
+        w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w)
+        ctle_H     = H / abs(H[0])              # Scale to force d.c. component of '1'.
+
+        return real(ifft(ctle_H))[:len(chnl_h)]
+
+    @cached_property
+    def _get_ctle_out_h_tune(self):
+        ideal_h   = self.ideal_h
+        chnl_h    = self.chnl_h
+        tx_h      = self.tx_h_tune.copy()
+        ctle_h    = self.ctle_h_tune
+
+        tx_h.resize(len(chnl_h))
+        tx_out_h   = convolve(tx_h,   chnl_h)  [:len(chnl_h)]
+        ctle_out_h = convolve(ctle_h, tx_out_h)[:len(chnl_h)]
+
+        self.ctle_out_g_tune = trim_shift_scale(ideal_h, ctle_out_h)
+
+        return ctle_out_h
+
+    def _ctle_out_h_tune_changed(self):
+        self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
+        self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
 if __name__ == '__main__':
     PyBERT().configure_traits(view=traits_view)
