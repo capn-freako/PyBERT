@@ -1,9 +1,11 @@
-# General purpose utilities for PyBERT.
-#
-# Original author: David Banas <capn.freako@gmail.com>
-# Original date:   September 27, 2014 (Copied from `pybert_cntrl.py'.)
-#
-# Copyright (c) 2014 David Banas; all rights reserved World wide.
+"""
+General purpose utilities for PyBERT.
+
+Original author: David Banas <capn.freako@gmail.com>
+Original date:   September 27, 2014 (Copied from `pybert_cntrl.py'.)
+
+Copyright (c) 2014 David Banas; all rights reserved World wide.
+"""
 
 from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, sqrt, power, exp, cumsum
 from numpy.random import normal

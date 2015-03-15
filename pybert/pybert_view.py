@@ -1,9 +1,11 @@
-# Default view definition for PyBERT class.
-#
-# Original author: David Banas <capn.freako@gmail.com>
-# Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major code cleanup.)
-#
-# Copyright (c) 2014 David Banas; all rights reserved World wide.
+"""
+Default view definition for PyBERT class.
+
+Original author: David Banas <capn.freako@gmail.com>
+Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major code cleanup.)
+
+Copyright (c) 2014 David Banas; all rights reserved World wide.
+"""
 
 from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor
 from enable.component_editor import ComponentEditor

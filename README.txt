@@ -9,7 +9,7 @@ as well as the NumPy and SciPy packages.
 
 In order to install and run PyBERT on a system with Python already installed:
 
-    $ easy_install pybert
+    $ easy_install PyBERT
     $ python -m pybert
 
 Notice: Before using this package for any purpose, you MUST read and understand the terms put forward

@@ -1,9 +1,11 @@
-# Default controller definition for PyBERT class.
-#
-# Original author: David Banas <capn.freako@gmail.com>
-# Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major code cleanup.)
-#
-# Copyright (c) 2014 David Banas; all rights reserved World wide.
+"""
+Default controller definition for PyBERT class.
+
+Original author: David Banas <capn.freako@gmail.com>
+Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major code cleanup.)
+
+Copyright (c) 2014 David Banas; all rights reserved World wide.
+"""
 
 from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, correlate
 from numpy.random import normal
@@ -34,31 +36,32 @@ def my_run_simulation(self, initial_run=False):
     start_time = time.clock()
     self.status = 'Running channel...'
 
-    nbits   = self.nbits
-    eye_bits = self.eye_bits
-    nspb    = self.nspb
-    rn      = self.rn
-    pn_mag  = self.pn_mag
-    pn_freq = self.pn_freq * 1.e6
-    Vod     = self.vod
-    Rs      = self.rs
-    Cs      = self.cout * 1.e-12
-    RL      = self.rin
-    CL      = self.cac * 1.e-6
-    Cp      = self.cin * 1.e-12
-    R0      = self.R0
-    w0      = self.w0
-    Rdc     = self.Rdc
-    Z0      = self.Z0
-    v0      = self.v0 * 3.e8
-    Theta0  = self.Theta0
-    l_ch    = self.l_ch
-    pretap  = self.pretap
-    posttap = self.posttap
-    pattern_len = self.pattern_len
-    rx_bw     = self.rx_bw * 1.e9
-    peak_freq = self.peak_freq * 1.e9
-    peak_mag  = self.peak_mag
+    # Pull class variables into local storage, performing unit conversion where necessary.
+    nbits           = self.nbits
+    eye_bits        = self.eye_bits
+    nspb            = self.nspb
+    rn              = self.rn
+    pn_mag          = self.pn_mag
+    pn_freq         = self.pn_freq * 1.e6
+    Vod             = self.vod
+    Rs              = self.rs
+    Cs              = self.cout * 1.e-12
+    RL              = self.rin
+    CL              = self.cac * 1.e-6
+    Cp              = self.cin * 1.e-12
+    R0              = self.R0
+    w0              = self.w0
+    Rdc             = self.Rdc
+    Z0              = self.Z0
+    v0              = self.v0 * 3.e8
+    Theta0          = self.Theta0
+    l_ch            = self.l_ch
+    pretap          = self.pretap
+    posttap         = self.posttap
+    pattern_len     = self.pattern_len
+    rx_bw           = self.rx_bw * 1.e9
+    peak_freq       = self.peak_freq * 1.e9
+    peak_mag        = self.peak_mag
     delta_t         = self.delta_t * 1.e-12
     alpha           = self.alpha
     ui              = self.ui * 1.e-12
@@ -78,20 +81,24 @@ def my_run_simulation(self, initial_run=False):
     npts = nbits * nspb
     t    = [i * t0 for i in range(npts)]
     t_ns = 1.e9 * array(t)
-    self.t_ns = t_ns
     
     # Calculate the frequency vector appropriate for indexing non-shifted FFT output.
     # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
     f0        = 1. / (t[1] * npts)
     half_npts = npts // 2
     f         = array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
-    self.f    = f
     w         = 2 * pi * f
     
     # Calculate misc. values.
     eye_offset = nspb / 2
     fs         = nspb / ui
     Ts         = 1. / fs
+
+    self.t_ns = t_ns
+    self.t    = t
+    self.f    = f
+    self.w    = w
+    self.Ts   = Ts
 
     # Correct unit interval for PAM-4 modulation, if necessary.
     nui      = nbits
@@ -105,7 +112,7 @@ def my_run_simulation(self, initial_run=False):
         nspui   *= 2
 
     # Generate the symbol stream.
-    bits        = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
+    bits = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
     if  (mod_type == 0):                         # NRZ
         symbols = 2 * bits - 1
     elif(mod_type == 1):                         # Duo-binary
@@ -115,47 +122,32 @@ def my_run_simulation(self, initial_run=False):
         symbols = (2 * array(symbols) - 1) / 2.    # These 2 lines do the actual duo-binary encoding.
         symbols = symbols[:-1] + symbols[1:]
     elif(mod_type == 2):                        # PAM-4
-        # Change this:
-        # - '00' = -1
-        # - '01' = -1/3
-        # - '11' = +1/3
-        # - '10' = +1
-        symbols = array(map(lambda x: (x[0] << 1) + x[1], zip(bits[0::2], bits[1::2]))) * 2./3. - 1.
-        symbols = repeat(symbols, 2)
+        symbols = []
+        for bits in zip(bits[0::2], bits[1::2]):
+            if(bits == [0,0]):
+                symbols.append(-1.)
+            elif(bits == [0,1]):
+                symbols.append(-1./3.)
+            elif(bits == [1,0]):
+                symbols.append(1.)
+            else:
+                symbols.append(1./3.)
+        symbols = repeat(array(symbols), 2)
     else:
         raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
 
     # Generate the ideal over-sampled signal.
-    x                 = repeat(symbols, nspb)
-    self.ideal_signal = x
+    x = repeat(symbols, nspb)
 
-    # Find the ideal crossing times.
+    # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
     ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
 
-    # Generate the output from, and the impulse/step/frequency responses of, the channel.
-    if(self.use_ch_file):
-        chnl_h           = import_qucs_csv(self.ch_file, Ts)
-        chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
-        chnl_h.resize(len(t))
-        chnl_H           = fft(chnl_h)
-        chnl_H          /= abs(chnl_H[0])
-        chnl_h, start_ix = trim_impulse(chnl_h)
-    else:
-        chnl_dly         = l_ch / v0
-        gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-        H                = exp(-l_ch * gamma)
-        chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-        chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
-    chnl_h   /= sum(chnl_h)
-    t_ns_chnl = t_ns[start_ix : start_ix + len(chnl_h)]
-    chnl_out  = convolve(x, chnl_h)[:len(x)]
+    self.ideal_signal = x
+    self.ideal_xings  = ideal_xings
 
-    self.t_ns_chnl   = t_ns_chnl
-    self.chnl_s      = chnl_h.cumsum()
-    self.chnl_H      = chnl_H
-    self.chnl_h      = chnl_h * 1.e-9 / Ts # Scaled to units of "V/ns" for later display. DON'T DO THIS TO THE LOCAL COPY!
-    self.chnl_out    = chnl_out
-    self.chnl_dly    = chnl_dly
+    # Generate the output from, and the impulse/step/frequency responses of, the channel.
+    chnl_h          = self.chnl_h
+    chnl_out  = convolve(x, chnl_h)[:len(x)]
 
     self.channel_perf = nbits * nspb / (time.clock() - start_time)
     split_time        = time.clock()
@@ -349,7 +341,13 @@ def my_run_simulation(self, initial_run=False):
     split_time       = time.clock()
     self.status = 'Updating plots...'
 
-    self.ideal_xings  = ideal_xings
+    # Save local variables to class instance for state preservation, performing unit conversion where necessary.
+    self.chnl_s      = chnl_h.cumsum()
+#    self.chnl_H      = chnl_H
+#    self.chnl_h      = chnl_h * 1.e-9 / Ts # Scaled to units of "V/ns" for later display. DON'T DO THIS TO THE LOCAL COPY!
+    self.chnl_out    = chnl_out
+#    self.chnl_dly    = chnl_dly
+
     self.adaptation = tap_weights
     self.ui_ests    = array(ui_ests) * 1.e12 # (ps)
     self.clocks     = clocks
