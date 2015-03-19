@@ -224,38 +224,15 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.ideal_xings  = ideal_xings
 
     # Generate the ideal impulse responses.
+    chnl_h   = self.chnl_h
     ideal_h  = sinc((array(t) - t[-1] / 2.) / ui)
     if(mod_type == 1):       # Duo-binary
         ideal_h = ideal_h[nspui:] + ideal_h[:-nspui]
     self.ideal_h = ideal_h
+    self.chnl_g  = trim_shift_scale(ideal_h, chnl_h)
 
-    # Generate the output from, and the impulse/step/frequency responses of, the channel.
-    if(self.use_ch_file):
-        chnl_h           = import_qucs_csv(self.ch_file, Ts)
-        chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
-        chnl_h.resize(len(t))
-        chnl_H           = fft(chnl_h)
-        chnl_H          /= abs(chnl_H[0])
-        chnl_h, start_ix = trim_impulse(chnl_h)
-    else:
-        chnl_dly         = l_ch / v0
-        gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-        H                = exp(-l_ch * gamma)
-        chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-        chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
-    chnl_h   /= sum(chnl_h)
-    chnl_g    = trim_shift_scale(ideal_h, chnl_h)
-    t_ns_chnl = t_ns[start_ix : start_ix + len(chnl_h)]
+    # Calculate the channel output.
     chnl_out  = convolve(x, chnl_h)[:len(x)]
-
-    self.t_ns_chnl   = t_ns_chnl
-    self.chnl_s      = chnl_h.cumsum()
-    self.chnl_p      = self.chnl_s[nspui:] - self.chnl_s[:-nspui] 
-    self.chnl_H      = chnl_H
-    self.chnl_h      = chnl_h * 1.e-9 / Ts # Scaled to units of "V/ns" for later display. DON'T DO THIS TO THE LOCAL COPY!
-    self.chnl_g      = chnl_g * 1.e-9 / Ts
-    self.chnl_out    = chnl_out
-    self.chnl_dly    = chnl_dly
 
     self.channel_perf = nbits * nspb / (time.clock() - start_time)
     split_time        = time.clock()
@@ -474,11 +451,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status      = 'Updating plots...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Save local variables to class instance for state preservation, performing unit conversion where necessary.
-    self.chnl_s      = chnl_h.cumsum()
-#    self.chnl_H      = chnl_H
-#    self.chnl_h      = chnl_h * 1.e-9 / Ts # Scaled to units of "V/ns" for later display. DON'T DO THIS TO THE LOCAL COPY!
     self.chnl_out    = chnl_out
-#    self.chnl_dly    = chnl_dly
 
     self.adaptation = tap_weights
     self.ui_ests    = array(ui_ests) * 1.e12 # (ps)

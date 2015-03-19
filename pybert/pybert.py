@@ -14,20 +14,22 @@ can be used to explore the concepts of serial communication link design.
 
 The application source is divided among several files, as follows:
 
-    pybert.py       - This file. It contains:
+    pybert.py       - This file. The M in MVC, it contains:
                       - independent variable declarations
                       - default initialization
                       - the definitions of those dependent variables, which are handled
                         automatically by the Traits/UI machinery.
                 
-    pybert_view.py  - Contains the main window layout definition, as
+    pybert_view.py  - The V in MVC, it contains the main window layout definition, as
                       well as the definitions of user invoked actions
                       (i.e.- buttons).
 
-    pybert_cntrl.py - Contains the definitions for those dependent
+    pybert_cntrl.py - The C in MVC, it contains the definitions for those dependent
                       variables, which are updated not automatically by
                       the Traits/UI machinery, but rather by explicit
                       user action (i.e. - button clicks).
+
+    pybert_plot.py  - Contains all plot definitions.
 
     pybert_util.py  - Contains general purpose utility functionality.
 
@@ -41,6 +43,8 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 from pylab           import *
 
 from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
+from traitsui.api    import View, Item, Group
+from enable.component_editor import ComponentEditor
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
 from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real
@@ -192,6 +196,7 @@ class PyBERT(HasTraits):
     plotdata          = ArrayPlotData()
     plots_h           = Instance(GridPlotContainer)
     plots_s           = Instance(GridPlotContainer)
+    plots_p           = Instance(GridPlotContainer)
     plots_H           = Instance(GridPlotContainer)
     plots_dfe         = Instance(GridPlotContainer)
     plots_eye         = Instance(GridPlotContainer)
@@ -210,17 +215,30 @@ class PyBERT(HasTraits):
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
-    instructions = Property(HTML)
+    instructions = Property()
+
+    # Changed counter dummies.
+    # (Used, in lieu of their counterparts, as dependencies, so as not
+    #  to slow down the GUI unnecessarily. See the note in the
+    #  "Dependent variables" section, below.)
+    chnl_h_changed_count = Int(0)
 
     # Dependent variables
     # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
-    jitter_info     = Property(HTML,    depends_on=['jitter_perf'])
-    perf_info       = Property(HTML,    depends_on=['total_perf'])
-    status_str      = Property(String,  depends_on=['status'])
-    sweep_info      = Property(HTML,    depends_on=['sweep_results'])
+    #
+    # - Note: Don't make properties, which have a high calculation overhead, dependencies of other properties!
+    #         This will slow the GUI down noticeably.
+    #         Instead, use dummy, changed counters, as above.
+    #         Don't forget to define "_{property_name}_changed" functions, below, in which you bump the counts.
+    #         See "_chnl_h_changed()", below, as an example.
+    jitter_info     = Property()
+    perf_info       = Property()
+    status_str      = Property()
+    sweep_info      = Property()
     tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune'])
     ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune'])
-    ctle_out_h_tune = Property(Array,   depends_on=['chnl_h', 'tx_h_tune', 'ctle_h_tune'])
+    #ctle_out_h_tune = Property(Array,   depends_on=['chnl_h_changed_count', 'tx_h_tune', 'ctle_h_tune'])
+    ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune'])
     # - Handled by pybert_cntrl.py, upon user button clicks. (May contain "large overhead" variables.)
     #   - These are dependencies. So, they must be Array()s.
     #   - These are not.
@@ -229,7 +247,8 @@ class PyBERT(HasTraits):
     #       due to the way in which I was splitting up the initialization.
     #       Also, this guarantees no GUI freeze-up.
     # This is an experiment at bringing channel impulse definition back.
-#    chnl_h          = Property(Array, depends_on=['use_ch_file', 'ch_file', 'Rdc', 'w0', 'R0', 'Theta0', 'Z0', 'v0', 'l_ch'])
+    chnl_h          = Property(Array, depends_on=['use_ch_file', 'ch_file', 'Rdc', 'w0', 'R0', 'Theta0', 'Z0', 'v0', 'l_ch'])
+    chnl_h2         = Property(Array, depends_on=['l_ch'])
 #    t_ns_chnl       = Property(Array, depends_on=['t_ns', 'chnl_h'])
 #    chnl_h          = Property(Array)
 #    t_ns_chnl       = Property(Array)
@@ -255,47 +274,141 @@ class PyBERT(HasTraits):
         make_plots(self, n_dfe_taps = gNtaps)
 
     # Dependent variable definitions
-#    @cached_property
-#    def _get_chnl_h(self):
-#        print "Just entered _get_chnl_h()."
-#        if(self.use_ch_file):
-#            t                = self.t
-#
-#            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
-#            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
-#            chnl_h.resize(len(t))
-#            chnl_H           = fft(chnl_h)
-#            chnl_H          /= abs(chnl_H[0])
-#            chnl_h, start_ix = trim_impulse(chnl_h)
-#        else:
-#            l_ch             = self.l_ch
-#            v0               = self.v0 * 3.e8
-#            R0               = self.R0
-#            w0               = self.w0
-#            Rdc              = self.Rdc
-#            Z0               = self.Z0
-#            Theta0           = self.Theta0
-#            w                = self.w
-#            Rs               = self.rs
-#            Cs               = self.cout * 1.e-12
-#            RL               = self.rin
-#            Cp               = self.cin * 1.e-12
-#            CL               = self.cac * 1.e-6
-#            Ts               = self.Ts
-#
-#            chnl_dly         = l_ch / v0
-#            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-#            H                = exp(-l_ch * gamma)
-#            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-#            chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
-#
-#        chnl_h   /= sum(chnl_h)
-#
+    @cached_property
+    def _get_chnl_h(self):
+        """
+        Calculates the channel impulse response.
+
+        Also sets, in 'self':
+         - chnl_dly     group delay of channel
+         - start_ix     first element of trimmed response
+         - t_ns_chnl    the x-values, in ns, for plotting 'chnl_h'
+         - chnl_H       channel frequency response
+         - chnl_s       channel step response
+         - chnl_p       channel pulse response
+
+        """
+
+        print "Just entered _get_chnl_h()."
+
+        if(False):
+            if(self.chnl_h_changed_count):
+                raise Exception("_get_chnl_h(): Stopping for debug.")
+
+        t                    = self.t
+        nspui                = self.nspui
+
+        if(self.use_ch_file):
+            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
+            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
+            chnl_h.resize(len(t))
+            chnl_H           = fft(chnl_h)
+            chnl_H          /= abs(chnl_H[0])
+            chnl_h, start_ix = trim_impulse(chnl_h)
+        else:
+            l_ch             = self.l_ch
+            v0               = self.v0 * 3.e8
+            R0               = self.R0
+            w0               = self.w0
+            Rdc              = self.Rdc
+            Z0               = self.Z0
+            Theta0           = self.Theta0
+            w                = self.w
+            Rs               = self.rs
+            Cs               = self.cout * 1.e-12
+            RL               = self.rin
+            Cp               = self.cin * 1.e-12
+            CL               = self.cac * 1.e-6
+            Ts               = self.Ts
+
+            chnl_dly         = l_ch / v0
+            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+            H                = exp(-l_ch * gamma)
+            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
+            chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
+
+        chnl_h   /= sum(chnl_h)
+        chnl_s    = chnl_h.cumsum()
+        chnl_p    = chnl_s[nspui:] - chnl_s[:-nspui] 
+
+        self.chnl_dly        = chnl_dly
+        self.chnl_H          = chnl_H
+        self.start_ix        = start_ix
+        self.t_ns_chnl       = array(t[start_ix : start_ix + len(chnl_h)]) * 1.e9
+        self.chnl_s          = chnl_s
+        self.chnl_p          = chnl_p
+
+#        self.chnl_h_changed_count += 1
+
+        return chnl_h
+
+    @cached_property
+    def _get_chnl_h2(self):
+        """
+        Calculates the channel impulse response.
+
+        Also sets, in 'self':
+         - chnl_dly     group delay of channel
+         - start_ix     first element of trimmed response
+         - t_ns_chnl    the x-values, in ns, for plotting 'chnl_h'
+         - chnl_H       channel frequency response
+         - chnl_s       channel step response
+         - chnl_p       channel pulse response
+
+        """
+
+        print "Just entered _get_chnl_h2()."
+
+        if(False):
+            if(self.chnl_h_changed_count):
+                raise Exception("_get_chnl_h(): Stopping for debug.")
+
+        t                    = self.t
+        nspui                = self.nspui
+
+        if(self.use_ch_file):
+            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
+            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
+            chnl_h.resize(len(t))
+            chnl_H           = fft(chnl_h)
+            chnl_H          /= abs(chnl_H[0])
+            chnl_h, start_ix = trim_impulse(chnl_h)
+        else:
+            l_ch             = self.l_ch
+            v0               = self.v0 * 3.e8
+            R0               = self.R0
+            w0               = self.w0
+            Rdc              = self.Rdc
+            Z0               = self.Z0
+            Theta0           = self.Theta0
+            w                = self.w
+            Rs               = self.rs
+            Cs               = self.cout * 1.e-12
+            RL               = self.rin
+            Cp               = self.cin * 1.e-12
+            CL               = self.cac * 1.e-6
+            Ts               = self.Ts
+
+            chnl_dly         = l_ch / v0
+            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+            H                = exp(-l_ch * gamma)
+            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
+            chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
+
+        chnl_h   /= sum(chnl_h)
+        chnl_s    = chnl_h.cumsum()
+        chnl_p    = chnl_s[nspui:] - chnl_s[:-nspui] 
+
 #        self.chnl_dly        = chnl_dly
 #        self.chnl_H          = chnl_H
 #        self.start_ix        = start_ix
-#
-#        return chnl_h
+#        self.t_ns_chnl       = array(t[start_ix : start_ix + len(chnl_h)]) * 1.e9
+#        self.chnl_s          = chnl_s
+#        self.chnl_p          = chnl_p
+
+#        self.chnl_h_changed_count += 1
+
+        return chnl_h
 
 #    @cached_property
 #    def _get_t_ns_chnl(self):
@@ -305,8 +418,9 @@ class PyBERT(HasTraits):
 #
 #        return t_ns[start_ix : start_ix + len(chnl_h)]
 
-    @cached_property
     def _get_jitter_info(self):
+        print "Just entered _get_jitter_info()."
+
         isi_chnl      = self.isi_chnl * 1.e12
         dcd_chnl      = self.dcd_chnl * 1.e12
         pj_chnl       = self.pj_chnl  * 1.e12
@@ -470,8 +584,9 @@ class PyBERT(HasTraits):
 
         return info_str
     
-    @cached_property
     def _get_perf_info(self):
+        print "Just entered _get_perf_info()."
+
         info_str  = '<H2>Performance by Component</H2>\n'
         info_str += '  <TABLE border="1">\n'
         info_str += '    <TR align="center">\n'
@@ -502,8 +617,9 @@ class PyBERT(HasTraits):
 
         return info_str
 
-    @cached_property
     def _get_sweep_info(self):
+        print "Just entered _get_sweep_info()."
+
         sweep_results = self.sweep_results
 
         info_str  = '<H2>Sweep Results</H2>\n'
@@ -521,8 +637,9 @@ class PyBERT(HasTraits):
 
         return info_str
 
-    @cached_property
     def _get_status_str(self):
+        print "Just entered _get_status_str()."
+
         perf_str = "%-20s | Perf. (Msmpls/min.):    %4.1f" % (self.status, self.total_perf * 60.e-6)
         jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
                      (self.isi_dfe * 1.e12, self.dcd_dfe * 1.e12, self.pj_dfe * 1.e12, self.rj_dfe * 1.e12)
@@ -530,8 +647,9 @@ class PyBERT(HasTraits):
         err_str  = "         | Bit errors detected: %d" % self.bit_errs
         return perf_str + dly_str + jit_str + err_str
 
-    @cached_property
     def _get_instructions(self):
+        print "Just entered _get_instructions()."
+
         help_str  = "<H2>PyBERT User's Guide</H2>\n"
         help_str += "  <H3>Note to developers</H3>\n"
         help_str += "    This is NOT for you. Instead, open 'pybert/doc/build/html/index.html' in a browser.\n"
@@ -546,6 +664,8 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_tx_h_tune(self):
+        print "Just entered _get_tx_h_tune()."
+
         nspui     = self.nspui
         pretap    = self.pretap_tune
         posttap   = self.posttap_tune
@@ -559,6 +679,8 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ctle_h_tune(self):
+        print "Just entered _get_ctle_h_tune()."
+
         w         = self.w
         chnl_h    = self.chnl_h
         rx_bw     = self.rx_bw_tune     * 1.e9
@@ -572,6 +694,8 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ctle_out_h_tune(self):
+        print "Just entered _get_ctle_out_h_tune()."
+
         ideal_h   = self.ideal_h
         chnl_h    = self.chnl_h
         tx_h      = self.tx_h_tune.copy()
@@ -585,10 +709,27 @@ class PyBERT(HasTraits):
 
         return ctle_out_h
 
+    # Changed property handlers.
+#    def _chnl_h_changed(self):
+#        print "Just entered _get_chnl_h_changed()."
+#
+#        self.chnl_h_changed_count += 1
+
     def _ctle_out_h_tune_changed(self):
+        print "Just entered _get_ctle_out_h_tune_changed()."
+
         self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
         self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
+    dummy_view = View(
+                   Group(
+                     Item('l_ch'),
+                     Item('plots_h', editor=ComponentEditor(), show_label=False,),
+                   ),
+                   buttons = ["OK"],
+                 )
+
 if __name__ == '__main__':
-    PyBERT().configure_traits(view=traits_view)
+    PyBERT().configure_traits()
+#    PyBERT().configure_traits(view=traits_view)
 
