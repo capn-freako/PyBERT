@@ -54,9 +54,11 @@ debug = False
 
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
-gUI             = 100     # (ps)
+#gUI             = 100     # (ps)
+gUI             = 17.8     # (ps)
 gNbits          = 8000    # number of bits to run
-gPatLen         = 127     # repeating bit pattern length
+#gPatLen         = 127     # repeating bit pattern length
+gPatLen         = 10000     # repeating bit pattern length
 gNspb           = 32      # samples per bit
 gNumAve         = 1       # Number of bit error samples to average, when sweeping.
 # - Channel Control
@@ -69,24 +71,32 @@ gR0             = 1.452   # skin-effect resistance (Ohms/m)
 gTheta0         = .02     # loss tangent
 gZ0             = 100.    # characteristic impedance in LC region (Ohms)
 gv0             = 0.67    # relative propagation velocity (c)
-gl_ch           = 1.0     # cable length (m)
-gRn             = 0.01    # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+#gl_ch           = 1.0     # cable length (m)
+gl_ch           = 0.25     # cable length (m)
+#gRn             = 0.01    # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+gRn             = 0.001    # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
 # - Tx
+#gVod            = 1.0     # output drive strength (Vp)
 gVod            = 1.0     # output drive strength (Vp)
 gRs             = 100     # differential source impedance (Ohms)
 gCout           = 0.50    # parasitic output capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
-gPnMag          = 0.1     # magnitude of periodic noise (V)
+#gPnMag          = 0.1     # magnitude of periodic noise (V)
+gPnMag          = 0.001     # magnitude of periodic noise (V)
 gPnFreq         = 0.437   # frequency of periodic noise (MHz)
 # - Rx
 gRin            = 100     # differential input resistance
 gCin            = 0.50    # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
 gCac            = 1.      # a.c. coupling capacitance (uF) (Assumed to exist at both 'P' and 'N' nodes.)
-gBW             = 12.     # Rx signal path bandwidth, assuming no CTLE action. (GHz)
-gUseCtle        = True    # Include CTLE when running simulation.
-gUseDfe         = True    # Include DFE when running simulation.
+#gBW             = 12.     # Rx signal path bandwidth, assuming no CTLE action. (GHz)
+gBW             = 100.     # Rx signal path bandwidth, assuming no CTLE action. (GHz)
+#gUseCtle        = True    # Include CTLE when running simulation.
+#gUseDfe         = True    # Include DFE when running simulation.
+gUseCtle        = False    # Include CTLE when running simulation.
+gUseDfe         = False    # Include DFE when running simulation.
 gDfeIdeal       = True    # DFE ideal summing node selector
 gPeakFreq       = 5.      # CTLE peaking frequency (GHz)
-gPeakMag        = 10.     # CTLE peaking magnitude (dB)
+#gPeakMag        = 10.     # CTLE peaking magnitude (dB)
+gPeakMag        = 0.     # CTLE peaking magnitude (dB)
 # - DFE
 gDecisionScaler = 0.5
 gNtaps          = 5
@@ -116,7 +126,8 @@ class PyBERT(HasTraits):
     pattern_len     = Int(gPatLen)
     nspb            = Int(gNspb)
     eye_bits        = Int(gNbits // 5)
-    mod_type        = List([0])
+#    mod_type        = List([0])
+    mod_type        = List([2])
     num_sweeps      = Int(1)
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
@@ -138,19 +149,23 @@ class PyBERT(HasTraits):
     pn_mag          = Float(gPnMag)                                         # (ps)
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
-    pretap          = Float(-0.05)
+#    pretap          = Float(-0.05)
+    pretap          = Float(-0.02)
     pretap_sweep    = Bool(False)
     pretap_final    = Float(-0.05)
     pretap_steps    = Int(5)
-    posttap         = Float(-0.10)
+#    posttap         = Float(-0.10)
+    posttap         = Float(-0.37)
     posttap_sweep   = Bool(False)
     posttap_final   = Float(-0.10)
     posttap_steps   = Int(10)
-    posttap2        = Float(0.0)
+#    posttap2        = Float(0.0)
+    posttap2        = Float(0.1)
     posttap2_sweep  = Bool(False)
     posttap2_final  = Float(0.0)
     posttap2_steps  = Int(10)
-    posttap3        = Float(0.0)
+#    posttap3        = Float(0.0)
+    posttap3        = Float(-0.02)
     posttap3_sweep  = Bool(False)
     posttap3_final  = Float(0.0)
     posttap3_steps  = Int(10)

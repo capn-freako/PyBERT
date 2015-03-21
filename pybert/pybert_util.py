@@ -80,6 +80,9 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
     xing_ix     = where(diff_sign_x)[0]
     xings       = [t[i] + (t[i + 1] - t[i]) * x[i] / (x[i] - x[i + 1]) for i in xing_ix]
 
+    if(not xings):
+        return(array([]))
+
     min_time = t[0]
     if(min_delay):
         assert min_delay < t[-1], "Error: min_delay must be less than final time value."

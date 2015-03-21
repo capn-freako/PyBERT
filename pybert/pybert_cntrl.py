@@ -190,7 +190,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         symbols = [bits[0]]
         for bit in bits[1:]:                       # XOR pre-coding prevents infinite error propagation.
             symbols.append(bit ^ symbols[-1])
-        symbols = 2 * array(symbols) - 1
+        symbols = array(symbols) - 0.5
     elif(mod_type == 2):                        # PAM-4
         # Change this:
         # - '00' = -1
@@ -254,7 +254,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
     ffe    = [pretap, main_tap, posttap, posttap2, posttap3]                    # FIR filter numerator, for fs = fbit.
     ffe_out= convolve(symbols, ffe)[:len(symbols)]
+    rel_power = mean(ffe_out ** 2)
+    print "Relative average Tx power dissipation:", rel_power
     tx_out = repeat(ffe_out, nspui)                                             # oversampled output
+    self.ideal_signal = tx_out
+
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
     #    This is partly due to the out of order nature in which we combine the Tx and channel,
@@ -282,11 +286,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     temp       = tx_out_h.copy()
     temp.resize(len(w))
     tx_out_H   = fft(temp)
-    tx_out     = convolve(tx_out, chnl_h)[:len(tx_out)]
+    rx_in      = convolve(tx_out, chnl_h)[:len(tx_out)]
     # - Add the random noise to the Rx input.
-    tx_out    += normal(scale=rn, size=(len(tx_out),))
+#    rx_in     += normal(scale=rn, size=(len(tx_out),))
+
     self.tx_s      = tx_h.cumsum()
-    self.tx_out    = tx_out
+    self.tx_out    = rx_in 
     self.tx_out_s  = tx_out_h.cumsum()
     self.tx_out_p  = self.tx_out_s[nspui:] - self.tx_out_s[:-nspui] 
     self.tx_H      = tx_H
@@ -303,7 +308,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
     ctle_H          = H / abs(H[0])              # Scale to force d.c. component of '1'.
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
-    ctle_out        = convolve(tx_out, ctle_h)[:len(tx_out)]
+    ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
     ctle_out       -= mean(ctle_out)             # Force zero mean.
     if(self.use_agc):                            # Automatic gain control engaged?
         ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
@@ -396,7 +401,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         pass
     # - Tx output
     try:
-        actual_xings = find_crossings(t, tx_out, decision_scaler, mod_type = mod_type)
+        actual_xings = find_crossings(t, rx_in , decision_scaler, mod_type = mod_type)
         (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
             thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
             hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
