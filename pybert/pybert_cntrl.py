@@ -111,6 +111,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status = 'Running channel...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Pull class variables into local storage, performing unit conversion where necessary.
+    t               = self.t
+    t_ns            = self.t_ns
+    f               = self.f
+    w               = self.w
+    bits            = self.bits
+    symbols         = self.symbols
     nbits           = self.nbits
     eye_bits        = self.eye_bits
     nspb            = self.nspb
@@ -152,29 +158,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     rel_thresh      = self.thresh
     mod_type        = self.mod_type[0]
 
-    # Calculate system time vector.
-    t0   = ui / nspb
-    npts = nbits * nspb
-    t    = [i * t0 for i in range(npts)]
-    t_ns = 1.e9 * array(t)
-    
-    # Calculate the frequency vector appropriate for indexing non-shifted FFT output.
-    # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
-    f0        = 1. / (t[1] * npts)
-    half_npts = npts // 2
-    f         = array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
-    w         = 2 * pi * f
-    self.w    = w
-    
     # Calculate misc. values.
     eye_offset = nspb / 2
     fs         = nspb / ui
     Ts         = 1. / fs
 
-    self.t_ns = t_ns
-    self.t    = t
-    self.f    = f
-    self.w    = w
     self.Ts   = Ts
 
     # Correct unit interval for PAM-4 modulation, if necessary.
@@ -189,33 +177,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         nspui   *= 2
     self.nspui = nspui
 
-    # Generate the symbol stream.
-    bits = resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
-    if  (mod_type == 0):                         # NRZ
-        symbols = 2 * bits - 1
-    elif(mod_type == 1):                         # Duo-binary
-        symbols = [bits[0]]
-        for bit in bits[1:]:                       # XOR pre-coding prevents infinite error propagation.
-            symbols.append(bit ^ symbols[-1])
-        symbols = 2 * array(symbols) - 1
-    elif(mod_type == 2):                        # PAM-4
-        symbols = []
-        for bits in zip(bits[0::2], bits[1::2]):
-            if(bits == [0,0]):
-                symbols.append(-1.)
-            elif(bits == [0,1]):
-                symbols.append(-1./3.)
-            elif(bits == [1,0]):
-                symbols.append(1.)
-            else:
-                symbols.append(1./3.)
-        symbols = repeat(array(symbols), 2)
-    else:
-        raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
-
     # Generate the ideal over-sampled signal.
-    symbols          *= Vod
-    x                 = repeat(symbols, nspb)
+    x = repeat(symbols, nspb)
 
     # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
     ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
@@ -224,8 +187,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.ideal_xings  = ideal_xings
 
     # Generate the ideal impulse responses.
-    chnl_h   = self.chnl_h
-    ideal_h  = sinc((array(t) - t[-1] / 2.) / ui)
+    chnl_h  = self.calc_chnl_h()
+    ideal_h = sinc((array(t) - t[-1] / 2.) / ui)
     if(mod_type == 1):       # Duo-binary
         ideal_h = ideal_h[nspui:] + ideal_h[:-nspui]
     self.ideal_h = ideal_h
@@ -447,6 +410,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         pass
 
     self.jitter_perf = nbits * nspb / (time.clock() - split_time)
+    self.total_perf  = nbits * nspb / (time.clock() - start_time)
     split_time       = time.clock()
     self.status      = 'Updating plots...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
@@ -466,16 +430,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             update_eyes(self)
 
     self.plotting_perf = nbits * nspb / (time.clock() - split_time)
-    self.total_perf    = nbits * nspb / (time.clock() - start_time)
     self.status = 'Ready.'
-
-#    self.pretap_tune    = pretap
-#    self.posttap_tune   = posttap
-#    self.posttap2_tune  = posttap2
-#    self.posttap3_tune  = posttap3
-#    self.rx_bw_tune     = rx_bw
-#    self.peak_freq_tune = peak_freq
-#    self.peak_mag_tune  = peak_mag
 
 # Plot updating
 def update_results(self):

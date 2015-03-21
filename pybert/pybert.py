@@ -211,47 +211,30 @@ class PyBERT(HasTraits):
     # - About
     ident  = String('PyBERT v1.5 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    March 15, 2015\n\n \
+    March 22, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
     instructions = Property()
-
-    # Changed counter dummies.
-    # (Used, in lieu of their counterparts, as dependencies, so as not
-    #  to slow down the GUI unnecessarily. See the note in the
-    #  "Dependent variables" section, below.)
-    chnl_h_changed_count = Int(0)
 
     # Dependent variables
     # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
     #
     # - Note: Don't make properties, which have a high calculation overhead, dependencies of other properties!
     #         This will slow the GUI down noticeably.
-    #         Instead, use dummy, changed counters, as above.
-    #         Don't forget to define "_{property_name}_changed" functions, below, in which you bump the counts.
-    #         See "_chnl_h_changed()", below, as an example.
-    jitter_info     = Property()
-    perf_info       = Property()
-    status_str      = Property()
-    sweep_info      = Property()
+    jitter_info     = Property(HTML,    depends_on=['jitter_perf'])
+    perf_info       = Property(HTML,    depends_on=['total_perf'])
+    status_str      = Property(String,  depends_on=['status'])
+    sweep_info      = Property(HTML,    depends_on=['sweep_results'])
     tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune'])
     ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune'])
-    #ctle_out_h_tune = Property(Array,   depends_on=['chnl_h_changed_count', 'tx_h_tune', 'ctle_h_tune'])
     ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune'])
-    # - Handled by pybert_cntrl.py, upon user button clicks. (May contain "large overhead" variables.)
-    #   - These are dependencies. So, they must be Array()s.
-    #   - These are not.
-    # Note: Everything has been moved to pybert_cntrl.py.
-    #       I was beginning to suspect flaky initialization behavior,
-    #       due to the way in which I was splitting up the initialization.
-    #       Also, this guarantees no GUI freeze-up.
-    # This is an experiment at bringing channel impulse definition back.
-    chnl_h          = Property(Array, depends_on=['use_ch_file', 'ch_file', 'Rdc', 'w0', 'R0', 'Theta0', 'Z0', 'v0', 'l_ch'])
-    chnl_h2         = Property(Array, depends_on=['l_ch'])
-#    t_ns_chnl       = Property(Array, depends_on=['t_ns', 'chnl_h'])
-#    chnl_h          = Property(Array)
-#    t_ns_chnl       = Property(Array)
+    t               = Property(Array,   depends_on=['ui', 'nspb', 'nbits'])
+    t_ns            = Property(Array,   depends_on=['t'])
+    f               = Property(Array,   depends_on=['t'])
+    w               = Property(Array,   depends_on=['f'])
+    bits            = Property(Array,   depends_on=['pattern_len', 'nbits'])
+    symbols         = Property(Array,   depends_on=['bits', 'mod_type', 'vod'])
 
     # Default initialization
     def __init__(self):
@@ -275,149 +258,98 @@ class PyBERT(HasTraits):
 
     # Dependent variable definitions
     @cached_property
-    def _get_chnl_h(self):
+    def _get_t(self):
         """
-        Calculates the channel impulse response.
-
-        Also sets, in 'self':
-         - chnl_dly     group delay of channel
-         - start_ix     first element of trimmed response
-         - t_ns_chnl    the x-values, in ns, for plotting 'chnl_h'
-         - chnl_H       channel frequency response
-         - chnl_s       channel step response
-         - chnl_p       channel pulse response
+        Calculate the system time vector, in seconds.
 
         """
 
-        print "Just entered _get_chnl_h()."
+        ui    = self.ui * 1.e-12
+        nspb  = self.nspb
+        nbits = self.nbits
 
-        if(False):
-            if(self.chnl_h_changed_count):
-                raise Exception("_get_chnl_h(): Stopping for debug.")
+        t0   = ui / nspb
+        npts = nbits * nspb
 
-        t                    = self.t
-        nspui                = self.nspui
+        return array([i * t0 for i in range(npts)])
+    
+    @cached_property
+    def _get_t_ns(self):
+        """
+        Calculate the system time vector, in ns.
+        """
 
-        if(self.use_ch_file):
-            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
-            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
-            chnl_h.resize(len(t))
-            chnl_H           = fft(chnl_h)
-            chnl_H          /= abs(chnl_H[0])
-            chnl_h, start_ix = trim_impulse(chnl_h)
-        else:
-            l_ch             = self.l_ch
-            v0               = self.v0 * 3.e8
-            R0               = self.R0
-            w0               = self.w0
-            Rdc              = self.Rdc
-            Z0               = self.Z0
-            Theta0           = self.Theta0
-            w                = self.w
-            Rs               = self.rs
-            Cs               = self.cout * 1.e-12
-            RL               = self.rin
-            Cp               = self.cin * 1.e-12
-            CL               = self.cac * 1.e-6
-            Ts               = self.Ts
+        return self.t * 1.e9
+    
+    @cached_property
+    def _get_f(self):
+        """
+        Calculate the frequency vector appropriate for indexing non-shifted FFT output, in Hz.
+        # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
+        """
 
-            chnl_dly         = l_ch / v0
-            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-            H                = exp(-l_ch * gamma)
-            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-            chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
+        t = self.t
 
-        chnl_h   /= sum(chnl_h)
-        chnl_s    = chnl_h.cumsum()
-        chnl_p    = chnl_s[nspui:] - chnl_s[:-nspui] 
+        npts      = len(t)
+        f0        = 1. / (t[1] * npts)
+        half_npts = npts // 2
 
-        self.chnl_dly        = chnl_dly
-        self.chnl_H          = chnl_H
-        self.start_ix        = start_ix
-        self.t_ns_chnl       = array(t[start_ix : start_ix + len(chnl_h)]) * 1.e9
-        self.chnl_s          = chnl_s
-        self.chnl_p          = chnl_p
-
-#        self.chnl_h_changed_count += 1
-
-        return chnl_h
+        return array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
 
     @cached_property
-    def _get_chnl_h2(self):
+    def _get_w(self):
         """
-        Calculates the channel impulse response.
-
-        Also sets, in 'self':
-         - chnl_dly     group delay of channel
-         - start_ix     first element of trimmed response
-         - t_ns_chnl    the x-values, in ns, for plotting 'chnl_h'
-         - chnl_H       channel frequency response
-         - chnl_s       channel step response
-         - chnl_p       channel pulse response
-
+        Calculate the frequency vector appropriate for indexing non-shifted FFT output, in rads./sec.
         """
 
-        print "Just entered _get_chnl_h2()."
+        return 2 * pi * self.f
+    
+    @cached_property
+    def _get_bits(self):
+        """
+        Generate the bit stream.
+        """
+        
+        pattern_len     = self.pattern_len
+        nbits           = self.nbits
 
-        if(False):
-            if(self.chnl_h_changed_count):
-                raise Exception("_get_chnl_h(): Stopping for debug.")
+        return resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
 
-        t                    = self.t
-        nspui                = self.nspui
+    @cached_property
+    def _get_symbols(self):
+        """
+        Generate the symbol stream.
+        """
+        
+        mod_type        = self.mod_type[0]
+        vod             = self.vod
+        bits            = self.bits
 
-        if(self.use_ch_file):
-            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
-            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
-            chnl_h.resize(len(t))
-            chnl_H           = fft(chnl_h)
-            chnl_H          /= abs(chnl_H[0])
-            chnl_h, start_ix = trim_impulse(chnl_h)
+        if  (mod_type == 0):                         # NRZ
+            symbols = 2 * bits - 1
+        elif(mod_type == 1):                         # Duo-binary
+            symbols = [bits[0]]
+            for bit in bits[1:]:                       # XOR pre-coding prevents infinite error propagation.
+                symbols.append(bit ^ symbols[-1])
+            symbols = 2 * array(symbols) - 1
+        elif(mod_type == 2):                        # PAM-4
+            symbols = []
+            for bits in zip(bits[0::2], bits[1::2]):
+                if(bits == [0,0]):
+                    symbols.append(-1.)
+                elif(bits == [0,1]):
+                    symbols.append(-1./3.)
+                elif(bits == [1,0]):
+                    symbols.append(1.)
+                else:
+                    symbols.append(1./3.)
+            symbols = repeat(array(symbols), 2)
         else:
-            l_ch             = self.l_ch
-            v0               = self.v0 * 3.e8
-            R0               = self.R0
-            w0               = self.w0
-            Rdc              = self.Rdc
-            Z0               = self.Z0
-            Theta0           = self.Theta0
-            w                = self.w
-            Rs               = self.rs
-            Cs               = self.cout * 1.e-12
-            RL               = self.rin
-            Cp               = self.cin * 1.e-12
-            CL               = self.cac * 1.e-6
-            Ts               = self.Ts
+            raise Exception("ERROR: _get_symbols(): Unknown modulation type requested!")
 
-            chnl_dly         = l_ch / v0
-            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-            H                = exp(-l_ch * gamma)
-            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-            chnl_h, start_ix = trim_impulse(real(ifft(chnl_H)), Ts, chnl_dly)
+        return symbols * vod
 
-        chnl_h   /= sum(chnl_h)
-        chnl_s    = chnl_h.cumsum()
-        chnl_p    = chnl_s[nspui:] - chnl_s[:-nspui] 
-
-#        self.chnl_dly        = chnl_dly
-#        self.chnl_H          = chnl_H
-#        self.start_ix        = start_ix
-#        self.t_ns_chnl       = array(t[start_ix : start_ix + len(chnl_h)]) * 1.e9
-#        self.chnl_s          = chnl_s
-#        self.chnl_p          = chnl_p
-
-#        self.chnl_h_changed_count += 1
-
-        return chnl_h
-
-#    @cached_property
-#    def _get_t_ns_chnl(self):
-#        start_ix  = self.start_ix
-#        t_ns      = self.t_ns
-#        chnl_h    = self.chnl_h
-#
-#        return t_ns[start_ix : start_ix + len(chnl_h)]
-
+    @cached_property
     def _get_jitter_info(self):
         print "Just entered _get_jitter_info()."
 
@@ -584,6 +516,7 @@ class PyBERT(HasTraits):
 
         return info_str
     
+    @cached_property
     def _get_perf_info(self):
         print "Just entered _get_perf_info()."
 
@@ -617,6 +550,7 @@ class PyBERT(HasTraits):
 
         return info_str
 
+    @cached_property
     def _get_sweep_info(self):
         print "Just entered _get_sweep_info()."
 
@@ -637,6 +571,7 @@ class PyBERT(HasTraits):
 
         return info_str
 
+    @cached_property
     def _get_status_str(self):
         print "Just entered _get_status_str()."
 
@@ -647,6 +582,7 @@ class PyBERT(HasTraits):
         err_str  = "         | Bit errors detected: %d" % self.bit_errs
         return perf_str + dly_str + jit_str + err_str
 
+    @cached_property
     def _get_instructions(self):
         print "Just entered _get_instructions()."
 
@@ -710,26 +646,76 @@ class PyBERT(HasTraits):
         return ctle_out_h
 
     # Changed property handlers.
-#    def _chnl_h_changed(self):
-#        print "Just entered _get_chnl_h_changed()."
-#
-#        self.chnl_h_changed_count += 1
-
     def _ctle_out_h_tune_changed(self):
         print "Just entered _get_ctle_out_h_tune_changed()."
 
         self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
         self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
-    dummy_view = View(
-                   Group(
-                     Item('l_ch'),
-                     Item('plots_h', editor=ComponentEditor(), show_label=False,),
-                   ),
-                   buttons = ["OK"],
-                 )
+    # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
+    # in order to more tightly control their times of execution. I wasn't able to get truly lazy evaluation, and
+    # this was causing noticeable GUI slowdown.
+    def calc_chnl_h(self):
+        """
+        Calculates the channel impulse response.
+
+        Also sets, in 'self':
+         - chnl_dly     group delay of channel
+         - start_ix     first element of trimmed response
+         - t_ns_chnl    the x-values, in ns, for plotting 'chnl_h'
+         - chnl_H       channel frequency response
+         - chnl_s       channel step response
+         - chnl_p       channel pulse response
+
+        """
+
+        t                    = self.t
+        nspui                = self.nspui
+
+        if(self.use_ch_file):
+            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
+            chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
+            chnl_h.resize(len(t))
+            chnl_H           = fft(chnl_h)
+            chnl_H          /= abs(chnl_H[0])
+            chnl_h, start_ix = trim_impulse(chnl_h)
+        else:
+            l_ch             = self.l_ch
+            v0               = self.v0 * 3.e8
+            R0               = self.R0
+            w0               = self.w0
+            Rdc              = self.Rdc
+            Z0               = self.Z0
+            Theta0           = self.Theta0
+            w                = self.w
+            Rs               = self.rs
+            Cs               = self.cout * 1.e-12
+            RL               = self.rin
+            Cp               = self.cin * 1.e-12
+            CL               = self.cac * 1.e-6
+            Ts               = self.Ts
+
+            chnl_dly         = l_ch / v0
+            gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+            H                = exp(-l_ch * gamma)
+            chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
+            chnl_h           = real(ifft(chnl_H)) * sqrt(len(chnl_H))    # Correcting for '1/N' scaling in ifft().
+            chnl_h, start_ix = trim_impulse(chnl_h, Ts, chnl_dly)
+
+        chnl_h   /= sum(chnl_h)                                          # a temporary crutch.
+        chnl_s    = chnl_h.cumsum()
+        chnl_p    = chnl_s[nspui:] - chnl_s[:-nspui] 
+
+        self.chnl_h          = chnl_h
+        self.chnl_dly        = chnl_dly
+        self.chnl_H          = chnl_H
+        self.start_ix        = start_ix
+        self.t_ns_chnl       = array(t[start_ix : start_ix + len(chnl_h)]) * 1.e9
+        self.chnl_s          = chnl_s
+        self.chnl_p          = chnl_p
+
+        return chnl_h
 
 if __name__ == '__main__':
-    PyBERT().configure_traits()
-#    PyBERT().configure_traits(view=traits_view)
+    PyBERT().configure_traits(view = traits_view)
 
