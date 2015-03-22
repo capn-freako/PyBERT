@@ -315,9 +315,9 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
         print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
         print "nbits:", nbits, "pattern_len:", pattern_len
         raise
-    assert len(filter(lambda x: x == None, tie_risings)) == 0, "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
+    assert all(tie_risings),  "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
                                            (num_patterns, risings_per_pattern, len(jitter))
-    assert len(filter(lambda x: x == None, tie_fallings)) == 0, "num_patterns: %d, fallings_per_pattern: %d, len(jitter): %d" % \
+    assert all(tie_fallings), "num_patterns: %d, fallings_per_pattern: %d, len(jitter): %d" % \
                                            (num_patterns, fallings_per_pattern, len(jitter))
 
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
