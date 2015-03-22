@@ -117,6 +117,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     w               = self.w
     bits            = self.bits
     symbols         = self.symbols
+    ffe             = self.ffe
     nbits           = self.nbits
     eye_bits        = self.eye_bits
     nspb            = self.nspb
@@ -204,9 +205,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     # - Generate the ideal, post-preemphasis signal.
     # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
-    main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
-    ffe    = [pretap, main_tap, posttap, posttap2, posttap3]                    # FIR filter numerator, for fs = fbit.
     ffe_out= convolve(symbols, ffe)[:len(symbols)]
+
+    # Report the average power dissipated in the Tx.
+    print "Relative average Tx power dissipation:", mean(ffe_out ** 2)
+
     tx_out = repeat(ffe_out, nspui)                                             # oversampled output
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
@@ -235,11 +238,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     temp       = tx_out_h.copy()
     temp.resize(len(w))
     tx_out_H   = fft(temp)
-    tx_out     = convolve(tx_out, chnl_h)[:len(tx_out)]
+    rx_in      = convolve(tx_out, chnl_h)[:len(tx_out)]
     # - Add the random noise to the Rx input.
-    tx_out    += normal(scale=rn, size=(len(tx_out),))
+    rx_in     += normal(scale=rn, size=(len(tx_out),))
     self.tx_s      = tx_h.cumsum()
     self.tx_out    = tx_out
+    self.rx_in     = rx_in
     self.tx_out_s  = tx_out_h.cumsum()
     self.tx_out_p  = self.tx_out_s[nspui:] - self.tx_out_s[:-nspui] 
     self.tx_H      = tx_H
@@ -256,7 +260,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
     ctle_H          = H / abs(H[0])              # Scale to force d.c. component of '1'.
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
-    ctle_out        = convolve(tx_out, ctle_h)[:len(tx_out)]
+    ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
     ctle_out       -= mean(ctle_out)             # Force zero mean.
     if(self.use_agc):                            # Automatic gain control engaged?
         ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
@@ -349,7 +353,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         pass
     # - Tx output
     try:
-        actual_xings = find_crossings(t, tx_out, decision_scaler, mod_type = mod_type)
+        actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type = mod_type)
         (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
             thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
             hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -508,7 +512,7 @@ def update_results(self):
     # Outputs
     self.plotdata.set_data("ideal_signal",   self.ideal_signal)
     self.plotdata.set_data("chnl_out",   self.chnl_out)
-    self.plotdata.set_data("tx_out",     self.tx_out)
+    self.plotdata.set_data("tx_out",     self.rx_in)
     self.plotdata.set_data("ctle_out",   self.ctle_out)
     self.plotdata.set_data("dfe_out",    self.dfe_out)
     self.plotdata.set_data("auto_corr",  self.auto_corr)
@@ -588,8 +592,8 @@ def update_results(self):
     height   = 100
     y_max    = 1.1 * max(abs(array(self.chnl_out)))
     eye_chnl = calc_eye(ui, samps_per_bit, height, self.chnl_out[conv_dly_ix:], y_max)
-    y_max    = 1.1 * max(abs(array(self.tx_out)))
-    eye_tx   = calc_eye(ui, samps_per_bit, height, self.tx_out[conv_dly_ix:],   y_max)
+    y_max    = 1.1 * max(abs(array(self.rx_in)))
+    eye_tx   = calc_eye(ui, samps_per_bit, height, self.rx_in[conv_dly_ix:],   y_max)
     y_max    = 1.1 * max(abs(array(self.ctle_out)))
     eye_ctle = calc_eye(ui, samps_per_bit, height, self.ctle_out[conv_dly_ix:], y_max)
     i = 0
@@ -630,7 +634,7 @@ def update_eyes(self):
     self.plots_eye.components[0].y_axis.mapper.range.high = ys[-1]
     self.plots_eye.components[0].invalidate_draw()
 
-    y_max    = 1.1 * max(abs(array(self.tx_out)))
+    y_max    = 1.1 * max(abs(array(self.rx_in)))
     ys       = linspace(-y_max, y_max, height)
     self.plots_eye.components[1].components[0].index.set_data(xs, ys)
     self.plots_eye.components[1].x_axis.mapper.range.low = xs[0]

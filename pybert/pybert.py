@@ -235,9 +235,10 @@ class PyBERT(HasTraits):
     w               = Property(Array,   depends_on=['f'])
     bits            = Property(Array,   depends_on=['pattern_len', 'nbits'])
     symbols         = Property(Array,   depends_on=['bits', 'mod_type', 'vod'])
+    ffe             = Property(Array,   depends_on=['pretap', 'posttap', 'posttap2', 'posttap3'])
 
     # Default initialization
-    def __init__(self):
+    def __init__(self, run_simulation = True):
         """
         Initial plot setup occurs here.
 
@@ -250,11 +251,12 @@ class PyBERT(HasTraits):
         # to get all the Traits/UI machinery setup correctly.
         super(PyBERT, self).__init__()
 
-        # Running the simulation will fill in the required data structure.
-        my_run_simulation(self, initial_run=True)
+        if(run_simulation):
+            # Running the simulation will fill in the required data structure.
+            my_run_simulation(self, initial_run=True)
 
-        # Once the required data structure is filled in, we can create the plots.
-        make_plots(self, n_dfe_taps = gNtaps)
+            # Once the required data structure is filled in, we can create the plots.
+            make_plots(self, n_dfe_taps = gNtaps)
 
     # Dependent variable definitions
     @cached_property
@@ -331,7 +333,7 @@ class PyBERT(HasTraits):
             symbols = [bits[0]]
             for bit in bits[1:]:                       # XOR pre-coding prevents infinite error propagation.
                 symbols.append(bit ^ symbols[-1])
-            symbols = 2 * array(symbols) - 1
+            symbols = array(symbols) - 0.5
         elif(mod_type == 2):                        # PAM-4
             symbols = []
             for bits in zip(bits[0::2], bits[1::2]):
@@ -350,8 +352,22 @@ class PyBERT(HasTraits):
         return symbols * vod
 
     @cached_property
+    def _get_ffe(self):
+        """
+        Generate the Tx pre-emphasis FIR numerator.
+        """
+        
+        pretap   = self.pretap
+        posttap  = self.posttap
+        posttap2 = self.posttap2
+        posttap3 = self.posttap3
+
+        main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
+
+        return [pretap, main_tap, posttap, posttap2, posttap3]
+
+    @cached_property
     def _get_jitter_info(self):
-        print "Just entered _get_jitter_info()."
 
         isi_chnl      = self.isi_chnl * 1.e12
         dcd_chnl      = self.dcd_chnl * 1.e12
@@ -518,7 +534,6 @@ class PyBERT(HasTraits):
     
     @cached_property
     def _get_perf_info(self):
-        print "Just entered _get_perf_info()."
 
         info_str  = '<H2>Performance by Component</H2>\n'
         info_str += '  <TABLE border="1">\n'
@@ -552,7 +567,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_sweep_info(self):
-        print "Just entered _get_sweep_info()."
 
         sweep_results = self.sweep_results
 
@@ -573,7 +587,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        print "Just entered _get_status_str()."
 
         perf_str = "%-20s | Perf. (Msmpls/min.):    %4.1f" % (self.status, self.total_perf * 60.e-6)
         jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
@@ -584,7 +597,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_instructions(self):
-        print "Just entered _get_instructions()."
 
         help_str  = "<H2>PyBERT User's Guide</H2>\n"
         help_str += "  <H3>Note to developers</H3>\n"
@@ -600,7 +612,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_tx_h_tune(self):
-        print "Just entered _get_tx_h_tune()."
 
         nspui     = self.nspui
         pretap    = self.pretap_tune
@@ -615,7 +626,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ctle_h_tune(self):
-        print "Just entered _get_ctle_h_tune()."
 
         w         = self.w
         chnl_h    = self.chnl_h
@@ -630,7 +640,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ctle_out_h_tune(self):
-        print "Just entered _get_ctle_out_h_tune()."
 
         ideal_h   = self.ideal_h
         chnl_h    = self.chnl_h
@@ -647,7 +656,6 @@ class PyBERT(HasTraits):
 
     # Changed property handlers.
     def _ctle_out_h_tune_changed(self):
-        print "Just entered _get_ctle_out_h_tune_changed()."
 
         self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
         self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
