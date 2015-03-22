@@ -205,12 +205,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     # - Generate the ideal, post-preemphasis signal.
     # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
-    ffe_out= convolve(symbols, ffe)[:len(symbols)]
+    ffe_out           = convolve(symbols, ffe)[:len(symbols)]
+    self.rel_power    = mean(ffe_out ** 2)                    # Store the relative average power dissipated in the Tx.
+    tx_out            = repeat(ffe_out, nspui)                # oversampled output
+    self.ideal_signal = tx_out
 
-    # Report the average power dissipated in the Tx.
-    print "Relative average Tx power dissipation:", mean(ffe_out ** 2)
-
-    tx_out = repeat(ffe_out, nspui)                                             # oversampled output
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
     #    This is partly due to the out of order nature in which we combine the Tx and channel,
@@ -241,6 +240,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     rx_in      = convolve(tx_out, chnl_h)[:len(tx_out)]
     # - Add the random noise to the Rx input.
     rx_in     += normal(scale=rn, size=(len(tx_out),))
+
     self.tx_s      = tx_h.cumsum()
     self.tx_out    = tx_out
     self.rx_in     = rx_in
