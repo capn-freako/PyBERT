@@ -119,8 +119,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     symbols         = self.symbols
     ffe             = self.ffe
     nbits           = self.nbits
+    nui             = self.nui
+    bit_rate        = self.bit_rate * 1.e9
     eye_bits        = self.eye_bits
     nspb            = self.nspb
+    nspui           = self.nspui
     rn              = self.rn
     pn_mag          = self.pn_mag
     pn_freq         = self.pn_freq * 1.e6
@@ -147,7 +150,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     peak_mag        = self.peak_mag
     delta_t         = self.delta_t * 1.e-12
     alpha           = self.alpha
-    ui              = self.ui * 1.e-12
+    ui              = self.ui
     n_taps          = self.n_taps
     gain            = self.gain
     n_ave           = self.n_ave
@@ -158,28 +161,18 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     bandwidth       = self.sum_bw * 1.e9
     rel_thresh      = self.thresh
     mod_type        = self.mod_type[0]
+    ideal_h         = self.ideal_h
+
+    # Correct pattern length, if using PAM-4.
+    if(mod_type == 2):
+        pattern_len = pattern_len // 2
 
     # Calculate misc. values.
-    eye_offset = nspb / 2
-    fs         = nspb / ui
-    Ts         = 1. / fs
-
-    self.Ts   = Ts
-
-    # Correct unit interval for PAM-4 modulation, if necessary.
-    nui      = nbits
-    eye_uis  = eye_bits
-    nspui    = nspb
-    mod_type = self.mod_type[0]
-    if(mod_type == 2):                           # PAM-4 uses 2 UI per transmitted symbol.
-        ui      *= 2.
-        nui     /= 2
-        eye_uis /= 2
-        nspui   *= 2
-    self.nspui = nspui
+    fs         = bit_rate * nspb
+    Ts         = t[1]
 
     # Generate the ideal over-sampled signal.
-    x = repeat(symbols, nspb)
+    x = repeat(symbols, nspui)
 
     # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
     ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
@@ -188,11 +181,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.ideal_xings  = ideal_xings
 
     # Generate the ideal impulse responses.
-    chnl_h  = self.calc_chnl_h()
-    ideal_h = sinc((array(t) - t[-1] / 2.) / ui)
-    if(mod_type == 1):       # Duo-binary
-        ideal_h = ideal_h[nspui:] + ideal_h[:-nspui]
-    self.ideal_h = ideal_h
+    chnl_h       = self.calc_chnl_h()
     self.chnl_g  = trim_shift_scale(ideal_h, chnl_h)
 
     # Calculate the channel output.
@@ -367,7 +356,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.jitter_spectrum_tx     = jitter_spectrum
         self.jitter_ind_spectrum_tx = jitter_ind_spectrum
     except:
-        pass
+        self.thresh_tx              = array([])
+        self.jitter_ext_tx          = array([])
+        self.jitter_tx              = array([])
+        self.jitter_spectrum_tx     = array([])
+        self.jitter_ind_spectrum_tx = array([])
     # - CTLE output
     try:
         actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type = mod_type)
@@ -384,7 +377,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.jitter_spectrum_ctle     = jitter_spectrum
         self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
     except:
-        pass
+        self.thresh_ctle              = array([])
+        self.jitter_ext_ctle          = array([])
+        self.jitter_ctle              = array([])
+        self.jitter_spectrum_ctle     = array([])
+        self.jitter_ind_spectrum_ctle = array([])
     # - DFE output
     try:
         ignore_until  = (nui - eye_uis) * ui + ui / 2.
@@ -411,7 +408,13 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         window_width                 = len(dfe_spec) / 10
         self.jitter_rejection_ratio  = zeros(len(dfe_spec))
     except:
-        pass
+        self.thresh_dfe              = array([])
+        self.jitter_ext_dfe          = array([])
+        self.jitter_dfe              = array([])
+        self.jitter_spectrum_dfe     = array([])
+        self.jitter_ind_spectrum_dfe = array([])
+        self.f_MHz_dfe               = array([])
+        self.jitter_rejection_ratio  = array([])
 
     self.jitter_perf = nbits * nspb / (time.clock() - split_time)
     self.total_perf  = nbits * nspb / (time.clock() - start_time)
@@ -441,29 +444,24 @@ def update_results(self):
     """Updates all plot data used by GUI."""
 
     # Copy globals into local namespace.
-    ui            = self.ui * 1.e-12
-    samps_per_bit = self.nspb
-    eye_bits      = self.eye_bits
-    num_bits      = self.nbits
+    ui            = self.ui
+    samps_per_ui  = self.nspui
+    eye_uis       = self.eye_uis
+    num_ui        = self.nui
     clock_times   = self.clock_times
     f             = self.f
     t_ns          = self.t_ns
     t_ns_chnl     = self.t_ns_chnl
-    mod_type      = self.mod_type[0]
     conv_dly_ix   = self.conv_dly_ix
 
-    # Correct for PAM-4, if necessary.
-    ignore_until  = (num_bits - eye_bits) * ui
-    if(mod_type == 2):
-        ui            *= 2.
-        samps_per_bit *= 2.
+    ignore_until  = (num_ui - eye_uis) * ui
 
     # Misc.
     f_GHz         = f[:len(f) // 2] / 1.e9
     len_f_GHz     = len(f_GHz)
     self.plotdata.set_data("f_GHz",     f_GHz[1:])
-    self.plotdata.set_data("t_ns",      self.t_ns)
-    self.plotdata.set_data("t_ns_chnl", self.t_ns_chnl)
+    self.plotdata.set_data("t_ns",      t_ns)
+    self.plotdata.set_data("t_ns_chnl", t_ns_chnl)
 
     # DFE.
     tap_weights = transpose(array(self.adaptation))
@@ -587,21 +585,21 @@ def update_results(self):
     self.plotdata.set_data("bathtub_dfe", log10(bathtub_dfe))
 
     # Eyes
-    width    = 2 * samps_per_bit
+    width    = 2 * samps_per_ui
     xs       = linspace(-ui * 1.e12, ui * 1.e12, width)
     height   = 100
     y_max    = 1.1 * max(abs(array(self.chnl_out)))
-    eye_chnl = calc_eye(ui, samps_per_bit, height, self.chnl_out[conv_dly_ix:], y_max)
+    eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[conv_dly_ix:], y_max)
     y_max    = 1.1 * max(abs(array(self.rx_in)))
-    eye_tx   = calc_eye(ui, samps_per_bit, height, self.rx_in[conv_dly_ix:],   y_max)
+    eye_tx   = calc_eye(ui, samps_per_ui, height, self.rx_in[conv_dly_ix:],   y_max)
     y_max    = 1.1 * max(abs(array(self.ctle_out)))
-    eye_ctle = calc_eye(ui, samps_per_bit, height, self.ctle_out[conv_dly_ix:], y_max)
+    eye_ctle = calc_eye(ui, samps_per_ui, height, self.ctle_out[conv_dly_ix:], y_max)
     i = 0
     while(clock_times[i] <= ignore_until):
         i += 1
         assert i < len(clock_times), "ERROR: Insufficient coverage in 'clock_times' vector."
     y_max    = 1.1 * max(abs(array(self.dfe_out)))
-    eye_dfe  = calc_eye(ui, samps_per_bit, height, self.dfe_out, y_max, clock_times[i:])
+    eye_dfe  = calc_eye(ui, samps_per_ui, height, self.dfe_out, y_max, clock_times[i:])
     self.plotdata.set_data("eye_index", xs)
     self.plotdata.set_data("eye_chnl",  eye_chnl)
     self.plotdata.set_data("eye_tx",    eye_tx)
@@ -611,17 +609,10 @@ def update_results(self):
 def update_eyes(self):
     """ Update the heat plots representing the eye diagrams."""
 
-    ui            = self.ui * 1.e-12
-    samps_per_bit = self.nspb
-    dfe_output    = array(self.dfe_out)
-    mod_type      = self.mod_type[0]
+    ui            = self.ui
+    samps_per_ui  = self.nspui
 
-    # Correct for PAM-4, if necessary.
-    if(mod_type == 2):
-        ui            *= 2.
-        samps_per_bit *= 2.
-
-    width    = 2 * samps_per_bit
+    width    = 2 * samps_per_ui
     height   = 100
     xs       = linspace(-ui * 1.e12, ui * 1.e12, width)
 

@@ -7,7 +7,7 @@ Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major co
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
-from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor
+from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem
 from enable.component_editor import ComponentEditor
 import time
 
@@ -51,7 +51,7 @@ traits_view = View(
             HGroup(
                 HGroup(
                     VGroup(
-                        Item(name='ui',          label='UI (ps)',  tooltip="unit interval", show_label=True, enabled_when='True'),
+                        Item(name='bit_rate',    label='Bit Rate (Gbps)',  tooltip="bit rate", show_label=True, enabled_when='True'),
                         #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
                         Item(name='nbits',       label='Nbits',    tooltip="# of bits to run", ),
                         Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit", ),

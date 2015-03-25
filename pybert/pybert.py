@@ -61,7 +61,7 @@ debug = False
 
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
-gUI             = 100     # (ps)
+gBitRate        = 10      # (Gbps)
 gNbits          = 8000    # number of bits to run
 gPatLen         = 127     # repeating bit pattern length
 gNspb           = 32      # samples per bit
@@ -118,7 +118,7 @@ class PyBERT(HasTraits):
 
     # Independent variables
     # - Simulation Control
-    ui              = Float(gUI)                                            # (ps)
+    bit_rate        = Float(gBitRate)                                       # (Gbps)
     nbits           = Int(gNbits)
     pattern_len     = Int(gPatLen)
     nspb            = Int(gNspb)
@@ -208,6 +208,9 @@ class PyBERT(HasTraits):
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
     sweep_results   = List([])
+    len_h           = Int(0)
+    chnl_dly        = Float(0.)
+    bit_errs        = Int(0)
     # - About
     ident  = String('PyBERT v1.5 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
@@ -226,9 +229,9 @@ class PyBERT(HasTraits):
     perf_info       = Property(HTML,    depends_on=['total_perf'])
     status_str      = Property(String,  depends_on=['status'])
     sweep_info      = Property(HTML,    depends_on=['sweep_results'])
-    tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune'])
-    ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune'])
-    ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune'])
+    tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune', 'nspui'])
+    ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune', 'w', 'len_h'])
+    ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune', 'ideal_h', 'chnl_h'])
     t               = Property(Array,   depends_on=['ui', 'nspb', 'nbits'])
     t_ns            = Property(Array,   depends_on=['t'])
     f               = Property(Array,   depends_on=['t'])
@@ -236,6 +239,11 @@ class PyBERT(HasTraits):
     bits            = Property(Array,   depends_on=['pattern_len', 'nbits'])
     symbols         = Property(Array,   depends_on=['bits', 'mod_type', 'vod'])
     ffe             = Property(Array,   depends_on=['pretap', 'posttap', 'posttap2', 'posttap3'])
+    ui              = Property(Float,   depends_on=['bit_rate', 'mod_type'])
+    ideal_h         = Property(Array,   depends_on=['ui', 'nspui', 't', 'mod_type'])
+    nui             = Property(Int,     depends_on=['nbits', 'mod_type'])
+    nspui           = Property(Int,     depends_on=['nspb', 'mod_type'])
+    eye_uis         = Property(Int,     depends_on=['eye_bits', 'mod_type'])
 
     # Default initialization
     def __init__(self, run_simulation = True):
@@ -266,12 +274,12 @@ class PyBERT(HasTraits):
 
         """
 
-        ui    = self.ui * 1.e-12
-        nspb  = self.nspb
-        nbits = self.nbits
+        ui    = self.ui
+        nspui = self.nspui
+        nui   = self.nui
 
-        t0   = ui / nspb
-        npts = nbits * nspb
+        t0   = ui / nspui
+        npts = nui * nspui
 
         return array([i * t0 for i in range(npts)])
     
@@ -318,6 +326,83 @@ class PyBERT(HasTraits):
         return resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
 
     @cached_property
+    def _get_ui(self):
+        """
+        Returns the "unit interval" (i.e. - the nominal time span of each symbol moving through the channel).
+        """
+        
+        mod_type        = self.mod_type[0]
+        bit_rate        = self.bit_rate * 1.e9
+
+        ui = 1. / bit_rate
+        if(mod_type == 2): # PAM-4
+            ui *= 2.
+
+        return ui
+
+    @cached_property
+    def _get_nui(self):
+        """
+        Returns the number of unit intervals in the test vectors.
+        """
+        
+        mod_type        = self.mod_type[0]
+        nbits           = self.nbits
+
+        nui = nbits
+        if(mod_type == 2): # PAM-4
+            nui /= 2
+
+        return nui
+
+    @cached_property
+    def _get_nspui(self):
+        """
+        Returns the number of samples per unit interval.
+        """
+        
+        mod_type        = self.mod_type[0]
+        nspb            = self.nspb
+
+        nspui = nspb
+        if(mod_type == 2): # PAM-4
+            nspui *= 2
+
+        return nspui
+
+    @cached_property
+    def _get_eye_uis(self):
+        """
+        Returns the number of unit intervals to use for eye construction.
+        """
+        
+        mod_type        = self.mod_type[0]
+        eye_bits        = self.eye_bits
+
+        eye_uis = eye_bits
+        if(mod_type == 2): # PAM-4
+            eye_uis /= 2
+
+        return eye_uis
+
+    @cached_property
+    def _get_ideal_h(self):
+        """
+        Returns the ideal link impulse response.
+        """
+        
+        ui              = self.ui
+        nspui           = self.nspui
+        t               = self.t
+        mod_type        = self.mod_type[0]
+
+        ideal_h = sinc((array(t) - t[-1] / 2.) / ui)
+        if(mod_type == 1): # Duo-binary relies upon the total link impulse response to perform the required addition.
+            ideal_h = ideal_h[nspui:] + ideal_h[:-nspui]
+
+        return ideal_h
+
+    @cached_property
     def _get_symbols(self):
         """
         Generate the symbol stream.
@@ -337,19 +422,18 @@ class PyBERT(HasTraits):
         elif(mod_type == 2):                        # PAM-4
             symbols = []
             for bits in zip(bits[0::2], bits[1::2]):
-                if(bits == [0,0]):
+                if(bits == (0,0)):
                     symbols.append(-1.)
-                elif(bits == [0,1]):
+                elif(bits == (0,1)):
                     symbols.append(-1./3.)
-                elif(bits == [1,0]):
+                elif(bits == (1,0)):
                     symbols.append(1.)
                 else:
                     symbols.append(1./3.)
-            symbols = repeat(array(symbols), 2)
         else:
             raise Exception("ERROR: _get_symbols(): Unknown modulation type requested!")
 
-        return symbols * vod
+        return array(symbols) * vod
 
     @cached_property
     def _get_ffe(self):
@@ -369,166 +453,170 @@ class PyBERT(HasTraits):
     @cached_property
     def _get_jitter_info(self):
 
-        isi_chnl      = self.isi_chnl * 1.e12
-        dcd_chnl      = self.dcd_chnl * 1.e12
-        pj_chnl       = self.pj_chnl  * 1.e12
-        rj_chnl       = self.rj_chnl  * 1.e12
-        isi_tx        = self.isi_tx   * 1.e12
-        dcd_tx        = self.dcd_tx   * 1.e12
-        pj_tx         = self.pj_tx    * 1.e12
-        rj_tx         = self.rj_tx    * 1.e12
-        isi_ctle      = self.isi_ctle * 1.e12
-        dcd_ctle      = self.dcd_ctle * 1.e12
-        pj_ctle       = self.pj_ctle  * 1.e12
-        rj_ctle       = self.rj_ctle  * 1.e12
-        isi_dfe       = self.isi_dfe  * 1.e12
-        dcd_dfe       = self.dcd_dfe  * 1.e12
-        pj_dfe        = self.pj_dfe   * 1.e12
-        rj_dfe        = self.rj_dfe   * 1.e12
+        try:
+            isi_chnl      = self.isi_chnl * 1.e12
+            dcd_chnl      = self.dcd_chnl * 1.e12
+            pj_chnl       = self.pj_chnl  * 1.e12
+            rj_chnl       = self.rj_chnl  * 1.e12
+            isi_tx        = self.isi_tx   * 1.e12
+            dcd_tx        = self.dcd_tx   * 1.e12
+            pj_tx         = self.pj_tx    * 1.e12
+            rj_tx         = self.rj_tx    * 1.e12
+            isi_ctle      = self.isi_ctle * 1.e12
+            dcd_ctle      = self.dcd_ctle * 1.e12
+            pj_ctle       = self.pj_ctle  * 1.e12
+            rj_ctle       = self.rj_ctle  * 1.e12
+            isi_dfe       = self.isi_dfe  * 1.e12
+            dcd_dfe       = self.dcd_dfe  * 1.e12
+            pj_dfe        = self.pj_dfe   * 1.e12
+            rj_dfe        = self.rj_dfe   * 1.e12
 
-        isi_rej_tx    = 1.e20
-        dcd_rej_tx    = 1.e20
-        pj_rej_tx     = 1.e20
-        rj_rej_tx     = 1.e20
-        isi_rej_ctle  = 1.e20
-        dcd_rej_ctle  = 1.e20
-        pj_rej_ctle   = 1.e20
-        rj_rej_ctle   = 1.e20
-        isi_rej_dfe   = 1.e20
-        dcd_rej_dfe   = 1.e20
-        pj_rej_dfe    = 1.e20
-        rj_rej_dfe    = 1.e20
-        isi_rej_total = 1.e20
-        dcd_rej_total = 1.e20
-        pj_rej_total  = 1.e20
-        rj_rej_total  = 1.e20
+            isi_rej_tx    = 1.e20
+            dcd_rej_tx    = 1.e20
+            pj_rej_tx     = 1.e20
+            rj_rej_tx     = 1.e20
+            isi_rej_ctle  = 1.e20
+            dcd_rej_ctle  = 1.e20
+            pj_rej_ctle   = 1.e20
+            rj_rej_ctle   = 1.e20
+            isi_rej_dfe   = 1.e20
+            dcd_rej_dfe   = 1.e20
+            pj_rej_dfe    = 1.e20
+            rj_rej_dfe    = 1.e20
+            isi_rej_total = 1.e20
+            dcd_rej_total = 1.e20
+            pj_rej_total  = 1.e20
+            rj_rej_total  = 1.e20
 
-        if(isi_tx):
-            isi_rej_tx = isi_chnl / isi_tx
-        if(dcd_tx):
-            dcd_rej_tx = dcd_chnl / dcd_tx
-        if(pj_tx):
-            pj_rej_tx  = pj_chnl  / pj_tx
-        if(rj_tx):
-            rj_rej_tx  = rj_chnl  / rj_tx
-        if(isi_ctle):
-            isi_rej_ctle = isi_tx / isi_ctle
-        if(dcd_ctle):
-            dcd_rej_ctle = dcd_tx / dcd_ctle
-        if(pj_ctle):
-            pj_rej_ctle  = pj_tx  / pj_ctle
-        if(rj_ctle):
-            rj_rej_ctle  = rj_tx  / rj_ctle
-        if(isi_dfe):
-            isi_rej_dfe = isi_ctle / isi_dfe
-        if(dcd_dfe):
-            dcd_rej_dfe = dcd_ctle / dcd_dfe
-        if(pj_dfe):
-            pj_rej_dfe  = pj_ctle  / pj_dfe
-        if(rj_dfe):
-            rj_rej_dfe  = rj_ctle  / rj_dfe
-        if(isi_dfe):
-            isi_rej_total = isi_chnl / isi_dfe
-        if(dcd_dfe):
-            dcd_rej_total = dcd_chnl / dcd_dfe
-        if(pj_dfe):
-            pj_rej_total  = pj_tx  / pj_dfe
-        if(rj_dfe):
-            rj_rej_total  = rj_tx  / rj_dfe
+            if(isi_tx):
+                isi_rej_tx = isi_chnl / isi_tx
+            if(dcd_tx):
+                dcd_rej_tx = dcd_chnl / dcd_tx
+            if(pj_tx):
+                pj_rej_tx  = pj_chnl  / pj_tx
+            if(rj_tx):
+                rj_rej_tx  = rj_chnl  / rj_tx
+            if(isi_ctle):
+                isi_rej_ctle = isi_tx / isi_ctle
+            if(dcd_ctle):
+                dcd_rej_ctle = dcd_tx / dcd_ctle
+            if(pj_ctle):
+                pj_rej_ctle  = pj_tx  / pj_ctle
+            if(rj_ctle):
+                rj_rej_ctle  = rj_tx  / rj_ctle
+            if(isi_dfe):
+                isi_rej_dfe = isi_ctle / isi_dfe
+            if(dcd_dfe):
+                dcd_rej_dfe = dcd_ctle / dcd_dfe
+            if(pj_dfe):
+                pj_rej_dfe  = pj_ctle  / pj_dfe
+            if(rj_dfe):
+                rj_rej_dfe  = rj_ctle  / rj_dfe
+            if(isi_dfe):
+                isi_rej_total = isi_chnl / isi_dfe
+            if(dcd_dfe):
+                dcd_rej_total = dcd_chnl / dcd_dfe
+            if(pj_dfe):
+                pj_rej_total  = pj_tx  / pj_dfe
+            if(rj_dfe):
+                rj_rej_total  = rj_tx  / rj_dfe
 
-        info_str = '<H1>Jitter Rejection by Equalization Component</H1>\n'
+            info_str = '<H1>Jitter Rejection by Equalization Component</H1>\n'
 
-        info_str += '<H2>Tx Preemphasis</H2>\n'
-        info_str += '<TABLE border="1">\n'
-        info_str += '<TR align="center">\n'
-        info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (isi_chnl, isi_tx, 10. * log10(isi_rej_tx))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (dcd_chnl, dcd_tx, 10. * log10(dcd_rej_tx))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % \
-                      (pj_chnl, pj_tx)
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % \
-                      (rj_chnl, rj_tx)
-        info_str += "</TR>\n"
-        info_str += "</TABLE>\n"
+            info_str += '<H2>Tx Preemphasis</H2>\n'
+            info_str += '<TABLE border="1">\n'
+            info_str += '<TR align="center">\n'
+            info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (isi_chnl, isi_tx, 10. * log10(isi_rej_tx))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (dcd_chnl, dcd_tx, 10. * log10(dcd_rej_tx))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % \
+                        (pj_chnl, pj_tx)
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % \
+                        (rj_chnl, rj_tx)
+            info_str += "</TR>\n"
+            info_str += "</TABLE>\n"
 
-        info_str += '<H2>CTLE</H2>\n'
-        info_str += '<TABLE border="1">\n'
-        info_str += '<TR align="center">\n'
-        info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (isi_tx, isi_ctle, 10. * log10(isi_rej_ctle))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (dcd_tx, dcd_ctle, 10. * log10(dcd_rej_ctle))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (pj_tx, pj_ctle, 10. * log10(pj_rej_ctle))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (rj_tx, rj_ctle, 10. * log10(rj_rej_ctle))
-        info_str += "</TR>\n"
-        info_str += "</TABLE>\n"
+            info_str += '<H2>CTLE</H2>\n'
+            info_str += '<TABLE border="1">\n'
+            info_str += '<TR align="center">\n'
+            info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (isi_tx, isi_ctle, 10. * log10(isi_rej_ctle))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (dcd_tx, dcd_ctle, 10. * log10(dcd_rej_ctle))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (pj_tx, pj_ctle, 10. * log10(pj_rej_ctle))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (rj_tx, rj_ctle, 10. * log10(rj_rej_ctle))
+            info_str += "</TR>\n"
+            info_str += "</TABLE>\n"
 
-        info_str += '<H2>DFE</H2>\n'
-        info_str += '<TABLE border="1">\n'
-        info_str += '<TR align="center">\n'
-        info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (isi_ctle, isi_dfe, 10. * log10(isi_rej_dfe))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (dcd_ctle, dcd_dfe, 10. * log10(dcd_rej_dfe))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (pj_ctle, pj_dfe, 10. * log10(pj_rej_dfe))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (rj_ctle, rj_dfe, 10. * log10(rj_rej_dfe))
-        info_str += "</TR>\n"
-        info_str += "</TABLE>\n"
+            info_str += '<H2>DFE</H2>\n'
+            info_str += '<TABLE border="1">\n'
+            info_str += '<TR align="center">\n'
+            info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (isi_ctle, isi_dfe, 10. * log10(isi_rej_dfe))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (dcd_ctle, dcd_dfe, 10. * log10(dcd_rej_dfe))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (pj_ctle, pj_dfe, 10. * log10(pj_rej_dfe))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (rj_ctle, rj_dfe, 10. * log10(rj_rej_dfe))
+            info_str += "</TR>\n"
+            info_str += "</TABLE>\n"
 
-        info_str += '<H2>TOTAL</H2>\n'
-        info_str += '<TABLE border="1">\n'
-        info_str += '<TR align="center">\n'
-        info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (isi_chnl, isi_dfe, 10. * log10(isi_rej_total))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (dcd_chnl, dcd_dfe, 10. * log10(dcd_rej_total))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (pj_tx, pj_dfe, 10. * log10(pj_rej_total))
-        info_str += "</TR>\n"
-        info_str += '<TR align="right">\n'
-        info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                      (rj_tx, rj_dfe, 10. * log10(rj_rej_total))
-        info_str += "</TR>\n"
-        info_str += "</TABLE>\n"
+            info_str += '<H2>TOTAL</H2>\n'
+            info_str += '<TABLE border="1">\n'
+            info_str += '<TR align="center">\n'
+            info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (isi_chnl, isi_dfe, 10. * log10(isi_rej_total))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (dcd_chnl, dcd_dfe, 10. * log10(dcd_rej_total))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (pj_tx, pj_dfe, 10. * log10(pj_rej_total))
+            info_str += "</TR>\n"
+            info_str += '<TR align="right">\n'
+            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
+                        (rj_tx, rj_dfe, 10. * log10(rj_rej_total))
+            info_str += "</TR>\n"
+            info_str += "</TABLE>\n"
+        except:
+            info_str  = '<H1>Jitter Rejection by Equalization Component</H1>\n'
+            info_str += "Sorry, an error occured.\n"
 
         return info_str
     
@@ -588,12 +676,20 @@ class PyBERT(HasTraits):
     @cached_property
     def _get_status_str(self):
 
-        perf_str = "%-20s | Perf. (Msmpls/min.):    %4.1f" % (self.status, self.total_perf * 60.e-6)
-        jit_str  = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
-                     (self.isi_dfe * 1.e12, self.dcd_dfe * 1.e12, self.pj_dfe * 1.e12, self.rj_dfe * 1.e12)
-        dly_str  = "         | Channel Delay (ns):    %5.3f" % (self.chnl_dly * 1.e9)
-        err_str  = "         | Bit errors detected: %d" % self.bit_errs
-        return perf_str + dly_str + jit_str + err_str
+        status_str  = "%-20s | Perf. (Msmpls/min.):    %4.1f" % (self.status, self.total_perf * 60.e-6)
+        dly_str     = "         | Channel Delay (ns):    %5.3f" % (self.chnl_dly * 1.e9)
+        err_str     = "         | Bit errors detected: %d" % self.bit_errs
+        status_str += dly_str + err_str
+
+        try:
+            jit_str = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
+                        (self.isi_dfe * 1.e12, self.dcd_dfe * 1.e12, self.pj_dfe * 1.e12, self.rj_dfe * 1.e12)
+        except:
+            jit_str = "         | (Jitter not available.)"
+
+        status_str += jit_str
+
+        return status_str
 
     @cached_property
     def _get_instructions(self):
@@ -620,7 +716,7 @@ class PyBERT(HasTraits):
         posttap3  = self.posttap3_tune
 
         main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
-        ffe      = [pretap, main_tap, posttap, posttap2, posttap3]                    # FIR filter numerator, for fs = fbit.
+        ffe      = [pretap, main_tap, posttap, posttap2, posttap3]
 
         return concatenate([[x] + list(zeros(nspui - 1)) for x in ffe])
 
@@ -628,7 +724,7 @@ class PyBERT(HasTraits):
     def _get_ctle_h_tune(self):
 
         w         = self.w
-        chnl_h    = self.chnl_h
+        len_h     = self.len_h
         rx_bw     = self.rx_bw_tune     * 1.e9
         peak_freq = self.peak_freq_tune * 1.e9
         peak_mag  = self.peak_mag_tune
@@ -636,19 +732,19 @@ class PyBERT(HasTraits):
         w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w)
         ctle_H     = H / abs(H[0])              # Scale to force d.c. component of '1'.
 
-        return real(ifft(ctle_H))[:len(chnl_h)]
+        return real(ifft(ctle_H))[:len_h]
 
     @cached_property
     def _get_ctle_out_h_tune(self):
 
         ideal_h   = self.ideal_h
         chnl_h    = self.chnl_h
-        tx_h      = self.tx_h_tune.copy()
+        tx_h      = self.tx_h_tune
         ctle_h    = self.ctle_h_tune
 
-        tx_h.resize(len(chnl_h))
-        tx_out_h   = convolve(tx_h,   chnl_h)  [:len(chnl_h)]
-        ctle_out_h = convolve(ctle_h, tx_out_h)[:len(chnl_h)]
+        len_h      = len(chnl_h)
+        tx_out_h   = convolve(tx_h,   chnl_h)  [:len_h]
+        ctle_out_h = convolve(ctle_h, tx_out_h)[:len_h]
 
         self.ctle_out_g_tune = trim_shift_scale(ideal_h, ctle_out_h)
 
@@ -656,9 +752,11 @@ class PyBERT(HasTraits):
 
     # Changed property handlers.
     def _ctle_out_h_tune_changed(self):
-
         self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
         self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
+
+    def _status_str_changed(self):
+        print self.status_str
 
     # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control their times of execution. I wasn't able to get truly lazy evaluation, and
@@ -701,8 +799,8 @@ class PyBERT(HasTraits):
             RL               = self.rin
             Cp               = self.cin * 1.e-12
             CL               = self.cac * 1.e-6
-            Ts               = self.Ts
 
+            Ts               = t[1]
             chnl_dly         = l_ch / v0
             gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H                = exp(-l_ch * gamma)
@@ -715,6 +813,7 @@ class PyBERT(HasTraits):
         chnl_p    = chnl_s[nspui:] - chnl_s[:-nspui] 
 
         self.chnl_h          = chnl_h
+        self.len_h           = len(chnl_h)
         self.chnl_dly        = chnl_dly
         self.chnl_H          = chnl_H
         self.start_ix        = start_ix

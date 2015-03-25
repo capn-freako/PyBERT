@@ -87,7 +87,11 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
 
     min_time = t[0]
     if(min_delay):
-        assert min_delay < t[-1], "Error: min_delay must be less than final time value."
+        try:
+            assert min_delay < t[-1], "Error: min_delay must be less than final time value."
+        except:
+            print "min_delay:", min_delay, "t[-3:]:", t[-3:]
+            raise
         i = 0
         while(i < len(t) and t[i] < min_delay):
             i += 1
@@ -164,11 +168,11 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
     elif(mod_type == 2):                         # PAM-4
         xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
     else:                                        # Unknown
-        raise Exception("ERROR: my_run_simulation(): Unknown modulation type requested!")
+        raise Exception("ERROR: find_crossings(): Unknown modulation type requested!")
 
     return array(xings)
 
-def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
+def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
     """
     Calculate the jitter in a set of actual zero crossings, given the ideal crossings and unit interval.
 
@@ -176,9 +180,9 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
 
       - ui               : The nominal unit interval.
 
-      - nbits            : The number of unit intervals spanned by the input signal.
+      - nui              : The number of unit intervals spanned by the input signal.
 
-      - pattern_len      : The number of unit intervals, before input bit stream repeats.
+      - pattern_len      : The number of unit intervals, before input symbol stream repeats.
 
       - ideal_xings      : The ideal zero crossing locations of the edges.
 
@@ -290,7 +294,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
     xings_per_pattern    = where(ideal_xings >= pattern_len * ui)[0][0]
     fallings_per_pattern = xings_per_pattern // 2
     risings_per_pattern  = xings_per_pattern - fallings_per_pattern
-    num_patterns         = nbits // pattern_len
+    num_patterns         = nui // pattern_len
 
     # -- Check and adjust vector lengths, reporting out if any modifications were necessary.
     if(False):
@@ -313,7 +317,7 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
     except:
         print "ideal_xings[xings_per_pattern - 1]:", ideal_xings[xings_per_pattern - 1], "ideal_xings[-1]:", ideal_xings[-1]
         print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
-        print "nbits:", nbits, "pattern_len:", pattern_len
+        print "nui:", nui, "pattern_len:", pattern_len
         raise
     assert all(tie_risings),  "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
                                            (num_patterns, risings_per_pattern, len(jitter))
@@ -336,14 +340,14 @@ def calc_jitter(ui, nbits, pattern_len, ideal_xings, actual_xings, rel_thresh=6,
     # -- Calculate the total jitter spectrum, for display purposes only.
     # --- Make vector uniformly sampled in time, via zero padding where necessary.
     # --- (It's necessary to keep track of those elements in the resultant vector, which aren't paddings; hence, 'valid_ix'.)
-    x, valid_ix     = make_uniform(t_jitter, jitter, ui, nbits)
+    x, valid_ix     = make_uniform(t_jitter, jitter, ui, nui)
     y               = fft(x)
     jitter_spectrum = abs(y[:len(y) / 2]) / sqrt(len(jitter)) # Normalized, in order to make power correct.
-    f0              = 1. / (ui * nbits)
+    f0              = 1. / (ui * nui)
     spectrum_freqs  = [i * f0 for i in range(len(y) / 2)]
 
     # -- Use the data independent jitter spectrum for our calculations.
-    tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nbits)
+    tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nui)
 
     # --- Normalized, in order to make power correct, since we grab Rj from the freq. domain.
     # --- (I'm using the length of the vector before zero padding, because zero padding doesn't add energy.)
@@ -716,7 +720,6 @@ def import_qucs_csv(filename, sample_per):
     return array(res)
 
 def trim_shift_scale(ideal_h, actual_h):
-    corr_res = correlate(ideal_h, actual_h, mode='valid')
-    offset   = where(corr_res == max(corr_res))[0][0]
+    offset = where(ideal_h == max(ideal_h))[0][0] - where(actual_h == max(actual_h))[0][0]
     return ideal_h[offset : offset + len(actual_h)] * max(actual_h) / max(ideal_h)
 
