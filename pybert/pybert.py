@@ -54,7 +54,7 @@ from scipy.signal    import lfilter, iirfilter
 
 from pybert_view     import traits_view
 from pybert_cntrl    import my_run_simulation, update_results, update_eyes
-from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale
+from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost
 from pybert_plot     import make_plots
 
 debug = False
@@ -138,6 +138,16 @@ class PyBERT(HasTraits):
     Z0              = Float(gZ0)
     v0              = Float(gv0)
     l_ch            = Float(gl_ch)
+    # - EQ Tune
+    pretap_tune     = Float(0.0)
+    posttap_tune    = Float(0.0)
+    posttap2_tune   = Float(0.0)
+    posttap3_tune   = Float(0.0)
+    rx_bw_tune      = Float(gBW)
+    peak_freq_tune  = Float(gPeakFreq)
+    peak_mag_tune   = Float(gPeakMag)
+    pulse_tune      = Bool(False)
+    rel_opt         = Float(0.)
     # - Tx
     vod             = Float(gVod)                                           # (V)
     rs              = Float(gRs)                                            # (Ohms)
@@ -161,10 +171,6 @@ class PyBERT(HasTraits):
     posttap3_sweep  = Bool(False)
     posttap3_final  = Float(0.0)
     posttap3_steps  = Int(10)
-    pretap_tune     = Float(0.0)
-    posttap_tune    = Float(0.0)
-    posttap2_tune   = Float(0.0)
-    posttap3_tune   = Float(0.0)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
@@ -175,9 +181,6 @@ class PyBERT(HasTraits):
     sum_ideal       = Bool(gDfeIdeal)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
     peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
-    rx_bw_tune      = Float(gBW)
-    peak_freq_tune  = Float(gPeakFreq)
-    peak_mag_tune   = Float(gPeakMag)
     # - DFE
     decision_scaler = Float(gDecisionScaler)
     gain            = Float(gGain)
@@ -676,10 +679,11 @@ class PyBERT(HasTraits):
     @cached_property
     def _get_status_str(self):
 
-        status_str  = "%-20s | Perf. (Msmpls/min.):    %4.1f" % (self.status, self.total_perf * 60.e-6)
-        dly_str     = "         | Channel Delay (ns):    %5.3f" % (self.chnl_dly * 1.e9)
-        err_str     = "         | Bit errors detected: %d" % self.bit_errs
-        status_str += dly_str + err_str
+        status_str  = "%-20s | Perf. (Ms/m):    %4.1f" % (self.status, self.total_perf * 60.e-6)
+        dly_str     = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.e9)
+        err_str     = "         | BitErrs: %d" % self.bit_errs
+        pwr_str     = "         | TxPwr: %4.2f" % self.rel_power
+        status_str += dly_str + err_str + pwr_str
 
         try:
             jit_str = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % \
@@ -741,14 +745,20 @@ class PyBERT(HasTraits):
         chnl_h    = self.chnl_h
         tx_h      = self.tx_h_tune
         ctle_h    = self.ctle_h_tune
+        use_pulse = self.pulse_tune
+        nspui     = self.nspui
+        rel_opt   = self.rel_opt
 
         len_h      = len(chnl_h)
-        tx_out_h   = convolve(tx_h,   chnl_h)  [:len_h]
-        ctle_out_h = convolve(ctle_h, tx_out_h)[:len_h]
+        tx_out_h   = convolve(tx_h,   chnl_h)
+        ctle_out_h = convolve(ctle_h, tx_out_h)
 
-        self.ctle_out_g_tune = trim_shift_scale(ideal_h, ctle_out_h)
+        cost, ideal_resp, the_resp = calc_cost(ctle_out_h, ideal_h, nspui, use_pulse)
 
-        return ctle_out_h
+        self.ctle_out_g_tune = ideal_resp
+        self.rel_opt         = 1. / cost
+
+        return the_resp
 
     # Changed property handlers.
     def _ctle_out_h_tune_changed(self):

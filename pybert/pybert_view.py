@@ -10,8 +10,10 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem
 from enable.component_editor import ComponentEditor
 import time
+import numpy as np
 
 from pybert_cntrl import *
+from pybert_util  import ffe_cost, opt_tx
 
 class MyHandler(Handler):
     """This handler is instantiated by the View and handles user button clicks."""
@@ -39,9 +41,29 @@ class MyHandler(Handler):
         info.object.peak_mag_tune  = info.object.peak_mag
         info.object.rx_bw_tune     = info.object.rx_bw
 
-run_simulation = Action(name="Run", action="do_run_simulation")
-tune_save      = Action(name="Save",  action="do_tune_save")
-tune_revert    = Action(name="Reset", action="do_tune_revert")
+    def do_tune_opt_tx(self, info):
+        ideal_h   = info.object.ideal_h
+        chnl_h    = info.object.chnl_h
+        ctle_h    = info.object.ctle_h_tune
+        nspui     = info.object.nspui
+        use_pulse = info.object.pulse_tune
+        old_taps = [ info.object.pretap_tune,
+                     info.object.posttap_tune,
+                     info.object.posttap2_tune,
+                     info.object.posttap3_tune
+                   ]
+
+        new_taps = opt_tx(old_taps, 1, nspui, chnl_h, ideal_h, use_pulse, ctle_h)
+
+        info.object.pretap_tune   = new_taps[0]
+        info.object.posttap_tune  = new_taps[1]
+        info.object.posttap2_tune = new_taps[2]
+        info.object.posttap3_tune = new_taps[3]
+
+run_simulation = Action(name="Run",     action="do_run_simulation")
+tune_save      = Action(name="SaveEq",  action="do_tune_save")
+tune_revert    = Action(name="ResetEq", action="do_tune_revert")
+tune_opt_tx    = Action(name="OptTx",   action="do_tune_opt_tx")
 
     
 # Main window layout definition.
@@ -174,6 +196,11 @@ traits_view = View(
                 Item(name='rx_bw_tune',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
                 label = 'Rx Equalization', show_border = True,
             ),
+            HGroup(
+                Item(name='pulse_tune',     label='Use Pulse Response',   tooltip="Use pulse response, as opposed to impulse response, to tune equalization.", ),
+                Item(name='rel_opt',        label='Rel. Opt.',            tooltip="Relative optimization metric.", ),
+                label = 'Tuning Options', show_border = True,
+            ),
             Item('plot_h_tune', editor=ComponentEditor(), show_label=False,),
             label = 'EQ Tune', id = 'eq_tune',
         ),
@@ -234,7 +261,7 @@ traits_view = View(
     ),
     resizable = True,
     handler = MyHandler(),
-    buttons = [tune_revert, tune_save, run_simulation, "OK"],
+    buttons = [tune_revert, tune_save, tune_opt_tx, run_simulation, "OK"],
     statusbar = "status_str",
     title='PyBERT',
     width=1200, height=800

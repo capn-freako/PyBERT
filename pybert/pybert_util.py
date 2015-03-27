@@ -11,6 +11,7 @@ from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, rep
 from numpy.random import normal
 from numpy.fft    import fft
 from scipy.signal import lfilter, iirfilter, invres, freqs, medfilt
+from scipy.optimize import minimize
 from dfe          import DFE
 from cdr          import CDR
 import time
@@ -719,7 +720,78 @@ def import_qucs_csv(filename, sample_per):
 
     return array(res)
 
-def trim_shift_scale(ideal_h, actual_h):
-    offset = where(ideal_h == max(ideal_h))[0][0] - where(actual_h == max(actual_h))[0][0]
-    return ideal_h[offset : offset + len(actual_h)] * max(actual_h) / max(ideal_h)
+def trim_shift_scale(ideal_h, actual_h, use_corr = False):
+    if(use_corr):
+        corr_res = np.correlate(ideal_h, actual_h, mode='valid')
+        offset   = where(corr_res == max(corr_res))[0][0]
+    else:
+        offset   = where(ideal_h == max(ideal_h))[0][0] - where(actual_h == max(actual_h))[0][0]
+
+    return roll(ideal_h, -offset)[:len(actual_h)] * max(actual_h) / max(ideal_h)
+
+def opt_tx(old_taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None):
+    """
+    """
+
+    cons     = ({'type': 'ineq',
+                    'fun' : lambda x: np.array([1 - sum(abs(x))])})
+    res      = minimize(ffe_cost, old_taps, args=(cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h), constraints=cons)
+
+    return res.x
+
+def ffe_cost(taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None):
+    """
+    """
+
+    # Assemble the link impulse response.
+    main_tap = 1. - sum(abs(taps))
+    taps     = list(taps)
+    taps.insert(cursor_pos, main_tap)
+    tx_h     = concatenate([[x] + list(zeros(nspui - 1)) for x in taps])
+    out_h    = convolve(tx_h, chnl_h)
+    if ctle_h is not None:
+        out_h = convolve(ctle_h, out_h)
+    
+    cost, ideal_resp, actual_resp = calc_cost(out_h, ideal_h, nspui, use_pulse)
+
+    return cost
+
+def calc_cost(actual_h, ideal_h, nspui, use_pulse):
+    """
+    Calculates the cost function for link equalization optimization.
+
+    Inputs:
+
+      - actual_h   actual impulse response
+
+      - ideal_h    ideal impulse response
+
+      - nspui      number of samples per unit interval
+
+      - use_pulse  Boolean flag; use pulse response when true.
+
+    Outputs:
+
+      - cost        cost function value
+
+      - ideal_resp  ideal response function
+
+      - actual_resp actual response function
+
+    """
+
+    # Calculate the cost function.
+    ideal_h = trim_shift_scale(ideal_h, actual_h, use_corr = True)
+    if(use_pulse):
+        actual_s = actual_h.cumsum()
+        actual   = actual_s - array([0.] * nspui + list(actual_s[:-nspui]))
+        ideal_s  = ideal_h.cumsum()
+        ideal    = ideal_s - array([0.] * nspui + list(ideal_s[:-nspui]))
+    else:
+        actual   = actual_h
+        ideal    = ideal_h
+
+    cost = sum((actual - ideal) ** 2)
+
+    return cost, ideal, actual
 

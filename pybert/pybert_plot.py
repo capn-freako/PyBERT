@@ -76,7 +76,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_tune.plot(("t_ns_chnl", "ctle_out_g_tune"), type="line", color="gray")
     plot_h_tune.title            = "Channel + Tx Preemphasis + CTLE"
     plot_h_tune.index_axis.title = "Time (ns)"
-    plot_h_tune.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_tune.y_axis.title     = "Response"
     zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis='index', always_on=False)
     plot_h_tune.overlays.append(zoom_tune)
     self.plot_h_tune = plot_h_tune
