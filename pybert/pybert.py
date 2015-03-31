@@ -47,14 +47,14 @@ from traitsui.api    import View, Item, Group
 from enable.component_editor import ComponentEditor
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
-from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real
+from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real, pad
 from numpy.fft       import fft, ifft
 from numpy.random    import randint
 from scipy.signal    import lfilter, iirfilter
 
 from pybert_view     import traits_view
 from pybert_cntrl    import my_run_simulation, update_results, update_eyes
-from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost
+from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits
 from pybert_plot     import make_plots
 
 debug = False
@@ -123,7 +123,7 @@ class PyBERT(HasTraits):
     pattern_len     = Int(gPatLen)
     nspb            = Int(gNspb)
     eye_bits        = Int(gNbits // 5)
-    mod_type        = List([0])
+    mod_type        = List([0])                                             # 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
     num_sweeps      = Int(1)
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
@@ -148,6 +148,7 @@ class PyBERT(HasTraits):
     peak_mag_tune   = Float(gPeakMag)
     pulse_tune      = Bool(False)
     rel_opt         = Float(0.)
+    ideal_type      = List([2])                                             # 0 = impulse; 1 = sinc; 2 = raised cosine
     # - Tx
     vod             = Float(gVod)                                           # (V)
     rs              = Float(gRs)                                            # (Ohms)
@@ -171,6 +172,7 @@ class PyBERT(HasTraits):
     posttap3_sweep  = Bool(False)
     posttap3_final  = Float(0.0)
     posttap3_steps  = Int(10)
+    rel_power       = Float(1.0)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Float(gCin)                                           # (pF)
@@ -214,6 +216,7 @@ class PyBERT(HasTraits):
     len_h           = Int(0)
     chnl_dly        = Float(0.)
     bit_errs        = Int(0)
+    run_count       = Int(0)                                                # Used as a mechanism to force bit stream regeneration.
     # - About
     ident  = String('PyBERT v1.5 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
@@ -239,11 +242,11 @@ class PyBERT(HasTraits):
     t_ns            = Property(Array,   depends_on=['t'])
     f               = Property(Array,   depends_on=['t'])
     w               = Property(Array,   depends_on=['f'])
-    bits            = Property(Array,   depends_on=['pattern_len', 'nbits'])
+    bits            = Property(Array,   depends_on=['pattern_len', 'nbits', 'run_count'])
     symbols         = Property(Array,   depends_on=['bits', 'mod_type', 'vod'])
     ffe             = Property(Array,   depends_on=['pretap', 'posttap', 'posttap2', 'posttap3'])
     ui              = Property(Float,   depends_on=['bit_rate', 'mod_type'])
-    ideal_h         = Property(Array,   depends_on=['ui', 'nspui', 't', 'mod_type'])
+    ideal_h         = Property(Array,   depends_on=['ui', 'nspui', 't', 'mod_type', 'ideal_type', 'pulse_tune'])
     nui             = Property(Int,     depends_on=['nbits', 'mod_type'])
     nspui           = Property(Int,     depends_on=['nspb', 'mod_type'])
     eye_uis         = Property(Int,     depends_on=['eye_bits', 'mod_type'])
@@ -326,7 +329,13 @@ class PyBERT(HasTraits):
         pattern_len     = self.pattern_len
         nbits           = self.nbits
 
-        return resize(array([0, 1, 1] + [randint(2) for i in range(pattern_len - 3)]), nbits)
+        bits    = []
+        bit_gen = lfsr_bits([7, 6], randint(128))
+        for i in range(pattern_len - 4):
+            bits.append(bit_gen.next())
+
+#        return resize(array([0, 0, 1, 1] + [randint(2) for i in range(pattern_len - 4)]), nbits)
+        return resize(array([0, 0, 1, 1] + bits), nbits)
 
     @cached_property
     def _get_ui(self):
@@ -398,10 +407,24 @@ class PyBERT(HasTraits):
         nspui           = self.nspui
         t               = self.t
         mod_type        = self.mod_type[0]
+        ideal_type      = self.ideal_type[0]
 
-        ideal_h = sinc((array(t) - t[-1] / 2.) / ui)
+        t = array(t) - t[-1] / 2.
+
+        if(ideal_type == 0):    # delta
+            ideal_h = zeros(len(t))
+            ideal_h[len(t) / 2] = 1.
+        elif(ideal_type == 1):  # sinc
+            ideal_h = sinc(t / (ui / 2.))
+        elif(ideal_type == 2):  # raised cosine
+            ideal_h  = (cos(pi * t / (ui / 2.)) + 1.) / 2.
+            ideal_h  = where(t < -ui / 2., zeros(len(t)), ideal_h)
+            ideal_h  = where(t >  ui / 2., zeros(len(t)), ideal_h)
+        else:
+            raise Exception("PyBERT._get_ideal_h(): ERROR: Unrecognized ideal impulse response type.")
+
         if(mod_type == 1): # Duo-binary relies upon the total link impulse response to perform the required addition.
-            ideal_h = ideal_h[nspui:] + ideal_h[:-nspui]
+            ideal_h = 0.5 * (ideal_h + pad(ideal_h[:-nspui], (nspui, 0), 'constant', constant_values=(0, 0)))
 
         return ideal_h
 
@@ -435,6 +458,9 @@ class PyBERT(HasTraits):
                     symbols.append(1./3.)
         else:
             raise Exception("ERROR: _get_symbols(): Unknown modulation type requested!")
+
+        vals, bins = histogram(symbols)
+        print "PyBERT._get_symbols(): Symbol values histogram:", vals
 
         return array(symbols) * vod
 
@@ -786,15 +812,15 @@ class PyBERT(HasTraits):
         """
 
         t                    = self.t
+        ts                   = t[1]
         nspui                = self.nspui
 
         if(self.use_ch_file):
-            chnl_h           = import_qucs_csv(self.ch_file, self.Ts)
+            chnl_h           = import_qucs_csv(self.ch_file, self.ts)
             chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
             chnl_h.resize(len(t))
             chnl_H           = fft(chnl_h)
             chnl_H          /= abs(chnl_H[0])
-            chnl_h, start_ix = trim_impulse(chnl_h)
         else:
             l_ch             = self.l_ch
             v0               = self.v0 * 3.e8
@@ -810,17 +836,20 @@ class PyBERT(HasTraits):
             Cp               = self.cin * 1.e-12
             CL               = self.cac * 1.e-6
 
-            Ts               = t[1]
             chnl_dly         = l_ch / v0
             gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H                = exp(-l_ch * gamma)
             chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
             chnl_h           = real(ifft(chnl_H)) * sqrt(len(chnl_H))    # Correcting for '1/N' scaling in ifft().
-            chnl_h, start_ix = trim_impulse(chnl_h, Ts, chnl_dly)
 
-        chnl_h   /= sum(chnl_h)                                          # a temporary crutch.
+        chnl_h           = chnl_h.copy()                                 # To allow use of 'resize()'.
+        min_len          = 10 * nspui
+        max_len          = 3 * chnl_dly / ts
+        chnl_h, start_ix = trim_impulse(chnl_h, ts, chnl_dly, min_len, max_len)
+        chnl_h          /= sum(chnl_h)                                   # a temporary crutch.
+
         chnl_s    = chnl_h.cumsum()
-        chnl_p    = chnl_s[nspui:] - chnl_s[:-nspui] 
+        chnl_p    = chnl_s - pad(chnl_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
 
         self.chnl_h          = chnl_h
         self.len_h           = len(chnl_h)

@@ -19,9 +19,7 @@ class MyHandler(Handler):
     """This handler is instantiated by the View and handles user button clicks."""
 
     def do_run_simulation(self, info):
-        info.object.status = 'Running channel...'
         my_run_sweeps(info.object)
-        info.object.status = 'Ready.'
 
     def do_tune_save(self, info):
         info.object.pretap    = info.object.pretap_tune
@@ -184,22 +182,26 @@ traits_view = View(
         ),
         VGroup(
             HGroup(
-                Item(name='pretap_tune',       label='Pre-tap',    tooltip="pre-cursor tap weight", ),
-                Item(name='posttap_tune',      label='Post-tap',   tooltip="post-cursor tap weight", ),
-                Item(name='posttap2_tune',     label='Post-tap2',  tooltip="2nd post-cursor tap weight", ),
-                Item(name='posttap3_tune',     label='Post-tap3',  tooltip="3rd post-cursor tap weight", ),
-                label='Tx Equalization', show_border=True,
-            ),
-            HGroup(
-                Item(name='peak_freq_tune', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
-                Item(name='peak_mag_tune',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
-                Item(name='rx_bw_tune',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
-                label = 'Rx Equalization', show_border = True,
-            ),
-            HGroup(
-                Item(name='pulse_tune',     label='Use Pulse Response',   tooltip="Use pulse response, as opposed to impulse response, to tune equalization.", ),
-                Item(name='rel_opt',        label='Rel. Opt.',            tooltip="Relative optimization metric.", ),
-                label = 'Tuning Options', show_border = True,
+                VGroup(
+                    Item(name='pretap_tune',    label='Pre-tap',              tooltip="pre-cursor tap weight", ),
+                    Item(name='posttap_tune',   label='Post-tap',             tooltip="post-cursor tap weight", ),
+                    Item(name='posttap2_tune',  label='Post-tap2',            tooltip="2nd post-cursor tap weight", ),
+                    Item(name='posttap3_tune',  label='Post-tap3',            tooltip="3rd post-cursor tap weight", ),
+                    label='Tx Equalization', show_border=True,
+                ),
+                VGroup(
+                    Item(name='peak_freq_tune', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
+                    Item(name='peak_mag_tune',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
+                    Item(name='rx_bw_tune',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
+                    label = 'Rx Equalization', show_border = True,
+                ),
+                VGroup(
+                    Item(name='ideal_type',     label='Ideal Response Type',   tooltip="Ideal impulse response type.",
+                                                editor=CheckListEditor(values=[(0, 'Impulse'), (1, 'Sinc'), (2, 'Raised Cosine'),])),
+                    Item(name='pulse_tune',     label='Use Pulse Response',   tooltip="Use pulse response, as opposed to impulse response, to tune equalization.", ),
+                    Item(name='rel_opt',        label='Rel. Opt.',            tooltip="Relative optimization metric.", ),
+                    label = 'Tuning Options', show_border = True,
+                ),
             ),
             Item('plot_h_tune', editor=ComponentEditor(), show_label=False,),
             label = 'EQ Tune', id = 'eq_tune',

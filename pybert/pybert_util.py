@@ -388,7 +388,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     rv         = ss.norm(loc = 0., scale = rj)
     rj_pdf     = rv.pdf(bin_centers)
     rj_pmf     = (rj_pdf / sum(rj_pdf))
-    hist_synth = convolve(hist_synth, rj_pmf)
+    hist_synth = np.convolve(hist_synth, rj_pmf)
     tail_len   = (len(bin_centers) - 1) / 2
     hist_synth = [sum(hist_synth[: tail_len + 1])] + list(hist_synth[tail_len + 1 : len(hist_synth) - tail_len - 1]) + [sum(hist_synth[len(hist_synth) - tail_len - 1 :])]
 
@@ -644,7 +644,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
 
     return freqs(b, a, w)
 
-def trim_impulse(g, Ts=0, chnl_dly=0):
+def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     """
     Trim impulse response, for more useful display, by:
       - eliminating 90% of the overall delay from the beginning, and
@@ -659,6 +659,10 @@ def trim_impulse(g, Ts=0, chnl_dly=0):
 
       - chnl_dly  (optional) channel delay
 
+      - min_len   (optional) minimum length of returned vector
+
+      - max_len   (optional) maximum length of returned vector
+
     Outputs:
     
       - g_trim    trimmed impulse response
@@ -668,6 +672,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0):
     """
 
     g         = array(g)
+
     if(Ts and chnl_dly):
         start_ix  = int(0.9 * chnl_dly / Ts)
     else:
@@ -676,12 +681,19 @@ def trim_impulse(g, Ts=0, chnl_dly=0):
         while(abs(g[i]) < min_mag):
             i += 1
         start_ix = int(0.9 * i)
-    Pt        = 0.998 * sum(g ** 2)
-    i         = 0
+
+    Pt        = 0.998 * sum(g[start_ix:] ** 2)
+    i         = start_ix
     P         = 0
     while(P < Pt):
         P += g[i] ** 2
         i += 1
+
+    vec_len = i - start_ix
+    if(vec_len < min_len):
+        i = min(len(g), start_ix + min_len)
+    if(vec_len > max_len):
+        i = start_ix + max_len
 
     return (g[start_ix : i], start_ix)
 
@@ -727,7 +739,10 @@ def trim_shift_scale(ideal_h, actual_h, use_corr = False):
     else:
         offset   = where(ideal_h == max(ideal_h))[0][0] - where(actual_h == max(actual_h))[0][0]
 
-    return roll(ideal_h, -offset)[:len(actual_h)] * max(actual_h) / max(ideal_h)
+#    return roll(ideal_h, -offset)[:len(actual_h)] * max(actual_h) / max(ideal_h)
+    res = ideal_h[offset:].copy()
+    res.resize(len(actual_h))                    # Clips, if too long; pads w/ zeros, if too short.
+    return res * max(actual_h) / max(res)
 
 def opt_tx(old_taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None):
     """
@@ -735,7 +750,7 @@ def opt_tx(old_taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = Non
 
     cons     = ({'type': 'ineq',
                     'fun' : lambda x: np.array([1 - sum(abs(x))])})
-    res      = minimize(ffe_cost, old_taps, args=(cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h), constraints=cons)
+    res      = minimize(ffe_cost, old_taps, args=(cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h), constraints=cons, options={'disp' : True})
 
     return res.x
 
@@ -748,9 +763,9 @@ def ffe_cost(taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None)
     taps     = list(taps)
     taps.insert(cursor_pos, main_tap)
     tx_h     = concatenate([[x] + list(zeros(nspui - 1)) for x in taps])
-    out_h    = convolve(tx_h, chnl_h)
+    out_h    = np.convolve(tx_h, chnl_h)
     if ctle_h is not None:
-        out_h = convolve(ctle_h, out_h)
+        out_h = np.convolve(ctle_h, out_h)
     
     cost, ideal_resp, actual_resp = calc_cost(out_h, ideal_h, nspui, use_pulse)
 
@@ -781,17 +796,46 @@ def calc_cost(actual_h, ideal_h, nspui, use_pulse):
     """
 
     # Calculate the cost function.
-    ideal_h = trim_shift_scale(ideal_h, actual_h, use_corr = True)
     if(use_pulse):
+        ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
         actual_s = actual_h.cumsum()
-        actual   = actual_s - array([0.] * nspui + list(actual_s[:-nspui]))
+        actual   = actual_s - np.pad(actual_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
         ideal_s  = ideal_h.cumsum()
-        ideal    = ideal_s - array([0.] * nspui + list(ideal_s[:-nspui]))
+        ideal    = ideal_s - np.pad(ideal_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
+        assert max(ideal) == max(abs(ideal)), "pybert_util.calc_cost(): ERROR: Ideal response peak is negative!"
+        min_thresh   = 0.01 * max(ideal)
+        pulse_center = int(sum([i * ideal[i] ** 2 for i in range(len(ideal))]) / sum(ideal ** 2))
+        i = pulse_center
+        while(i > 0 and ideal[i] > min_thresh):
+            i -= 1
+        pulse_left = i
+        i = pulse_center
+        while(i < len(ideal) and ideal[i] > min_thresh):
+            i += 1
+        pulse_right = i
+        cost = sum(actual[:pulse_left + 1] ** 2) + sum(actual[pulse_right:] ** 2) 
     else:
+        ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
         actual   = actual_h
         ideal    = ideal_h
-
-    cost = sum((actual - ideal) ** 2)
+        cost     = sum((actual - ideal) ** 2)
 
     return cost, ideal, actual
+
+def lfsr_bits(taps, seed):
+    """
+    """
+
+    val      = int(seed)
+    num_taps = max(taps)
+    mask     = (1 << num_taps) - 1
+
+    while(True):
+        print "val:", val
+        xor_res = reduce(lambda x, b: x ^ b, [bool(val & (1 << (tap - 1))) for tap in taps])
+        print "xor_res:", xor_res
+        val     = (val << 1) & mask  # Just to keep 'val' from growing without bound.
+        if(xor_res):
+            val += 1
+        yield(val & 1)
 

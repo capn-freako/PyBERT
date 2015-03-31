@@ -110,6 +110,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     start_time = time.clock()
     self.status = 'Running channel...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
+    self.run_count += 1  # Force regeneration of bit stream.
+
     # Pull class variables into local storage, performing unit conversion where necessary.
     t               = self.t
     t_ns            = self.t_ns
