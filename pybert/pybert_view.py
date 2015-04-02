@@ -8,7 +8,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem
-from enable.component_editor import ComponentEditor
+from enthought.enable.component_editor import ComponentEditor
 import time
 import numpy as np
 

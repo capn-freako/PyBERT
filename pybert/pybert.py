@@ -44,7 +44,6 @@ from pylab           import *
 
 from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
 from traitsui.api    import View, Item, Group
-from enable.component_editor import ComponentEditor
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
 from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real, pad
@@ -816,7 +815,7 @@ class PyBERT(HasTraits):
         nspui                = self.nspui
 
         if(self.use_ch_file):
-            chnl_h           = import_qucs_csv(self.ch_file, self.ts)
+            chnl_h           = import_qucs_csv(self.ch_file, ts)
             chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
             chnl_h.resize(len(t))
             chnl_H           = fft(chnl_h)
@@ -844,7 +843,8 @@ class PyBERT(HasTraits):
 
         chnl_h           = chnl_h.copy()                                 # To allow use of 'resize()'.
         min_len          = 10 * nspui
-        max_len          = 3 * chnl_dly / ts
+#        max_len          = 3 * chnl_dly / ts
+        max_len          = 100 * nspui
         chnl_h, start_ix = trim_impulse(chnl_h, ts, chnl_dly, min_len, max_len)
         chnl_h          /= sum(chnl_h)                                   # a temporary crutch.
 
