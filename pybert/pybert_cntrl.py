@@ -124,6 +124,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     nui             = self.nui
     bit_rate        = self.bit_rate * 1.e9
     eye_bits        = self.eye_bits
+    eye_uis         = self.eye_uis
     nspb            = self.nspb
     nspui           = self.nspui
     rn              = self.rn
@@ -408,8 +409,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         dfe_spec                     = self.jitter_spectrum_dfe
         ctle_spec_condensed          = array([ctle_spec.take(range(i, i + skip_factor)).mean() for i in range(0, len(ctle_spec), skip_factor)])
         window_width                 = len(dfe_spec) / 10
-        self.jitter_rejection_ratio  = zeros(len(dfe_spec))
+        self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
+        #self.jitter_rejection_ratio  = zeros(len(dfe_spec))
     except:
+        raise
         self.thresh_dfe              = array([])
         self.jitter_ext_dfe          = array([])
         self.jitter_dfe              = array([])

@@ -831,9 +831,7 @@ def lfsr_bits(taps, seed):
     mask     = (1 << num_taps) - 1
 
     while(True):
-        print "val:", val
         xor_res = reduce(lambda x, b: x ^ b, [bool(val & (1 << (tap - 1))) for tap in taps])
-        print "xor_res:", xor_res
         val     = (val << 1) & mask  # Just to keep 'val' from growing without bound.
         if(xor_res):
             val += 1

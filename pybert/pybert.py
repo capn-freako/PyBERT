@@ -40,14 +40,14 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from pylab           import *
+#from pylab           import *
 
 from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
 from traitsui.api    import View, Item, Group
 from enable.component_editor import ComponentEditor
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
-from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real, pad
+from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real, pad, pi, resize, cos, where, sqrt, convolve
 from numpy.fft       import fft, ifft
 from numpy.random    import randint
 from scipy.signal    import lfilter, iirfilter
@@ -57,7 +57,8 @@ from pybert_cntrl    import my_run_simulation, update_results, update_eyes
 from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits
 from pybert_plot     import make_plots
 
-debug = False
+debug        = False
+gDebugStatus = False
 
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
@@ -460,7 +461,7 @@ class PyBERT(HasTraits):
             raise Exception("ERROR: _get_symbols(): Unknown modulation type requested!")
 
         vals, bins = histogram(symbols)
-        print "PyBERT._get_symbols(): Symbol values histogram:", vals
+#        print "PyBERT._get_symbols(): Symbol values histogram:", vals
 
         return array(symbols) * vod
 
@@ -748,7 +749,7 @@ class PyBERT(HasTraits):
         main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
         ffe      = [pretap, main_tap, posttap, posttap2, posttap3]
 
-        return concatenate([[x] + list(zeros(nspui - 1)) for x in ffe])
+        return sum([[x] + list(zeros(nspui - 1)) for x in ffe], [])
 
     @cached_property
     def _get_ctle_h_tune(self):
@@ -792,7 +793,8 @@ class PyBERT(HasTraits):
         self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
     def _status_str_changed(self):
-        print self.status_str
+        if(gDebugStatus):
+            print self.status_str
 
     # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control their times of execution. I wasn't able to get truly lazy evaluation, and
