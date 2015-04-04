@@ -40,21 +40,19 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-#from pylab           import *
-
 from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
 from traitsui.api    import View, Item, Group
-from enable.component_editor import ComponentEditor
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
-from numpy           import array, linspace, zeros, histogram, mean, diff, log10, transpose, shape, exp, real, pad, pi, resize, cos, where, sqrt, convolve
+from numpy           import array, linspace, zeros, histogram, mean, diff, transpose, shape, exp, real, pad, pi, resize, cos, where, sqrt, convolve, sinc
 from numpy.fft       import fft, ifft
 from numpy.random    import randint
 from scipy.signal    import lfilter, iirfilter
+from enable.component_editor import ComponentEditor
 
 from pybert_view     import traits_view
 from pybert_cntrl    import my_run_simulation, update_results, update_eyes
-from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits
+from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits, safe_log10
 from pybert_plot     import make_plots
 
 debug        = False
@@ -221,7 +219,7 @@ class PyBERT(HasTraits):
     # - About
     ident  = String('PyBERT v1.5 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    March 22, 2015\n\n \
+    April 3, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -331,11 +329,13 @@ class PyBERT(HasTraits):
         nbits           = self.nbits
 
         bits    = []
-        bit_gen = lfsr_bits([7, 6], randint(128))
+        seed    = randint(128)
+        while(not seed):                         # We don't want to seed our LFSR with zero.
+            seed    = randint(128)
+        bit_gen = lfsr_bits([7, 6], seed)
         for i in range(pattern_len - 4):
             bits.append(bit_gen.next())
 
-#        return resize(array([0, 0, 1, 1] + [randint(2) for i in range(pattern_len - 4)]), nbits)
         return resize(array([0, 0, 1, 1] + bits), nbits)
 
     @cached_property
@@ -454,9 +454,9 @@ class PyBERT(HasTraits):
                 elif(bits == (0,1)):
                     symbols.append(-1./3.)
                 elif(bits == (1,0)):
-                    symbols.append(1.)
-                else:
                     symbols.append(1./3.)
+                else:
+                    symbols.append(1.)
         else:
             raise Exception("ERROR: _get_symbols(): Unknown modulation type requested!")
 
@@ -560,11 +560,11 @@ class PyBERT(HasTraits):
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (isi_chnl, isi_tx, 10. * log10(isi_rej_tx))
+                        (isi_chnl, isi_tx, 10. * safe_log10(isi_rej_tx))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (dcd_chnl, dcd_tx, 10. * log10(dcd_rej_tx))
+                        (dcd_chnl, dcd_tx, 10. * safe_log10(dcd_rej_tx))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % \
@@ -583,19 +583,19 @@ class PyBERT(HasTraits):
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (isi_tx, isi_ctle, 10. * log10(isi_rej_ctle))
+                        (isi_tx, isi_ctle, 10. * safe_log10(isi_rej_ctle))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (dcd_tx, dcd_ctle, 10. * log10(dcd_rej_ctle))
+                        (dcd_tx, dcd_ctle, 10. * safe_log10(dcd_rej_ctle))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (pj_tx, pj_ctle, 10. * log10(pj_rej_ctle))
+                        (pj_tx, pj_ctle, 10. * safe_log10(pj_rej_ctle))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (rj_tx, rj_ctle, 10. * log10(rj_rej_ctle))
+                        (rj_tx, rj_ctle, 10. * safe_log10(rj_rej_ctle))
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
 
@@ -606,19 +606,19 @@ class PyBERT(HasTraits):
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (isi_ctle, isi_dfe, 10. * log10(isi_rej_dfe))
+                        (isi_ctle, isi_dfe, 10. * safe_log10(isi_rej_dfe))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (dcd_ctle, dcd_dfe, 10. * log10(dcd_rej_dfe))
+                        (dcd_ctle, dcd_dfe, 10. * safe_log10(dcd_rej_dfe))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (pj_ctle, pj_dfe, 10. * log10(pj_rej_dfe))
+                        (pj_ctle, pj_dfe, 10. * safe_log10(pj_rej_dfe))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (rj_ctle, rj_dfe, 10. * log10(rj_rej_dfe))
+                        (rj_ctle, rj_dfe, 10. * safe_log10(rj_rej_dfe))
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
 
@@ -629,22 +629,23 @@ class PyBERT(HasTraits):
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">ISI</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (isi_chnl, isi_dfe, 10. * log10(isi_rej_total))
+                        (isi_chnl, isi_dfe, 10. * safe_log10(isi_rej_total))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">DCD</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (dcd_chnl, dcd_dfe, 10. * log10(dcd_rej_total))
+                        (dcd_chnl, dcd_dfe, 10. * safe_log10(dcd_rej_total))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (pj_tx, pj_dfe, 10. * log10(pj_rej_total))
+                        (pj_tx, pj_dfe, 10. * safe_log10(pj_rej_total))
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
             info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>%4.1f</TD>\n' % \
-                        (rj_tx, rj_dfe, 10. * log10(rj_rej_total))
+                        (rj_tx, rj_dfe, 10. * safe_log10(rj_rej_total))
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
         except:
+            raise
             info_str  = '<H1>Jitter Rejection by Equalization Component</H1>\n'
             info_str += "Sorry, an error occured.\n"
 

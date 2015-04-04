@@ -9,11 +9,9 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem
 from enable.component_editor import ComponentEditor
-import time
-import numpy as np
 
-from pybert_cntrl import *
-from pybert_util  import ffe_cost, opt_tx
+from pybert_cntrl            import my_run_sweeps
+from pybert_util             import ffe_cost, opt_tx
 
 class MyHandler(Handler):
     """This handler is instantiated by the View and handles user button clicks."""
@@ -174,7 +172,6 @@ traits_view = View(
                 ),
             ),
             label = 'Config.', id = 'config',
-            #layout = 'flow',
         ),
         Group(
             Item('plots_dfe', editor=ComponentEditor(), show_label=False,),

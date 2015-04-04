@@ -7,15 +7,16 @@ Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major co
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
-from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, correlate
+from time         import clock
+from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where
+from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum
 from numpy.random import normal
-from numpy.fft    import fft
+from numpy.fft    import fft, ifft
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
 from dfe          import DFE
 from cdr          import CDR
-import time
-from pylab import *
-from pybert_util import *
+
+from pybert_util  import find_crossings, trim_shift_scale, make_ctle, calc_jitter, moving_average, calc_eye
 
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.e-18
@@ -107,7 +108,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     num_sweeps = self.num_sweeps
     sweep_num  = self.sweep_num
 
-    start_time = time.clock()
+    start_time = clock()
     self.status = 'Running channel...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     self.run_count += 1  # Force regeneration of bit stream.
@@ -168,7 +169,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
     # Correct pattern length, if using PAM-4.
     if(mod_type == 2):
-        pattern_len = pattern_len // 2
+        pattern_len = pattern_len * 2 // 2  # Catches the case of odd number of bits in pattern.
 
     # Calculate misc. values.
     fs         = bit_rate * nspb
@@ -178,9 +179,15 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     x = repeat(symbols, nspui)
 
     # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
-    ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
+    # (Duo-binary is problematic, in that it requires convolution with the ideal duobinary
+    #  impulse response, in order to produce the proper ideal crossings.)
+    tmp_x = x
+    if(mod_type == 1):
+        duob_h = array(([0.5] + [0.] * (nspui - 1)) * 2)
+        tmp_x  = convolve(tmp_x, duob_h)[:len(t)]
+#    ideal_xings = find_crossings(t, tmp_x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
 
-    self.ideal_signal = x
+    ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
     self.ideal_xings  = ideal_xings
 
     # Generate the ideal impulse responses.
@@ -190,8 +197,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     # Calculate the channel output.
     chnl_out  = convolve(x, chnl_h)[:len(x)]
 
-    self.channel_perf = nbits * nspb / (time.clock() - start_time)
-    split_time        = time.clock()
+    self.channel_perf = nbits * nspb / (clock() - start_time)
+    split_time        = clock()
     self.status       = 'Running Tx...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
@@ -200,13 +207,15 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     ffe_out           = convolve(symbols, ffe)[:len(symbols)]
     self.rel_power    = mean(ffe_out ** 2)                    # Store the relative average power dissipated in the Tx.
     tx_out            = repeat(ffe_out, nspui)                # oversampled output
-    self.ideal_signal = tx_out
+    #self.ideal_signal = x
+    #self.ideal_signal = tx_out
+    self.ideal_signal = tmp_x
 
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
     #    This is partly due to the out of order nature in which we combine the Tx and channel,
     #    and partly due to the fact that we're adding noise to the Tx output.)
-    tx_h   = concatenate([[x] + list(zeros(nspui - 1)) for x in ffe])
+    tx_h   = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
     tx_h.resize(len(chnl_h))
     temp   = tx_h.copy()
     temp.resize(len(w))
@@ -244,8 +253,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.tx_out_h  = tx_out_h * 1.e-9 / Ts
     self.tx_out_g  = tx_out_g * 1.e-9 / Ts
 
-    self.tx_perf   = nbits * nspb / (time.clock() - split_time)
-    split_time     = time.clock()
+    self.tx_perf   = nbits * nspb / (clock() - split_time)
+    split_time     = clock()
     self.status    = 'Running CTLE...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
@@ -277,8 +286,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.conv_dly   = conv_dly
     self.conv_dly_ix = conv_dly_ix
 
-    self.ctle_perf  = nbits * nspb / (time.clock() - split_time)
-    split_time      = time.clock()
+    self.ctle_perf  = nbits * nspb / (clock() - split_time)
+    split_time      = clock()
     self.status     = 'Running DFE/CDR...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
@@ -300,7 +309,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     bit_errs        = where(bits_out[(nbits - eye_bits + bit_dly):] ^ bits[(nbits - eye_bits) : len(bits_out) - bit_dly])[0]
     self.bit_errs   = len(bit_errs)
 
-    dfe_h          = array([1.] + list(zeros(nspb - 1)) + list(concatenate([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]])))
+    dfe_h          = array([1.] + list(zeros(nspb - 1)) + sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))
     dfe_h.resize(len(ctle_out_h))
     temp           = dfe_h.copy()
     temp.resize(len(w))
@@ -318,8 +327,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.dfe_out_g = dfe_out_g * 1.e-9 / Ts
     self.dfe_out   = dfe_out
 
-    self.dfe_perf  = nbits * nspb / (time.clock() - split_time)
-    split_time     = time.clock()
+    self.dfe_perf  = nbits * nspb / (clock() - split_time)
+    split_time     = clock()
     self.status    = 'Analyzing jitter...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Analyze the jitter.
@@ -421,9 +430,9 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.f_MHz_dfe               = array([])
         self.jitter_rejection_ratio  = array([])
 
-    self.jitter_perf = nbits * nspb / (time.clock() - split_time)
-    self.total_perf  = nbits * nspb / (time.clock() - start_time)
-    split_time       = time.clock()
+    self.jitter_perf = nbits * nspb / (clock() - split_time)
+    self.total_perf  = nbits * nspb / (clock() - start_time)
+    split_time       = clock()
     self.status      = 'Updating plots...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Save local variables to class instance for state preservation, performing unit conversion where necessary.
@@ -441,7 +450,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         if(not initial_run):
             update_eyes(self)
 
-    self.plotting_perf = nbits * nspb / (time.clock() - split_time)
+    self.plotting_perf = nbits * nspb / (clock() - split_time)
     self.status = 'Ready.'
 
 # Plot updating
