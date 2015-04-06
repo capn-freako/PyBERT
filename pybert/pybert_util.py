@@ -8,17 +8,18 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 from numpy          import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, append, pad, real, histogram
-from numpy          import log10, sqrt, power, exp, cumsum, mean, power, convolve, correlate, reshape, resize, insert
+from numpy          import log10, sqrt, power, exp, cumsum, mean, power, convolve, correlate, reshape, resize, insert, shape
 from numpy.random   import normal
 from numpy.fft      import fft, ifft
 from scipy.signal   import lfilter, iirfilter, invres, freqs, medfilt
-from scipy.optimize import minimize
+from scipy.optimize import minimize, minimize_scalar
 from scipy.stats    import norm
 from dfe            import DFE
 from cdr            import CDR
 
 debug          = False
-gDebugOptimize = False
+gDebugOptimize = True
+gMaxCTLEPeak   = 20          # max. allowed CTLE peaking (dB) (when optimizing, only)
 
 def moving_average(a, n=3) :
     """Calculates a sliding average over the input vector."""
@@ -631,7 +632,10 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
         r2   = z - p1
     b, a = invres([r1, r2], [p1, p2], [])
 
-    return freqs(b, a, w)
+    w, H = freqs(b, a, w)
+    H   /= max(abs(H))                           # Enforce passivity.
+
+    return (w, H)
 
 def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     """
@@ -724,6 +728,7 @@ def import_qucs_csv(filename, sample_per):
 def trim_shift_scale(ideal_h, actual_h, use_corr = False):
     if(use_corr):
         corr_res = correlate(ideal_h, actual_h, mode='valid')
+        corr_res = where(corr_res < 0., zeros(len(corr_res)), corr_res)
         offset   = int(sum([i * corr_res[i] ** 2 for i in range(len(corr_res))]) / sum(corr_res ** 2))
     else:
         offset   = mean(where(ideal_h == max(ideal_h))[0]) - mean(where(actual_h == max(actual_h))[0])
@@ -731,36 +736,6 @@ def trim_shift_scale(ideal_h, actual_h, use_corr = False):
     res = ideal_h[offset:].copy()
     res.resize(len(actual_h))                    # Clips, if too long; pads w/ zeros, if too short.
     return res * max(actual_h) / max(res)
-
-def opt_tx(old_taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None):
-    """
-    """
-
-    cons     = ({'type': 'ineq',
-                    'fun' : lambda x: array([1 - sum(abs(x))])})
-    if(gDebugOptimize):
-        res  = minimize(ffe_cost, old_taps, args=(cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h), constraints=cons, options={'disp' : True})
-    else:
-        res  = minimize(ffe_cost, old_taps, args=(cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h), constraints=cons, options={'disp' : False})
-
-    return res.x
-
-def ffe_cost(taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None):
-    """
-    """
-
-    # Assemble the link impulse response.
-    main_tap = 1. - sum(abs(taps))
-    taps     = list(taps)
-    taps.insert(cursor_pos, main_tap)
-    tx_h     = sum([[x] + list(zeros(nspui - 1)) for x in taps], [])
-    out_h    = convolve(tx_h, chnl_h)
-    if ctle_h is not None:
-        out_h = convolve(ctle_h, out_h)
-    
-    cost, ideal_resp, actual_resp = calc_cost(out_h, ideal_h, nspui, use_pulse)
-
-    return cost
 
 def calc_cost(actual_h, ideal_h, nspui, use_pulse):
     """
@@ -807,6 +782,7 @@ def calc_cost(actual_h, ideal_h, nspui, use_pulse):
         pwr_outside = sum(actual[:pulse_left + 1] ** 2) + sum(actual[pulse_right:] ** 2) 
         pwr_inside  = sum(actual[pulse_left + 1 : pulse_right] ** 2)
         cost        = pwr_outside / pwr_inside
+        #cost        = pwr_outside
     else:
         ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
         actual   = actual_h

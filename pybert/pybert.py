@@ -40,7 +40,7 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File
+from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File, Button
 from traitsui.api    import View, Item, Group
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
@@ -48,15 +48,18 @@ from numpy           import array, linspace, zeros, histogram, mean, diff, trans
 from numpy.fft       import fft, ifft
 from numpy.random    import randint
 from scipy.signal    import lfilter, iirfilter
+from scipy.optimize  import minimize, minimize_scalar
 from enable.component_editor import ComponentEditor
 
 from pybert_view     import traits_view
-from pybert_cntrl    import my_run_simulation, update_results, update_eyes
+from pybert_cntrl    import my_run_simulation, update_results, update_eyes, do_opt_rx, do_opt_tx
 from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits, safe_log10
 from pybert_plot     import make_plots
 
-debug        = False
-gDebugStatus = False
+debug          = False
+gDebugStatus   = False
+gDebugOptimize = True
+gMaxCTLEPeak   = 20          # max. allowed CTLE peaking (dB) (when optimizing, only)
 
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
@@ -145,9 +148,10 @@ class PyBERT(HasTraits):
     rx_bw_tune      = Float(gBW)
     peak_freq_tune  = Float(gPeakFreq)
     peak_mag_tune   = Float(gPeakMag)
-    pulse_tune      = Bool(False)
-    rel_opt         = Float(0.)
+    pulse_tune      = Bool(True)
     ideal_type      = List([2])                                             # 0 = impulse; 1 = sinc; 2 = raised cosine
+    max_iter        = Int(2)                                               # max. # of optimization iterations
+    rel_opt         = Float(0.)
     # - Tx
     vod             = Float(gVod)                                           # (V)
     rs              = Float(gRs)                                            # (Ohms)
@@ -237,6 +241,7 @@ class PyBERT(HasTraits):
     tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune', 'nspui'])
     ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune', 'w', 'len_h'])
     ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune', 'ideal_h', 'chnl_h'])
+    cost            = Property(Float,   depends_on=['ctle_out_h_tune'])
     t               = Property(Array,   depends_on=['ui', 'nspb', 'nbits'])
     t_ns            = Property(Array,   depends_on=['t'])
     f               = Property(Array,   depends_on=['t'])
@@ -249,6 +254,13 @@ class PyBERT(HasTraits):
     nui             = Property(Int,     depends_on=['nbits', 'mod_type'])
     nspui           = Property(Int,     depends_on=['nspb', 'mod_type'])
     eye_uis         = Property(Int,     depends_on=['eye_bits', 'mod_type'])
+
+    # Custom buttons, which we'll use in particular tabs.
+    # (Globally applicable buttons, such as "Run" and "Ok", are handled more simply, in the View.)
+    btn_rst_eq  = Button(label = 'ResetEq')
+    btn_save_eq = Button(label = 'SaveEq')
+    btn_opt_tx  = Button(label = 'OptTx')
+    btn_opt_rx  = Button(label = 'OptRx')
 
     # Default initialization
     def __init__(self, run_simulation = True):
@@ -270,6 +282,51 @@ class PyBERT(HasTraits):
 
             # Once the required data structure is filled in, we can create the plots.
             make_plots(self, n_dfe_taps = gNtaps)
+
+    # Button handlers
+    def _btn_rst_eq_fired(self):
+        self.pretap_tune    = self.pretap
+        self.posttap_tune   = self.posttap
+        self.posttap2_tune  = self.posttap2
+        self.peak_freq_tune = self.peak_freq
+        self.peak_mag_tune  = self.peak_mag
+        self.posttap3_tune  = self.posttap3
+        self.rx_bw_tune     = self.rx_bw
+
+    def _btn_save_eq_fired(self):
+        self.pretap    = self.pretap_tune
+        self.posttap   = self.posttap_tune
+        self.posttap2  = self.posttap2_tune
+        self.posttap3  = self.posttap3_tune
+        self.peak_freq = self.peak_freq_tune
+        self.peak_mag  = self.peak_mag_tune
+        self.rx_bw     = self.rx_bw_tune
+
+    def _btn_opt_tx_fired(self):
+        ideal_h   = self.ideal_h
+        chnl_h    = self.chnl_h
+        ctle_h    = self.ctle_h_tune
+        nspui     = self.nspui
+        max_iter  = self.max_iter
+        use_pulse = self.pulse_tune
+        old_taps  = [ self.pretap_tune,
+                      self.posttap_tune,
+                      self.posttap2_tune,
+                      self.posttap3_tune
+                    ]
+
+        cons     = ({'type': 'ineq',
+                     'fun' : lambda x: array([1 - sum(abs(x))])})
+        if(gDebugOptimize):
+            res  = minimize(do_opt_tx, old_taps, args=(self, ),
+                            constraints=cons, options={'disp' : True, 'maxiter' : max_iter})
+        else:
+            res  = minimize(do_opt_tx, old_taps, args=(self, ),
+                            constraints=cons, options={'disp' : False, 'maxiter' : max_iter})
+
+    def _btn_opt_rx_fired(self):
+        max_iter = self.max_iter
+        res      = minimize_scalar(do_opt_rx, bounds=(0, gMaxCTLEPeak), args=(self,), method='Bounded', options={'disp' : True, 'maxiter' : max_iter})
 
     # Dependent variable definitions
     @cached_property
@@ -762,7 +819,8 @@ class PyBERT(HasTraits):
         peak_mag  = self.peak_mag_tune
 
         w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w)
-        ctle_H     = H / abs(H[0])              # Scale to force d.c. component of '1'.
+#        ctle_H     = H / abs(H[0])              # Scale to force d.c. component of '1'.
+        ctle_H    = H
 
         return real(ifft(ctle_H))[:len_h]
 
@@ -777,16 +835,20 @@ class PyBERT(HasTraits):
         nspui     = self.nspui
         rel_opt   = self.rel_opt
 
-        len_h      = len(chnl_h)
         tx_out_h   = convolve(tx_h,   chnl_h)
         ctle_out_h = convolve(ctle_h, tx_out_h)
 
         cost, ideal_resp, the_resp = calc_cost(ctle_out_h, ideal_h, nspui, use_pulse)
 
         self.ctle_out_g_tune = ideal_resp
+        self._cost           = cost
         self.rel_opt         = 1. / cost
 
         return the_resp
+
+    @cached_property
+    def _get_cost(self):
+        return self._cost
 
     # Changed property handlers.
     def _ctle_out_h_tune_changed(self):

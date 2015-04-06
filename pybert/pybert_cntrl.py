@@ -259,7 +259,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
     w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
-    ctle_H          = H / abs(H[0])              # Scale to force d.c. component of '1'.
+#    ctle_H          = H / abs(H[0])              # Scale to force d.c. component of '1'.
+    ctle_H          = H
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
     ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
     ctle_out       -= mean(ctle_out)             # Force zero mean.
@@ -667,4 +668,15 @@ def update_eyes(self):
     self.plots_eye.components[3].invalidate_draw()
 
     self.plots_eye.request_redraw()
+
+def do_opt_rx(peak_mag, self):
+    self.peak_mag_tune = peak_mag
+    return self.cost
+
+def do_opt_tx(taps, self):
+    self.pretap_tune   = taps[0]
+    self.posttap_tune  = taps[1]
+    self.posttap2_tune = taps[2]
+    self.posttap3_tune = taps[3]
+    return self.cost
 
