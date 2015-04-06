@@ -7,26 +7,26 @@ Original date:   September 27, 2014 (Copied from `pybert_cntrl.py'.)
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
-from numpy        import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, log10, sqrt, power, exp, cumsum
-from numpy.random import normal
-from numpy.fft    import fft
-from scipy.signal import lfilter, iirfilter, invres, freqs, medfilt
-from scipy.optimize import minimize
-from dfe          import DFE
-from cdr          import CDR
-import time
-from pylab import *
-import numpy as np
-import scipy.stats as ss
+from numpy          import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, append, pad, real, histogram
+from numpy          import log10, sqrt, power, exp, cumsum, mean, power, convolve, correlate, reshape, resize, insert, shape
+from numpy.random   import normal
+from numpy.fft      import fft, ifft
+from scipy.signal   import lfilter, iirfilter, invres, freqs, medfilt
+from scipy.optimize import minimize, minimize_scalar
+from scipy.stats    import norm
+from dfe            import DFE
+from cdr            import CDR
 
-debug = False
+debug          = False
+gDebugOptimize = True
+gMaxCTLEPeak   = 20          # max. allowed CTLE peaking (dB) (when optimizing, only)
 
 def moving_average(a, n=3) :
     """Calculates a sliding average over the input vector."""
 
-    ret = np.cumsum(a, dtype=float)
+    ret     = cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return np.insert(ret[n - 1:], 0, ret[n - 1] * ones(n - 1)) / n
+    return insert(ret[n - 1:], 0, ret[n - 1] * ones(n - 1)) / n
 
 def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1, thresh = 0.):
     """
@@ -159,18 +159,7 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
 
     """
 
-    if  (mod_type == 0):                         # NRZ
-        xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
-    elif(mod_type == 1):                         # Duo-binary
-        xings_low  = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh = -amplitude / 2.))
-        xings_high = list(find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev, thresh =  amplitude / 2.))
-        xings      = (xings_low + xings_high)
-        xings.sort()
-    elif(mod_type == 2):                         # PAM-4
-        xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
-    else:                                        # Unknown
-        raise Exception("ERROR: find_crossings(): Unknown modulation type requested!")
-
+    xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
     return array(xings)
 
 def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
@@ -242,7 +231,8 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     t_jitter = []
     i        = 0
     ideal_xings  = array(ideal_xings)  - (ideal_xings[0] - ui / 2.)
-    actual_xings = array(actual_xings) - (actual_xings[0] - ideal_xings[0])
+    if(len(actual_xings)):
+        actual_xings = array(actual_xings) - (actual_xings[0] - ideal_xings[0])
 
     skip_next_ideal_xing = False
     pad_ixs = []
@@ -301,7 +291,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     if(False):
         if(len(jitter) < xings_per_pattern * num_patterns):
             print "Added %d zeros to 'jitter'." % (xings_per_pattern * num_patterns - len(jitter))
-            jitter = np.append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
+            jitter = append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
         try:
             t_jitter = t_jitter[:len(jitter)]
             if(len(jitter) > len(t_jitter)):
@@ -313,17 +303,17 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
 
     # -- Do the reshaping and check results thoroughly.
     try:
-        tie_risings          = reshape(jitter.take(range(0, num_patterns * risings_per_pattern * 2, 2)),  (num_patterns, risings_per_pattern))
-        tie_fallings         = reshape(jitter.take(range(1, num_patterns * fallings_per_pattern * 2, 2)), (num_patterns, fallings_per_pattern))
+        tie_risings  = jitter.take(range(0, len(jitter), 2))
+        tie_fallings = jitter.take(range(1, len(jitter), 2))
+        tie_risings.resize (num_patterns * risings_per_pattern)
+        tie_fallings.resize(num_patterns * fallings_per_pattern)
+        tie_risings  = reshape(tie_risings, (num_patterns, risings_per_pattern))
+        tie_fallings = reshape(tie_fallings,(num_patterns, fallings_per_pattern))
     except:
         print "ideal_xings[xings_per_pattern - 1]:", ideal_xings[xings_per_pattern - 1], "ideal_xings[-1]:", ideal_xings[-1]
         print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
         print "nui:", nui, "pattern_len:", pattern_len
         raise
-    assert all(tie_risings),  "num_patterns: %d, risings_per_pattern: %d, len(jitter): %d" % \
-                                           (num_patterns, risings_per_pattern, len(jitter))
-    assert all(tie_fallings), "num_patterns: %d, fallings_per_pattern: %d, len(jitter): %d" % \
-                                           (num_patterns, fallings_per_pattern, len(jitter))
 
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
     tie_risings_ave  = tie_risings.mean(axis=0)
@@ -333,7 +323,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
 
     # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
-    tie_ave  = concatenate(zip(tie_risings_ave, tie_fallings_ave))
+    tie_ave  = sum(zip(tie_risings_ave, tie_fallings_ave), ())
     tie_ave  = resize(tie_ave, len(jitter))
     tie_ind  = jitter - tie_ave
 
@@ -385,10 +375,10 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     hist_synth, bin_centers = my_hist(jitter_synth)
 
     # - Extrapolate the tails by convolving w/ complete Gaussian.
-    rv         = ss.norm(loc = 0., scale = rj)
+    rv         = norm(loc = 0., scale = rj)
     rj_pdf     = rv.pdf(bin_centers)
     rj_pmf     = (rj_pdf / sum(rj_pdf))
-    hist_synth = np.convolve(hist_synth, rj_pmf)
+    hist_synth = convolve(hist_synth, rj_pmf)
     tail_len   = (len(bin_centers) - 1) / 2
     hist_synth = [sum(hist_synth[: tail_len + 1])] + list(hist_synth[tail_len + 1 : len(hist_synth) - tail_len - 1]) + [sum(hist_synth[len(hist_synth) - tail_len - 1 :])]
 
@@ -472,10 +462,10 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
         w[0] = 1.e-12
 
     Rac   = R0 * sqrt(2 * 1j * w / w0)                        # AC resistance vector
-    R     = sqrt(np.power(Rdc, 2) + np.power(Rac, 2))         # total resistance vector
+    R     = sqrt(power(Rdc, 2) + power(Rac, 2))               # total resistance vector
     L0    = Z0 / v0                                           # "external" inductance per unit length (H/m)
     C0    = 1. / (Z0 * v0)                                    # nominal capacitance per unit length (F/m)
-    C     = C0 * np.power((1j * w / w0), (-2. * Theta0 / pi)) # complex capacitance per unit length (F/m)
+    C     = C0 * power((1j * w / w0), (-2. * Theta0 / pi))    # complex capacitance per unit length (F/m)
     gamma = sqrt((1j * w * L0 + R) * (1j * w * C))            # propagation constant (nepers/m)
     Zc    = sqrt((1j * w * L0 + R) / (1j * w * C))            # characteristic impedance (Ohms)
 
@@ -642,7 +632,10 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
         r2   = z - p1
     b, a = invres([r1, r2], [p1, p2], [])
 
-    return freqs(b, a, w)
+    w, H = freqs(b, a, w)
+    H   /= max(abs(H))                           # Enforce passivity.
+
+    return (w, H)
 
 def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     """
@@ -734,42 +727,15 @@ def import_qucs_csv(filename, sample_per):
 
 def trim_shift_scale(ideal_h, actual_h, use_corr = False):
     if(use_corr):
-        corr_res = np.correlate(ideal_h, actual_h, mode='valid')
-        offset   = where(corr_res == max(corr_res))[0][0]
+        corr_res = correlate(ideal_h, actual_h, mode='valid')
+        corr_res = where(corr_res < 0., zeros(len(corr_res)), corr_res)
+        offset   = int(sum([i * corr_res[i] ** 2 for i in range(len(corr_res))]) / sum(corr_res ** 2))
     else:
-        offset   = where(ideal_h == max(ideal_h))[0][0] - where(actual_h == max(actual_h))[0][0]
+        offset   = mean(where(ideal_h == max(ideal_h))[0]) - mean(where(actual_h == max(actual_h))[0])
 
-#    return roll(ideal_h, -offset)[:len(actual_h)] * max(actual_h) / max(ideal_h)
     res = ideal_h[offset:].copy()
     res.resize(len(actual_h))                    # Clips, if too long; pads w/ zeros, if too short.
     return res * max(actual_h) / max(res)
-
-def opt_tx(old_taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None):
-    """
-    """
-
-    cons     = ({'type': 'ineq',
-                    'fun' : lambda x: np.array([1 - sum(abs(x))])})
-    res      = minimize(ffe_cost, old_taps, args=(cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h), constraints=cons, options={'disp' : True})
-
-    return res.x
-
-def ffe_cost(taps, cursor_pos, nspui, chnl_h, ideal_h, use_pulse, ctle_h = None):
-    """
-    """
-
-    # Assemble the link impulse response.
-    main_tap = 1. - sum(abs(taps))
-    taps     = list(taps)
-    taps.insert(cursor_pos, main_tap)
-    tx_h     = concatenate([[x] + list(zeros(nspui - 1)) for x in taps])
-    out_h    = np.convolve(tx_h, chnl_h)
-    if ctle_h is not None:
-        out_h = np.convolve(ctle_h, out_h)
-    
-    cost, ideal_resp, actual_resp = calc_cost(out_h, ideal_h, nspui, use_pulse)
-
-    return cost
 
 def calc_cost(actual_h, ideal_h, nspui, use_pulse):
     """
@@ -799,9 +765,9 @@ def calc_cost(actual_h, ideal_h, nspui, use_pulse):
     if(use_pulse):
         ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
         actual_s = actual_h.cumsum()
-        actual   = actual_s - np.pad(actual_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
+        actual   = actual_s - pad(actual_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
         ideal_s  = ideal_h.cumsum()
-        ideal    = ideal_s - np.pad(ideal_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
+        ideal    = ideal_s - pad(ideal_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
         assert max(ideal) == max(abs(ideal)), "pybert_util.calc_cost(): ERROR: Ideal response peak is negative!"
         min_thresh   = 0.01 * max(ideal)
         pulse_center = int(sum([i * ideal[i] ** 2 for i in range(len(ideal))]) / sum(ideal ** 2))
@@ -813,7 +779,10 @@ def calc_cost(actual_h, ideal_h, nspui, use_pulse):
         while(i < len(ideal) and ideal[i] > min_thresh):
             i += 1
         pulse_right = i
-        cost = sum(actual[:pulse_left + 1] ** 2) + sum(actual[pulse_right:] ** 2) 
+        pwr_outside = sum(actual[:pulse_left + 1] ** 2) + sum(actual[pulse_right:] ** 2) 
+        pwr_inside  = sum(actual[pulse_left + 1 : pulse_right] ** 2)
+        cost        = pwr_outside / pwr_inside
+        #cost        = pwr_outside
     else:
         ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
         actual   = actual_h
@@ -831,11 +800,20 @@ def lfsr_bits(taps, seed):
     mask     = (1 << num_taps) - 1
 
     while(True):
-        print "val:", val
         xor_res = reduce(lambda x, b: x ^ b, [bool(val & (1 << (tap - 1))) for tap in taps])
-        print "xor_res:", xor_res
         val     = (val << 1) & mask  # Just to keep 'val' from growing without bound.
         if(xor_res):
             val += 1
         yield(val & 1)
+
+def safe_log10(x):
+    "Guards against pesky 'Divide by 0' error messages."
+
+    if hasattr(x, "__len__"):
+        x = where(x == 0, 1.e-20 * ones(len(x)), x)
+    else:
+        if(x == 0):
+            x = 1.e-20
+
+    return log10(x)
 

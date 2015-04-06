@@ -8,12 +8,9 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem
-from enthought.enable.component_editor import ComponentEditor
-import time
-import numpy as np
+from enable.component_editor import ComponentEditor
 
-from pybert_cntrl import *
-from pybert_util  import ffe_cost, opt_tx
+from pybert_cntrl            import my_run_sweeps
 
 class MyHandler(Handler):
     """This handler is instantiated by the View and handles user button clicks."""
@@ -21,48 +18,7 @@ class MyHandler(Handler):
     def do_run_simulation(self, info):
         my_run_sweeps(info.object)
 
-    def do_tune_save(self, info):
-        info.object.pretap    = info.object.pretap_tune
-        info.object.posttap   = info.object.posttap_tune
-        info.object.posttap2  = info.object.posttap2_tune
-        info.object.posttap3  = info.object.posttap3_tune
-        info.object.peak_freq = info.object.peak_freq_tune
-        info.object.peak_mag  = info.object.peak_mag_tune
-        info.object.rx_bw     = info.object.rx_bw_tune
-
-    def do_tune_revert(self, info):
-        info.object.pretap_tune    = info.object.pretap
-        info.object.posttap_tune   = info.object.posttap
-        info.object.posttap2_tune  = info.object.posttap2
-        info.object.posttap3_tune  = info.object.posttap3
-        info.object.peak_freq_tune = info.object.peak_freq
-        info.object.peak_mag_tune  = info.object.peak_mag
-        info.object.rx_bw_tune     = info.object.rx_bw
-
-    def do_tune_opt_tx(self, info):
-        ideal_h   = info.object.ideal_h
-        chnl_h    = info.object.chnl_h
-        ctle_h    = info.object.ctle_h_tune
-        nspui     = info.object.nspui
-        use_pulse = info.object.pulse_tune
-        old_taps = [ info.object.pretap_tune,
-                     info.object.posttap_tune,
-                     info.object.posttap2_tune,
-                     info.object.posttap3_tune
-                   ]
-
-        new_taps = opt_tx(old_taps, 1, nspui, chnl_h, ideal_h, use_pulse, ctle_h)
-
-        info.object.pretap_tune   = new_taps[0]
-        info.object.posttap_tune  = new_taps[1]
-        info.object.posttap2_tune = new_taps[2]
-        info.object.posttap3_tune = new_taps[3]
-
 run_simulation = Action(name="Run",     action="do_run_simulation")
-tune_save      = Action(name="SaveEq",  action="do_tune_save")
-tune_revert    = Action(name="ResetEq", action="do_tune_revert")
-tune_opt_tx    = Action(name="OptTx",   action="do_tune_opt_tx")
-
     
 # Main window layout definition.
 traits_view = View(
@@ -174,7 +130,6 @@ traits_view = View(
                 ),
             ),
             label = 'Config.', id = 'config',
-            #layout = 'flow',
         ),
         Group(
             Item('plots_dfe', editor=ComponentEditor(), show_label=False,),
@@ -183,27 +138,35 @@ traits_view = View(
         VGroup(
             HGroup(
                 VGroup(
-                    Item(name='pretap_tune',    label='Pre-tap',              tooltip="pre-cursor tap weight", ),
-                    Item(name='posttap_tune',   label='Post-tap',             tooltip="post-cursor tap weight", ),
-                    Item(name='posttap2_tune',  label='Post-tap2',            tooltip="2nd post-cursor tap weight", ),
-                    Item(name='posttap3_tune',  label='Post-tap3',            tooltip="3rd post-cursor tap weight", ),
+                    Item(name='pretap_tune',    label='Pre-tap',              format_str='%7.4f', tooltip="pre-cursor tap weight", ),
+                    Item(name='posttap_tune',   label='Post-tap',             format_str='%7.4f', tooltip="post-cursor tap weight", ),
+                    Item(name='posttap2_tune',  label='Post-tap2',            format_str='%7.4f', tooltip="2nd post-cursor tap weight", ),
+                    Item(name='posttap3_tune',  label='Post-tap3',            format_str='%7.4f', tooltip="3rd post-cursor tap weight", ),
                     label='Tx Equalization', show_border=True,
                 ),
                 VGroup(
-                    Item(name='peak_freq_tune', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
-                    Item(name='peak_mag_tune',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
-                    Item(name='rx_bw_tune',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
-                    label = 'Rx Equalization', show_border = True,
+                    Item(name='peak_freq_tune', label='CTLE fp (GHz)',                            tooltip="CTLE peaking frequency (GHz)", ),
+                    Item(name='peak_mag_tune',  label='CTLE boost (dB)',      format_str='%7.4f', tooltip="CTLE peaking magnitude (dB)", ),
+                    Item(name='rx_bw_tune',     label='Bandwidth (GHz)',                          tooltip="unequalized signal path bandwidth (GHz).", ),
+                    Item(label="Note: Only peaking magnitude will be optimized;\nplease, set peak frequency and bandwidth appropriately."),
+                    label = 'Rx Equalization', show_border = True, 
                 ),
                 VGroup(
-                    Item(name='ideal_type',     label='Ideal Response Type',   tooltip="Ideal impulse response type.",
+                    Item(name='ideal_type',     label='Ideal Response Type',                      tooltip="Ideal impulse response type.",
                                                 editor=CheckListEditor(values=[(0, 'Impulse'), (1, 'Sinc'), (2, 'Raised Cosine'),])),
-                    Item(name='pulse_tune',     label='Use Pulse Response',   tooltip="Use pulse response, as opposed to impulse response, to tune equalization.", ),
-                    Item(name='rel_opt',        label='Rel. Opt.',            tooltip="Relative optimization metric.", ),
+                    Item(name='pulse_tune',     label='Use Pulse Response',                       tooltip="Use pulse response, as opposed to impulse response, to tune equalization.", ),
+                    Item(name='rel_opt',        label='Rel. Opt.',            format_str='%7.4f', tooltip="Relative optimization metric.", ),
+                    Item(name='max_iter',       label='Max. Iterations',                          tooltip="Maximum number of iterations to allow, during optimization.", ),
                     label = 'Tuning Options', show_border = True,
                 ),
             ),
             Item('plot_h_tune', editor=ComponentEditor(), show_label=False,),
+            HGroup(
+                Item('btn_rst_eq',  show_label=False, tooltip="Reset all values to those on the 'Config.' tab.",),
+                Item('btn_save_eq', show_label=False, tooltip="Store all values to 'Config.' tab.",),
+                Item('btn_opt_tx',  show_label=False, tooltip="Run Tx tap weight optimization.",),
+                Item('btn_opt_rx',  show_label=False, tooltip="Run Rx CTLE optimization.",),
+            ),
             label = 'EQ Tune', id = 'eq_tune',
         ),
         Group(
@@ -263,7 +226,7 @@ traits_view = View(
     ),
     resizable = True,
     handler = MyHandler(),
-    buttons = [tune_revert, tune_save, tune_opt_tx, run_simulation, "OK"],
+    buttons = [run_simulation, "OK"],
     statusbar = "status_str",
     title='PyBERT',
     width=1200, height=800
