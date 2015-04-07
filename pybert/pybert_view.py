@@ -7,16 +7,33 @@ Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major co
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
+from threading               import Thread
+
+from traits.api              import Instance
 from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem
 from enable.component_editor import ComponentEditor
 
 from pybert_cntrl            import my_run_sweeps
 
+class RunSimThread(Thread):
+    'Used to run the simulation in its own thread, in order to preserve GUI responsiveness.'
+
+    def run(self):
+        my_run_sweeps(self.the_pybert)
+
 class MyHandler(Handler):
     """This handler is instantiated by the View and handles user button clicks."""
 
+    run_sim_thread = Instance(RunSimThread)
+
     def do_run_simulation(self, info):
-        my_run_sweeps(info.object)
+        the_pybert = info.object
+        if self.run_sim_thread and self.run_sim_thread.isAlive():
+            pass
+        else:
+            self.run_sim_thread            = RunSimThread()
+            self.run_sim_thread.the_pybert = the_pybert
+            self.run_sim_thread.start()
 
 run_simulation = Action(name="Run",     action="do_run_simulation")
     

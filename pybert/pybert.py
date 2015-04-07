@@ -167,6 +167,7 @@ class PyBERT(HasTraits):
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
     do_sweep        = Bool(False)
+#    run_sim_thread  = Instance(RunSimThread)
     # - Channel Control
     use_ch_file     = Bool(False)
     ch_file         = File('', entries=5, filter=['*.csv'])
@@ -260,9 +261,9 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)                                                # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.5 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.6 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    April 3, 2015\n\n \
+    April 6, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help

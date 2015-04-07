@@ -8,11 +8,13 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 from time         import clock, sleep
+
 from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where
 from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum
 from numpy.random import normal
 from numpy.fft    import fft, ifft
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
+
 from dfe          import DFE
 from cdr          import CDR
 
