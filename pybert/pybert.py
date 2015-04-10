@@ -157,10 +157,14 @@ class PyBERT(HasTraits):
 
     # Independent variables
     # - Simulation Control
-    bit_rate        = Float(gBitRate)                                       # (Gbps)
-    nbits           = Int(gNbits)
-    pattern_len     = Int(gPatLen)
-    nspb            = Int(gNspb)
+#    bit_rate        = Float(gBitRate)                                       # (Gbps)
+    bit_rate        = Range(low=1.0, high=100.0, value=gBitRate)            # (Gbps)
+#    nbits           = Int(gNbits)
+    nbits           = Range(low=1000, high=10000000, value=gNbits)
+#    pattern_len     = Int(gPatLen)
+    pattern_len     = Range(low=7, high=10000000, value=gPatLen)
+#    nspb            = Int(gNspb)
+    nspb            = Range(low=2, high=256, value=gNspb)
     eye_bits        = Int(gNbits // 5)
     mod_type        = List([0])                                             # 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
     num_sweeps      = Int(1)

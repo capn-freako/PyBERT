@@ -178,25 +178,33 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     Ts         = t[1]
 
     # Generate the ideal over-sampled signal.
+    #
+    # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
+    # impulse response, in order to produce the proper ideal signal.
+    #
+    # Note that we don't use the ideal duobinary signal thusly constructed for determining
+    # the ideal crossing locations, below, because it has "shelves" at zero volts, which
+    # wreak havoc on our zero crossing detection algorithm.
     x = repeat(symbols, nspui)
-
-    # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
-    # (Duo-binary is problematic, in that it requires convolution with the ideal duobinary
-    #  impulse response, in order to produce the proper ideal crossings.)
     tmp_x = x
     if(mod_type == 1):
         duob_h = array(([0.5] + [0.] * (nspui - 1)) * 2)
         tmp_x  = convolve(tmp_x, duob_h)[:len(t)]
-#    ideal_xings = find_crossings(t, tmp_x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
+    self.ideal_signal = tmp_x
 
-    ideal_xings = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
-    self.ideal_xings  = ideal_xings
+    # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
+    ideal_xings      = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
+    self.ideal_xings = ideal_xings
 
     # Generate the ideal impulse responses.
     chnl_h       = self.calc_chnl_h()
     self.chnl_g  = trim_shift_scale(ideal_h, chnl_h)
 
     # Calculate the channel output.
+    #
+    # Note: We're not using 'tmp_x', because we rely on the system response to
+    #       create the duobinary waveform. We only create it explicitly, above,
+    #       so that we'll have an ideal reference for comparison.
     chnl_out  = convolve(x, chnl_h)[:len(x)]
 
     self.channel_perf = nbits * nspb / (clock() - start_time)
@@ -204,14 +212,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status       = 'Running Tx...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
+    #
     # - Generate the ideal, post-preemphasis signal.
     # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
     ffe_out           = convolve(symbols, ffe)[:len(symbols)]
     self.rel_power    = mean(ffe_out ** 2)                    # Store the relative average power dissipated in the Tx.
     tx_out            = repeat(ffe_out, nspui)                # oversampled output
-    #self.ideal_signal = x
-    #self.ideal_signal = tx_out
-    self.ideal_signal = tmp_x
 
     # - Calculate the responses.
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
@@ -222,6 +228,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     temp   = tx_h.copy()
     temp.resize(len(w))
     tx_H   = fft(temp)
+
     # - Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
     #   - Generate the ideal rectangular aggressor waveform.
     pn_period          = 1. / pn_freq
@@ -232,8 +239,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     #   - High pass filter it. (Simulating capacitive coupling.)
     (b, a) = iirfilter(2, gFc/(fs/2), btype='highpass')
     pn     = lfilter(b, a, pn)[:len(pn)]
+
     # - Add the uncorrelated periodic noise to the Tx output.
     tx_out += pn
+
     # - Convolve w/ channel.
     tx_out_h   = convolve(tx_h, chnl_h)[:len(chnl_h)]
     tx_out_g   = trim_shift_scale(ideal_h, tx_out_h)
@@ -241,6 +250,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     temp.resize(len(w))
     tx_out_H   = fft(temp)
     rx_in      = convolve(tx_out, chnl_h)[:len(tx_out)]
+
     # - Add the random noise to the Rx input.
     rx_in     += normal(scale=rn, size=(len(tx_out),))
 
@@ -261,7 +271,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
     w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
-#    ctle_H          = H / abs(H[0])              # Scale to force d.c. component of '1'.
     ctle_H          = H
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
     ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
@@ -419,10 +428,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         skip_factor                  = nbits / eye_bits
         ctle_spec                    = self.jitter_spectrum_ctle
         dfe_spec                     = self.jitter_spectrum_dfe
-        ctle_spec_condensed          = array([ctle_spec.take(range(i, i + skip_factor)).mean() for i in range(0, len(ctle_spec), skip_factor)])
-        window_width                 = len(dfe_spec) / 10
-        self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
-        #self.jitter_rejection_ratio  = zeros(len(dfe_spec))
+#        ctle_spec_condensed          = array([ctle_spec.take(range(i, i + skip_factor)).mean() for i in range(0, len(ctle_spec), skip_factor)])
+#        window_width                 = len(dfe_spec) / 10
+#        self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
+        self.jitter_rejection_ratio  = zeros(len(dfe_spec))
     except:
         raise
         self.thresh_dfe              = array([])
@@ -497,7 +506,7 @@ def update_results(self):
     self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
     # Impulse responses
-    self.plotdata.set_data("chnl_h",     self.chnl_h)
+    self.plotdata.set_data("chnl_h",     self.chnl_h / t_ns[1])
     self.plotdata.set_data("chnl_g",     self.chnl_g)
     self.plotdata.set_data("tx_h",       self.tx_h)
     self.plotdata.set_data("tx_out_h",   self.tx_out_h)
