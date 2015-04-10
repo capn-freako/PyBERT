@@ -8,7 +8,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 from numpy          import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, append, pad, real, histogram
-from numpy          import log10, sqrt, power, exp, cumsum, mean, power, convolve, correlate, reshape, resize, insert, shape
+from numpy          import log10, sqrt, power, exp, cumsum, mean, power, convolve, correlate, reshape, resize, insert, shape, concatenate
 from numpy.random   import normal
 from numpy.fft      import fft, ifft
 from scipy.signal   import lfilter, iirfilter, invres, freqs, medfilt
@@ -707,9 +707,13 @@ def import_qucs_csv(filename, sample_per):
     ts = []
     xs = []
     with open(filename, mode='rU') as csv_file:
-        line = csv_file.readline()               # We don't use the header.
+#        line = csv_file.readline()               # We don't use the header.
         for line in csv_file:
-            tmp = map (float, line.split(';'))   # QUCS uses the semicolon as the field separator.
+#            tmp = map (float, line.split(';'))   # QUCS uses the semicolon as the field separator.
+            try:
+                tmp = map(float, concatenate(map(lambda s: s.split(','), line.split(';'))))
+            except:
+                continue
             ts.append(tmp[0])
             xs.append(tmp[1])
 

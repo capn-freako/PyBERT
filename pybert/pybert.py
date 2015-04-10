@@ -918,6 +918,8 @@ class PyBERT(HasTraits):
 
         if(self.use_ch_file):
             chnl_h           = import_qucs_csv(self.ch_file, ts)
+            if(chnl_h[-1] > (max(chnl_h) / 2.)):  # step response?
+                chnl_h       = diff(chnl_h)      # impulse response is derivative of step response.
             chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
             chnl_h.resize(len(t))
             chnl_H           = fft(chnl_h)

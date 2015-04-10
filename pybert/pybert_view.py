@@ -44,14 +44,25 @@ traits_view = View(
             HGroup(
                 HGroup(
                     VGroup(
-                        Item(name='bit_rate',    label='Bit Rate (Gbps)',  tooltip="bit rate", show_label=True, enabled_when='True'),
-                        #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
-                        Item(name='nbits',       label='Nbits',    tooltip="# of bits to run", ),
-                        Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit", ),
-                        Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream", ),
-                        Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams", ),
+                        Item(name='bit_rate',    label='Bit Rate (Gbps)',  tooltip="bit rate", show_label=True, enabled_when='True',
+                            #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                        ),
+                        Item(name='nbits',       label='Nbits',    tooltip="# of bits to run",
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                        ),
+                        Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit",
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                        ),
+                        Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream",
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                        ),
+                        Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams",
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                        ),
                         Item(name='mod_type',    label='Modulation', tooltip="line signalling/modulation scheme",
-                                                                    editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])),
+                            editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])
+                        ),
                     ),
                     VGroup(
                         Item(name='do_sweep',    label='Do Sweep',    tooltip="Run parameter sweeps.", ),
