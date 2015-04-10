@@ -267,7 +267,7 @@ class PyBERT(HasTraits):
     # - About
     ident  = String('PyBERT v1.6 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    April 6, 2015\n\n \
+    April 10, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
