@@ -87,24 +87,29 @@ def make_plots(self, n_dfe_taps):
     plot_h_chnl.title            = "Channel"
     plot_h_chnl.index_axis.title = "Time (ns)"
     plot_h_chnl.y_axis.title     = "Impulse Response (V/ns)"
+    zoom_h = ZoomTool(plot_h_chnl, tool_mode="range", axis='index', always_on=False)
+    plot_h_chnl.overlays.append(zoom_h)
 
     plot_h_tx = Plot(plotdata)
     plot_h_tx.plot(("t_ns_chnl", "tx_out_h"), type="line", color="red",  name="Cumulative")
     plot_h_tx.title            = "Channel + Tx Preemphasis"
     plot_h_tx.index_axis.title = "Time (ns)"
     plot_h_tx.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_tx.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
     plot_h_ctle = Plot(plotdata)
     plot_h_ctle.plot(("t_ns_chnl", "ctle_out_h"), type="line", color="red",  name="Cumulative")
     plot_h_ctle.title            = "Channel + Tx Preemphasis + CTLE"
     plot_h_ctle.index_axis.title = "Time (ns)"
     plot_h_ctle.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_ctle.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
     plot_h_dfe = Plot(plotdata)
     plot_h_dfe.plot(("t_ns_chnl", "dfe_out_h"), type="line", color="red",  name="Cumulative")
     plot_h_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_h_dfe.index_axis.title = "Time (ns)"
     plot_h_dfe.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_dfe.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
     container_h = GridPlotContainer(shape=(2,2))
     container_h.add(plot_h_chnl)
@@ -119,6 +124,8 @@ def make_plots(self, n_dfe_taps):
     plot_s_chnl.title            = "Channel"
     plot_s_chnl.index_axis.title = "Time (ns)"
     plot_s_chnl.y_axis.title     = "Step Response (V)"
+    zoom_s = ZoomTool(plot_s_chnl, tool_mode="range", axis='index', always_on=False)
+    plot_s_chnl.overlays.append(zoom_s)
 
     plot_s_tx = Plot(plotdata)
     plot_s_tx.plot(("t_ns_chnl", "tx_s"),     type="line", color="blue", name="Incremental")
@@ -128,6 +135,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_tx.y_axis.title     = "Step Response (V)"
     plot_s_tx.legend.visible   = True
     plot_s_tx.legend.align     = 'lr'
+    plot_s_tx.index_range = plot_s_chnl.index_range # Zoom x-axes in tandem.
 
     plot_s_ctle = Plot(plotdata)
     plot_s_ctle.plot(("t_ns_chnl", "ctle_s"),     type="line", color="blue", name="Incremental")
@@ -137,6 +145,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_ctle.y_axis.title     = "Step Response (V)"
     plot_s_ctle.legend.visible   = True
     plot_s_ctle.legend.align     = 'lr'
+    plot_s_ctle.index_range = plot_s_chnl.index_range # Zoom x-axes in tandem.
 
     plot_s_dfe = Plot(plotdata)
     plot_s_dfe.plot(("t_ns_chnl", "dfe_s"),     type="line", color="blue", name="Incremental")
@@ -146,6 +155,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_dfe.y_axis.title     = "Step Response (V)"
     plot_s_dfe.legend.visible   = True
     plot_s_dfe.legend.align     = 'lr'
+    plot_s_dfe.index_range = plot_s_chnl.index_range # Zoom x-axes in tandem.
 
     container_s = GridPlotContainer(shape=(2,2))
     container_s.add(plot_s_chnl)
@@ -160,6 +170,8 @@ def make_plots(self, n_dfe_taps):
     plot_p_chnl.title            = "Channel"
     plot_p_chnl.index_axis.title = "Time (ns)"
     plot_p_chnl.y_axis.title     = "Pulse Response (V)"
+    zoom_p = ZoomTool(plot_p_chnl, tool_mode="range", axis='index', always_on=False)
+    plot_p_chnl.overlays.append(zoom_p)
 
     plot_p_tx = Plot(plotdata)
     plot_p_tx.plot(("t_ns_chnl", "tx_out_p"), type="line", color="red",  name="Cumulative")
@@ -167,6 +179,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_tx.index_axis.title = "Time (ns)"
     plot_p_tx.y_axis.title     = "Pulse Response (V)"
     plot_p_tx.legend.align     = 'lr'
+    plot_p_tx.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
     plot_p_ctle = Plot(plotdata)
     plot_p_ctle.plot(("t_ns_chnl", "ctle_out_p"), type="line", color="red",  name="Cumulative")
@@ -174,6 +187,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_ctle.index_axis.title = "Time (ns)"
     plot_p_ctle.y_axis.title     = "Pulse Response (V)"
     plot_p_ctle.legend.align     = 'lr'
+    plot_p_ctle.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
     plot_p_dfe = Plot(plotdata)
     plot_p_dfe.plot(("t_ns_chnl", "dfe_out_p"), type="line", color="red",  name="Cumulative")
@@ -181,6 +195,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_dfe.index_axis.title = "Time (ns)"
     plot_p_dfe.y_axis.title     = "Pulse Response (V)"
     plot_p_dfe.legend.align     = 'lr'
+    plot_p_dfe.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
     container_p = GridPlotContainer(shape=(2,2))
     container_p.add(plot_p_chnl)

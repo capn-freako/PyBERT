@@ -665,6 +665,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     """
 
     g         = array(g)
+    g        -= g[0]
 
     if(Ts and chnl_dly):
         start_ix  = int(0.9 * chnl_dly / Ts)
@@ -673,7 +674,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
         i = 0
         while(abs(g[i]) < min_mag):
             i += 1
-        start_ix = int(0.9 * i)
+        start_ix = max(0, min(i - 10, int(0.9 * i)))
 
     Pt        = 0.998 * sum(g[start_ix:] ** 2)
     i         = start_ix

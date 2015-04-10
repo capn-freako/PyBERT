@@ -943,11 +943,14 @@ class PyBERT(HasTraits):
             chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
             chnl_h           = real(ifft(chnl_H)) * sqrt(len(chnl_H))    # Correcting for '1/N' scaling in ifft().
 
-        chnl_h           = chnl_h.copy()                                 # To allow use of 'resize()'.
+#        chnl_h           = chnl_h.copy()                                 # To allow use of 'resize()'.
         min_len          = 10 * nspui
 #        max_len          = 3 * chnl_dly / ts
         max_len          = 100 * nspui
-        chnl_h, start_ix = trim_impulse(chnl_h, ts, chnl_dly, min_len, max_len)
+#        chnl_h, start_ix = trim_impulse(chnl_h, ts, chnl_dly, min_len, max_len)
+        chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
+        chnl_h          -= mean(chnl_h[len(chnl_h) / -10 :])             # In order to avoid wandering step response.
+#        chnl_h          -= chnl_h[0]                                     # In order to avoid wandering step response.
         chnl_h          /= sum(chnl_h)                                   # a temporary crutch.
 
         chnl_s    = chnl_h.cumsum()
