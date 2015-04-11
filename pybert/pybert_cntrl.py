@@ -685,9 +685,14 @@ def do_opt_rx(peak_mag, self):
     return self.cost
 
 def do_opt_tx(taps, self):
-    self.pretap_tune   = taps[0]
-    self.posttap_tune  = taps[1]
-    self.posttap2_tune = taps[2]
-    self.posttap3_tune = taps[3]
+    taps = list(taps)
+    if(self.pretap_tune_enable):
+        self.pretap_tune   = taps.pop(0)
+    if(self.posttap_tune_enable):
+        self.posttap_tune  = taps.pop(0)
+    if(self.posttap2_tune_enable):
+        self.posttap2_tune = taps.pop(0)
+    if(self.posttap3_tune_enable):
+        self.posttap3_tune = taps.pop(0)
     return self.cost
 

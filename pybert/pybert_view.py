@@ -10,7 +10,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 from threading               import Thread
 
 from traits.api              import Instance
-from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem
+from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem, TextEditor
 from enable.component_editor import ComponentEditor
 
 from pybert_cntrl            import my_run_sweeps
@@ -46,7 +46,7 @@ traits_view = View(
                     VGroup(
                         Item(name='bit_rate',    label='Bit Rate (Gbps)',  tooltip="bit rate", show_label=True, enabled_when='True',
                             #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
-                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=float)
                         ),
                         Item(name='nbits',       label='Nbits',    tooltip="# of bits to run",
                             editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
@@ -96,25 +96,29 @@ traits_view = View(
             HGroup(
                 VGroup(
                     HGroup(
-                        Item(name='pretap',       label='Pre-tap',    tooltip="pre-cursor tap weight", ),
+                        Item(name='pretap_enable', label='Enable',    tooltip="Enable this tap."),
+                        Item(name='pretap',       label='Pre-tap',    tooltip="pre-cursor tap weight",         enabled_when='pretap_enable == True' ),
                         Item(name='pretap_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
-                        Item(name='pretap_final', show_label=False,   tooltip="final pretap value",                 enabled_when='pretap_sweep == True'),
-                        Item(name='pretap_steps', label='# of Steps', tooltip="number of pretap steps",             enabled_when='pretap_sweep == True'),
+                        Item(name='pretap_final', show_label=False,   tooltip="final pretap value",            enabled_when='pretap_sweep == True'),
+                        Item(name='pretap_steps', label='# of Steps', tooltip="number of pretap steps",        enabled_when='pretap_sweep == True'),
                     ),
                     HGroup(
-                        Item(name='posttap',       label='Post-tap',   tooltip="post-cursor tap weight", ),
+                        Item(name='posttap_enable', label='Enable',    tooltip="Enable this tap."),
+                        Item(name='posttap',       label='Post-tap',   tooltip="post-cursor tap weight",       enabled_when='posttap_enable == True' ),
                         Item(name='posttap_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
-                        Item(name='posttap_final', show_label=False,   tooltip="final posttap value",                 enabled_when='posttap_sweep == True'),
-                        Item(name='posttap_steps', label='# of Steps', tooltip="number of posttap steps",             enabled_when='posttap_sweep == True'),
+                        Item(name='posttap_final', show_label=False,   tooltip="final posttap value",          enabled_when='posttap_sweep == True'),
+                        Item(name='posttap_steps', label='# of Steps', tooltip="number of posttap steps",      enabled_when='posttap_sweep == True'),
                     ),
                     HGroup(
-                        Item(name='posttap2',       label='Post-tap2',  tooltip="2nd post-cursor tap weight", ),
+                        Item(name='posttap2_enable', label='Enable',    tooltip="Enable this tap."),
+                        Item(name='posttap2',       label='Post-tap2',  tooltip="2nd post-cursor tap weight",  enabled_when='posttap2_enable == True' ),
                         Item(name='posttap2_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
                         Item(name='posttap2_final', show_label=False,   tooltip="final value",                 enabled_when='posttap_sweep == True'),
                         Item(name='posttap2_steps', label='# of Steps', tooltip="number of steps",             enabled_when='posttap_sweep == True'),
                     ),
                     HGroup(
-                        Item(name='posttap3',       label='Post-tap3',  tooltip="3rd post-cursor tap weight", ),
+                        Item(name='posttap3_enable', label='Enable',    tooltip="Enable this tap."),
+                        Item(name='posttap3',       label='Post-tap3',  tooltip="3rd post-cursor tap weight",  enabled_when='posttap3_enable == True' ),
                         Item(name='posttap3_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
                         Item(name='posttap3_final', show_label=False,   tooltip="final value",                 enabled_when='posttap_sweep == True'),
                         Item(name='posttap3_steps', label='# of Steps', tooltip="number of steps",             enabled_when='posttap_sweep == True'),
@@ -166,10 +170,22 @@ traits_view = View(
         VGroup(
             HGroup(
                 VGroup(
-                    Item(name='pretap_tune',    label='Pre-tap',              format_str='%7.4f', tooltip="pre-cursor tap weight", ),
-                    Item(name='posttap_tune',   label='Post-tap',             format_str='%7.4f', tooltip="post-cursor tap weight", ),
-                    Item(name='posttap2_tune',  label='Post-tap2',            format_str='%7.4f', tooltip="2nd post-cursor tap weight", ),
-                    Item(name='posttap3_tune',  label='Post-tap3',            format_str='%7.4f', tooltip="3rd post-cursor tap weight", ),
+                    HGroup(
+                        Item(name='pretap_tune_enable',   label='Enable',                            tooltip="Enable this tap.", ),
+                        Item(name='pretap_tune',          label='Pre-tap',     format_str='%7.4f',   tooltip="pre-cursor tap weight", ),
+                    ),
+                    HGroup(
+                        Item(name='posttap_tune_enable',  label='Enable',                            tooltip="Enable this tap.", ),
+                        Item(name='posttap_tune',         label='Post-tap',    format_str='%7.4f',   tooltip="post-cursor tap weight", ),
+                    ),
+                    HGroup(
+                        Item(name='posttap2_tune_enable', label='Enable',                            tooltip="Enable this tap.", ),
+                        Item(name='posttap2_tune',        label='Post-tap2',   format_str='%7.4f',   tooltip="2nd post-cursor tap weight", ),
+                    ),
+                    HGroup(
+                        Item(name='posttap3_tune_enable', label='Enable',                            tooltip="Enable this tap.", ),
+                        Item(name='posttap3_tune',        label='Post-tap3',   format_str='%7.4f',   tooltip="3rd post-cursor tap weight", ),
+                    ),
                     label='Tx Equalization', show_border=True,
                 ),
                 VGroup(

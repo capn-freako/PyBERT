@@ -120,14 +120,19 @@ class TxOptThread(Thread):
     def run(self):
         self.pybert.status = "Optimizing Tx..."
         max_iter  = self.pybert.max_iter
-        old_taps  = [ self.pybert.pretap_tune,
-                      self.pybert.posttap_tune,
-                      self.pybert.posttap2_tune,
-                      self.pybert.posttap3_tune
-                    ]
+        old_taps  = []
+        if(self.pybert.pretap_tune_enable):
+            old_taps.append(self.pybert.pretap_tune)
+        if(self.pybert.posttap_tune_enable):
+            old_taps.append(self.pybert.posttap_tune)
+        if(self.pybert.posttap2_tune_enable):
+            old_taps.append(self.pybert.posttap2_tune)
+        if(self.pybert.posttap3_tune_enable):
+            old_taps.append(self.pybert.posttap3_tune)
 
         cons     = ({'type': 'ineq',
-                     'fun' : lambda x: array([1 - sum(abs(x))])})
+                     'fun' : lambda x: 1 - sum(abs(x))})
+#                     'fun' : lambda x: array([1 - sum(abs(x))])})
         if(gDebugOptimize):
             res  = minimize(do_opt_tx, old_taps, args=(self.pybert, ),
                             constraints=cons, options={'disp' : True, 'maxiter' : max_iter})
@@ -184,15 +189,19 @@ class PyBERT(HasTraits):
     l_ch            = Float(gl_ch)
     # - EQ Tune
     pretap_tune     = Float(0.0)
+    pretap_tune_enable   = Bool(True)
     posttap_tune    = Float(0.0)
+    posttap_tune_enable  = Bool(True)
     posttap2_tune   = Float(0.0)
+    posttap2_tune_enable = Bool(True)
     posttap3_tune   = Float(0.0)
+    posttap3_tune_enable = Bool(True)
     rx_bw_tune      = Float(gBW)
     peak_freq_tune  = Float(gPeakFreq)
     peak_mag_tune   = Float(gPeakMag)
     pulse_tune      = Bool(True)
     ideal_type      = List([2])                                             # 0 = impulse; 1 = sinc; 2 = raised cosine
-    max_iter        = Int(2)                                               # max. # of optimization iterations
+    max_iter        = Int(20)                                               # max. # of optimization iterations
     rel_opt         = Float(0.)
     tx_opt_thread   = Instance(TxOptThread)
     rx_opt_thread   = Instance(RxOptThread)
@@ -204,18 +213,22 @@ class PyBERT(HasTraits):
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
     pretap          = Float(-0.05)
+    pretap_enable   = Bool(True)
     pretap_sweep    = Bool(False)
     pretap_final    = Float(-0.05)
     pretap_steps    = Int(5)
     posttap         = Float(-0.10)
+    posttap_enable  = Bool(True)
     posttap_sweep   = Bool(False)
     posttap_final   = Float(-0.10)
     posttap_steps   = Int(10)
     posttap2        = Float(0.0)
+    posttap2_enable = Bool(True)
     posttap2_sweep  = Bool(False)
     posttap2_final  = Float(0.0)
     posttap2_steps  = Int(10)
     posttap3        = Float(0.0)
+    posttap3_enable = Bool(True)
     posttap3_sweep  = Bool(False)
     posttap3_final  = Float(0.0)
     posttap3_steps  = Int(10)
@@ -332,9 +345,13 @@ class PyBERT(HasTraits):
         self.pretap_tune    = self.pretap
         self.posttap_tune   = self.posttap
         self.posttap2_tune  = self.posttap2
+        self.posttap3_tune  = self.posttap3
+        self.pretap_tune_enable    = self.pretap_enable
+        self.posttap_tune_enable   = self.posttap_enable
+        self.posttap2_tune_enable  = self.posttap2_enable
+        self.posttap3_tune_enable  = self.posttap3_enable
         self.peak_freq_tune = self.peak_freq
         self.peak_mag_tune  = self.peak_mag
-        self.posttap3_tune  = self.posttap3
         self.rx_bw_tune     = self.rx_bw
 
     def _btn_save_eq_fired(self):
@@ -342,6 +359,10 @@ class PyBERT(HasTraits):
         self.posttap   = self.posttap_tune
         self.posttap2  = self.posttap2_tune
         self.posttap3  = self.posttap3_tune
+        self.pretap_enable    = self.pretap_tune_enable
+        self.posttap_enable   = self.posttap_tune_enable
+        self.posttap2_enable  = self.posttap2_tune_enable
+        self.posttap3_enable  = self.posttap3_tune_enable
         self.peak_freq = self.peak_freq_tune
         self.peak_mag  = self.peak_mag_tune
         self.rx_bw     = self.rx_bw_tune
@@ -895,6 +916,38 @@ class PyBERT(HasTraits):
         if(gDebugStatus):
             print self.status_str
 
+    def _pretap_enable_changed(self, new_value):
+        if(new_value == False):
+            self.pretap = 0.
+
+    def _posttap_enable_changed(self, new_value):
+        if(new_value == False):
+            self.posttap = 0.
+
+    def _posttap2_enable_changed(self, new_value):
+        if(new_value == False):
+            self.posttap2 = 0.
+
+    def _posttap3_enable_changed(self, new_value):
+        if(new_value == False):
+            self.posttap3 = 0.
+
+    def _pretap_tune_enable_changed(self, new_value):
+        if(new_value == False):
+            self.pretap_tune = 0.
+
+    def _posttap_tune_enable_changed(self, new_value):
+        if(new_value == False):
+            self.posttap_tune = 0.
+
+    def _posttap2_tune_enable_changed(self, new_value):
+        if(new_value == False):
+            self.posttap2_tune = 0.
+
+    def _posttap3_tune_enable_changed(self, new_value):
+        if(new_value == False):
+            self.posttap3_tune = 0.
+
     # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control their times of execution. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
@@ -951,7 +1004,7 @@ class PyBERT(HasTraits):
         max_len          = 100 * nspui
 #        chnl_h, start_ix = trim_impulse(chnl_h, ts, chnl_dly, min_len, max_len)
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
-        chnl_h          -= mean(chnl_h[len(chnl_h) / -10 :])             # In order to avoid wandering step response.
+#        chnl_h          -= mean(chnl_h[len(chnl_h) / -10 :])             # In order to avoid wandering step response.
 #        chnl_h          -= chnl_h[0]                                     # In order to avoid wandering step response.
         chnl_h          /= sum(chnl_h)                                   # a temporary crutch.
 
