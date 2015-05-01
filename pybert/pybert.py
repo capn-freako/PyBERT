@@ -162,13 +162,9 @@ class PyBERT(HasTraits):
 
     # Independent variables
     # - Simulation Control
-#    bit_rate        = Float(gBitRate)                                       # (Gbps)
     bit_rate        = Range(low=1.0, high=100.0, value=gBitRate)            # (Gbps)
-#    nbits           = Int(gNbits)
     nbits           = Range(low=1000, high=10000000, value=gNbits)
-#    pattern_len     = Int(gPatLen)
     pattern_len     = Range(low=7, high=10000000, value=gPatLen)
-#    nspb            = Int(gNspb)
     nspb            = Range(low=2, high=256, value=gNspb)
     eye_bits        = Int(gNbits // 5)
     mod_type        = List([0])                                             # 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
@@ -176,10 +172,10 @@ class PyBERT(HasTraits):
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
     do_sweep        = Bool(False)
-#    run_sim_thread  = Instance(RunSimThread)
     # - Channel Control
     use_ch_file     = Bool(False)
     ch_file         = File('', entries=5, filter=['*.csv'])
+    impulse_length  = Float(0.0)
     Rdc             = Float(gRdc)
     w0              = Float(gw0)
     R0              = Float(gR0)
@@ -968,6 +964,7 @@ class PyBERT(HasTraits):
         t                    = self.t
         ts                   = t[1]
         nspui                = self.nspui
+        impulse_length       = self.impulse_length * 1.e-9
 
         if(self.use_ch_file):
             chnl_h           = import_qucs_csv(self.ch_file, ts)
@@ -998,14 +995,11 @@ class PyBERT(HasTraits):
             chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
             chnl_h           = real(ifft(chnl_H)) * sqrt(len(chnl_H))    # Correcting for '1/N' scaling in ifft().
 
-#        chnl_h           = chnl_h.copy()                                 # To allow use of 'resize()'.
         min_len          = 10 * nspui
-#        max_len          = 3 * chnl_dly / ts
         max_len          = 100 * nspui
-#        chnl_h, start_ix = trim_impulse(chnl_h, ts, chnl_dly, min_len, max_len)
+        if(impulse_length):
+            min_len = max_len = impulse_length / ts
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
-#        chnl_h          -= mean(chnl_h[len(chnl_h) / -10 :])             # In order to avoid wandering step response.
-#        chnl_h          -= chnl_h[0]                                     # In order to avoid wandering step response.
         chnl_h          /= sum(chnl_h)                                   # a temporary crutch.
 
         chnl_s    = chnl_h.cumsum()
