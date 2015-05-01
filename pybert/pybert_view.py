@@ -270,7 +270,7 @@ traits_view = View(
     ),
     resizable = True,
     handler = MyHandler(),
-    buttons = [run_simulation, "OK"],
+    buttons = [run_simulation, ],
     statusbar = "status_str",
     title='PyBERT',
     width=1200, height=800

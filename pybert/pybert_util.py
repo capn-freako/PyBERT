@@ -569,7 +569,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
                 last_y = y
                 i += 1
     else:
-        start_ix      = (where(diff(sign(ys)))[0] % samps_per_ui).mean() + samps_per_ui // 2 
+        start_ix      = where(diff(sign(ys)))[0][0] + samps_per_ui // 2 
         last_start_ix = len(ys) - 2 * samps_per_ui
         while(start_ix < last_start_ix):
             i = 0

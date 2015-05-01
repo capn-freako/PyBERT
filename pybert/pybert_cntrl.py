@@ -481,6 +481,7 @@ def update_results(self):
     conv_dly_ix   = self.conv_dly_ix
 
     ignore_until  = (num_ui - eye_uis) * ui
+    ignore_samps  = (num_ui - eye_uis) * samps_per_ui
 
     # Misc.
     f_GHz         = f[:len(f) // 2] / 1.e9
@@ -615,11 +616,11 @@ def update_results(self):
     xs       = linspace(-ui * 1.e12, ui * 1.e12, width)
     height   = 100
     y_max    = 1.1 * max(abs(array(self.chnl_out)))
-    eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[conv_dly_ix:], y_max)
+    eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[ignore_samps:], y_max)
     y_max    = 1.1 * max(abs(array(self.rx_in)))
-    eye_tx   = calc_eye(ui, samps_per_ui, height, self.rx_in[conv_dly_ix:],   y_max)
+    eye_tx   = calc_eye(ui, samps_per_ui, height, self.rx_in[ignore_samps:],   y_max)
     y_max    = 1.1 * max(abs(array(self.ctle_out)))
-    eye_ctle = calc_eye(ui, samps_per_ui, height, self.ctle_out[conv_dly_ix:], y_max)
+    eye_ctle = calc_eye(ui, samps_per_ui, height, self.ctle_out[ignore_samps:], y_max)
     i = 0
     while(clock_times[i] <= ignore_until):
         i += 1
