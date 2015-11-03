@@ -210,7 +210,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_chnl.title            = "Channel"
     plot_H_chnl.index_axis.title = "Frequency (GHz)"
     plot_H_chnl.y_axis.title     = "Frequency Response (dB)"
-    plot_H_chnl.index_range.low_setting  = 0.1
+    plot_H_chnl.index_range.low_setting  = 0.01
     plot_H_chnl.index_range.high_setting = 40.
 
     plot_H_tx = Plot(plotdata)
@@ -219,7 +219,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_tx.title            = "Channel + Tx Preemphasis"
     plot_H_tx.index_axis.title = "Frequency (GHz)"
     plot_H_tx.y_axis.title     = "Frequency Response (dB)"
-    plot_H_tx.index_range.low_setting  = 0.1
+    plot_H_tx.index_range.low_setting  = 0.01
     plot_H_tx.index_range.high_setting = 40.
     plot_H_tx.legend.visible   = True
     plot_H_tx.legend.align     = 'll'
@@ -230,7 +230,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_ctle.title            = "Channel + Tx Preemphasis + CTLE"
     plot_H_ctle.index_axis.title = "Frequency (GHz)"
     plot_H_ctle.y_axis.title     = "Frequency Response (dB)"
-    plot_H_ctle.index_range.low_setting  = 0.1
+    plot_H_ctle.index_range.low_setting  = 0.01
     plot_H_ctle.index_range.high_setting = 40.
     plot_H_ctle.value_range.low_setting  = -40.
     plot_H_ctle.legend.visible   = True
@@ -245,7 +245,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_H_dfe.index_axis.title = "Frequency (GHz)"
     plot_H_dfe.y_axis.title     = "Frequency Response (dB)"
-    plot_H_dfe.index_range.low_setting  = 0.1
+    plot_H_dfe.index_range.low_setting  = 0.01
     plot_H_dfe.index_range.high_setting = 40.
     plot_H_dfe.value_range = plot_H_ctle.value_range 
     plot_H_dfe.legend.visible   = True

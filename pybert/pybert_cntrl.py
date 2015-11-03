@@ -154,6 +154,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     rx_bw           = self.rx_bw * 1.e9
     peak_freq       = self.peak_freq * 1.e9
     peak_mag        = self.peak_mag
+    ctle_offset     = self.ctle_offset
     delta_t         = self.delta_t * 1.e-12
     alpha           = self.alpha
     ui              = self.ui
@@ -270,7 +271,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status    = 'Running CTLE...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
-    w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
+    w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_offset)
     ctle_H          = H
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
     ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]

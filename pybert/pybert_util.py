@@ -580,7 +580,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     return img_array
 
-def make_ctle(rx_bw, peak_freq, peak_mag, w):
+def make_ctle(rx_bw, peak_freq, peak_mag, w, dc_offset=0):
     """
     Generate the frequency response of a continuous time linear
     equalizer (CTLE), given the:
@@ -614,6 +614,8 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
 
       - w            The list of frequencies of interest (rads./s).
 
+      - dc_offset    The d.c. offset of the CTLE gain curve (dB).
+
     Outputs:
 
       - w, H         The resultant complex frequency response, at the
@@ -633,7 +635,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
     b, a = invres([r1, r2], [p1, p2], [])
 
     w, H = freqs(b, a, w)
-    H   /= max(abs(H))                           # Enforce passivity.
+    H   *= pow(10., dc_offset / 20.) / abs(H[0])  # Enforce d.c. offset.
 
     return (w, H)
 
@@ -707,9 +709,7 @@ def import_qucs_csv(filename, sample_per):
     ts = []
     xs = []
     with open(filename, mode='rU') as csv_file:
-#        line = csv_file.readline()               # We don't use the header.
         for line in csv_file:
-#            tmp = map (float, line.split(';'))   # QUCS uses the semicolon as the field separator.
             try:
                 tmp = map(float, concatenate(map(lambda s: s.split(','), line.split(';'))))
             except:
@@ -787,7 +787,6 @@ def calc_cost(actual_h, ideal_h, nspui, use_pulse):
         pwr_outside = sum(actual[:pulse_left + 1] ** 2) + sum(actual[pulse_right:] ** 2) 
         pwr_inside  = sum(actual[pulse_left + 1 : pulse_right] ** 2)
         cost        = pwr_outside / pwr_inside
-        #cost        = pwr_outside
     else:
         ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
         actual   = actual_h

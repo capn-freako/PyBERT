@@ -99,6 +99,7 @@ gUseDfe         = True    # Include DFE when running simulation.
 gDfeIdeal       = True    # DFE ideal summing node selector
 gPeakFreq       = 5.      # CTLE peaking frequency (GHz)
 gPeakMag        = 10.     # CTLE peaking magnitude (dB)
+gCTLEOffset     = 0.      # CTLE d.c. offset (dB)
 # - DFE
 gDecisionScaler = 0.5
 gNtaps          = 5
@@ -132,7 +133,6 @@ class TxOptThread(Thread):
 
         cons     = ({'type': 'ineq',
                      'fun' : lambda x: 1 - sum(abs(x))})
-#                     'fun' : lambda x: array([1 - sum(abs(x))])})
         if(gDebugOptimize):
             res  = minimize(do_opt_tx, old_taps, args=(self.pybert, ),
                             constraints=cons, options={'disp' : True, 'maxiter' : max_iter})
@@ -162,7 +162,7 @@ class PyBERT(HasTraits):
 
     # Independent variables
     # - Simulation Control
-    bit_rate        = Range(low=1.0, high=100.0, value=gBitRate)            # (Gbps)
+    bit_rate        = Range(low=0.1, high=100.0, value=gBitRate)            # (Gbps)
     nbits           = Range(low=1000, high=10000000, value=gNbits)
     pattern_len     = Range(low=7, high=10000000, value=gPatLen)
     nspb            = Range(low=2, high=256, value=gNspb)
@@ -239,6 +239,7 @@ class PyBERT(HasTraits):
     sum_ideal       = Bool(gDfeIdeal)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
     peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
+    ctle_offset     = Float(gCTLEOffset)                                    # CTLE d.c. offset (dB)
     # - DFE
     decision_scaler = Float(gDecisionScaler)
     gain            = Float(gGain)
@@ -274,9 +275,9 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)                                                # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.6 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.7 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    April 10, 2015\n\n \
+    November 3, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -872,7 +873,6 @@ class PyBERT(HasTraits):
         peak_mag  = self.peak_mag_tune
 
         w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w)
-#        ctle_H     = H / abs(H[0])              # Scale to force d.c. component of '1'.
         ctle_H    = H
 
         return real(ifft(ctle_H))[:len_h]

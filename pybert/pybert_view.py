@@ -130,6 +130,7 @@ traits_view = View(
                     VGroup(
                         Item(name='peak_freq', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
                         Item(name='peak_mag',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
+                        Item(name='ctle_offset', label='CTLE offset (dB)',   tooltip="CTLE d.c. offset (dB)", ),
                         Item(name='rx_bw',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
                     ),
                     VGroup(
