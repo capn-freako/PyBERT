@@ -16,6 +16,7 @@ from scipy.optimize import minimize, minimize_scalar
 from scipy.stats    import norm
 from dfe            import DFE
 from cdr            import CDR
+from pylab          import plot, show, legend
 
 debug          = False
 gDebugOptimize = True
@@ -633,7 +634,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w):
     b, a = invres([r1, r2], [p1, p2], [])
 
     w, H = freqs(b, a, w)
-    H   /= max(abs(H))                           # Enforce passivity.
+    H   /= abs(H[0])  # Enforce unity d.c. response.
 
     return (w, H)
 
@@ -731,12 +732,34 @@ def import_qucs_csv(filename, sample_per):
     return array(res)
 
 def trim_shift_scale(ideal_h, actual_h, use_corr = False):
+    """
+    Trims, shifts, and scales an ideal impulse response, to match the
+    length, position, and magnitude of an actual impulse response, so
+    that they can be more readily manipulated as a pair by certain
+    NumPy/SciPy routines.
+
+    ToDo:
+    - Add some checking, re: vector lengths. (Actual should be quite shorter than ideal.)
+      Currently, this routine is fairly fragile; sending in ideal and actual
+      with same lengths, for instance will wreak havoc.
+
+    """
+
     if(use_corr):
         corr_res = correlate(ideal_h, actual_h, mode='valid')
         corr_res = where(corr_res < 0., zeros(len(corr_res)), corr_res)
         offset   = int(sum([i * corr_res[i] ** 2 for i in range(len(corr_res))]) / sum(corr_res ** 2))
     else:
         offset   = mean(where(ideal_h == max(ideal_h))[0]) - mean(where(actual_h == max(actual_h))[0])
+
+    if(False):
+        print "len(ideal_h):", len(ideal_h), "len(actual_h):", len(actual_h)
+        print "offset:", offset
+        plot(ideal_h,  label='Ideal')
+        plot(actual_h, label='Actual')
+        plot(corr_res, label='Correlation')
+        legend()
+        show()
 
     res = ideal_h[offset:].copy()
     res.resize(len(actual_h))                    # Clips, if too long; pads w/ zeros, if too short.
@@ -768,7 +791,7 @@ def calc_cost(actual_h, ideal_h, nspui, use_pulse):
 
     # Calculate the cost function.
     if(use_pulse):
-        ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
+        ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = False)
         actual_s = actual_h.cumsum()
         actual   = actual_s - pad(actual_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
         ideal_s  = ideal_h.cumsum()

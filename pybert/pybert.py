@@ -58,6 +58,7 @@ from pybert_view     import traits_view
 from pybert_cntrl    import my_run_simulation, update_results, update_eyes, do_opt_rx, do_opt_tx
 from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits, safe_log10
 from pybert_plot     import make_plots
+from pybert_help     import help_str
 
 debug          = False
 gDebugStatus   = False
@@ -162,13 +163,9 @@ class PyBERT(HasTraits):
 
     # Independent variables
     # - Simulation Control
-#    bit_rate        = Float(gBitRate)                                       # (Gbps)
     bit_rate        = Range(low=1.0, high=100.0, value=gBitRate)            # (Gbps)
-#    nbits           = Int(gNbits)
     nbits           = Range(low=1000, high=10000000, value=gNbits)
-#    pattern_len     = Int(gPatLen)
     pattern_len     = Range(low=7, high=10000000, value=gPatLen)
-#    nspb            = Int(gNspb)
     nspb            = Range(low=2, high=256, value=gNspb)
     eye_bits        = Int(gNbits // 5)
     mod_type        = List([0])                                             # 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
@@ -176,7 +173,6 @@ class PyBERT(HasTraits):
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
     do_sweep        = Bool(False)
-#    run_sim_thread  = Instance(RunSimThread)
     # - Channel Control
     use_ch_file     = Bool(False)
     ch_file         = File('', entries=5, filter=['*.csv'])
@@ -278,13 +274,14 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)                                                # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.6 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.8 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    April 10, 2015\n\n \
+    August 11, 2015\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
-    instructions = Property()
+#    instructions = Property()
+    instructions = help_str
 
     # Dependent variables
     # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
@@ -339,6 +336,8 @@ class PyBERT(HasTraits):
 
             # Once the required data structure is filled in, we can create the plots.
             make_plots(self, n_dfe_taps = gNtaps)
+        else:
+            self.calc_chnl_h()  # Prevents missing attribute error in _get_ctle_out_h_tune().
 
     # Button handlers
     def _btn_rst_eq_fired(self):
@@ -838,21 +837,6 @@ class PyBERT(HasTraits):
         return status_str
 
     @cached_property
-    def _get_instructions(self):
-
-        help_str  = "<H2>PyBERT User's Guide</H2>\n"
-        help_str += "  <H3>Note to developers</H3>\n"
-        help_str += "    This is NOT for you. Instead, open 'pybert/doc/build/html/index.html' in a browser.\n"
-        help_str += "  <H3>PyBERT User Help Options</H3>\n"
-        help_str += "    <UL>\n"
-        help_str += "      <LI>Hover over any user-settable value in the <em>Config.</em> tab, for help message.</LI>\n"
-        help_str += '      <LI>Visit the PyBERT FAQ at: https://github.com/capn-freako/PyBERT/wiki/pybert_faq.</LI>\n'
-        help_str += '      <LI>Send e-mail to David Banas at capn.freako@gmail.com.</LI>\n'
-        help_str += "    </UL>\n"
-
-        return help_str
-
-    @cached_property
     def _get_tx_h_tune(self):
 
         nspui     = self.nspui
@@ -972,11 +956,12 @@ class PyBERT(HasTraits):
         if(self.use_ch_file):
             chnl_h           = import_qucs_csv(self.ch_file, ts)
             if(chnl_h[-1] > (max(chnl_h) / 2.)):  # step response?
-                chnl_h       = diff(chnl_h)      # impulse response is derivative of step response.
+                chnl_h       = diff(chnl_h)       # impulse response is derivative of step response.
+            else:
+                chnl_h      *= ts                 # Normalize to (V/sample)
             chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
             chnl_h.resize(len(t))
             chnl_H           = fft(chnl_h)
-            chnl_H          /= abs(chnl_H[0])
         else:
             l_ch             = self.l_ch
             v0               = self.v0 * 3.e8
@@ -996,17 +981,12 @@ class PyBERT(HasTraits):
             gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H                = exp(-l_ch * gamma)
             chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-            chnl_h           = real(ifft(chnl_H)) * sqrt(len(chnl_H))    # Correcting for '1/N' scaling in ifft().
+#            chnl_h           = real(ifft(chnl_H)) * sqrt(len(chnl_H))    # Correcting for '1/N' scaling in ifft().
+            chnl_h           = real(ifft(chnl_H))
 
-#        chnl_h           = chnl_h.copy()                                 # To allow use of 'resize()'.
         min_len          = 10 * nspui
-#        max_len          = 3 * chnl_dly / ts
         max_len          = 100 * nspui
-#        chnl_h, start_ix = trim_impulse(chnl_h, ts, chnl_dly, min_len, max_len)
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
-#        chnl_h          -= mean(chnl_h[len(chnl_h) / -10 :])             # In order to avoid wandering step response.
-#        chnl_h          -= chnl_h[0]                                     # In order to avoid wandering step response.
-        chnl_h          /= sum(chnl_h)                                   # a temporary crutch.
 
         chnl_s    = chnl_h.cumsum()
         chnl_p    = chnl_s - pad(chnl_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))

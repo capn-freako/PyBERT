@@ -76,7 +76,7 @@ traits_view = View(
                 ),
                 HGroup(
                     VGroup(
-                        Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse response from file.', ),
+                        Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse/step response from file.', ),
                         Item(name='ch_file', label='Filename',    enabled_when='use_ch_file == True'),
                         Item(name='Theta0',  label='Loss Tan.',   enabled_when='use_ch_file == False', tooltip="dielectric loss tangent", ),
                         Item(name='Z0',      label='Z0 (Ohms)',   enabled_when='use_ch_file == False', tooltip="characteristic differential impedance", ),

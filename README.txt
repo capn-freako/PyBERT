@@ -9,11 +9,10 @@ as well as the NumPy and SciPy packages.
 
 In order to install and run PyBERT on a system with Python already installed:
 
-    $ easy_install PyBERT
-    $ python -m pybert
+- easy_install PyBERT
+- python -m pybert
 
-Notice: Before using this package for any purpose, you MUST read and understand the terms put forward
-        in the accompanying "LICENSE" file.
+Notice: Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
 
 Documentation
 =============
@@ -22,6 +21,7 @@ PyBERT documentation exists in 2 separate forms:
 - For developers: pybert/doc/build/html/index.html
 
 - For users:
+
   - The 'Help' tab of the PyBERT GUI
   - The PyBERT FAQ at <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>
   - Sending e-mail to David Banas at <capn.freako@gmail.com>

@@ -9,7 +9,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 from time         import clock, sleep
 
-from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where
+from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt
 from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum
 from numpy.random import normal
 from numpy.fft    import fft, ifft
@@ -223,11 +223,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     # - (The Tx is unique in that the calculated responses aren't used to form the output.
     #    This is partly due to the out of order nature in which we combine the Tx and channel,
     #    and partly due to the fact that we're adding noise to the Tx output.)
-    tx_h   = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
+    tx_h   = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
     tx_h.resize(len(chnl_h))
     temp   = tx_h.copy()
     temp.resize(len(w))
     tx_H   = fft(temp)
+    tx_H  *= sum(ffe) / abs(tx_H[0])  # Normalize for proper d.c. magnitude.
 
     # - Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
     #   - Generate the ideal rectangular aggressor waveform.
@@ -249,6 +250,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     temp       = tx_out_h.copy()
     temp.resize(len(w))
     tx_out_H   = fft(temp)
+#    tx_out_H  *= sum(ffe) / abs(tx_out_H[0])  # Normalize for proper d.c. magnitude.
     rx_in      = convolve(tx_out, chnl_h)[:len(tx_out)]
 
     # - Add the random noise to the Rx input.
@@ -260,10 +262,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.tx_out_s  = tx_out_h.cumsum()
     self.tx_out_p  = self.tx_out_s[nspui:] - self.tx_out_s[:-nspui] 
     self.tx_H      = tx_H
-    self.tx_h      = tx_h * 1.e-9 / Ts
+    self.tx_h      = tx_h
     self.tx_out_H  = tx_out_H
-    self.tx_out_h  = tx_out_h * 1.e-9 / Ts
-    self.tx_out_g  = tx_out_g * 1.e-9 / Ts
+    self.tx_out_h  = tx_out_h
+    self.tx_out_g  = tx_out_g
 
     self.tx_perf   = nbits * nspb / (clock() - split_time)
     split_time     = clock()
@@ -273,6 +275,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w)
     ctle_H          = H
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
+    ctle_h         *= abs(ctle_H[0]) / sum(ctle_h)
     ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
     ctle_out       -= mean(ctle_out)             # Force zero mean.
     if(self.use_agc):                            # Automatic gain control engaged?
@@ -286,14 +289,17 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     temp            = ctle_out_h.copy()
     temp.resize(len(w))
     ctle_out_H      = fft(temp)
+#    ctle_out_H     *= sum(temp) / abs(ctle_out_H[0])
     # - Store local variables to class instance.
     self.ctle_out_s = ctle_out_s
     self.ctle_out_p = self.ctle_out_s[nspui:] - self.ctle_out_s[:-nspui] 
     self.ctle_H     = ctle_H
-    self.ctle_h     = ctle_h * 1.e-9 / Ts
+#    self.ctle_h     = ctle_h * 1.e-9 / Ts
+    self.ctle_h     = ctle_h
     self.ctle_out_H = ctle_out_H
-    self.ctle_out_h = ctle_out_h * 1.e-9 / Ts
-    self.ctle_out_g = ctle_out_g * 1.e-9 / Ts
+#    self.ctle_out_h = ctle_out_h * 1.e-9 / Ts
+    self.ctle_out_h = ctle_out_h
+    self.ctle_out_g = ctle_out_g
     self.ctle_out   = ctle_out
     self.conv_dly   = conv_dly
     self.conv_dly_ix = conv_dly_ix
@@ -333,10 +339,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.dfe_out_s = dfe_out_h.cumsum()
     self.dfe_out_p = self.dfe_out_s[nspui:] - self.dfe_out_s[:-nspui] 
     self.dfe_H     = dfe_H
-    self.dfe_h     = dfe_h * 1.e-9 / Ts
+    self.dfe_h     = dfe_h
     self.dfe_out_H = dfe_out_H
-    self.dfe_out_h = dfe_out_h * 1.e-9 / Ts
-    self.dfe_out_g = dfe_out_g * 1.e-9 / Ts
+#    self.dfe_out_h = dfe_out_h * 1.e-9 / Ts
+    self.dfe_out_h = dfe_out_h
+    self.dfe_out_g = dfe_out_g
     self.dfe_out   = dfe_out
 
     self.dfe_perf  = nbits * nspb / (clock() - split_time)
@@ -476,10 +483,12 @@ def update_results(self):
     num_ui        = self.nui
     clock_times   = self.clock_times
     f             = self.f
+    t             = self.t
     t_ns          = self.t_ns
     t_ns_chnl     = self.t_ns_chnl
     conv_dly_ix   = self.conv_dly_ix
 
+    Ts = t[1]
     ignore_until  = (num_ui - eye_uis) * ui
 
     # Misc.
@@ -506,17 +515,17 @@ def update_results(self):
     self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
 
     # Impulse responses
-    self.plotdata.set_data("chnl_h",     self.chnl_h / t_ns[1])
-    self.plotdata.set_data("chnl_g",     self.chnl_g)
-    self.plotdata.set_data("tx_h",       self.tx_h)
-    self.plotdata.set_data("tx_out_h",   self.tx_out_h)
-    self.plotdata.set_data("tx_out_g",   self.tx_out_g)
-    self.plotdata.set_data("ctle_h",     self.ctle_h)
-    self.plotdata.set_data("ctle_out_h", self.ctle_out_h)
-    self.plotdata.set_data("ctle_out_g", self.ctle_out_g)
-    self.plotdata.set_data("dfe_h",      self.dfe_h)
-    self.plotdata.set_data("dfe_out_h",  self.dfe_out_h)
-    self.plotdata.set_data("dfe_out_g",  self.dfe_out_g)
+    self.plotdata.set_data("chnl_h",     self.chnl_h * 1.e-9 / Ts)  # Re-normalize to (V/ns), for plotting.
+    self.plotdata.set_data("chnl_g",     self.chnl_g * 1.e-9 / Ts)
+    self.plotdata.set_data("tx_h",       self.tx_h * 1.e-9 / Ts)
+    self.plotdata.set_data("tx_out_h",   self.tx_out_h * 1.e-9 / Ts)
+    self.plotdata.set_data("tx_out_g",   self.tx_out_g * 1.e-9 / Ts)
+    self.plotdata.set_data("ctle_h",     self.ctle_h * 1.e-9 / Ts)
+    self.plotdata.set_data("ctle_out_h", self.ctle_out_h * 1.e-9 / Ts)
+    self.plotdata.set_data("ctle_out_g", self.ctle_out_g * 1.e-9 / Ts)
+    self.plotdata.set_data("dfe_h",      self.dfe_h * 1.e-9 / Ts)
+    self.plotdata.set_data("dfe_out_h",  self.dfe_out_h * 1.e-9 / Ts)
+    self.plotdata.set_data("dfe_out_g",  self.dfe_out_g * 1.e-9 / Ts)
 
     # Step responses
     self.plotdata.set_data("chnl_s",     self.chnl_s)
