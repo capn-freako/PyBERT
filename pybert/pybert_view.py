@@ -84,6 +84,7 @@ traits_view = View(
                         Item(name='l_ch',    label='Length (m)',  enabled_when='use_ch_file == False', tooltip="interconnect length", ),
                     ),
                     VGroup(
+                        Item(name='impulse_length', label='Impl. Len. (ns)', tooltip="Manual impulse response length override", ),
                         Item(name='rs',      label='Tx_Rs (Ohms)',   enabled_when='use_ch_file == False', tooltip="Tx differential source impedance", ),
                         Item(name='cout',    label='Tx_Cout (pF)',   enabled_when='use_ch_file == False', tooltip="Tx parasitic output capacitance (each pin)", ),
                         Item(name='rin',     label='Rx_Rin (Ohms)',  enabled_when='use_ch_file == False', tooltip="Rx differential input impedance", ),
@@ -129,6 +130,7 @@ traits_view = View(
                     VGroup(
                         Item(name='peak_freq', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
                         Item(name='peak_mag',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
+                        Item(name='ctle_offset', label='CTLE offset (dB)',   tooltip="CTLE d.c. offset (dB)", ),
                         Item(name='rx_bw',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
                     ),
                     VGroup(
@@ -270,7 +272,7 @@ traits_view = View(
     ),
     resizable = True,
     handler = MyHandler(),
-    buttons = [run_simulation, "OK"],
+    buttons = [run_simulation, ],
     statusbar = "status_str",
     title='PyBERT',
     width=1200, height=800
