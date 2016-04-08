@@ -187,6 +187,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     # the ideal crossing locations, below, because it has "shelves" at zero volts, which
     # wreak havoc on our zero crossing detection algorithm.
     x = repeat(symbols, nspui)
+    self.x = x
     tmp_x = x
     if(mod_type == 1):
         duob_h = array(([0.5] + [0.] * (nspui - 1)) * 2)
@@ -705,5 +706,18 @@ def do_opt_tx(taps, self):
         self.posttap2_tune = taps.pop(0)
     if(self.posttap3_tune_enable):
         self.posttap3_tune = taps.pop(0)
+    return self.cost
+
+def do_coopt(vals, self):
+    vals = list(vals)
+    if(self.pretap_tune_enable):
+        self.pretap_tune   = vals.pop(0)
+    if(self.posttap_tune_enable):
+        self.posttap_tune  = vals.pop(0)
+    if(self.posttap2_tune_enable):
+        self.posttap2_tune = vals.pop(0)
+    if(self.posttap3_tune_enable):
+        self.posttap3_tune = vals.pop(0)
+    self.peak_mag_tune = vals.pop(0)
     return self.cost
 

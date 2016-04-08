@@ -212,6 +212,7 @@ traits_view = View(
                 Item('btn_save_eq', show_label=False, tooltip="Store all values to 'Config.' tab.",),
                 Item('btn_opt_tx',  show_label=False, tooltip="Run Tx tap weight optimization.",),
                 Item('btn_opt_rx',  show_label=False, tooltip="Run Rx CTLE optimization.",),
+                Item('btn_coopt',   show_label=False, tooltip="Run co-optimization.",),
             ),
             label = 'EQ Tune', id = 'eq_tune',
         ),

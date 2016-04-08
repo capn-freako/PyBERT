@@ -55,7 +55,7 @@ from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
 from enable.component_editor import ComponentEditor
 
 from pybert_view     import traits_view
-from pybert_cntrl    import my_run_simulation, update_results, update_eyes, do_opt_rx, do_opt_tx
+from pybert_cntrl    import my_run_simulation, update_results, update_eyes, do_opt_rx, do_opt_tx, do_coopt
 from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits, safe_log10
 from pybert_plot     import make_plots
 from pybert_help     import help_str
@@ -64,6 +64,7 @@ debug          = False
 gDebugStatus   = False
 gDebugOptimize = True
 gMaxCTLEPeak   = 20          # max. allowed CTLE peaking (dB) (when optimizing, only)
+gMaxCTLEFreq   = 20          # max. allowed CTLE peak frequency (GHz) (when optimizing, only)
 
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
@@ -154,6 +155,40 @@ class RxOptThread(Thread):
             res  = minimize_scalar(do_opt_rx, bounds=(0, gMaxCTLEPeak), args=(self.pybert,), method='Bounded', options={'disp' : False, 'maxiter' : max_iter})
         self.pybert.status = "Ready."
 
+class CoOptThread(Thread):
+    'Used to run co-optimization in its own thread, in order to preserve GUI responsiveness.'
+
+    def run(self):
+        self.pybert.status = "Co-optimizing..."
+        max_iter  = self.pybert.max_iter
+        vals  = []
+        if(self.pybert.pretap_tune_enable):
+            vals.append(self.pybert.pretap_tune)
+        if(self.pybert.posttap_tune_enable):
+            vals.append(self.pybert.posttap_tune)
+        if(self.pybert.posttap2_tune_enable):
+            vals.append(self.pybert.posttap2_tune)
+        if(self.pybert.posttap3_tune_enable):
+            vals.append(self.pybert.posttap3_tune)
+        vals.append(self.pybert.peak_mag_tune)
+
+        cons = (
+          { 'type': 'ineq',
+              'fun' : lambda x: 1 - sum(abs(x[:-1]))
+          },
+          { 'type': 'ineq',
+            'fun' : lambda x: gMaxCTLEPeak - x[-1]
+          },
+        )
+
+        if(gDebugOptimize):
+            res  = minimize(do_coopt, vals, args=(self.pybert, ), constraints=cons,
+                            options={'disp' : True, 'maxiter' : max_iter})
+        else:
+            res  = minimize(do_coopt, vals, args=(self.pybert, ), constraints=cons,
+                            options={'disp' : False, 'maxiter' : max_iter})
+        self.pybert.status = "Ready."
+
 class PyBERT(HasTraits):
     """
     A serial communication link bit error rate tester (BERT) simulator with a GUI interface.
@@ -202,6 +237,7 @@ class PyBERT(HasTraits):
     rel_opt         = Float(0.)
     tx_opt_thread   = Instance(TxOptThread)
     rx_opt_thread   = Instance(RxOptThread)
+    coopt_thread    = Instance(CoOptThread)
     # - Tx
     vod             = Float(gVod)                                           # (V)
     rs              = Float(gRs)                                            # (Ohms)
@@ -317,6 +353,7 @@ class PyBERT(HasTraits):
     btn_save_eq = Button(label = 'SaveEq')
     btn_opt_tx  = Button(label = 'OptTx')
     btn_opt_rx  = Button(label = 'OptRx')
+    btn_coopt   = Button(label = 'CoOpt')
 
     # Default initialization
     def __init__(self, run_simulation = True):
@@ -370,7 +407,6 @@ class PyBERT(HasTraits):
 
     def _btn_opt_tx_fired(self):
         if self.tx_opt_thread and self.tx_opt_thread.isAlive():
-            #self.tx_opt_thread.wants_abort = True
             pass
         else:
             self.tx_opt_thread = TxOptThread()
@@ -379,12 +415,19 @@ class PyBERT(HasTraits):
 
     def _btn_opt_rx_fired(self):
         if self.rx_opt_thread and self.rx_opt_thread.isAlive():
-            #self.rx_opt_thread.wants_abort = True
             pass
         else:
             self.rx_opt_thread = RxOptThread()
             self.rx_opt_thread.pybert = self
             self.rx_opt_thread.start()
+
+    def _btn_coopt_fired(self):
+        if self.coopt_thread and self.coopt_thread.isAlive():
+            pass
+        else:
+            self.coopt_thread = CoOptThread()
+            self.coopt_thread.pybert = self
+            self.coopt_thread.start()
 
     # Dependent variable definitions
     @cached_property
