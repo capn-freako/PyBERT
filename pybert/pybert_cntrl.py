@@ -9,8 +9,8 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 from time         import clock, sleep
 
-from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt
-from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum
+from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt, histogram, arange
+from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff
 from numpy.random import normal
 from numpy.fft    import fft, ifft
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
@@ -507,6 +507,19 @@ def update_results(self):
     for tap_weight in tap_weights:
         self.plotdata.set_data("tap%d_weights" % i, tap_weight)
         i += 1
+    clock_pers = diff(clock_times)
+    start_t = t[where(self.lockeds)[0][0]]
+    start_ix = where(clock_times > start_t)[0][0]
+    (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
+    clock_spec = fft(clock_pers[start_ix:])
+    clock_spec = abs(clock_spec[:len(clock_spec) / 2])
+    spec_freqs = arange(len(clock_spec)) / (2. * len(clock_spec))  # In this case, fNyquist = half the bit rate.
+    clock_spec /= clock_spec[1:].mean()  # Normalize the mean non-d.c. value to 0 dB.
+    self.plotdata.set_data("clk_per_hist_bins",  bin_centers * 1.e12)  # (ps)
+    self.plotdata.set_data("clk_per_hist_vals",  bin_counts)
+    self.plotdata.set_data("clk_spec",  10. * log10(clock_spec[1:]))  # Omit the d.c. value.
+    self.plotdata.set_data("clk_freqs",  spec_freqs[1:])
     self.plotdata.set_data("tap_weight_index", range(len(tap_weight)))
     self.plotdata.set_data("dfe_out",  self.dfe_out)
     self.plotdata.set_data("ui_ests",  self.ui_ests)
@@ -719,5 +732,6 @@ def do_coopt(vals, self):
     if(self.posttap3_tune_enable):
         self.posttap3_tune = vals.pop(0)
     self.peak_mag_tune = vals.pop(0)
+    self.peak_freq_tune = vals.pop(0)
     return self.cost
 

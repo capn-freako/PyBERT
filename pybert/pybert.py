@@ -171,13 +171,17 @@ class CoOptThread(Thread):
         if(self.pybert.posttap3_tune_enable):
             vals.append(self.pybert.posttap3_tune)
         vals.append(self.pybert.peak_mag_tune)
+        vals.append(self.pybert.peak_freq_tune)
 
         cons = (
           { 'type': 'ineq',
-              'fun' : lambda x: 1 - sum(abs(x[:-1]))
+              'fun' : lambda x: 1 - sum(abs(x[:-2]))
           },
           { 'type': 'ineq',
-            'fun' : lambda x: gMaxCTLEPeak - x[-1]
+            'fun' : lambda x: gMaxCTLEPeak - x[-2]
+          },
+          { 'type': 'ineq',
+            'fun' : lambda x: gMaxCTLEFreq - x[-1]
           },
         )
 
@@ -312,13 +316,12 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)                                                # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.7 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.7.3 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    November 3, 2015\n\n \
+    April 10, 2016\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
-#    instructions = Property()
     instructions = help_str
 
     # Dependent variables

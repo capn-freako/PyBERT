@@ -63,11 +63,26 @@ def make_plots(self, n_dfe_taps):
     plot9.legend.visible = True
     plot9.legend.align = 'ul'
 
+    plot_clk_per_hist = Plot(plotdata)
+    plot_clk_per_hist.plot(('clk_per_hist_bins', 'clk_per_hist_vals'), type="line", color="blue")
+    plot_clk_per_hist.title  = "CDR Clock Period Histogram"
+    plot_clk_per_hist.index_axis.title = "Clock Period (ps)"
+    plot_clk_per_hist.value_axis.title = "Bin Count"
+
+    plot_clk_per_spec = Plot(plotdata)
+    plot_clk_per_spec.plot(('clk_freqs', 'clk_spec'), type="line", color="blue")
+    plot_clk_per_spec.title  = "CDR Clock Period Spectrum"
+    plot_clk_per_spec.index_axis.title = "Frequency (bit rate)"
+    plot_clk_per_spec.value_axis.title = "|H(f)| (dB mean)"
+    plot_clk_per_spec.value_range.low_setting  = -10
+    zoom_clk_per_spec = ZoomTool(plot_clk_per_spec, tool_mode="range", axis='index', always_on=False)
+    plot_clk_per_spec.overlays.append(zoom_clk_per_spec)
+
     container_dfe = GridPlotContainer(shape=(2,2))
     container_dfe.add(plot2)
     container_dfe.add(plot9)
-    container_dfe.add(plot1)
-    container_dfe.add(plot3)
+    container_dfe.add(plot_clk_per_hist)
+    container_dfe.add(plot_clk_per_spec)
     self.plots_dfe = container_dfe
 
     # - EQ Tune tab
