@@ -42,29 +42,36 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 
 from threading       import Thread
 
-from numpy           import array, linspace, zeros, histogram, mean, diff, transpose, shape, exp, real, pad, pi, resize, cos, where, sqrt, convolve, sinc
+from numpy           import array, linspace, zeros, histogram, mean, diff, \
+                            transpose, shape, exp, real, pad, pi, resize, cos, \
+                            where, sqrt, convolve, sinc, log10, ones
 from numpy.fft       import fft, ifft
 from numpy.random    import randint
 from scipy.signal    import lfilter, iirfilter
 from scipy.optimize  import minimize, minimize_scalar
 
-from traits.api      import HasTraits, Array, Range, Float, Int, Property, String, cached_property, Instance, HTML, List, Bool, File, Button
+from traits.api      import HasTraits, Array, Range, Float, Int, Property, \
+                            String, cached_property, Instance, HTML, List, \
+                            Bool, File, Button, Enum
 from traitsui.api    import View, Item, Group
-from chaco.api       import Plot, ArrayPlotData, VPlotContainer, GridPlotContainer, ColorMapper, Legend, OverlayPlotContainer, PlotAxis
+from chaco.api       import Plot, ArrayPlotData, VPlotContainer, \
+                            GridPlotContainer, ColorMapper, Legend, \
+                            OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
 from enable.component_editor import ComponentEditor
 
 from pybert_view     import traits_view
-from pybert_cntrl    import my_run_simulation, update_results, update_eyes, do_opt_rx, do_opt_tx, do_coopt
-from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, make_ctle, trim_shift_scale, calc_cost, lfsr_bits, safe_log10
+from pybert_cntrl    import my_run_simulation, update_results, update_eyes
+from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, \
+                            make_ctle, lfsr_bits, safe_log10
 from pybert_plot     import make_plots
 from pybert_help     import help_str
 
 debug          = False
 gDebugStatus   = False
 gDebugOptimize = True
-gMaxCTLEPeak   = 20          # max. allowed CTLE peaking (dB) (when optimizing, only)
-gMaxCTLEFreq   = 20          # max. allowed CTLE peak frequency (GHz) (when optimizing, only)
+gMaxCTLEPeak   = 20.      # max. allowed CTLE peaking (dB) (when optimizing, only)
+gMaxCTLEFreq   = 20.      # max. allowed CTLE peak frequency (GHz) (when optimizing, only)
 
 # Default model parameters - Modify these to customize the default simulation.
 # - Simulation Control
@@ -117,81 +124,180 @@ gLockSustain    = 500
 # - Analysis
 gThresh         = 6       # threshold for identifying periodic jitter spectral elements (sigma)
 
+
 class TxOptThread(Thread):
     'Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
-        self.pybert.status = "Optimizing Tx..."
-        max_iter  = self.pybert.max_iter
-        old_taps  = []
-        if(self.pybert.pretap_tune_enable):
-            old_taps.append(self.pybert.pretap_tune)
-        if(self.pybert.posttap_tune_enable):
-            old_taps.append(self.pybert.posttap_tune)
-        if(self.pybert.posttap2_tune_enable):
-            old_taps.append(self.pybert.posttap2_tune)
-        if(self.pybert.posttap3_tune_enable):
-            old_taps.append(self.pybert.posttap3_tune)
+        pybert = self.pybert
 
-        cons     = ({'type': 'ineq',
-                     'fun' : lambda x: 1 - sum(abs(x))})
+        pybert.status = "Optimizing Tx..."
+        max_iter  = pybert.max_iter
+
+        old_taps  = []
+        min_vals  = []
+        max_vals  = []
+        for tuner in pybert.tx_tap_tuners:
+            if tuner.enabled:
+                old_taps.append(tuner.value)
+                min_vals.append(tuner.min_val)
+                max_vals.append(tuner.max_val)
+
+        cons = ({   'type': 'ineq',
+                    'fun' : lambda x: 0.7 - sum(abs(x))
+                })
+
+        bounds = zip(min_vals, max_vals)
+
         if(gDebugOptimize):
-            res  = minimize(do_opt_tx, old_taps, args=(self.pybert, ),
-                            constraints=cons, options={'disp' : True, 'maxiter' : max_iter})
+            res = minimize( self.do_opt_tx, old_taps, bounds=bounds,
+                            constraints=cons, options={'disp'    : True,
+                                                       'maxiter' : max_iter
+                                                      }
+                          )
         else:
-            res  = minimize(do_opt_tx, old_taps, args=(self.pybert, ),
-                            constraints=cons, options={'disp' : False, 'maxiter' : max_iter})
-        self.pybert.status = "Ready."
+            res = minimize( self.do_opt_tx, old_taps, bounds=bounds,
+                            constraints=cons, options={'disp'    : False,
+                                                       'maxiter' : max_iter
+                                                      }
+                          )
+
+        if(res['success']):
+            pybert.status = "Optimization succeeded."
+        else:
+            pybert.status = "Optimization failed: {}".format(res['message'])
+
+    def do_opt_tx(self, taps):
+        pybert = self.pybert
+        tuners = pybert.tx_tap_tuners
+        taps = list(taps)
+        for tuner in tuners:
+            if(tuner.enabled):
+                tuner.value = taps.pop(0)
+        pybert.rel_opt = -pybert.cost
+        return pybert.cost
+
 
 class RxOptThread(Thread):
     'Used to run Rx tap weight optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
-        self.pybert.status = "Optimizing Rx..."
-        max_iter = self.pybert.max_iter
+        pybert = self.pybert
+
+        pybert.status = "Optimizing Rx..."
+        max_iter = pybert.max_iter
+
         if(gDebugOptimize):
-            res  = minimize_scalar(do_opt_rx, bounds=(0, gMaxCTLEPeak), args=(self.pybert,), method='Bounded', options={'disp' : True, 'maxiter' : max_iter})
+            res  = minimize_scalar(self.do_opt_rx, bounds=(0, gMaxCTLEPeak),
+                                   method='Bounded', options={'disp'    : True,
+                                                              'maxiter' : max_iter}
+                                  )
         else:
-            res  = minimize_scalar(do_opt_rx, bounds=(0, gMaxCTLEPeak), args=(self.pybert,), method='Bounded', options={'disp' : False, 'maxiter' : max_iter})
-        self.pybert.status = "Ready."
+            res  = minimize_scalar(self.do_opt_rx, bounds=(0, gMaxCTLEPeak),
+                                   method='Bounded', options={'disp'    : False,
+                                                              'maxiter' : max_iter}
+                                  )
+
+        if(res['success']):
+            pybert.status = "Optimization succeeded."
+        else:
+            pybert.status = "Optimization failed: {}".format(res['message'])
+
+    def do_opt_rx(self, peak_mag):
+        pybert = self.pybert
+        pybert.peak_mag_tune = peak_mag
+        pybert.rel_opt = -pybert.cost
+        return pybert.cost
+
 
 class CoOptThread(Thread):
     'Used to run co-optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
-        self.pybert.status = "Co-optimizing..."
-        max_iter  = self.pybert.max_iter
-        vals  = []
-        if(self.pybert.pretap_tune_enable):
-            vals.append(self.pybert.pretap_tune)
-        if(self.pybert.posttap_tune_enable):
-            vals.append(self.pybert.posttap_tune)
-        if(self.pybert.posttap2_tune_enable):
-            vals.append(self.pybert.posttap2_tune)
-        if(self.pybert.posttap3_tune_enable):
-            vals.append(self.pybert.posttap3_tune)
-        vals.append(self.pybert.peak_mag_tune)
-        vals.append(self.pybert.peak_freq_tune)
+        pybert = self.pybert
 
-        cons = (
-          { 'type': 'ineq',
-              'fun' : lambda x: 1 - sum(abs(x[:-2]))
-          },
-          { 'type': 'ineq',
-            'fun' : lambda x: gMaxCTLEPeak - x[-2]
-          },
-          { 'type': 'ineq',
-            'fun' : lambda x: gMaxCTLEFreq - x[-1]
-          },
-        )
+        pybert.status = "Co-optimizing..."
+        max_iter  = pybert.max_iter
+
+        vals = []
+        min_vals = []
+        max_vals = []
+        for tuner in pybert.tx_tap_tuners:
+            if tuner.enabled:
+                vals.append(tuner.value)
+                min_vals.append(tuner.min_val)
+                max_vals.append(tuner.max_val)
+
+        vals.append(pybert.peak_mag_tune)
+        min_vals.append(0.0)
+        max_vals.append(gMaxCTLEPeak)
+
+        cons = ({   'type': 'ineq',
+                    'fun' : lambda x: 0.7 - sum(abs(x[:-1]))
+                })
+
+        bounds = zip(min_vals, max_vals)
 
         if(gDebugOptimize):
-            res  = minimize(do_coopt, vals, args=(self.pybert, ), constraints=cons,
-                            options={'disp' : True, 'maxiter' : max_iter})
+            res = minimize( self.do_coopt, vals, constraints=cons,
+                            bounds=bounds, options={'disp'    : True,
+                                                    'maxiter' : max_iter
+                                                   }
+                          )
         else:
-            res  = minimize(do_coopt, vals, args=(self.pybert, ), constraints=cons,
-                            options={'disp' : False, 'maxiter' : max_iter})
-        self.pybert.status = "Ready."
+            res = minimize( self.do_coopt, vals, constraints=cons,
+                            bounds=bounds, options={'disp'    : False,
+                                                    'maxiter' : max_iter
+                                                   }
+                          )
+
+        if(res['success']):
+            pybert.status = "Optimization succeeded."
+        else:
+            pybert.status = "Optimization failed: {}".format(res['message'])
+
+    def do_coopt(self, vals):
+        pybert = self.pybert
+
+        vals = list(vals)
+        tuners = pybert.tx_tap_tuners
+        for tuner in tuners:
+            if(tuner.enabled):
+                tuner.value = vals.pop(0)
+
+        pybert.peak_mag_tune = vals.pop(0)
+        pybert.rel_opt = -pybert.cost
+
+        return pybert.cost
+
+
+class TxTapTuner(HasTraits):
+    'Object used to populate the rows of the Tx FFE tap tuning table.'
+
+    name = String('(noname)')
+    enabled = Bool(False)
+    min_val = Float(0.0)
+    max_val = Float(0.0)
+    value = Float(0.0)
+    
+    def __init__(self,  name='(noname)',
+                        enabled = Bool(False),
+                        min_val = Float(0.0),
+                        max_val = Float(0.0),
+                        value = Float(0.0),
+                ):
+        'Allows user to define properties, at instantiation.'
+
+        # Super-class initialization is ABSOLUTELY NECESSARY, in order
+        # to get all the Traits/UI machinery setup correctly.
+        super(TxTapTuner, self).__init__()
+
+        self.name = name
+        self.enabled = enabled
+        self.min_val = min_val
+        self.max_val = max_val
+        self.value = value
+
 
 class PyBERT(HasTraits):
     """
@@ -224,20 +330,18 @@ class PyBERT(HasTraits):
     v0              = Float(gv0)
     l_ch            = Float(gl_ch)
     # - EQ Tune
-    pretap_tune     = Float(0.0)
-    pretap_tune_enable   = Bool(True)
-    posttap_tune    = Float(0.0)
-    posttap_tune_enable  = Bool(True)
-    posttap2_tune   = Float(0.0)
-    posttap2_tune_enable = Bool(True)
-    posttap3_tune   = Float(0.0)
-    posttap3_tune_enable = Bool(True)
+    tx_tap_tuners = List(  [TxTapTuner(name='Pre-tap',   enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
+                            TxTapTuner(name='Post-tap1', enabled=True, min_val=-0.4, max_val=0.4, value=0.0),
+                            TxTapTuner(name='Post-tap2', enabled=True, min_val=-0.3, max_val=0.3, value=0.0),
+                            TxTapTuner(name='Post-tap3', enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
+                           ]
+                        )
     rx_bw_tune      = Float(gBW)
     peak_freq_tune  = Float(gPeakFreq)
     peak_mag_tune   = Float(gPeakMag)
-    pulse_tune      = Bool(True)
-    ideal_type      = List([2])                                             # 0 = impulse; 1 = sinc; 2 = raised cosine
-    max_iter        = Int(20)                                               # max. # of optimization iterations
+    ctle_offset_tune = Float(gCTLEOffset)                                   # CTLE d.c. offset (dB)
+    ctle_mode_tune  = Enum('Off', 'Passive', 'AGC', 'Manual')
+    max_iter        = Int(50)                                               # max. # of optimization iterations
     rel_opt         = Float(0.)
     tx_opt_thread   = Instance(TxOptThread)
     rx_opt_thread   = Instance(RxOptThread)
@@ -275,13 +379,13 @@ class PyBERT(HasTraits):
     cin             = Float(gCin)                                           # (pF)
     cac             = Float(gCac)                                           # (uF)
     rx_bw           = Float(gBW)                                            # (GHz)
-    use_agc         = Bool(True)
-    use_dfe         = Bool(gUseDfe)
-    sum_ideal       = Bool(gDfeIdeal)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
     peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
     ctle_offset     = Float(gCTLEOffset)                                    # CTLE d.c. offset (dB)
+    ctle_mode       = Enum('Off', 'Passive', 'AGC', 'Manual')
     # - DFE
+    use_dfe         = Bool(gUseDfe)
+    sum_ideal       = Bool(gDfeIdeal)
     decision_scaler = Float(gDecisionScaler)
     gain            = Float(gGain)
     n_ave           = Float(gNave)
@@ -314,11 +418,11 @@ class PyBERT(HasTraits):
     len_h           = Int(0)
     chnl_dly        = Float(0.)
     bit_errs        = Int(0)
-    run_count       = Int(0)                                                # Used as a mechanism to force bit stream regeneration.
+    run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.7.3 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.7.4 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    April 10, 2016\n\n \
+    April 23, 2016\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -333,10 +437,11 @@ class PyBERT(HasTraits):
     perf_info       = Property(HTML,    depends_on=['total_perf'])
     status_str      = Property(String,  depends_on=['status'])
     sweep_info      = Property(HTML,    depends_on=['sweep_results'])
-    tx_h_tune       = Property(Array,   depends_on=['pretap_tune', 'posttap_tune', 'posttap2_tune', 'posttap3_tune', 'nspui'])
-    ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune', 'w', 'len_h'])
-    ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune', 'ideal_h', 'chnl_h'])
-    cost            = Property(Float,   depends_on=['ctle_out_h_tune'])
+    tx_h_tune       = Property(Array,   depends_on=['tx_tap_tuners.value', 'nspui'])
+    ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune',
+                                                    'w', 'len_h', 'ctle_mode_tune', 'ctle_offset_tune'])
+    ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune', 'chnl_h'])
+    cost            = Property(Float,   depends_on=['ctle_out_h_tune', 'nspui'])
     t               = Property(Array,   depends_on=['ui', 'nspb', 'nbits'])
     t_ns            = Property(Array,   depends_on=['t'])
     f               = Property(Array,   depends_on=['t'])
@@ -345,7 +450,6 @@ class PyBERT(HasTraits):
     symbols         = Property(Array,   depends_on=['bits', 'mod_type', 'vod'])
     ffe             = Property(Array,   depends_on=['pretap', 'posttap', 'posttap2', 'posttap3'])
     ui              = Property(Float,   depends_on=['bit_rate', 'mod_type'])
-    ideal_h         = Property(Array,   depends_on=['ui', 'nspui', 't', 'mod_type', 'ideal_type', 'pulse_tune'])
     nui             = Property(Int,     depends_on=['nbits', 'mod_type'])
     nspui           = Property(Int,     depends_on=['nspb', 'mod_type'])
     eye_uis         = Property(Int,     depends_on=['eye_bits', 'mod_type'])
@@ -383,30 +487,34 @@ class PyBERT(HasTraits):
 
     # Button handlers
     def _btn_rst_eq_fired(self):
-        self.pretap_tune    = self.pretap
-        self.posttap_tune   = self.posttap
-        self.posttap2_tune  = self.posttap2
-        self.posttap3_tune  = self.posttap3
-        self.pretap_tune_enable    = self.pretap_enable
-        self.posttap_tune_enable   = self.posttap_enable
-        self.posttap2_tune_enable  = self.posttap2_enable
-        self.posttap3_tune_enable  = self.posttap3_enable
+        self.tx_tap_tuners[0].value = self.pretap
+        self.tx_tap_tuners[0].enable = self.pretap_enable
+        self.tx_tap_tuners[1].value = self.posttap
+        self.tx_tap_tuners[1].enable = self.posttap_enable
+        self.tx_tap_tuners[2].value = self.posttap2
+        self.tx_tap_tuners[2].enable = self.posttap2_enable
+        self.tx_tap_tuners[3].value = self.posttap3
+        self.tx_tap_tuners[3].enable = self.posttap3_enable
         self.peak_freq_tune = self.peak_freq
         self.peak_mag_tune  = self.peak_mag
         self.rx_bw_tune     = self.rx_bw
+        self.ctle_mode_tune = self.ctle_mode
+        self.ctle_offset_tune = self.ctle_offset
 
     def _btn_save_eq_fired(self):
-        self.pretap    = self.pretap_tune
-        self.posttap   = self.posttap_tune
-        self.posttap2  = self.posttap2_tune
-        self.posttap3  = self.posttap3_tune
-        self.pretap_enable    = self.pretap_tune_enable
-        self.posttap_enable   = self.posttap_tune_enable
-        self.posttap2_enable  = self.posttap2_tune_enable
-        self.posttap3_enable  = self.posttap3_tune_enable
+        self.pretap = self.tx_tap_tuners[0].value
+        self.pretap_enable = self.tx_tap_tuners[0].enabled
+        self.posttap = self.tx_tap_tuners[1].value
+        self.posttap_enable = self.tx_tap_tuners[1].enabled
+        self.posttap2 = self.tx_tap_tuners[2].value
+        self.posttap2_enable = self.tx_tap_tuners[2].enabled
+        self.posttap3 = self.tx_tap_tuners[3].value
+        self.posttap3_enable = self.tx_tap_tuners[3].enabled
         self.peak_freq = self.peak_freq_tune
         self.peak_mag  = self.peak_mag_tune
         self.rx_bw     = self.rx_bw_tune
+        self.ctle_mode = self.ctle_mode_tune 
+        self.ctle_offset = self.ctle_offset_tune 
 
     def _btn_opt_tx_fired(self):
         if self.tx_opt_thread and self.tx_opt_thread.isAlive():
@@ -431,6 +539,16 @@ class PyBERT(HasTraits):
             self.coopt_thread = CoOptThread()
             self.coopt_thread.pybert = self
             self.coopt_thread.start()
+
+
+    # Independent variable setting intercepts
+    # (Primarily, for debugging.)
+    def _set_ctle_peak_mag_tune(self, val):
+        if(val > gMaxCTLEPeak or val < 0.):
+            raise RunTimeException("CTLE peak magnitude out of range!")
+        else:
+            self.peak_mag_tune = val
+
 
     # Dependent variable definitions
     @cached_property
@@ -488,6 +606,7 @@ class PyBERT(HasTraits):
         
         pattern_len     = self.pattern_len
         nbits           = self.nbits
+        mod_type        = self.mod_type[0]
 
         bits    = []
         seed    = randint(128)
@@ -497,7 +616,18 @@ class PyBERT(HasTraits):
         for i in range(pattern_len - 4):
             bits.append(bit_gen.next())
 
-        return resize(array([0, 0, 1, 1] + bits), nbits)
+        # The 4-bit prequels, below, are to ensure that the first zero crossing
+        # in the actual slicer input signal occurs. This is necessary, because
+        # we assume it does, when aligning the ideal and actual signals for
+        # jitter calculation.
+        #
+        # We may want to talk to Mike Steinberger, of SiSoft, about his
+        # correlation based approach to this alignment chore. It's
+        # probably more robust.
+        if(mod_type == 1):  # Duo-binary precodes, using XOR.
+            return resize(array([0, 0, 1, 0] + bits), nbits)
+        else:
+            return resize(array([0, 0, 1, 1] + bits), nbits)
 
     @cached_property
     def _get_ui(self):
@@ -604,10 +734,10 @@ class PyBERT(HasTraits):
             symbols = 2 * bits - 1
         elif(mod_type == 1):                         # Duo-binary
             symbols = [bits[0]]
-            for bit in bits[1:]:                       # XOR pre-coding prevents infinite error propagation.
+            for bit in bits[1:]:                     # XOR pre-coding prevents infinite error propagation.
                 symbols.append(bit ^ symbols[-1])
-            symbols = array(symbols) - 0.5
-        elif(mod_type == 2):                        # PAM-4
+            symbols = 2 * array(symbols) - 1
+        elif(mod_type == 2):                         # PAM-4
             symbols = []
             for bits in zip(bits[0::2], bits[1::2]):
                 if(bits == (0,0)):
@@ -620,9 +750,6 @@ class PyBERT(HasTraits):
                     symbols.append(1.)
         else:
             raise Exception("ERROR: _get_symbols(): Unknown modulation type requested!")
-
-        vals, bins = histogram(symbols)
-#        print "PyBERT._get_symbols(): Symbol values histogram:", vals
 
         return array(symbols) * vod
 
@@ -643,7 +770,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_jitter_info(self):
-
         try:
             isi_chnl      = self.isi_chnl * 1.e12
             dcd_chnl      = self.dcd_chnl * 1.e12
@@ -814,7 +940,6 @@ class PyBERT(HasTraits):
     
     @cached_property
     def _get_perf_info(self):
-
         info_str  = '<H2>Performance by Component</H2>\n'
         info_str += '  <TABLE border="1">\n'
         info_str += '    <TR align="center">\n'
@@ -847,7 +972,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_sweep_info(self):
-
         sweep_results = self.sweep_results
 
         info_str  = '<H2>Sweep Results</H2>\n'
@@ -867,7 +991,6 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-
         status_str  = "%-20s | Perf. (Ms/m):    %4.1f" % (self.status, self.total_perf * 60.e-6)
         dly_str     = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.e9)
         err_str     = "         | BitErrs: %d" % self.bit_errs
@@ -886,63 +1009,95 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_tx_h_tune(self):
+        nspui = self.nspui
+        tap_tuners = self.tx_tap_tuners
 
-        nspui     = self.nspui
-        pretap    = self.pretap_tune
-        posttap   = self.posttap_tune
-        posttap2  = self.posttap2_tune
-        posttap3  = self.posttap3_tune
+        taps = []
+        for tuner in tap_tuners:
+            if(tuner.enabled):
+                taps.append(tuner.value)
+            else:
+                taps.append(0.0)
+        taps.insert(1, 1.0 - sum(map(abs, taps)))  # Assume one pre-tap.
 
-        main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
-        ffe      = [pretap, main_tap, posttap, posttap2, posttap3]
+        h = sum([[x] + list(zeros(nspui - 1)) for x in taps], [])
 
-        return sum([[x] + list(zeros(nspui - 1)) for x in ffe], [])
+        return h
 
     @cached_property
     def _get_ctle_h_tune(self):
-
         w         = self.w
         len_h     = self.len_h
         rx_bw     = self.rx_bw_tune     * 1.e9
         peak_freq = self.peak_freq_tune * 1.e9
         peak_mag  = self.peak_mag_tune
+        offset    = self.ctle_offset_tune
+        mode      = self.ctle_mode_tune
 
-        w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w)
-        ctle_H    = H
+        w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w, mode, offset)
+        h = real(ifft(H))[:len_h]
+        h *= abs(H[0]) / sum(h)
 
-        return real(ifft(ctle_H))[:len_h]
+        return h
 
     @cached_property
     def _get_ctle_out_h_tune(self):
-
-        ideal_h   = self.ideal_h
         chnl_h    = self.chnl_h
         tx_h      = self.tx_h_tune
         ctle_h    = self.ctle_h_tune
-        use_pulse = self.pulse_tune
-        nspui     = self.nspui
-        rel_opt   = self.rel_opt
 
-        tx_out_h   = convolve(tx_h,   chnl_h)
-        ctle_out_h = convolve(ctle_h, tx_out_h)
+        tx_out_h = convolve(tx_h, chnl_h)
+        h = convolve(ctle_h, tx_out_h)
 
-        cost, ideal_resp, the_resp = calc_cost(ctle_out_h, ideal_h, nspui, use_pulse)
-
-        self.ctle_out_g_tune = ideal_resp
-        self._cost           = cost
-        self.rel_opt         = 1. / cost
-
-        return the_resp
+        return h
 
     @cached_property
     def _get_cost(self):
-        return self._cost
+        nspui = self.nspui
+        h = self.ctle_out_h_tune
+        mod_type = self.mod_type[0]
+
+        s = h.cumsum()
+        p = s - pad(s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
+        self.plotdata.set_data('ctle_out_h_tune', p)
+
+        # Simplified "Hula Hoop" algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
+        thresh = p.max() / 2.
+        clocks = thresh * ones(len(p))
+        main_lobe_ixs = where(p > (p.max() / 2.))[0]
+        if(len(main_lobe_ixs)):
+            clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
+        else:
+            return 1.0
+        if(mod_type == 1):  # Handle duo-binary.
+            clock_pos -= nspui // 2
+        clocks[clock_pos] = 0.
+        if(mod_type == 1):  # Handle duo-binary.
+            clocks[clock_pos + nspui] = 0.
+
+        # Cost is simply ISI minus main lobe amplitude.
+        isi = 0.
+        ix = clock_pos - nspui
+        while(ix >= 0):
+            clocks[ix] = 0.
+            isi += abs(p[ix])
+            ix -= nspui
+        ix = clock_pos + nspui
+        if(mod_type == 1):  # Handle duo-binary.
+            ix += nspui
+        while(ix < len(p)):
+            clocks[ix] = 0.
+            isi += abs(p[ix])
+            ix += nspui
+
+        self.plotdata.set_data('clocks_tune', clocks)
+
+        if(mod_type == 1):  # Handle duo-binary.
+            return isi - p[clock_pos] - p[clock_pos + nspui] + 2. * abs(p[clock_pos + nspui] - p[clock_pos])
+        else:
+            return isi - p[clock_pos]
 
     # Changed property handlers.
-    def _ctle_out_h_tune_changed(self):
-        self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
-        self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
-
     def _status_str_changed(self):
         if(gDebugStatus):
             print self.status_str
@@ -1029,7 +1184,6 @@ class PyBERT(HasTraits):
             gamma, Zc        = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H                = exp(-l_ch * gamma)
             chnl_H           = 2. * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w) # Compensating for nominal /2 divider action.
-#            chnl_h           = real(ifft(chnl_H)) * sqrt(len(chnl_H))    # Correcting for '1/N' scaling in ifft().
             chnl_h           = real(ifft(chnl_H))
 
         min_len          = 10 * nspui

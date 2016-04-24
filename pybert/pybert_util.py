@@ -7,8 +7,11 @@ Original date:   September 27, 2014 (Copied from `pybert_cntrl.py'.)
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
-from numpy          import sign, sin, pi, array, linspace, float, zeros, ones, repeat, where, diff, append, pad, real, histogram
-from numpy          import log10, sqrt, power, exp, cumsum, mean, power, convolve, correlate, reshape, resize, insert, shape, concatenate
+from numpy import sign, sin, pi, array, linspace, float, zeros, ones, \
+                  repeat, where, diff, append, pad, real, histogram, \
+                  log10, sqrt, power, exp, cumsum, mean, power, \
+                  convolve, correlate, reshape, resize, insert, shape, \
+                  concatenate, sort
 from numpy.random   import normal
 from numpy.fft      import fft, ifft
 from scipy.signal   import lfilter, iirfilter, invres, freqs, medfilt
@@ -19,7 +22,7 @@ from cdr            import CDR
 from pylab          import plot, show, legend
 
 debug          = False
-gDebugOptimize = True
+gDebugOptimize = False
 gMaxCTLEPeak   = 20          # max. allowed CTLE peaking (dB) (when optimizing, only)
 
 def moving_average(a, n=3) :
@@ -48,7 +51,7 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
                      When this option is True, the first rising edge crossing
                      is the first crossing returned. This is the desired
                      behavior for PyBERT, because we always initialize the
-                     bit stream with [0, 1, 1], in order to provide a known
+                     bit stream with [0, 0, 1, 1], in order to provide a known
                      synchronization point for jitter analysis.
 
       - min_init_dev The minimum initial deviation from zero, which must
@@ -74,7 +77,7 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
     i = 0
     while(abs(x[i]) < min_mag_x):
         i += 1
-        assert i < len(x), "ERROR: find_crossing_times(): Input signal minimum deviation not detected!"
+        assert i < len(x), "Input signal minimum deviation not detected!"
     x = x[i:] - thresh
     t = t[i:]
 
@@ -87,34 +90,32 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
     if(not xings):
         return(array([]))
 
-    min_time = t[0]
-    if(min_delay):
-        try:
-            assert min_delay < t[-1], "Error: min_delay must be less than final time value."
-        except:
-            print "min_delay:", min_delay, "t[-3:]:", t[-3:]
-            raise
-        i = 0
-        while(i < len(t) and t[i] < min_delay):
-            i += 1
-        min_time = t[i]
-
     i = 0
-    try:
-        while(xings[i] < min_time):
+    if(min_delay):
+        assert min_delay < xings[-1], "min_delay ({}) must be less than last crossing time ({}).".format(min_delay, xings[-1])
+        while(xings[i] < min_delay):
             i += 1
-    except:
-        print "i:", i, "min_time:", min_time, "xings[i-3:]:", xings[i-3:]
-        print "xing_ix:", xing_ix
-        raise
-
-    if(rising_first and diff_sign_x[xing_ix[i]] < 0.):
-        i += 1
 
     if(debug):
-        print "find_crossing_times(): min_delay:", min_delay, "; first crossing returned:", xings[i], "rising_first:", rising_first
+        print "min_delay: {}".format(min_delay)
+        print "rising_first: {}".format(rising_first)
+        print "i: {}".format(i)
+        print "max_mag_x: {}".format(max_mag_x)
+        print "min_mag_x: {}".format(min_mag_x)
+        print "xings[0]: {}".format(xings[0])
+        print "xings[i]: {}".format(xings[i])
+
+    try:
+        if(rising_first and diff_sign_x[xing_ix[i]] < 0.):
+            i += 1
+    except:
+        print "len(diff_sign_x):", len(diff_sign_x)
+        print "len(xing_ix):", len(xing_ix)
+        print "i:", i
+        raise
 
     return array(xings[i:])
+
 
 def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_init_dev = 0.1, mod_type = 0):
     """
@@ -160,8 +161,51 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
 
     """
 
-    xings = find_crossing_times(t, x, min_delay = min_delay, rising_first = rising_first, min_init_dev = min_init_dev)
-    return array(xings)
+    assert mod_type >= 0 and mod_type <= 2, \
+            "ERROR: pybert_util.find_crossings(): Unknown modulation type: {}".format(mod_type)
+
+    xings = []
+    if(mod_type == 0):    # NRZ
+        xings.append(find_crossing_times(t, x, min_delay=min_delay,
+                                               rising_first=rising_first,
+                                               min_init_dev=min_init_dev,
+                                        )
+                    )
+    elif(mod_type == 1):  # Duo-binary
+        xings.append(find_crossing_times(t, x, min_delay=min_delay,
+                                               rising_first=rising_first,
+                                               min_init_dev=min_init_dev,
+                                               thresh=(-0.5 * amplitude),
+                                        )
+                    )
+        xings.append(find_crossing_times(t, x, min_delay=min_delay,
+                                               rising_first=rising_first,
+                                               min_init_dev=min_init_dev,
+                                               thresh=(0.5 * amplitude),
+                                        )
+                    )
+    else:  # PAM-4 (Enabling the +/-0.67 cases yields multiple ideal crossings at the same edge.)
+#        xings.append(find_crossing_times(t, x, min_delay=min_delay,
+#                                               rising_first=rising_first,
+#                                               min_init_dev=min_init_dev,
+#                                               thresh=(-0.67 * amplitude),
+#                                        )
+#                    )
+        xings.append(find_crossing_times(t, x, min_delay=min_delay,
+                                               rising_first=rising_first,
+                                               min_init_dev=min_init_dev,
+                                               thresh=(0.0 * amplitude),
+                                        )
+                    )
+#        xings.append(find_crossing_times(t, x, min_delay=min_delay,
+#                                               rising_first=rising_first,
+#                                               min_init_dev=min_init_dev,
+#                                               thresh=(0.67 * amplitude),
+#                                        )
+#                    )
+
+    return sort(concatenate(xings, axis=1))
+
 
 def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
     """
@@ -223,48 +267,61 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         enforcing an output range of [-UI/2, +UI/2], sweeping everything in [-UI, -UI/2] into the first bin,
         and everything in [UI/2, UI] into the last bin.
         """
-        hist, bin_edges      = histogram(x, [-ui] + [-ui / 2. + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui])
-        bin_centers          = [-ui / 2.] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) for i in range(len(bin_edges) - 3)] + [ui / 2.]
+        hist, bin_edges = histogram(x, [-ui] + [-ui / 2. + i * ui / (num_bins - 2) \
+                            for i in range(num_bins - 1)] + [ui])
+        bin_centers     = [-ui / 2.] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) \
+                            for i in range(len(bin_edges) - 3)] + [ui / 2.]
+
         return (array(map(float, hist)) / sum(hist), bin_centers)
 
+
+    # Check inputs.
+    assert len(ideal_xings), "ERROR: pybert_util.calc_jitter(): zero length ideal crossings vector received!"
+    assert len(actual_xings), "ERROR: pybert_util.calc_jitter(): zero length actual crossings vector received!"
+
+    # Line up first ideal/actual crossings, and count/validate crossings per pattern.
+    ideal_xings  = array(ideal_xings)  - (ideal_xings[0] - ui / 2.)
+    actual_xings = array(actual_xings) - (actual_xings[0] - ui / 2.)
+    xings_per_pattern = where(ideal_xings > (pattern_len * ui))[0][0]
+    if(xings_per_pattern % 2 or not xings_per_pattern):
+        print "xings_per_pattern:", xings_per_pattern
+        print "len(ideal_xings):", len(ideal_xings)
+        print "min(ideal_xings):", min(ideal_xings)
+        print "max(ideal_xings):", max(ideal_xings)
+        raise AssertionError("pybert_util.calc_jitter(): Odd number of (or, no) crossings per pattern detected!")
+    num_patterns = nui // pattern_len
+
     # Assemble the TIE track.
+    i        = 0
     jitter   = []
     t_jitter = []
-    i        = 0
-    ideal_xings  = array(ideal_xings)  - (ideal_xings[0] - ui / 2.)
-    if(len(actual_xings)):
-        actual_xings = array(actual_xings) - (actual_xings[0] - ideal_xings[0])
-
     skip_next_ideal_xing = False
-    pad_ixs = []
     for ideal_xing in ideal_xings:
         if(skip_next_ideal_xing):
             t_jitter.append(ideal_xing)
             skip_next_ideal_xing = False
             continue
-        # Find the closest actual crossing, occuring within [-ui, ui],
-        # to the ideal crossing, checking for missing crossings.
-        min_t = ideal_xing - ui
-        max_t = ideal_xing + ui
+        # Confine our attention to those actual crossings occuring
+        # within the interval [-UI/2, +UI/2] centered around the
+        # ideal crossing.
+        min_t = ideal_xing - ui/2.
+        max_t = ideal_xing + ui/2.
         while(i < len(actual_xings) and actual_xings[i] < min_t):
             i += 1
-        if(i == len(actual_xings)):              # We've exhausted the list of actual crossings; we're done.
+        if(i == len(actual_xings)):       # We've exhausted the list of actual crossings; we're done.
             break
-        if(actual_xings[i] > max_t):             # Means the xing we're looking for didn't occur, in the actual signal.
-            pad_ixs.append(len(jitter) + 2 * len(pad_ixs))
-            skip_next_ideal_xing = True          # If we missed one, we missed two.
-        else:
-            candidates = []
-            j = i
+        if(actual_xings[i] > max_t):      # Means the xing we're looking for didn't occur, in the actual signal.
+            jitter.append( 3. * ui / 4.)  # Pad the jitter w/ alternating +/- 3UI/4.
+            jitter.append(-3. * ui / 4.)  # (Will get pulled into [-UI/2, UI/2], later.
+            skip_next_ideal_xing = True   # If we missed one, we missed two.
+        else:                             # Noise may produce several crossings. We find all those
+            xings = []                    # within the interval [-UI/2, +UI/2] centered
+            j = i                         # around the ideal crossing, and take the average.
             while(j < len(actual_xings) and actual_xings[j] <= max_t):
-                candidates.append(actual_xings[j])
+                xings.append(actual_xings[j])
                 j += 1
-            ties     = array(candidates) - ideal_xing
-            tie_mags = abs(ties)
-            best_ix  = where(tie_mags == min(tie_mags))[0][0]
-            tie      = ties[best_ix]
+            tie = mean(xings) - ideal_xing
             jitter.append(tie)
-            i += best_ix + 1
         t_jitter.append(ideal_xing)
     jitter  = array(jitter)
 
@@ -275,51 +332,24 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     if(zero_mean):
         jitter -= mean(jitter)
 
-    jitter = list(jitter)
-    for pad_ix in pad_ixs:
-        jitter.insert(pad_ix, -3. * ui / 4.)         # Pad the jitter w/ alternating +/- 3UI/4. (Will get pulled into [-UI/2, UI/2], later.
-        jitter.insert(pad_ix,  3. * ui / 4.)
-    jitter = array(jitter)
-
     # Do the jitter decomposition.
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    xings_per_pattern    = where(ideal_xings >= pattern_len * ui)[0][0]
-    fallings_per_pattern = xings_per_pattern // 2
-    risings_per_pattern  = xings_per_pattern - fallings_per_pattern
-    num_patterns         = nui // pattern_len
-
-    # -- Check and adjust vector lengths, reporting out if any modifications were necessary.
-    if(False):
-        if(len(jitter) < xings_per_pattern * num_patterns):
-            print "Added %d zeros to 'jitter'." % (xings_per_pattern * num_patterns - len(jitter))
-            jitter = append(jitter, zeros(xings_per_pattern * num_patterns - len(jitter)))
-        try:
-            t_jitter = t_jitter[:len(jitter)]
-            if(len(jitter) > len(t_jitter)):
-                jitter = jitter[:len(t_jitter)]
-                print "Had to shorten 'jitter', due to 't_jitter'."
-        except:
-            print "jitter:", jitter
-            raise
-
-    # -- Do the reshaping and check results thoroughly.
-    try:
-        tie_risings  = jitter.take(range(0, len(jitter), 2))
-        tie_fallings = jitter.take(range(1, len(jitter), 2))
-        tie_risings.resize (num_patterns * risings_per_pattern)
-        tie_fallings.resize(num_patterns * fallings_per_pattern)
-        tie_risings  = reshape(tie_risings, (num_patterns, risings_per_pattern))
-        tie_fallings = reshape(tie_fallings,(num_patterns, fallings_per_pattern))
-    except:
-        print "ideal_xings[xings_per_pattern - 1]:", ideal_xings[xings_per_pattern - 1], "ideal_xings[-1]:", ideal_xings[-1]
-        print "num_patterns:", num_patterns, "risings_per_pattern:", risings_per_pattern, "fallings_per_pattern:", fallings_per_pattern, "len(jitter):", len(jitter)
-        print "nui:", nui, "pattern_len:", pattern_len
-        raise
+    tie_risings  = jitter.take(range(0, len(jitter), 2))
+    tie_fallings = jitter.take(range(1, len(jitter), 2))
+    tie_risings.resize (num_patterns * xings_per_pattern // 2)
+    tie_fallings.resize(num_patterns * xings_per_pattern // 2)
+    tie_risings  = reshape(tie_risings,  (num_patterns, xings_per_pattern // 2))
+    tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
 
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
-    tie_risings_ave  = tie_risings.mean(axis=0)
-    tie_fallings_ave = tie_fallings.mean(axis=0)
-    isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
+    try:
+        tie_risings_ave  = tie_risings.mean(axis=0)
+        tie_fallings_ave = tie_fallings.mean(axis=0)
+        isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
+    except:
+        print "xings_per_pattern:", xings_per_pattern
+        print "len(ideal_xings):", len(ideal_xings)
+        raise
     isi = min(isi, ui) # Cap the ISI at the unit interval.
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
 
@@ -354,15 +384,16 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     y_rnd    = where(y_mag > thresh, zeros(len(y)), y)               # Random components are those lying below.
     y_rnd    = abs(y_rnd)
     rj       = sqrt(mean((y_rnd - mean(y_rnd)) ** 2))
-    tie_per  = real(ifft(y_per)).take(valid_ix) * sqrt(len(tie_ind)) # Restoring shape of vector to its original, non-uniformly sampled state.
-    pj       = tie_per.ptp()
+    tie_per  = real(ifft(y_per)).take(valid_ix) * sqrt(len(tie_ind)) # Restoring shape of vector to its original,
+    pj       = tie_per.ptp()                                         # non-uniformly sampled state.
 
     # --- Save the spectrum, for display purposes.
     tie_ind_spectrum = y_mag[:len(y_mag) / 2]
 
     # - Reassemble the jitter, excluding the Rj.
     # -- Here, we see why it was necessary to keep track of the non-padded elements with 'valid_ix':
-    # -- It was so that we could add the average and periodic components back together, maintaining correct alignment between them.
+    # -- It was so that we could add the average and periodic components back together,
+    # -- maintaining correct alignment between them.
     if(len(tie_per) > len(tie_ave)):
         tie_per = tie_per[:len(tie_ave)]
     if(len(tie_per) < len(tie_ave)):
@@ -381,7 +412,8 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     rj_pmf     = (rj_pdf / sum(rj_pdf))
     hist_synth = convolve(hist_synth, rj_pmf)
     tail_len   = (len(bin_centers) - 1) / 2
-    hist_synth = [sum(hist_synth[: tail_len + 1])] + list(hist_synth[tail_len + 1 : len(hist_synth) - tail_len - 1]) + [sum(hist_synth[len(hist_synth) - tail_len - 1 :])]
+    hist_synth = [sum(hist_synth[: tail_len + 1])] + list(hist_synth[tail_len + 1 : len(hist_synth) - tail_len - 1]) \
+               + [sum(hist_synth[len(hist_synth) - tail_len - 1 :])]
 
     return (jitter, t_jitter, isi, dcd, pj, rj, tie_ind,
             thresh[:len(thresh) / 2], jitter_spectrum, tie_ind_spectrum, spectrum_freqs,
@@ -581,14 +613,15 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     return img_array
 
-def make_ctle(rx_bw, peak_freq, peak_mag, w, dc_offset=0):
+def make_ctle(rx_bw, peak_freq, peak_mag, w, mode='Passive', dc_offset=0):
     """
     Generate the frequency response of a continuous time linear
     equalizer (CTLE), given the:
 
     - signal path bandwidth,
-    - peaking specification, and
-    - list of frequencies of interest.
+    - peaking specification
+    - list of frequencies of interest, and
+    - operational mode/offset.
 
     We use the 'invres()' function from scipy.signal, as it suggests
     itself as a natural approach, given our chosen use model of having
@@ -615,7 +648,14 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, dc_offset=0):
 
       - w            The list of frequencies of interest (rads./s).
 
+      - mode         The operational mode; must be one of:
+                       - 'Off'    : CTLE is disengaged.
+                       - 'Passive': Maximum frequency response has magnitude one.
+                       - 'AGC'    : Automatic gain control. (Handled by calling routine.)
+                       - 'Manual' : D.C. offset is set manually.
+
       - dc_offset    The d.c. offset of the CTLE gain curve (dB).
+                     (Only valid, when 'mode' = 'Manual'.)
 
     Outputs:
 
@@ -623,6 +663,9 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, dc_offset=0):
                      given frequencies.
 
     """
+
+    if(mode == 'Off'):
+        return (w, ones(len(w)))
 
     p2   = -2. * pi * rx_bw
     p1   = -2. * pi * peak_freq
@@ -634,9 +677,14 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, dc_offset=0):
         r1   = -1.
         r2   = z - p1
     b, a = invres([r1, r2], [p1, p2], [])
-
     w, H = freqs(b, a, w)
-    H   *= pow(10., dc_offset / 20.) / abs(H[0])  # Enforce d.c. offset.
+
+    if(mode == 'Passive'):
+        H /= max(abs(H))
+    elif(mode == 'Manual' or mode == 'AGC'):
+        H *= pow(10., dc_offset / 20.) / abs(H[0])  # Enforce d.c. offset.
+    else:
+        raise RunTimeException("pybert_util.make_ctle(): Unrecognized value for 'mode' parameter: {}.".format(mode))
 
     return (w, H)
 
@@ -730,93 +778,6 @@ def import_qucs_csv(filename, sample_per):
         t += sample_per
 
     return array(res)
-
-def trim_shift_scale(ideal_h, actual_h, use_corr = False):
-    """
-    Trims, shifts, and scales an ideal impulse response, to match the
-    length, position, and magnitude of an actual impulse response, so
-    that they can be more readily manipulated as a pair by certain
-    NumPy/SciPy routines.
-
-    ToDo:
-    - Add some checking, re: vector lengths. (Actual should be quite shorter than ideal.)
-      Currently, this routine is fairly fragile; sending in ideal and actual
-      with same lengths, for instance will wreak havoc.
-
-    """
-
-    if(use_corr):
-        corr_res = correlate(ideal_h, actual_h, mode='valid')
-        corr_res = where(corr_res < 0., zeros(len(corr_res)), corr_res)
-        offset   = int(sum([i * corr_res[i] ** 2 for i in range(len(corr_res))]) / sum(corr_res ** 2))
-    else:
-        offset   = mean(where(ideal_h == max(ideal_h))[0]) - mean(where(actual_h == max(actual_h))[0])
-
-    if(False):
-        print "len(ideal_h):", len(ideal_h), "len(actual_h):", len(actual_h)
-        print "offset:", offset
-        plot(ideal_h,  label='Ideal')
-        plot(actual_h, label='Actual')
-        plot(corr_res, label='Correlation')
-        legend()
-        show()
-
-    res = ideal_h[offset:].copy()
-    res.resize(len(actual_h))                    # Clips, if too long; pads w/ zeros, if too short.
-    return res * max(actual_h) / max(res)
-
-def calc_cost(actual_h, ideal_h, nspui, use_pulse):
-    """
-    Calculates the cost function for link equalization optimization.
-
-    Inputs:
-
-      - actual_h   actual impulse response
-
-      - ideal_h    ideal impulse response
-
-      - nspui      number of samples per unit interval
-
-      - use_pulse  Boolean flag; use pulse response when true.
-
-    Outputs:
-
-      - cost        cost function value
-
-      - ideal_resp  ideal response function
-
-      - actual_resp actual response function
-
-    """
-
-    # Calculate the cost function.
-    if(use_pulse):
-        ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = False)
-        actual_s = actual_h.cumsum()
-        actual   = actual_s - pad(actual_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
-        ideal_s  = ideal_h.cumsum()
-        ideal    = ideal_s - pad(ideal_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
-        assert max(ideal) == max(abs(ideal)), "pybert_util.calc_cost(): ERROR: Ideal response peak is negative!"
-        min_thresh   = 0.01 * max(ideal)
-        pulse_center = int(sum([i * ideal[i] ** 2 for i in range(len(ideal))]) / sum(ideal ** 2))
-        i = pulse_center
-        while(i > 0 and ideal[i] > min_thresh):
-            i -= 1
-        pulse_left = i
-        i = pulse_center
-        while(i < len(ideal) and ideal[i] > min_thresh):
-            i += 1
-        pulse_right = i
-        pwr_outside = sum(actual[:pulse_left + 1] ** 2) + sum(actual[pulse_right:] ** 2) 
-        pwr_inside  = sum(actual[pulse_left + 1 : pulse_right] ** 2)
-        cost        = pwr_outside / pwr_inside
-    else:
-        ideal_h  = trim_shift_scale(ideal_h, actual_h, use_corr = True)
-        actual   = actual_h
-        ideal    = ideal_h
-        cost     = sum((actual - ideal) ** 2)
-
-    return cost, ideal, actual
 
 def lfsr_bits(taps, seed):
     """

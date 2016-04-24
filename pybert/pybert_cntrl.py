@@ -18,7 +18,7 @@ from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
 from dfe          import DFE
 from cdr          import CDR
 
-from pybert_util  import find_crossings, trim_shift_scale, make_ctle, calc_jitter, moving_average, calc_eye
+from pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye
 
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.e-18
@@ -155,6 +155,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     peak_freq       = self.peak_freq * 1.e9
     peak_mag        = self.peak_mag
     ctle_offset     = self.ctle_offset
+    ctle_mode       = self.ctle_mode
     delta_t         = self.delta_t * 1.e-12
     alpha           = self.alpha
     ui              = self.ui
@@ -168,11 +169,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     bandwidth       = self.sum_bw * 1.e9
     rel_thresh      = self.thresh
     mod_type        = self.mod_type[0]
-    ideal_h         = self.ideal_h
-
-    # Correct pattern length, if using PAM-4.
-    if(mod_type == 2):
-        pattern_len = pattern_len * 2 // 2  # Catches the case of odd number of bits in pattern.
 
     # Calculate misc. values.
     fs         = bit_rate * nspb
@@ -182,32 +178,26 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     #
     # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
     # impulse response, in order to produce the proper ideal signal.
-    #
-    # Note that we don't use the ideal duobinary signal thusly constructed for determining
-    # the ideal crossing locations, below, because it has "shelves" at zero volts, which
-    # wreak havoc on our zero crossing detection algorithm.
     x = repeat(symbols, nspui)
     self.x = x
-    tmp_x = x
-    if(mod_type == 1):
+    if(mod_type == 1):  # Handle duo-binary case.
         duob_h = array(([0.5] + [0.] * (nspui - 1)) * 2)
-        tmp_x  = convolve(tmp_x, duob_h)[:len(t)]
-    self.ideal_signal = tmp_x
+        x = convolve(x, duob_h)[:len(t)]
+    self.ideal_signal = x
 
     # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
-    ideal_xings      = find_crossings(t, x, decision_scaler, min_delay = ui / 2., mod_type = mod_type)
+    ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 2.), mod_type=mod_type)
     self.ideal_xings = ideal_xings
 
     # Generate the ideal impulse responses.
     chnl_h       = self.calc_chnl_h()
-    self.chnl_g  = trim_shift_scale(ideal_h, chnl_h)
 
     # Calculate the channel output.
     #
-    # Note: We're not using 'tmp_x', because we rely on the system response to
+    # Note: We're not using 'self.ideal_signal', because we rely on the system response to
     #       create the duobinary waveform. We only create it explicitly, above,
     #       so that we'll have an ideal reference for comparison.
-    chnl_out  = convolve(x, chnl_h)[:len(x)]
+    chnl_out = convolve(self.x, chnl_h)[:len(x)]
 
     self.channel_perf = nbits * nspb / (clock() - start_time)
     split_time        = clock()
@@ -243,20 +233,16 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     (b, a) = iirfilter(2, gFc/(fs/2), btype='highpass')
     pn     = lfilter(b, a, pn)[:len(pn)]
 
-    # - Add the uncorrelated periodic noise to the Tx output.
+    # - Add the uncorrelated periodic and random noise to the Tx output.
     tx_out += pn
+    tx_out += normal(scale=rn, size=(len(tx_out),))
 
     # - Convolve w/ channel.
     tx_out_h   = convolve(tx_h, chnl_h)[:len(chnl_h)]
-    tx_out_g   = trim_shift_scale(ideal_h, tx_out_h)
     temp       = tx_out_h.copy()
     temp.resize(len(w))
     tx_out_H   = fft(temp)
-#    tx_out_H  *= sum(ffe) / abs(tx_out_H[0])  # Normalize for proper d.c. magnitude.
     rx_in      = convolve(tx_out, chnl_h)[:len(tx_out)]
-
-    # - Add the random noise to the Rx input.
-    rx_in     += normal(scale=rn, size=(len(tx_out),))
 
     self.tx_s      = tx_h.cumsum()
     self.tx_out    = tx_out
@@ -267,41 +253,36 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.tx_h      = tx_h
     self.tx_out_H  = tx_out_H
     self.tx_out_h  = tx_out_h
-    self.tx_out_g  = tx_out_g
 
     self.tx_perf   = nbits * nspb / (clock() - split_time)
     split_time     = clock()
     self.status    = 'Running CTLE...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
-    w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_offset)
+    w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
     ctle_H          = H
     ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
     ctle_h         *= abs(ctle_H[0]) / sum(ctle_h)
     ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
     ctle_out       -= mean(ctle_out)             # Force zero mean.
-    if(self.use_agc):                            # Automatic gain control engaged?
+    if(self.ctle_mode == 'AGC'):                 # Automatic gain control engaged?
         ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
     self.ctle_s     = ctle_h.cumsum()
     ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
-    ctle_out_g      = trim_shift_scale(ideal_h, ctle_out_h)
-    conv_dly_ix     = where(ctle_out_h == max(ctle_out_h))[0][0]
+    conv_dly_ix     = where(ctle_out_h >= max(ctle_out_h) / 2.)[0][0]
     conv_dly        = t[conv_dly_ix]
     ctle_out_s      = ctle_out_h.cumsum()
     temp            = ctle_out_h.copy()
     temp.resize(len(w))
     ctle_out_H      = fft(temp)
-#    ctle_out_H     *= sum(temp) / abs(ctle_out_H[0])
+    self.rel_opt = self.cost  # Triggers update to EQ tuning plot data.
     # - Store local variables to class instance.
     self.ctle_out_s = ctle_out_s
     self.ctle_out_p = self.ctle_out_s[nspui:] - self.ctle_out_s[:-nspui] 
     self.ctle_H     = ctle_H
-#    self.ctle_h     = ctle_h * 1.e-9 / Ts
     self.ctle_h     = ctle_h
     self.ctle_out_H = ctle_out_H
-#    self.ctle_out_h = ctle_out_h * 1.e-9 / Ts
     self.ctle_out_h = ctle_out_h
-    self.ctle_out_g = ctle_out_g
     self.ctle_out   = ctle_out
     self.conv_dly   = conv_dly
     self.conv_dly_ix = conv_dly_ix
@@ -321,7 +302,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                     bandwidth=bandwidth, ideal=True)
     (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
     bits_out = array(bits_out)
-    auto_corr       = 1. * correlate(bits_out[(nbits - eye_bits):], bits[(nbits - eye_bits):], mode='same') / sum(bits[(nbits - eye_bits):])
+    auto_corr       = 1. * correlate(bits_out[(nbits - eye_bits):], bits[(nbits - eye_bits):], mode='same') \
+                         / sum(bits[(nbits - eye_bits):])
     auto_corr       = auto_corr[len(auto_corr) // 2 :]
     self.auto_corr  = auto_corr
     bit_dly         = where(auto_corr == max(auto_corr))[0][0]
@@ -337,15 +319,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.dfe_s     = dfe_h.cumsum()
     dfe_out_H      = ctle_out_H * dfe_H
     dfe_out_h      = convolve(ctle_out_h, dfe_h)[:len(ctle_out_h)]
-    dfe_out_g      = trim_shift_scale(ideal_h, dfe_out_h)
     self.dfe_out_s = dfe_out_h.cumsum()
     self.dfe_out_p = self.dfe_out_s[nspui:] - self.dfe_out_s[:-nspui] 
     self.dfe_H     = dfe_H
     self.dfe_h     = dfe_h
     self.dfe_out_H = dfe_out_H
-#    self.dfe_out_h = dfe_out_h * 1.e-9 / Ts
     self.dfe_out_h = dfe_out_h
-    self.dfe_out_g = dfe_out_g
     self.dfe_out   = dfe_out
 
     self.dfe_perf  = nbits * nspb / (clock() - split_time)
@@ -353,9 +332,15 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status    = 'Analyzing jitter...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Analyze the jitter.
+    if(mod_type == 1):  # Handle duo-binary case.
+        pattern_len *= 2        # Because, the XOR pre-coding can invert every other pattern rep.
+    if(mod_type == 2):  # Handle PAM-4 case.
+        if(pattern_len % 2):
+            pattern_len *= 2    # Because, the bits are taken in pairs, to form the symbols.
+
     # - channel output
     try:
-        actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type = mod_type)
+        actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
         (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
             thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
             hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -372,10 +357,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.jitter_ind_spectrum_chnl = jitter_ind_spectrum
         self.f_MHz                    = array(spectrum_freqs) * 1.e-6
     except:
-        pass
+        raise
+
     # - Tx output
     try:
-        actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type = mod_type)
+        actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
         (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
             thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
             hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -394,9 +380,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.jitter_tx              = array([])
         self.jitter_spectrum_tx     = array([])
         self.jitter_ind_spectrum_tx = array([])
+
     # - CTLE output
     try:
-        actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type = mod_type)
+        actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
         (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
             thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
             hist, hist_synth, bin_centers) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -415,12 +402,16 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.jitter_ctle              = array([])
         self.jitter_spectrum_ctle     = array([])
         self.jitter_ind_spectrum_ctle = array([])
+
     # - DFE output
     try:
-        ignore_until  = (nui - eye_uis) * ui + ui / 2.
+        ignore_until  = (nui - eye_uis) * ui + 0.75 * ui  # 0.5 was causing an occasional misalignment.
         ideal_xings   = array(filter(lambda x: x > ignore_until, list(ideal_xings)))
         min_delay     = ignore_until + conv_dly
-        actual_xings  = find_crossings(t, dfe_out, decision_scaler, min_delay = min_delay, mod_type = mod_type, rising_first = False)
+        actual_xings  = find_crossings(t, dfe_out, decision_scaler, min_delay=min_delay,
+                                                                    mod_type=mod_type,
+                                                                    rising_first=False,
+                                      )
         (jitter, t_jitter, isi, dcd, pj, rj, jitter_ext, \
             thresh, jitter_spectrum, jitter_ind_spectrum, spectrum_freqs, \
             hist, hist_synth, bin_centers) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings, actual_xings, rel_thresh)
@@ -437,9 +428,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         skip_factor                  = nbits / eye_bits
         ctle_spec                    = self.jitter_spectrum_ctle
         dfe_spec                     = self.jitter_spectrum_dfe
-#        ctle_spec_condensed          = array([ctle_spec.take(range(i, i + skip_factor)).mean() for i in range(0, len(ctle_spec), skip_factor)])
-#        window_width                 = len(dfe_spec) / 10
-#        self.jitter_rejection_ratio  = moving_average(ctle_spec_condensed, window_width) / moving_average(dfe_spec, window_width) 
         self.jitter_rejection_ratio  = zeros(len(dfe_spec))
     except:
         raise
@@ -526,22 +514,14 @@ def update_results(self):
     self.plotdata.set_data("clocks",   self.clocks)
     self.plotdata.set_data("lockeds",  self.lockeds)
 
-    # EQ Tune
-    self.plotdata.set_data('ctle_out_h_tune', self.ctle_out_h_tune)
-    self.plotdata.set_data('ctle_out_g_tune', self.ctle_out_g_tune)
-
     # Impulse responses
     self.plotdata.set_data("chnl_h",     self.chnl_h * 1.e-9 / Ts)  # Re-normalize to (V/ns), for plotting.
-    self.plotdata.set_data("chnl_g",     self.chnl_g * 1.e-9 / Ts)
     self.plotdata.set_data("tx_h",       self.tx_h * 1.e-9 / Ts)
     self.plotdata.set_data("tx_out_h",   self.tx_out_h * 1.e-9 / Ts)
-    self.plotdata.set_data("tx_out_g",   self.tx_out_g * 1.e-9 / Ts)
     self.plotdata.set_data("ctle_h",     self.ctle_h * 1.e-9 / Ts)
     self.plotdata.set_data("ctle_out_h", self.ctle_out_h * 1.e-9 / Ts)
-    self.plotdata.set_data("ctle_out_g", self.ctle_out_g * 1.e-9 / Ts)
     self.plotdata.set_data("dfe_h",      self.dfe_h * 1.e-9 / Ts)
     self.plotdata.set_data("dfe_out_h",  self.dfe_out_h * 1.e-9 / Ts)
-    self.plotdata.set_data("dfe_out_g",  self.dfe_out_g * 1.e-9 / Ts)
 
     # Step responses
     self.plotdata.set_data("chnl_s",     self.chnl_s)
@@ -614,25 +594,29 @@ def update_results(self):
     bathtub_chnl    = list(cumsum(jitter_ext_chnl[-1 : -(half_len + 1) : -1]))
     bathtub_chnl.reverse()
     bathtub_chnl    = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[:half_len + 1])))
-    bathtub_chnl    = where(bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl) # To avoid Chaco log scale plot wierdness.
+    bathtub_chnl    = where(bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)),
+                            bathtub_chnl) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_chnl", log10(bathtub_chnl))
     #  - Tx
     bathtub_tx    = list(cumsum(jitter_ext_tx[-1 : -(half_len + 1) : -1]))
     bathtub_tx.reverse()
     bathtub_tx    = array(bathtub_tx + list(cumsum(jitter_ext_tx[:half_len + 1])))
-    bathtub_tx    = where(bathtub_tx < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_tx)), bathtub_tx) # To avoid Chaco log scale plot wierdness.
+    bathtub_tx    = where(bathtub_tx < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_tx)),
+                          bathtub_tx) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_tx", log10(bathtub_tx))
     #  - CTLE
     bathtub_ctle    = list(cumsum(jitter_ext_ctle[-1 : -(half_len + 1) : -1]))
     bathtub_ctle.reverse()
     bathtub_ctle    = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[:half_len + 1])))
-    bathtub_ctle    = where(bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle) # To avoid Chaco log scale plot wierdness.
+    bathtub_ctle    = where(bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)),
+                            bathtub_ctle) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_ctle", log10(bathtub_ctle))
     #  - DFE
     bathtub_dfe    = list(cumsum(jitter_ext_dfe[-1 : -(half_len + 1) : -1]))
     bathtub_dfe.reverse()
     bathtub_dfe    = array(bathtub_dfe + list(cumsum(jitter_ext_dfe[:half_len + 1])))
-    bathtub_dfe    = where(bathtub_dfe < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_dfe)), bathtub_dfe) # To avoid Chaco log scale plot wierdness.
+    bathtub_dfe    = where(bathtub_dfe < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_dfe)),
+                           bathtub_dfe) # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_dfe", log10(bathtub_dfe))
 
     # Eyes
@@ -685,15 +669,6 @@ def update_eyes(self):
     self.plots_eye.components[1].y_axis.mapper.range.high = ys[-1]
     self.plots_eye.components[1].invalidate_draw()
 
-    y_max    = 1.1 * max(abs(array(self.ctle_out)))
-    ys       = linspace(-y_max, y_max, height)
-    self.plots_eye.components[2].components[0].index.set_data(xs, ys)
-    self.plots_eye.components[2].x_axis.mapper.range.low = xs[0]
-    self.plots_eye.components[2].x_axis.mapper.range.high = xs[-1]
-    self.plots_eye.components[2].y_axis.mapper.range.low = ys[0]
-    self.plots_eye.components[2].y_axis.mapper.range.high = ys[-1]
-    self.plots_eye.components[2].invalidate_draw()
-
     y_max    = 1.1 * max(abs(array(self.dfe_out)))
     ys       = linspace(-y_max, y_max, height)
     self.plots_eye.components[3].components[0].index.set_data(xs, ys)
@@ -703,35 +678,12 @@ def update_eyes(self):
     self.plots_eye.components[3].y_axis.mapper.range.high = ys[-1]
     self.plots_eye.components[3].invalidate_draw()
 
+    self.plots_eye.components[2].components[0].index.set_data(xs, ys)
+    self.plots_eye.components[2].x_axis.mapper.range.low = xs[0]
+    self.plots_eye.components[2].x_axis.mapper.range.high = xs[-1]
+    self.plots_eye.components[2].y_axis.mapper.range.low = ys[0]
+    self.plots_eye.components[2].y_axis.mapper.range.high = ys[-1]
+    self.plots_eye.components[2].invalidate_draw()
+
     self.plots_eye.request_redraw()
-
-def do_opt_rx(peak_mag, self):
-    self.peak_mag_tune = peak_mag
-    return self.cost
-
-def do_opt_tx(taps, self):
-    taps = list(taps)
-    if(self.pretap_tune_enable):
-        self.pretap_tune   = taps.pop(0)
-    if(self.posttap_tune_enable):
-        self.posttap_tune  = taps.pop(0)
-    if(self.posttap2_tune_enable):
-        self.posttap2_tune = taps.pop(0)
-    if(self.posttap3_tune_enable):
-        self.posttap3_tune = taps.pop(0)
-    return self.cost
-
-def do_coopt(vals, self):
-    vals = list(vals)
-    if(self.pretap_tune_enable):
-        self.pretap_tune   = vals.pop(0)
-    if(self.posttap_tune_enable):
-        self.posttap_tune  = vals.pop(0)
-    if(self.posttap2_tune_enable):
-        self.posttap2_tune = vals.pop(0)
-    if(self.posttap3_tune_enable):
-        self.posttap3_tune = vals.pop(0)
-    self.peak_mag_tune = vals.pop(0)
-    self.peak_freq_tune = vals.pop(0)
-    return self.cost
 
