@@ -69,7 +69,11 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
     t = array(t)
     x = array(x)
 
-    max_mag_x = max(abs(x))
+    try:
+        max_mag_x = max(abs(x))
+    except:
+        print "len(x):", len(x)
+        raise
     min_mag_x = min_init_dev * max_mag_x
     i = 0
     while(abs(x[i]) < min_mag_x):
