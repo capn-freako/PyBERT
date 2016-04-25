@@ -7,13 +7,15 @@ Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major co
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
-from threading               import Thread
+from threading import Thread
 
-from traits.api              import Instance
-from traitsui.api            import View, Item, Group, VGroup, HGroup, Action, Handler, DefaultOverride, CheckListEditor, StatusItem, TextEditor
+from traits.api import Instance
+from traitsui.api import View, Item, Group, VGroup, HGroup, Action, Handler, \
+                         DefaultOverride, CheckListEditor, StatusItem, \
+                         TextEditor, TableEditor, ObjectColumn
 from enable.component_editor import ComponentEditor
 
-from pybert_cntrl            import my_run_sweeps
+from pybert_cntrl import my_run_sweeps
 
 class RunSimThread(Thread):
     'Used to run the simulation in its own thread, in order to preserve GUI responsiveness.'
@@ -45,7 +47,6 @@ traits_view = View(
                 HGroup(
                     VGroup(
                         Item(name='bit_rate',    label='Bit Rate (Gbps)',  tooltip="bit rate", show_label=True, enabled_when='True',
-                            #editor=DefaultOverride(mode='spinner'), width=0.5, style='readonly', format_str="%+06.3f"
                             editor=TextEditor(auto_set=False, enter_set=True, evaluate=float)
                         ),
                         Item(name='nbits',       label='Nbits',    tooltip="# of bits to run",
@@ -128,13 +129,17 @@ traits_view = View(
                 ),
                 HGroup(
                     VGroup(
-                        Item(name='peak_freq', label='CTLE fp (GHz)',        tooltip="CTLE peaking frequency (GHz)", ),
-                        Item(name='peak_mag',  label='CTLE boost (dB)',      tooltip="CTLE peaking magnitude (dB)", ),
-                        Item(name='ctle_offset', label='CTLE offset (dB)',   tooltip="CTLE d.c. offset (dB)", ),
-                        Item(name='rx_bw',     label='Bandwidth (GHz)',      tooltip="unequalized signal path bandwidth (GHz).", ),
+                        Item(name='peak_freq', label='CTLE fp (GHz)',   tooltip="CTLE peaking frequency (GHz)", ),
+                        Item(name='rx_bw',     label='Bandwidth (GHz)', tooltip="unequalized signal path bandwidth (GHz).", ),
+                        Item(name='peak_mag',  label='CTLE boost (dB)', tooltip="CTLE peaking magnitude (dB)",
+                             format_str='%4.1f'),
+                        HGroup(
+                            Item(name='ctle_mode', label='CTLE mode', tooltip="CTLE Operating Mode"),
+                            Item(name='ctle_offset', tooltip="CTLE d.c. offset (dB)",
+                                    show_label=False, enabled_when='ctle_mode == "Manual"'),
+                        ),
                     ),
                     VGroup(
-                        Item(name='use_agc',   label='Use AGC',              tooltip="Include automatic gain control.", ),
                         Item(name='use_dfe',   label='Use DFE',              tooltip="Include DFE in simulation.", ),
                         Item(name='sum_ideal', label='Ideal DFE',            tooltip="Use ideal DFE. (performance boost)", ),
                     ),
@@ -171,47 +176,59 @@ traits_view = View(
         ),
         VGroup(
             HGroup(
-                VGroup(
-                    HGroup(
-                        Item(name='pretap_tune_enable',   label='Enable',                            tooltip="Enable this tap.", ),
-                        Item(name='pretap_tune',          label='Pre-tap',     format_str='%7.4f',   tooltip="pre-cursor tap weight", ),
-                    ),
-                    HGroup(
-                        Item(name='posttap_tune_enable',  label='Enable',                            tooltip="Enable this tap.", ),
-                        Item(name='posttap_tune',         label='Post-tap',    format_str='%7.4f',   tooltip="post-cursor tap weight", ),
-                    ),
-                    HGroup(
-                        Item(name='posttap2_tune_enable', label='Enable',                            tooltip="Enable this tap.", ),
-                        Item(name='posttap2_tune',        label='Post-tap2',   format_str='%7.4f',   tooltip="2nd post-cursor tap weight", ),
-                    ),
-                    HGroup(
-                        Item(name='posttap3_tune_enable', label='Enable',                            tooltip="Enable this tap.", ),
-                        Item(name='posttap3_tune',        label='Post-tap3',   format_str='%7.4f',   tooltip="3rd post-cursor tap weight", ),
-                    ),
+                Group(
+                    Item(   name='tx_tap_tuners',
+                            editor=TableEditor(columns=[ObjectColumn(name='name', editable=False),
+                                                        ObjectColumn(name='enabled'),
+                                                        ObjectColumn(name='min_val'),
+                                                        ObjectColumn(name='max_val'),
+                                                        ObjectColumn(name='value', format='%+05.3f'),
+                                                       ],
+                                                configurable=False,
+                                                reorderable=False,
+                                                sortable=False,
+                                                selection_mode='cell',
+                                                auto_size=True,
+                                                rows=4,
+                                                orientation='horizontal',
+                                                is_grid_cell=True,
+                                               ),
+                            show_label=False,
+                        ),
                     label='Tx Equalization', show_border=True,
                 ),
-                VGroup(
-                    Item(name='peak_freq_tune', label='CTLE fp (GHz)',                            tooltip="CTLE peaking frequency (GHz)", ),
-                    Item(name='peak_mag_tune',  label='CTLE boost (dB)',      format_str='%7.4f', tooltip="CTLE peaking magnitude (dB)", ),
-                    Item(name='rx_bw_tune',     label='Bandwidth (GHz)',                          tooltip="unequalized signal path bandwidth (GHz).", ),
-                    Item(label="Note: Only peaking magnitude will be optimized;\nplease, set peak frequency and bandwidth appropriately."),
-                    label = 'Rx Equalization', show_border = True, 
+                HGroup(
+                    VGroup(
+                        Item(name='peak_freq_tune', label='CTLE fp (GHz)',   tooltip="CTLE peaking frequency (GHz)", ),
+                        Item(name='rx_bw_tune', label='Bandwidth (GHz)', tooltip="unequalized signal path bandwidth (GHz).", ),
+                        Item(name='peak_mag_tune', label='CTLE boost (dB)', tooltip="CTLE peaking magnitude (dB)",
+                             format_str='%4.1f'),
+                        HGroup(
+                            Item(name='ctle_mode_tune', label='CTLE mode', tooltip="CTLE Operating Mode"),
+                            Item(name='ctle_offset_tune', tooltip="CTLE d.c. offset (dB)",
+                                    show_label=False, enabled_when='ctle_mode_tune == "Manual"'),
+                        ),
+                    ),
+                    Item(label="Note: Only peaking magnitude\nwill be optimized; please,\nset peak frequency and\nbandwidth appropriately."),
+                    label='Rx Equalization', show_border=True,
                 ),
                 VGroup(
-                    Item(name='ideal_type',     label='Ideal Response Type',                      tooltip="Ideal impulse response type.",
-                                                editor=CheckListEditor(values=[(0, 'Impulse'), (1, 'Sinc'), (2, 'Raised Cosine'),])),
-                    Item(name='pulse_tune',     label='Use Pulse Response',                       tooltip="Use pulse response, as opposed to impulse response, to tune equalization.", ),
-                    Item(name='rel_opt',        label='Rel. Opt.',            format_str='%7.4f', tooltip="Relative optimization metric.", ),
-                    Item(name='max_iter',       label='Max. Iterations',                          tooltip="Maximum number of iterations to allow, during optimization.", ),
+                    Item(   name='max_iter', label='Max. Iterations',
+                            tooltip="Maximum number of iterations to allow, during optimization.", ),
+                    Item(   name='rel_opt', label='Rel. Opt.', format_str='%7.4f',
+                            tooltip="Relative optimization metric.", enabled_when='False'),
                     label = 'Tuning Options', show_border = True,
                 ),
+                springy=False,
             ),
-            Item('plot_h_tune', editor=ComponentEditor(), show_label=False,),
+            Item('plot_h_tune', editor=ComponentEditor(), show_label=False,
+                                springy=True),
             HGroup(
                 Item('btn_rst_eq',  show_label=False, tooltip="Reset all values to those on the 'Config.' tab.",),
                 Item('btn_save_eq', show_label=False, tooltip="Store all values to 'Config.' tab.",),
                 Item('btn_opt_tx',  show_label=False, tooltip="Run Tx tap weight optimization.",),
                 Item('btn_opt_rx',  show_label=False, tooltip="Run Rx CTLE optimization.",),
+                Item('btn_coopt',   show_label=False, tooltip="Run co-optimization.",),
             ),
             label = 'EQ Tune', id = 'eq_tune',
         ),

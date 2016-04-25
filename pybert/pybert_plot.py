@@ -18,42 +18,13 @@ def make_plots(self, n_dfe_taps):
     plotdata = self.plotdata
 
     # - DFE tab
-    plot1 = Plot(plotdata)
-    plot1.plot(("t_ns", "dfe_out"), type="line", color="blue")
-    plot1.plot(("t_ns", "clocks"), type="line", color="green")
-    plot1.plot(("t_ns", "lockeds"), type="line", color="red")
-    plot1.title  = "DFE Output, Recovered Clocks, & Locked"
-    plot1.index_axis.title = "Time (ns)"
-    plot1.tools.append(PanTool(plot1, constrain=True, constrain_key=None, constrain_direction='x'))
-    zoom1 = ZoomTool(plot1, tool_mode="range", axis='index', always_on=False)
-    plot1.overlays.append(zoom1)
-
-    plot2        = Plot(plotdata)
+    plot2 = Plot(plotdata, padding_left=75)
     plot2.plot(("t_ns", "ui_ests"), type="line", color="blue")
     plot2.title  = "CDR Adaptation"
     plot2.index_axis.title = "Time (ns)"
     plot2.value_axis.title = "UI (ps)"
-    plot2.index_range = plot1.index_range # Zoom x-axes in tandem.
 
-    plot3        = Plot(plotdata)
-    plot3.plot(('f_MHz_dfe', 'jitter_rejection_ratio'), type="line", color="blue")
-    plot3.title  = "CDR/DFE Jitter Rejection Ratio"
-    plot3.index_axis.title = "Frequency (MHz)"
-    plot3.value_axis.title = "Ratio (dB)"
-    zoom3 = ZoomTool(plot3, tool_mode="range", axis='index', always_on=False)
-    plot3.overlays.append(zoom3)
-
-    plot4        = Plot(plotdata)
-    plot4.plot(('auto_corr'), type="line", color="blue")
-    plot4.title  = "Received to Transmitted Bits Correlation"
-    plot4.index_axis.title = "Offset (bits)"
-    plot4.value_axis.title = "Correlation"
-    plot4.value_range.high_setting = 1
-    plot4.value_range.low_setting  = 0
-    zoom4 = ZoomTool(plot4, tool_mode="range", axis='index', always_on=False)
-    plot4.overlays.append(zoom4)
-
-    plot9 = Plot(plotdata, auto_colors=['red', 'orange', 'yellow', 'green', 'blue', 'purple'])
+    plot9 = Plot(plotdata, auto_colors=['red', 'orange', 'yellow', 'green', 'blue', 'purple'], padding_left=75)
     for i in range(n_dfe_taps):
         plot9.plot(("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d"%(i+1))
     plot9.title  = "DFE Adaptation"
@@ -63,26 +34,41 @@ def make_plots(self, n_dfe_taps):
     plot9.legend.visible = True
     plot9.legend.align = 'ul'
 
+    plot_clk_per_hist = Plot(plotdata, padding_left=75)
+    plot_clk_per_hist.plot(('clk_per_hist_bins', 'clk_per_hist_vals'), type="line", color="blue")
+    plot_clk_per_hist.title  = "CDR Clock Period Histogram"
+    plot_clk_per_hist.index_axis.title = "Clock Period (ps)"
+    plot_clk_per_hist.value_axis.title = "Bin Count"
+
+    plot_clk_per_spec = Plot(plotdata, padding_left=75)
+    plot_clk_per_spec.plot(('clk_freqs', 'clk_spec'), type="line", color="blue")
+    plot_clk_per_spec.title  = "CDR Clock Period Spectrum"
+    plot_clk_per_spec.index_axis.title = "Frequency (bit rate)"
+    plot_clk_per_spec.value_axis.title = "|H(f)| (dB mean)"
+    plot_clk_per_spec.value_range.low_setting  = -10
+    zoom_clk_per_spec = ZoomTool(plot_clk_per_spec, tool_mode="range", axis='index', always_on=False)
+    plot_clk_per_spec.overlays.append(zoom_clk_per_spec)
+
     container_dfe = GridPlotContainer(shape=(2,2))
     container_dfe.add(plot2)
     container_dfe.add(plot9)
-    container_dfe.add(plot1)
-    container_dfe.add(plot3)
+    container_dfe.add(plot_clk_per_hist)
+    container_dfe.add(plot_clk_per_spec)
     self.plots_dfe = container_dfe
 
     # - EQ Tune tab
-    plot_h_tune = Plot(plotdata)
-    plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="red",  name="Cumulative")
-    plot_h_tune.plot(("t_ns_chnl", "ctle_out_g_tune"), type="line", color="gray")
+    plot_h_tune = Plot(plotdata, padding_left=75)
+    plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="blue")
+    plot_h_tune.plot(("t_ns_chnl", "clocks_tune"), type="line", color="gray")
     plot_h_tune.title            = "Channel + Tx Preemphasis + CTLE"
     plot_h_tune.index_axis.title = "Time (ns)"
-    plot_h_tune.y_axis.title     = "Response"
+    plot_h_tune.y_axis.title     = "Post-CTLE Pulse Response (V)"
     zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis='index', always_on=False)
     plot_h_tune.overlays.append(zoom_tune)
     self.plot_h_tune = plot_h_tune
 
     # - Impulse Responses tab
-    plot_h_chnl = Plot(plotdata)
+    plot_h_chnl = Plot(plotdata, padding_left=75)
     plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue")
     plot_h_chnl.title            = "Channel"
     plot_h_chnl.index_axis.title = "Time (ns)"
@@ -90,21 +76,21 @@ def make_plots(self, n_dfe_taps):
     zoom_h = ZoomTool(plot_h_chnl, tool_mode="range", axis='index', always_on=False)
     plot_h_chnl.overlays.append(zoom_h)
 
-    plot_h_tx = Plot(plotdata)
+    plot_h_tx = Plot(plotdata, padding_left=75)
     plot_h_tx.plot(("t_ns_chnl", "tx_out_h"), type="line", color="red",  name="Cumulative")
     plot_h_tx.title            = "Channel + Tx Preemphasis"
     plot_h_tx.index_axis.title = "Time (ns)"
     plot_h_tx.y_axis.title     = "Impulse Response (V/ns)"
     plot_h_tx.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_h_ctle = Plot(plotdata)
+    plot_h_ctle = Plot(plotdata, padding_left=75)
     plot_h_ctle.plot(("t_ns_chnl", "ctle_out_h"), type="line", color="red",  name="Cumulative")
     plot_h_ctle.title            = "Channel + Tx Preemphasis + CTLE"
     plot_h_ctle.index_axis.title = "Time (ns)"
     plot_h_ctle.y_axis.title     = "Impulse Response (V/ns)"
     plot_h_ctle.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_h_dfe = Plot(plotdata)
+    plot_h_dfe = Plot(plotdata, padding_left=75)
     plot_h_dfe.plot(("t_ns_chnl", "dfe_out_h"), type="line", color="red",  name="Cumulative")
     plot_h_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_h_dfe.index_axis.title = "Time (ns)"
@@ -119,7 +105,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_h  = container_h
 
     # - Step Responses tab
-    plot_s_chnl = Plot(plotdata)
+    plot_s_chnl = Plot(plotdata, padding_left=75)
     plot_s_chnl.plot(("t_ns_chnl", "chnl_s"), type="line", color="blue")
     plot_s_chnl.title            = "Channel"
     plot_s_chnl.index_axis.title = "Time (ns)"
@@ -127,7 +113,7 @@ def make_plots(self, n_dfe_taps):
     zoom_s = ZoomTool(plot_s_chnl, tool_mode="range", axis='index', always_on=False)
     plot_s_chnl.overlays.append(zoom_s)
 
-    plot_s_tx = Plot(plotdata)
+    plot_s_tx = Plot(plotdata, padding_left=75)
     plot_s_tx.plot(("t_ns_chnl", "tx_s"),     type="line", color="blue", name="Incremental")
     plot_s_tx.plot(("t_ns_chnl", "tx_out_s"), type="line", color="red",  name="Cumulative")
     plot_s_tx.title            = "Channel + Tx Preemphasis"
@@ -137,7 +123,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_tx.legend.align     = 'lr'
     plot_s_tx.index_range = plot_s_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_s_ctle = Plot(plotdata)
+    plot_s_ctle = Plot(plotdata, padding_left=75)
     plot_s_ctle.plot(("t_ns_chnl", "ctle_s"),     type="line", color="blue", name="Incremental")
     plot_s_ctle.plot(("t_ns_chnl", "ctle_out_s"), type="line", color="red",  name="Cumulative")
     plot_s_ctle.title            = "Channel + Tx Preemphasis + CTLE"
@@ -147,7 +133,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_ctle.legend.align     = 'lr'
     plot_s_ctle.index_range = plot_s_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_s_dfe = Plot(plotdata)
+    plot_s_dfe = Plot(plotdata, padding_left=75)
     plot_s_dfe.plot(("t_ns_chnl", "dfe_s"),     type="line", color="blue", name="Incremental")
     plot_s_dfe.plot(("t_ns_chnl", "dfe_out_s"), type="line", color="red",  name="Cumulative")
     plot_s_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
@@ -165,7 +151,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_s  = container_s
 
     # - Pulse Responses tab
-    plot_p_chnl = Plot(plotdata)
+    plot_p_chnl = Plot(plotdata, padding_left=75)
     plot_p_chnl.plot(("t_ns_chnl", "chnl_p"), type="line", color="blue")
     plot_p_chnl.title            = "Channel"
     plot_p_chnl.index_axis.title = "Time (ns)"
@@ -173,7 +159,7 @@ def make_plots(self, n_dfe_taps):
     zoom_p = ZoomTool(plot_p_chnl, tool_mode="range", axis='index', always_on=False)
     plot_p_chnl.overlays.append(zoom_p)
 
-    plot_p_tx = Plot(plotdata)
+    plot_p_tx = Plot(plotdata, padding_left=75)
     plot_p_tx.plot(("t_ns_chnl", "tx_out_p"), type="line", color="red",  name="Cumulative")
     plot_p_tx.title            = "Channel + Tx Preemphasis"
     plot_p_tx.index_axis.title = "Time (ns)"
@@ -181,7 +167,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_tx.legend.align     = 'lr'
     plot_p_tx.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_p_ctle = Plot(plotdata)
+    plot_p_ctle = Plot(plotdata, padding_left=75)
     plot_p_ctle.plot(("t_ns_chnl", "ctle_out_p"), type="line", color="red",  name="Cumulative")
     plot_p_ctle.title            = "Channel + Tx Preemphasis + CTLE"
     plot_p_ctle.index_axis.title = "Time (ns)"
@@ -189,7 +175,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_ctle.legend.align     = 'lr'
     plot_p_ctle.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_p_dfe = Plot(plotdata)
+    plot_p_dfe = Plot(plotdata, padding_left=75)
     plot_p_dfe.plot(("t_ns_chnl", "dfe_out_p"), type="line", color="red",  name="Cumulative")
     plot_p_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_p_dfe.index_axis.title = "Time (ns)"
@@ -205,7 +191,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_p  = container_p
 
     # - Frequency Responses tab
-    plot_H_chnl = Plot(plotdata)
+    plot_H_chnl = Plot(plotdata, padding_left=75)
     plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue", index_scale='log')
     plot_H_chnl.title            = "Channel"
     plot_H_chnl.index_axis.title = "Frequency (GHz)"
@@ -213,7 +199,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_chnl.index_range.low_setting  = 0.01
     plot_H_chnl.index_range.high_setting = 40.
 
-    plot_H_tx = Plot(plotdata)
+    plot_H_tx = Plot(plotdata, padding_left=75)
     plot_H_tx.plot(("f_GHz", "tx_H"),     type="line", color="blue", name="Incremental", index_scale='log')
     plot_H_tx.plot(("f_GHz", "tx_out_H"), type="line", color="red",  name="Cumulative", index_scale='log')
     plot_H_tx.title            = "Channel + Tx Preemphasis"
@@ -224,7 +210,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_tx.legend.visible   = True
     plot_H_tx.legend.align     = 'll'
 
-    plot_H_ctle = Plot(plotdata)
+    plot_H_ctle = Plot(plotdata, padding_left=75)
     plot_H_ctle.plot(("f_GHz", "ctle_H"),     type="line", color="blue", name="Incremental", index_scale='log')
     plot_H_ctle.plot(("f_GHz", "ctle_out_H"), type="line", color="red",  name="Cumulative", index_scale='log')
     plot_H_ctle.title            = "Channel + Tx Preemphasis + CTLE"
@@ -239,7 +225,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_chnl.value_range = plot_H_ctle.value_range 
     plot_H_tx.value_range   = plot_H_ctle.value_range 
 
-    plot_H_dfe = Plot(plotdata)
+    plot_H_dfe = Plot(plotdata, padding_left=75)
     plot_H_dfe.plot(("f_GHz", "dfe_H"),     type="line", color="blue", name="Incremental", index_scale='log')
     plot_H_dfe.plot(("f_GHz", "dfe_out_H"), type="line", color="red",  name="Cumulative", index_scale='log')
     plot_H_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
@@ -259,30 +245,31 @@ def make_plots(self, n_dfe_taps):
     self.plots_H  = container_H
 
     # - Outputs tab
-    plot_out_chnl = Plot(plotdata)
+    plot_out_chnl = Plot(plotdata, padding_left=75)
     plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="lightgrey")
     plot_out_chnl.plot(("t_ns", "chnl_out"),     type="line", color="blue")
     plot_out_chnl.title            = "Channel"
     plot_out_chnl.index_axis.title = "Time (ns)"
     plot_out_chnl.y_axis.title     = "Output (V)"
+    plot_out_chnl.tools.append(PanTool(plot_out_chnl, constrain=True, constrain_key=None, constrain_direction='x'))
     zoom_out_chnl = ZoomTool(plot_out_chnl, tool_mode="range", axis='index', always_on=False)
     plot_out_chnl.overlays.append(zoom_out_chnl)
 
-    plot_out_tx = Plot(plotdata)
+    plot_out_tx = Plot(plotdata, padding_left=75)
     plot_out_tx.plot(("t_ns", "tx_out"), type="line", color="blue")
     plot_out_tx.title            = "Channel + Tx Preemphasis (Noise added here.)"
     plot_out_tx.index_axis.title = "Time (ns)"
     plot_out_tx.y_axis.title     = "Output (V)"
     plot_out_tx.index_range = plot_out_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_out_ctle = Plot(plotdata)
+    plot_out_ctle = Plot(plotdata, padding_left=75)
     plot_out_ctle.plot(("t_ns", "ctle_out"), type="line", color="blue")
     plot_out_ctle.title            = "Channel + Tx Preemphasis + CTLE"
     plot_out_ctle.index_axis.title = "Time (ns)"
     plot_out_ctle.y_axis.title     = "Output (V)"
     plot_out_ctle.index_range = plot_out_chnl.index_range # Zoom x-axes in tandem.
 
-    plot_out_dfe = Plot(plotdata)
+    plot_out_dfe = Plot(plotdata, padding_left=75)
     plot_out_dfe.plot(("t_ns", "dfe_out"), type="line", color="blue")
     plot_out_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_out_dfe.index_axis.title = "Time (ns)"
@@ -335,7 +322,7 @@ def make_plots(self, n_dfe_taps):
     clr_map = ColorMapper.from_segment_map(seg_map)
     self.clr_map = clr_map
 
-    plot_eye_chnl = Plot(plotdata)
+    plot_eye_chnl = Plot(plotdata, padding_left=75)
     plot_eye_chnl.img_plot("eye_chnl", colormap=clr_map,)
     plot_eye_chnl.y_direction = 'normal'
     plot_eye_chnl.components[0].y_direction = 'normal'
@@ -348,7 +335,7 @@ def make_plots(self, n_dfe_taps):
     plot_eye_chnl.x_grid.line_color = 'gray'
     plot_eye_chnl.y_grid.line_color = 'gray'
 
-    plot_eye_tx = Plot(plotdata)
+    plot_eye_tx = Plot(plotdata, padding_left=75)
     plot_eye_tx.img_plot("eye_tx", colormap=clr_map,)
     plot_eye_tx.y_direction = 'normal'
     plot_eye_tx.components[0].y_direction = 'normal'
@@ -361,7 +348,7 @@ def make_plots(self, n_dfe_taps):
     plot_eye_tx.x_grid.line_color = 'gray'
     plot_eye_tx.y_grid.line_color = 'gray'
 
-    plot_eye_ctle = Plot(plotdata)
+    plot_eye_ctle = Plot(plotdata, padding_left=75)
     plot_eye_ctle.img_plot("eye_ctle", colormap=clr_map,)
     plot_eye_ctle.y_direction = 'normal'
     plot_eye_ctle.components[0].y_direction = 'normal'
@@ -374,7 +361,7 @@ def make_plots(self, n_dfe_taps):
     plot_eye_ctle.x_grid.line_color = 'gray'
     plot_eye_ctle.y_grid.line_color = 'gray'
 
-    plot_eye_dfe = Plot(plotdata)
+    plot_eye_dfe = Plot(plotdata, padding_left=75)
     plot_eye_dfe.img_plot("eye_dfe", colormap=clr_map,)
     plot_eye_dfe.y_direction = 'normal'
     plot_eye_dfe.components[0].y_direction = 'normal'
@@ -395,7 +382,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_eye  = container_eye
 
     # - Jitter Distributions tab
-    plot_jitter_dist_chnl        = Plot(plotdata)
+    plot_jitter_dist_chnl = Plot(plotdata, padding_left=75)
     plot_jitter_dist_chnl.plot(('jitter_bins', 'jitter_chnl'),     type="line", color="blue", name="Measured")
     plot_jitter_dist_chnl.plot(('jitter_bins', 'jitter_ext_chnl'), type="line", color="red",  name="Extrapolated")
     plot_jitter_dist_chnl.title  = "Channel"
@@ -404,7 +391,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_dist_chnl.legend.visible   = True
     plot_jitter_dist_chnl.legend.align     = 'ur'
 
-    plot_jitter_dist_tx        = Plot(plotdata)
+    plot_jitter_dist_tx = Plot(plotdata, padding_left=75)
     plot_jitter_dist_tx.plot(('jitter_bins', 'jitter_tx'),     type="line", color="blue", name="Measured")
     plot_jitter_dist_tx.plot(('jitter_bins', 'jitter_ext_tx'), type="line", color="red",  name="Extrapolated")
     plot_jitter_dist_tx.title  = "Channel + Tx Preemphasis (Noise added here.)"
@@ -413,7 +400,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_dist_tx.legend.visible   = True
     plot_jitter_dist_tx.legend.align     = 'ur'
 
-    plot_jitter_dist_ctle        = Plot(plotdata)
+    plot_jitter_dist_ctle = Plot(plotdata, padding_left=75)
     plot_jitter_dist_ctle.plot(('jitter_bins', 'jitter_ctle'),     type="line", color="blue", name="Measured")
     plot_jitter_dist_ctle.plot(('jitter_bins', 'jitter_ext_ctle'), type="line", color="red",  name="Extrapolated")
     plot_jitter_dist_ctle.title  = "Channel + Tx Preemphasis + CTLE"
@@ -422,7 +409,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_dist_ctle.legend.visible   = True
     plot_jitter_dist_ctle.legend.align     = 'ur'
 
-    plot_jitter_dist_dfe        = Plot(plotdata)
+    plot_jitter_dist_dfe = Plot(plotdata, padding_left=75)
     plot_jitter_dist_dfe.plot(('jitter_bins', 'jitter_dfe'),     type="line", color="blue", name="Measured")
     plot_jitter_dist_dfe.plot(('jitter_bins', 'jitter_ext_dfe'), type="line", color="red",  name="Extrapolated")
     plot_jitter_dist_dfe.title  = "Channel + Tx Preemphasis + CTLE + DFE"
@@ -460,9 +447,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_tx.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_tx.value_axis.title = "|FFT(TIE)| (dBui)"
     plot_jitter_spec_tx.value_range.low_setting  = -40.
-    plot_jitter_spec_tx.tools.append(PanTool(plot_jitter_spec_tx, constrain=True, constrain_key=None, constrain_direction='x'))
-    zoom_jitter_spec_tx = ZoomTool(plot_jitter_spec_tx, tool_mode="range", axis='index', always_on=False)
-    plot_jitter_spec_tx.overlays.append(zoom_jitter_spec_tx)
+    plot_jitter_spec_tx.index_range = plot_jitter_spec_chnl.index_range # Zoom x-axes in tandem.
     plot_jitter_spec_tx.legend.visible = True
     plot_jitter_spec_tx.legend.align = 'lr'
 
@@ -475,9 +460,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_ctle.title  = "Channel + Tx Preemphasis + CTLE"
     plot_jitter_spec_ctle.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_ctle.value_axis.title = "|FFT(TIE)| (dBui)"
-    plot_jitter_spec_ctle.tools.append(PanTool(plot_jitter_spec_ctle, constrain=True, constrain_key=None, constrain_direction='x'))
-    zoom_jitter_spec_ctle = ZoomTool(plot_jitter_spec_ctle, tool_mode="range", axis='index', always_on=False)
-    plot_jitter_spec_ctle.overlays.append(zoom_jitter_spec_ctle)
+    plot_jitter_spec_ctle.index_range = plot_jitter_spec_chnl.index_range # Zoom x-axes in tandem.
     plot_jitter_spec_ctle.legend.visible = True
     plot_jitter_spec_ctle.legend.align = 'lr'
     plot_jitter_spec_ctle.value_range = plot_jitter_spec_tx.value_range 
@@ -489,9 +472,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_dfe.title  = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_jitter_spec_dfe.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_dfe.value_axis.title = "|FFT(TIE)| (dBui)"
-    plot_jitter_spec_dfe.tools.append(PanTool(plot_jitter_spec_dfe, constrain=True, constrain_key=None, constrain_direction='x'))
-    zoom_jitter_spec_dfe = ZoomTool(plot_jitter_spec_dfe, tool_mode="range", axis='index', always_on=False)
-    plot_jitter_spec_dfe.overlays.append(zoom_jitter_spec_dfe)
+    plot_jitter_spec_dfe.index_range = plot_jitter_spec_chnl.index_range # Zoom x-axes in tandem.
     plot_jitter_spec_dfe.legend.visible = True
     plot_jitter_spec_dfe.legend.align = 'lr'
     plot_jitter_spec_dfe.value_range = plot_jitter_spec_tx.value_range 
