@@ -208,7 +208,7 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
 #                                        )
 #                    )
 
-    return sort(concatenate(xings, axis=1))
+    return sort(concatenate(xings))
 
 
 def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
