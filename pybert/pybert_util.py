@@ -72,7 +72,11 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
     t = array(t)
     x = array(x)
 
-    max_mag_x = max(abs(x))
+    try:
+        max_mag_x = max(abs(x))
+    except:
+        print "len(x):", len(x)
+        raise
     min_mag_x = min_init_dev * max_mag_x
     i = 0
     while(abs(x[i]) < min_mag_x):
@@ -204,7 +208,7 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
 #                                        )
 #                    )
 
-    return sort(concatenate(xings, axis=1))
+    return sort(concatenate(xings))
 
 
 def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
