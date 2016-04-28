@@ -715,8 +715,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
 
     """
 
-    g         = array(g)
-    g        -= g[0]
+    g = array(g[:int(0.9 * len(g))])  # Trim off potential FFT artifacts from the end.
 
     if(Ts and chnl_dly):
         start_ix  = int(0.9 * chnl_dly / Ts)

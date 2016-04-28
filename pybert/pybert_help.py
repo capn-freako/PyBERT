@@ -19,7 +19,7 @@ help_str  = "<H2>PyBERT User's Guide</H2>\n" \
 +           "    </UL>\n" \
 +           "  <H3>General Tips</H3>\n" \
 +           "    <H4>Main Window Status Bar</H4>\n" \
-+           "      The status bar, just above the <em>Run</em> & <em>OK</em> buttons, gives the following information, from left to right:.\n" \
++           "      The status bar, just above the <em>Run</em> button, gives the following information, from left to right:.<p>\n" \
 +           "      (Note: the individual pieces of information are separated by vertical bar, or 'pipe', characters.)\n" \
 +           "        <UL>\n" \
 +           "          <LI>Current state of, and/or activity engaged in by, the program.</LI>\n" \
@@ -27,7 +27,7 @@ help_str  = "<H2>PyBERT User's Guide</H2>\n" \
 +           "          <LI>The observed delay in the channel; can be used as a sanity check, if you know your channel.</LI>\n" \
 +           "          <LI>The number of bit errors detected in the last successful simulation run.</LI>\n" \
 +           "          <LI>The average power dissipated by the transmitter, assuming perfect matching to the channel ,no reflections, and a 50-Ohm system impedance.</LI>\n" \
-+           "          <LI></LI>\n" \
++           "          <LI>The jitter breakdown for the last run. (Taken at DFE output.)</LI>\n" \
 +           "        </UL>\n" \
 +           "  <H3>Help by Tab</H3>\n" \
 +           "    <H4>Config.</H4>\n" \

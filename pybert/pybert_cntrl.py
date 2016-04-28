@@ -189,14 +189,12 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 2.), mod_type=mod_type)
     self.ideal_xings = ideal_xings
 
-    # Generate the ideal impulse responses.
-    chnl_h       = self.calc_chnl_h()
-
     # Calculate the channel output.
     #
     # Note: We're not using 'self.ideal_signal', because we rely on the system response to
     #       create the duobinary waveform. We only create it explicitly, above,
     #       so that we'll have an ideal reference for comparison.
+    chnl_h   = self.calc_chnl_h()
     chnl_out = convolve(self.x, chnl_h)[:len(x)]
 
     self.channel_perf = nbits * nspb / (clock() - start_time)
@@ -269,13 +267,17 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
     self.ctle_s     = ctle_h.cumsum()
     ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
-    conv_dly_ix     = where(ctle_out_h >= max(ctle_out_h) / 2.)[0][0]
+    ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.)[0]
+    if(len(ctle_out_h_main_lobe)):
+        conv_dly_ix = ctle_out_h_main_lobe[0]
+    else:
+        conv_dly_ix = self.chnl_dly / Ts
     conv_dly        = t[conv_dly_ix]
     ctle_out_s      = ctle_out_h.cumsum()
     temp            = ctle_out_h.copy()
     temp.resize(len(w))
     ctle_out_H      = fft(temp)
-    self.rel_opt = self.cost  # Triggers update to EQ tuning plot data.
+    self.rel_opt = -self.cost  # Triggers update to EQ tuning plot data.
     # - Store local variables to class instance.
     self.ctle_out_s = ctle_out_s
     self.ctle_out_p = self.ctle_out_s[nspui:] - self.ctle_out_s[:-nspui] 

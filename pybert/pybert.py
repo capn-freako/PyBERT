@@ -69,7 +69,7 @@ from pybert_help     import help_str
 
 debug          = False
 gDebugStatus   = False
-gDebugOptimize = True
+gDebugOptimize = False
 gMaxCTLEPeak   = 20.      # max. allowed CTLE peaking (dB) (when optimizing, only)
 gMaxCTLEFreq   = 20.      # max. allowed CTLE peak frequency (GHz) (when optimizing, only)
 
@@ -91,19 +91,18 @@ gTheta0         = .02     # loss tangent
 gZ0             = 100.    # characteristic impedance in LC region (Ohms)
 gv0             = 0.67    # relative propagation velocity (c)
 gl_ch           = 1.0     # cable length (m)
-gRn             = 0.01    # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+gRn             = 0.001   # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
 # - Tx
 gVod            = 1.0     # output drive strength (Vp)
 gRs             = 100     # differential source impedance (Ohms)
 gCout           = 0.50    # parasitic output capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
-gPnMag          = 0.1     # magnitude of periodic noise (V)
+gPnMag          = 0.001     # magnitude of periodic noise (V)
 gPnFreq         = 0.437   # frequency of periodic noise (MHz)
 # - Rx
 gRin            = 100     # differential input resistance
 gCin            = 0.50    # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
 gCac            = 1.      # a.c. coupling capacitance (uF) (Assumed to exist at both 'P' and 'N' nodes.)
 gBW             = 12.     # Rx signal path bandwidth, assuming no CTLE action. (GHz)
-gUseCtle        = True    # Include CTLE when running simulation.
 gUseDfe         = True    # Include DFE when running simulation.
 gDfeIdeal       = True    # DFE ideal summing node selector
 gPeakFreq       = 5.      # CTLE peaking frequency (GHz)
@@ -206,8 +205,9 @@ class RxOptThread(Thread):
     def do_opt_rx(self, peak_mag):
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
-        pybert.rel_opt = -pybert.cost
-        return pybert.cost
+        cost = pybert.cost
+        pybert.rel_opt = -cost
+        return cost
 
 
 class CoOptThread(Thread):
@@ -349,7 +349,7 @@ class PyBERT(HasTraits):
     # - Tx
     vod             = Float(gVod)                                           # (V)
     rs              = Float(gRs)                                            # (Ohms)
-    cout            = Float(gCout)                                          # (pF)
+    cout            = Range(low=0.001, value=gCout)                         # (pF)
     pn_mag          = Float(gPnMag)                                         # (ps)
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
@@ -376,7 +376,7 @@ class PyBERT(HasTraits):
     rel_power       = Float(1.0)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
-    cin             = Float(gCin)                                           # (pF)
+    cin             = Range(low=0.001, value=gCin)                          # (pF)
     cac             = Float(gCac)                                           # (uF)
     rx_bw           = Float(gBW)                                            # (GHz)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
@@ -420,9 +420,9 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.7.4 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.7.7 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    April 23, 2016\n\n \
+    April 28, 2016\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -517,7 +517,8 @@ class PyBERT(HasTraits):
         self.ctle_offset = self.ctle_offset_tune 
 
     def _btn_opt_tx_fired(self):
-        if self.tx_opt_thread and self.tx_opt_thread.isAlive():
+        if self.tx_opt_thread and self.tx_opt_thread.isAlive() \
+                              or not any([self.tx_tap_tuners[i].enabled for i in range(len(self.tx_tap_tuners))]):
             pass
         else:
             self.tx_opt_thread = TxOptThread()
@@ -525,7 +526,7 @@ class PyBERT(HasTraits):
             self.tx_opt_thread.start()
 
     def _btn_opt_rx_fired(self):
-        if self.rx_opt_thread and self.rx_opt_thread.isAlive():
+        if self.rx_opt_thread and self.rx_opt_thread.isAlive() or self.ctle_mode_tune == "Off":
             pass
         else:
             self.rx_opt_thread = RxOptThread()
@@ -994,7 +995,7 @@ class PyBERT(HasTraits):
         status_str  = "%-20s | Perf. (Ms/m):    %4.1f" % (self.status, self.total_perf * 60.e-6)
         dly_str     = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.e9)
         err_str     = "         | BitErrs: %d" % self.bit_errs
-        pwr_str     = "         | TxPwr: %4.2f" % self.rel_power
+        pwr_str     = "         | TxPwr (W): %4.2f" % self.rel_power
         status_str += dly_str + err_str + pwr_str
 
         try:
@@ -1060,15 +1061,25 @@ class PyBERT(HasTraits):
         s = h.cumsum()
         p = s - pad(s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
         self.plotdata.set_data('ctle_out_h_tune', p)
+        p_max = p.max()
 
-        # Simplified "Hula Hoop" algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
-        thresh = p.max() / 2.
+        # "Hula Hoop" algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
+        div = 2.
+        thresh = p_max / div
+        main_lobe_ixs = where(p > thresh)[0]
+        if(not len(main_lobe_ixs)):  # Sometimes, the optimizer really whacks out.
+            return 1.0               # Returning a large cost lets it know it took a wrong turn.
+        err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui
+        while(err and div < 5000):
+            div *= 2.
+            if(err > 0):
+                thresh += p_max / div
+            else:
+                thresh -= p_max / div
+            main_lobe_ixs = where(p > thresh)[0]
+            err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui
+        clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
         clocks = thresh * ones(len(p))
-        main_lobe_ixs = where(p > (p.max() / 2.))[0]
-        if(len(main_lobe_ixs)):
-            clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
-        else:
-            return 1.0
         if(mod_type == 1):  # Handle duo-binary.
             clock_pos -= nspui // 2
         clocks[clock_pos] = 0.
