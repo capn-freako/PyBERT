@@ -420,9 +420,9 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.7.8 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v1.7.9 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    April 28, 2016\n\n \
+    June 12, 2016\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
