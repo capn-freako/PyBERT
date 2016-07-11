@@ -44,5 +44,5 @@ Acknowledgements
 I would like to thank the following individuals, for their contributions to PyBERT:
 - Mark Marlett
 - Low Kian Seong
-- Amanda Bukur
+- Amanda Bukur <amandabukur11@gmail.com>
 
