@@ -378,6 +378,8 @@ class PyBERT(HasTraits):
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Range(low=0.001, value=gCin)                          # (pF)
     cac             = Float(gCac)                                           # (uF)
+    use_ctle_file   = Bool(False)                                           # For importing CTLE impulse/step response directly.
+    ctle_file       = File('', entries=5, filter=['*.csv'])
     rx_bw           = Float(gBW)                                            # (GHz)
     peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
     peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
@@ -1176,6 +1178,7 @@ class PyBERT(HasTraits):
             chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
             chnl_h.resize(len(t))
             chnl_H           = fft(chnl_h)
+            chnl_H          *= sum(chnl_h) / chnl_H[0]
         else:
             l_ch             = self.l_ch
             v0               = self.v0 * 3.e8

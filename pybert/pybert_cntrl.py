@@ -18,7 +18,7 @@ from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
 from dfe          import DFE
 from cdr          import CDR
 
-from pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye
+from pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye, import_qucs_csv
 
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.e-18
@@ -173,6 +173,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     # Calculate misc. values.
     fs         = bit_rate * nspb
     Ts         = t[1]
+    ts         = Ts
 
     # Generate the ideal over-sampled signal.
     #
@@ -257,10 +258,19 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status    = 'Running CTLE...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
-    w_dummy, H      = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-    ctle_H          = H
-    ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
-    ctle_h         *= abs(ctle_H[0]) / sum(ctle_h)
+    if(self.use_ctle_file):
+        ctle_h           = import_qucs_csv(self.ctle_file, ts)
+        if(max(abs(ctle_h)) < 100.):          # step response?
+            ctle_h       = diff(ctle_h)       # impulse response is derivative of step response.
+        else:
+            ctle_h      *= ts                 # Normalize to (V/sample)
+        ctle_h.resize(len(t))
+        ctle_H           = fft(ctle_h)
+        ctle_H          *= sum(ctle_h) / ctle_H[0]
+    else:
+        w_dummy, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
+        ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
+        ctle_h         *= abs(ctle_H[0]) / sum(ctle_h)
     ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
     ctle_out       -= mean(ctle_out)             # Force zero mean.
     if(self.ctle_mode == 'AGC'):                 # Automatic gain control engaged?

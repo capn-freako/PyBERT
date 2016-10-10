@@ -129,12 +129,16 @@ traits_view = View(
                 ),
                 HGroup(
                     VGroup(
-                        Item(name='peak_freq', label='CTLE fp (GHz)',   tooltip="CTLE peaking frequency (GHz)", ),
-                        Item(name='rx_bw',     label='Bandwidth (GHz)', tooltip="unequalized signal path bandwidth (GHz).", ),
-                        Item(name='peak_mag',  label='CTLE boost (dB)', tooltip="CTLE peaking magnitude (dB)",
-                             format_str='%4.1f'),
+                        Item(name='use_ctle_file', label='fromFile', tooltip='Select CTLE impulse/step response from file.', ),
+                        Item(name='ctle_file', label='Filename',    enabled_when='use_ctle_file == True'),
                         HGroup(
-                            Item(name='ctle_mode', label='CTLE mode', tooltip="CTLE Operating Mode"),
+                            Item(name='peak_freq', label='CTLE fp (GHz)',   tooltip="CTLE peaking frequency (GHz)", enabled_when='use_ctle_file == False' ),
+                            Item(name='rx_bw',     label='Bandwidth (GHz)', tooltip="unequalized signal path bandwidth (GHz).", enabled_when='use_ctle_file == False' ),
+                        ),
+                        HGroup(
+                            Item(name='peak_mag',  label='CTLE boost (dB)', tooltip="CTLE peaking magnitude (dB)",
+                                format_str='%4.1f', enabled_when='use_ctle_file == False' ),
+                            Item(name='ctle_mode', label='CTLE mode', tooltip="CTLE Operating Mode", enabled_when='use_ctle_file == False' ),
                             Item(name='ctle_offset', tooltip="CTLE d.c. offset (dB)",
                                     show_label=False, enabled_when='ctle_mode == "Manual"'),
                         ),
