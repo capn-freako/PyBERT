@@ -41,7 +41,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 Acknowledgements
 ================
 
-I would like to thank the following individuals, for their contributions to PyBERT: (This is irrelevant.)
+I would like to thank the following individuals, for their contributions to PyBERT:
 - Mark Marlett
 - Low Kian Seong
 - Amanda Bukur <amandabukur11@gmail.com>
