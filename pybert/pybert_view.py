@@ -213,7 +213,7 @@ traits_view = View(
                                     show_label=False, enabled_when='ctle_mode_tune == "Manual"'),
                         ),
                     ),
-                    Item(label="Note: Only peaking magnitude\nwill be optimized; please,\nset peak frequency and\nbandwidth appropriately."),
+                    Item(label="Note: Only peaking magnitude\nwill be optimized; please, set\npeak frequency, bandwidth, and\nmode appropriately."),
                     label='Rx Equalization', show_border=True,
                 ),
                 VGroup(

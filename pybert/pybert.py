@@ -266,6 +266,8 @@ class CoOptThread(Thread):
                 tuner.value = vals.pop(0)
 
         pybert.peak_mag_tune = vals.pop(0)
+
+        # Go to sleep here, to give 'cost' a chance to completely update?
         pybert.rel_opt = -pybert.cost
 
         return pybert.cost
