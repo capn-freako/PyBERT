@@ -333,9 +333,9 @@ class PyBERT(HasTraits):
     l_ch            = Float(gl_ch)
     # - EQ Tune
     tx_tap_tuners = List(  [TxTapTuner(name='Pre-tap',   enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
-                            TxTapTuner(name='Post-tap1', enabled=True, min_val=-0.4, max_val=0.4, value=0.0),
-                            TxTapTuner(name='Post-tap2', enabled=True, min_val=-0.3, max_val=0.3, value=0.0),
-                            TxTapTuner(name='Post-tap3', enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
+                            TxTapTuner(name='Post-tap1', enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
+                            TxTapTuner(name='Post-tap2', enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
+                            TxTapTuner(name='Post-tap3', enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
                            ]
                         )
     rx_bw_tune      = Float(gBW)
@@ -343,6 +343,7 @@ class PyBERT(HasTraits):
     peak_mag_tune   = Float(gPeakMag)
     ctle_offset_tune = Float(gCTLEOffset)                                   # CTLE d.c. offset (dB)
     ctle_mode_tune  = Enum('Off', 'Passive', 'AGC', 'Manual')
+    use_dfe_tune    = Bool(gUseDfe)
     max_iter        = Int(50)                                               # max. # of optimization iterations
     rel_opt         = Float(0.)
     tx_opt_thread   = Instance(TxOptThread)
@@ -361,17 +362,17 @@ class PyBERT(HasTraits):
     pretap_final    = Float(-0.05)
     pretap_steps    = Int(5)
     posttap         = Float(-0.10)
-    posttap_enable  = Bool(True)
+    posttap_enable  = Bool(False)
     posttap_sweep   = Bool(False)
     posttap_final   = Float(-0.10)
     posttap_steps   = Int(10)
     posttap2        = Float(0.0)
-    posttap2_enable = Bool(True)
+    posttap2_enable = Bool(False)
     posttap2_sweep  = Bool(False)
     posttap2_final  = Float(0.0)
     posttap2_steps  = Int(10)
     posttap3        = Float(0.0)
-    posttap3_enable = Bool(True)
+    posttap3_enable = Bool(False)
     posttap3_sweep  = Bool(False)
     posttap3_final  = Float(0.0)
     posttap3_steps  = Int(10)
@@ -504,6 +505,7 @@ class PyBERT(HasTraits):
         self.rx_bw_tune     = self.rx_bw
         self.ctle_mode_tune = self.ctle_mode
         self.ctle_offset_tune = self.ctle_offset
+        self.use_dfe_tune = self.use_dfe
 
     def _btn_save_eq_fired(self):
         self.pretap = self.tx_tap_tuners[0].value
@@ -519,6 +521,7 @@ class PyBERT(HasTraits):
         self.rx_bw     = self.rx_bw_tune
         self.ctle_mode = self.ctle_mode_tune 
         self.ctle_offset = self.ctle_offset_tune 
+        self.use_dfe = self.use_dfe_tune
 
     def _btn_opt_tx_fired(self):
         if self.tx_opt_thread and self.tx_opt_thread.isAlive() \
@@ -1064,7 +1067,6 @@ class PyBERT(HasTraits):
 
         s = h.cumsum()
         p = s - pad(s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
-        self.plotdata.set_data('ctle_out_h_tune', p)
         p_max = p.max()
 
         # "Hula Hoop" algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
@@ -1091,6 +1093,7 @@ class PyBERT(HasTraits):
             clocks[clock_pos + nspui] = 0.
 
         # Cost is simply ISI minus main lobe amplitude.
+        # Note: post-cursor ISI is NOT included in cost, when we're using the DFE.
         isi = 0.
         ix = clock_pos - nspui
         while(ix >= 0):
@@ -1102,9 +1105,15 @@ class PyBERT(HasTraits):
             ix += nspui
         while(ix < len(p)):
             clocks[ix] = 0.
-            isi += abs(p[ix])
+            if(not self.use_dfe_tune):
+                isi += abs(p[ix])
             ix += nspui
+        if(self.use_dfe_tune):
+            for i in range(gNtaps):
+                if(clock_pos + nspui * (1 + i) < len(p)):
+                    p[clock_pos + nspui * (0.5 + i) :] -= p[clock_pos + nspui * (1 + i)] 
 
+        self.plotdata.set_data('ctle_out_h_tune', p)
         self.plotdata.set_data('clocks_tune', clocks)
 
         if(mod_type == 1):  # Handle duo-binary.
@@ -1133,6 +1142,16 @@ class PyBERT(HasTraits):
         if(new_value == False):
             self.posttap3 = 0.
 
+    def _use_dfe_changed(self, new_value):
+        if(new_value == False):
+            self.posttap_enable = True
+            self.posttap2_enable = True
+            self.posttap3_enable = True
+        else:
+            self.posttap_enable = False
+            self.posttap2_enable = False
+            self.posttap3_enable = False
+
     def _pretap_tune_enable_changed(self, new_value):
         if(new_value == False):
             self.pretap_tune = 0.
@@ -1148,6 +1167,16 @@ class PyBERT(HasTraits):
     def _posttap3_tune_enable_changed(self, new_value):
         if(new_value == False):
             self.posttap3_tune = 0.
+
+    def _use_dfe_tune_changed(self, new_value):
+        if(new_value == False):
+            self.tx_tap_tuners[1].enabled = True
+            self.tx_tap_tuners[2].enabled = True
+            self.tx_tap_tuners[3].enabled = True
+        else:
+            self.tx_tap_tuners[1].enabled = False
+            self.tx_tap_tuners[2].enabled = False
+            self.tx_tap_tuners[3].enabled = False
 
     # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control their times of execution. I wasn't able to get truly lazy evaluation, and

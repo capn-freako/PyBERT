@@ -277,12 +277,13 @@ class DFE(object):
                 else:
                     raise Exception("ERROR: DFE.run(): Unrecognized modulation type!")
                 ui, locked     = self.cdr.adapt(samples)
-                decision, new_bits = self.decide(x)
+                decision, new_bits = self.decide(sum_out)
                 bits.extend(new_bits)
-                error  = sum_out - decision * decision_scaler
+                slicer_output = decision * decision_scaler
+                error  = sum_out - slicer_output
                 update = locked and (clk_cntr % n_ave) == 0
                 if(locked): # We only want error accumulation to happen, when we're locked.
-                    nxt_filter_out = self.step(decision, error, update)
+                    nxt_filter_out = self.step(slicer_output, error, update)
                 else:
                     nxt_filter_out = self.step(decision, 0., update)
                 tap_weights.append(self.tap_weights)

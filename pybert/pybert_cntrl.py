@@ -10,7 +10,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 from time         import clock, sleep
 
 from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt, histogram, arange
-from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff, std
+from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff, std, pad
 from numpy.random import normal
 from numpy.fft    import fft, ifft
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
@@ -290,6 +290,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.rel_opt = -self.cost  # Triggers update to EQ tuning plot data.
     # - Store local variables to class instance.
     self.ctle_out_s = ctle_out_s
+    # Consider changing this; it could be sensitive to insufficient "front porch" in the CTLE output step response.
     self.ctle_out_p = self.ctle_out_s[nspui:] - self.ctle_out_s[:-nspui] 
     self.ctle_H     = ctle_H
     self.ctle_h     = ctle_h
@@ -331,12 +332,14 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.dfe_s     = dfe_h.cumsum()
     dfe_out_H      = ctle_out_H * dfe_H
     dfe_out_h      = convolve(ctle_out_h, dfe_h)[:len(ctle_out_h)]
-    self.dfe_out_s = dfe_out_h.cumsum()
-    self.dfe_out_p = self.dfe_out_s[nspui:] - self.dfe_out_s[:-nspui] 
+    dfe_out_s      = dfe_out_h.cumsum()
+    # self.dfe_out_p = self.dfe_out_s[nspui:] - self.dfe_out_s[:-nspui] 
+    self.dfe_out_p = dfe_out_s - pad(dfe_out_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
     self.dfe_H     = dfe_H
     self.dfe_h     = dfe_h
     self.dfe_out_H = dfe_out_H
     self.dfe_out_h = dfe_out_h
+    self.dfe_out_s = dfe_out_s
     self.dfe_out   = dfe_out
 
     self.dfe_perf  = nbits * nspb / (clock() - split_time)
