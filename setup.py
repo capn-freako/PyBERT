@@ -8,7 +8,7 @@ from setuptools import setup
 
 setup(
     name='PyBERT',
-    version='1.8.0',
+    version='2.0.0',
     packages=['pybert',],
     license='BSD',
     description='Serial communication link bit error rate tester simulator, written in Python.',
@@ -24,6 +24,7 @@ setup(
         'enable',
         'chaco',
         'Sphinx',
+        'pyibisami >= 2.0.0',
         ],
     keywords = ['bert', 'communication', 'simulator'],
     classifiers=[

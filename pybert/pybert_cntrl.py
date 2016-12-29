@@ -18,6 +18,7 @@ from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
 from dfe          import DFE
 from cdr          import CDR
 
+from pyibisami.amimodel import AMIModel, AMIModelInitializer
 from pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye, import_qucs_csv
 
 DEBUG           = False
@@ -102,8 +103,16 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
     Inputs:
 
-      - initial_run     If True, don't update the eye diagrams, since they haven't been created, yet.
+      - initial_run     If True, don't update the eye diagrams, since
+                        they haven't been created, yet.
                         (Optional; default = False.)
+
+      - update_plots    If True, update the plots, after simulation completes.
+                        This option can be used by larger scripts, which
+                        import *pybert*, in order to avoid graphical
+                        back-end conflicts and speed up this function's
+                        execution time.
+                        (Optional; default = True.)
 
     """
 
@@ -203,23 +212,58 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status       = 'Running Tx...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
-    #
-    # - Generate the ideal, post-preemphasis signal.
-    # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
-    ffe_out           = convolve(symbols, ffe)[:len(symbols)]
-    self.rel_power    = mean(ffe_out ** 2)                    # Store the relative average power dissipated in the Tx.
-    tx_out            = repeat(ffe_out, nspui)                # oversampled output
+    if(self.tx_use_ami):
+        tx_cfg = self._tx_cfg  # Grab the 'AMIParamConfigurator' instance for this model.
+        # Get the model invoked and initialized, except for 'channel_response', which
+        # we need to do several different ways, in order to gather all the data we need.
+        tx_param_dict = tx_cfg.input_ami_params
+        tx_model_init = AMIModelInitializer(tx_param_dict)
+        tx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
+        tx_model_init.channel_response = [1.] + [0.] * (len(chnl_h) - 1)  # Start with a delta function, to capture the model's impulse response.
+        tx_model_init.bit_time = ui
+        tx_model = AMIModel(self.tx_dll_file)
+        tx_model.initialize(tx_model_init)
+        self.log("Tx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
+            tx_model.ami_params_in, tx_model.ami_params_out, tx_model.msg))
+        if(tx_cfg.fetch_param_val(['Reserved_Parameters', 'Init_Returns_Impulse'])):
+            tx_h = array(tx_model.initOut)
+        elif(not tx_cfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])):
+            error("ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
+                    I cannot continue.\nThis condition is supposed to be caught sooner in the flow.")
+            self.status = "Simulation Error."
+            return
+        elif(not self.tx_use_getwave):
+            error("ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
+                    I cannot continue.\nPlease, select 'Use GetWave' and try again.", 'PyBERT Alert')
+            self.status = "Simulation Error."
+            return
+        if(self.tx_use_getwave):
+            # For GetWave, use a step to extract the model's native properties.
+            tx_s = tx_model.getWave([0.] * (len(chnl_h) / 2) + [1.] * (len(chnl_h) / 2))
+            tx_h = diff(tx_s)
+            tx_out = tx_model.getWave(x)
+        else:
+            tx_s = tx_h.cumsum()
+            tx_out = convolve(tx_h, self.x)[:len(self.x)]
+    else:
+        # - Generate the ideal, post-preemphasis signal.
+        # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
+        ffe_out           = convolve(symbols, ffe)[:len(symbols)]
+        self.rel_power    = mean(ffe_out ** 2)                    # Store the relative average power dissipated in the Tx.
+        tx_out            = repeat(ffe_out, nspui)                # oversampled output
 
-    # - Calculate the responses.
-    # - (The Tx is unique in that the calculated responses aren't used to form the output.
-    #    This is partly due to the out of order nature in which we combine the Tx and channel,
-    #    and partly due to the fact that we're adding noise to the Tx output.)
-    tx_h   = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
-    tx_h.resize(len(chnl_h))
+        # - Calculate the responses.
+        # - (The Tx is unique in that the calculated responses aren't used to form the output.
+        #    This is partly due to the out of order nature in which we combine the Tx and channel,
+        #    and partly due to the fact that we're adding noise to the Tx output.)
+        tx_h   = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
+        tx_h.resize(len(chnl_h))
+        tx_s   = tx_h.cumsum()
+
     temp   = tx_h.copy()
     temp.resize(len(w))
     tx_H   = fft(temp)
-    tx_H  *= sum(ffe) / abs(tx_H[0])  # Normalize for proper d.c. magnitude.
+    tx_H  *= tx_s[-1] / abs(tx_H[0])
 
     # - Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
     #   - Generate the ideal rectangular aggressor waveform.
@@ -243,7 +287,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     tx_out_H   = fft(temp)
     rx_in      = convolve(tx_out, chnl_h)[:len(tx_out)]
 
-    self.tx_s      = tx_h.cumsum()
+    self.tx_s      = tx_s
     self.tx_out    = tx_out
     self.rx_in     = rx_in
     self.tx_out_s  = tx_out_h.cumsum()
@@ -258,24 +302,61 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     self.status    = 'Running CTLE...(sweep %d of %d)' % (sweep_num, num_sweeps)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
-    if(self.use_ctle_file):
-        ctle_h           = import_qucs_csv(self.ctle_file, ts)
-        if(max(abs(ctle_h)) < 100.):          # step response?
-            ctle_h       = diff(ctle_h)       # impulse response is derivative of step response.
+    if(self.rx_use_ami):
+        rx_cfg = self._rx_cfg  # Grab the 'AMIParamConfigurator' instance for this model.
+        # Get the model invoked and initialized, except for 'channel_response', which
+        # we need to do several different ways, in order to gather all the data we need.
+        rx_param_dict = rx_cfg.input_ami_params
+        rx_model_init = AMIModelInitializer(rx_param_dict)
+        rx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
+        rx_model_init.channel_response = [1.] + [0.] * (len(chnl_h) - 1)  # Start with a delta function, to capture the model's impulse response.
+        rx_model_init.bit_time = ui
+        rx_model = AMIModel(self.rx_dll_file)
+        rx_model.initialize(rx_model_init)
+        self.log("Rx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
+            rx_model.ami_params_in, rx_model.ami_params_out, rx_model.msg))
+        if(rx_cfg.fetch_param_val(['Reserved_Parameters', 'Init_Returns_Impulse'])):
+            ctle_h = array(rx_model.initOut)
+        elif(not rx_cfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])):
+            error("ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
+                    I cannot continue.\nThis condition is supposed to be caught sooner in the flow.")
+            self.status = "Simulation Error."
+            return
+        elif(not self.rx_use_getwave):
+            error("ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
+                    I cannot continue.\nPlease, select 'Use GetWave' and try again.", 'PyBERT Alert')
+            self.status = "Simulation Error."
+            return
+        if(self.rx_use_getwave):
+            # For GetWave, use a step to extract the model's native properties.
+            ctle_s = rx_model.getWave([0.] * (len(chnl_h) / 2) + [1.] * (len(chnl_h) / 2))
+            ctle_h = diff(ctle_s)
+            ctle_out = rx_model.getWave(rx_in)
         else:
-            ctle_h      *= ts                 # Normalize to (V/sample)
-        ctle_h.resize(len(t))
-        ctle_H           = fft(ctle_h)
-        ctle_H          *= sum(ctle_h) / ctle_H[0]
+            ctle_s = ctle_h.cumsum()
+            ctle_out = convolve(ctle_h, self.rx_in)[:len(self.rx_in)]
+        ctle_H = fft(ctle_h)
+        ctle_H *= ctle_s[-1] / abs(ctle_H[0])
     else:
-        w_dummy, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-        ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
-        ctle_h         *= abs(ctle_H[0]) / sum(ctle_h)
-    ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
-    ctle_out       -= mean(ctle_out)             # Force zero mean.
-    if(self.ctle_mode == 'AGC'):                 # Automatic gain control engaged?
-        ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
-    self.ctle_s     = ctle_h.cumsum()
+        if(self.use_ctle_file):
+            ctle_h           = import_qucs_csv(self.ctle_file, ts)
+            if(max(abs(ctle_h)) < 100.):          # step response?
+                ctle_h       = diff(ctle_h)       # impulse response is derivative of step response.
+            else:
+                ctle_h      *= ts                 # Normalize to (V/sample)
+            ctle_h.resize(len(t))
+            ctle_H           = fft(ctle_h)
+            ctle_H          *= sum(ctle_h) / ctle_H[0]
+        else:
+            w_dummy, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
+            ctle_h          = real(ifft(ctle_H))[:len(chnl_h)]
+            ctle_h         *= abs(ctle_H[0]) / sum(ctle_h)
+        ctle_out        = convolve(rx_in, ctle_h)[:len(tx_out)]
+        ctle_out       -= mean(ctle_out)             # Force zero mean.
+        if(self.ctle_mode == 'AGC'):                 # Automatic gain control engaged?
+            ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
+        ctle_s = ctle_h.cumsum()
+    self.ctle_s     = ctle_s
     ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
     ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.)[0]
     if(len(ctle_out_h_main_lobe)):

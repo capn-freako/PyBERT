@@ -40,6 +40,7 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
+from datetime        import datetime
 from threading       import Thread
 
 from numpy           import array, linspace, zeros, histogram, mean, diff, \
@@ -54,11 +55,16 @@ from traits.api      import HasTraits, Array, Range, Float, Int, Property, \
                             String, cached_property, Instance, HTML, List, \
                             Bool, File, Button, Enum
 from traitsui.api    import View, Item, Group
+from traitsui.message import auto_close_message, error, message
+
 from chaco.api       import Plot, ArrayPlotData, VPlotContainer, \
                             GridPlotContainer, ColorMapper, Legend, \
                             OverlayPlotContainer, PlotAxis
 from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
 from enable.component_editor import ComponentEditor
+
+from pyibisami.amimodel  import AMIModel, AMIModelInitializer
+from pyibisami.ami_parse import AMIParamConfigurator
 
 from pybert_view     import traits_view
 from pybert_cntrl    import my_run_simulation, update_results, update_eyes
@@ -111,7 +117,7 @@ gCTLEOffset     = 0.      # CTLE d.c. offset (dB)
 # - DFE
 gDecisionScaler = 0.5
 gNtaps          = 5
-gGain           = 0.1
+gGain           = 0.5
 gNave           = 100
 gDfeBW          = 12.     # DFE summing node bandwidth (GHz)
 # - CDR
@@ -377,6 +383,13 @@ class PyBERT(HasTraits):
     posttap3_final  = Float(0.0)
     posttap3_steps  = Int(10)
     rel_power       = Float(1.0)
+    tx_use_ami      = Bool(False)
+    tx_use_getwave  = Bool(False)
+    tx_has_getwave  = Bool(False)
+    tx_ami_file     = File('', entries=5, filter=['*.ami'])
+    tx_ami_valid    = Bool(False)
+    tx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])
+    tx_dll_valid    = Bool(False)
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Range(low=0.001, value=gCin)                          # (pF)
@@ -388,6 +401,13 @@ class PyBERT(HasTraits):
     peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
     ctle_offset     = Float(gCTLEOffset)                                    # CTLE d.c. offset (dB)
     ctle_mode       = Enum('Off', 'Passive', 'AGC', 'Manual')
+    rx_use_ami      = Bool(False)
+    rx_use_getwave  = Bool(False)
+    rx_has_getwave  = Bool(False)
+    rx_ami_file     = File('', entries=5, filter=['*.ami'])
+    rx_ami_valid    = Bool(False)
+    rx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])
+    rx_dll_valid    = Bool(False)
     # - DFE
     use_dfe         = Bool(gUseDfe)
     sum_ideal       = Bool(gDfeIdeal)
@@ -425,13 +445,15 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v1.7.9 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v2.0.0 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    June 12, 2016\n\n \
+    December 29, 2016\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
     instructions = help_str
+    # - Console
+    console_log = String("PyBERT Console Log\n\n")
 
     # Dependent variables
     # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
@@ -466,6 +488,12 @@ class PyBERT(HasTraits):
     btn_opt_tx  = Button(label = 'OptTx')
     btn_opt_rx  = Button(label = 'OptRx')
     btn_coopt   = Button(label = 'CoOpt')
+    btn_cfg_tx  = Button(label = 'Configure')
+    btn_cfg_rx  = Button(label = 'Configure')
+
+    # Logger
+    def log(self, msg):
+        self.console_log += "\n[{}]: {}\n".format(datetime.now(), msg.strip())
 
     # Default initialization
     def __init__(self, run_simulation = True):
@@ -480,6 +508,8 @@ class PyBERT(HasTraits):
         # Super-class initialization is ABSOLUTELY NECESSARY, in order
         # to get all the Traits/UI machinery setup correctly.
         super(PyBERT, self).__init__()
+
+        self.log("Started.")
 
         if(run_simulation):
             # Running the simulation will fill in the required data structure.
@@ -548,6 +578,11 @@ class PyBERT(HasTraits):
             self.coopt_thread.pybert = self
             self.coopt_thread.start()
 
+    def _btn_cfg_tx_fired(self):
+        self._tx_cfg()
+
+    def _btn_cfg_rx_fired(self):
+        self._rx_cfg()
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
@@ -1177,6 +1212,43 @@ class PyBERT(HasTraits):
             self.tx_tap_tuners[1].enabled = False
             self.tx_tap_tuners[2].enabled = False
             self.tx_tap_tuners[3].enabled = False
+
+    def _tx_ami_file_changed(self, new_value):
+        try:
+            with open(new_value) as pfile:
+                pcfg = AMIParamConfigurator(pfile.read())
+            self.tx_has_getwave = pcfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])
+            self._tx_cfg = pcfg
+            self.tx_ami_valid = True
+        except Exception as err:
+            error('Failed to open and/or parse AMI file!\n{}'.format(err.message), 'PyBert Alert')
+
+    def _tx_dll_file_changed(self, new_value):
+        try:
+            model = AMIModel(new_value)
+            self._tx_model = model
+            self.tx_dll_valid = True
+        except Exception as err:
+            error('Failed to open DLL file!\n{}'.format(err.message), 'PyBert Alert')
+
+    def _rx_ami_file_changed(self, new_value):
+        try:
+            with open(new_value) as pfile:
+                pcfg = AMIParamConfigurator(pfile.read())
+            self.rx_has_getwave = pcfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])
+            self._rx_cfg = pcfg
+            self.rx_ami_valid = True
+        except Exception as err:
+            error('Failed to open and/or parse AMI file!\n{}'.format(err.message), 'PyBert Alert')
+
+    def _rx_dll_file_changed(self, new_value):
+        try:
+            model = AMIModel(new_value)
+            self._rx_model = model
+            self.rx_dll_valid = True
+        except Exception as err:
+            error('Failed to open DLL file!\n{}'.format(err.message), 'PyBert Alert')
+
 
     # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control their times of execution. I wasn't able to get truly lazy evaluation, and
