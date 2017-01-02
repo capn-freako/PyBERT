@@ -9,7 +9,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 from time         import clock, sleep
 
-from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt, histogram, arange
+from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt, histogram, arange, append
 from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff, std, pad
 from numpy.random import normal
 from numpy.fft    import fft, ifft
@@ -32,67 +32,41 @@ def my_run_sweeps(self):
 
     """
 
-    pretap        = self.pretap
-    pretap_sweep  = self.pretap_sweep
-    pretap_steps  = self.pretap_steps
-    pretap_final  = self.pretap_final
-    posttap       = self.posttap
-    posttap_sweep = self.posttap_sweep  
-    posttap_steps = self.posttap_steps
-    posttap_final = self.posttap_final
-    posttap2       = self.posttap2
-    posttap2_sweep = self.posttap2_sweep  
-    posttap2_steps = self.posttap2_steps
-    posttap2_final = self.posttap2_final
-    posttap3       = self.posttap3
-    posttap3_sweep = self.posttap3_sweep  
-    posttap3_steps = self.posttap3_steps
-    posttap3_final = self.posttap3_final
     sweep_aves    = self.sweep_aves
     do_sweep      = self.do_sweep
+    tx_taps       = self.tx_taps
 
     if(do_sweep):
         # Assemble the list of desired values for each sweepable parameter.
-        pretap_vals  = [pretap]
-        posttap_vals = [posttap]
-        posttap2_vals = [posttap2]
-        posttap3_vals = [posttap3]
-        if(pretap_sweep):
-            pretap_step = (pretap_final - pretap) / pretap_steps
-            pretap_vals.extend([pretap + (i + 1) * pretap_step for i in range(pretap_steps)])
-        if(posttap_sweep):
-            posttap_step = (posttap_final - posttap) / posttap_steps
-            posttap_vals.extend([posttap + (i + 1) * posttap_step for i in range(posttap_steps)])
-        if(posttap2_sweep):
-            posttap2_step = (posttap2_final - posttap2) / posttap2_steps
-            posttap2_vals.extend([posttap2 + (i + 1) * posttap2_step for i in range(posttap2_steps)])
-        if(posttap3_sweep):
-            posttap3_step = (posttap3_final - posttap3) / posttap3_steps
-            posttap3_vals.extend([posttap3 + (i + 1) * posttap3_step for i in range(posttap3_steps)])
-
+        sweep_vals = []
+        for tap in tx_taps:
+            if(tap.enabled):
+                if(tap.steps):
+                    sweep_vals.append(list(arange(tap.min_val, tap.max_val, (tap.max_val - tap.min_val) / tap.steps)))
+                else:
+                    sweep_vals.append([tap.value])
+            else:
+                sweep_vals.append([0.])
         # Run the sweep, using the lists assembled, above.
-        sweeps          = [(pretap_vals[l], posttap_vals[k], posttap2_vals[j], posttap3_vals[i])
-                for i in range(len(posttap3_vals))
-                for j in range(len(posttap2_vals))
-                for k in range(len(posttap_vals))
-                for l in range(len(pretap_vals))
-                ]
+        sweeps = [[w, x, y, z] for w in sweep_vals[0]
+                               for x in sweep_vals[1]
+                               for y in sweep_vals[2]
+                               for z in sweep_vals[3]
+                 ]
         num_sweeps      = sweep_aves * len(sweeps)
         self.num_sweeps = num_sweeps
         sweep_results   = []
         sweep_num       = 1
-        for (pretap_val, posttap_val, posttap2_val, posttap3_val) in sweeps:
-            self.pretap    = pretap_val
-            self.posttap   = posttap_val
-            self.posttap2  = posttap2_val
-            self.posttap3  = posttap3_val
+        for sweep in sweeps:
+            for i in range(4):
+                self.tx_taps[i].value = sweep[i]
             bit_errs       = []
             for i in range(sweep_aves):
                 self.sweep_num = sweep_num
                 my_run_simulation(self, update_plots=False)
                 bit_errs.append(self.bit_errs)
                 sweep_num += 1
-            sweep_results.append((pretap_val, posttap_val, mean(bit_errs), std(bit_errs)))
+            sweep_results.append((sweep, mean(bit_errs), std(bit_errs)))
         self.sweep_results = sweep_results
     else:
         my_run_simulation(self)
@@ -155,10 +129,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     v0              = self.v0 * 3.e8
     Theta0          = self.Theta0
     l_ch            = self.l_ch
-    pretap          = self.pretap
-    posttap         = self.posttap
-    posttap2        = self.posttap2
-    posttap3        = self.posttap3
     pattern_len     = self.pattern_len
     rx_bw           = self.rx_bw * 1.e9
     peak_freq       = self.peak_freq * 1.e9
@@ -239,7 +209,13 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             return
         if(self.tx_use_getwave):
             # For GetWave, use a step to extract the model's native properties.
-            tx_s = tx_model.getWave([0.] * (len(chnl_h) / 2) + [1.] * (len(chnl_h) / 2))
+            # Position the input edge at the center of the vector, in
+            # order to minimize high frequency artifactual energy
+            # introduced by frequency domain processing in some models.
+            half_len = len(chnl_h) // 2
+            tx_s = tx_model.getWave([0.] * half_len + [1.] * half_len)
+            # Shift the result back to the correct location, extending the last sample.
+            tx_s = pad(tx_s[half_len:], (0, half_len), 'edge')
             tx_h = diff(tx_s)
             tx_out = tx_model.getWave(x)
         else:
@@ -329,12 +305,35 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             return
         if(self.rx_use_getwave):
             # For GetWave, use a step to extract the model's native properties.
-            ctle_s = rx_model.getWave([0.] * (len(chnl_h) / 2) + [1.] * (len(chnl_h) / 2))
+            # In case the model is adaptive, place this step at the end
+            # of the actual signal vector. And make it large amplitude
+            # and d.c. balanced, to avoid triggering d.c. blocking
+            # behavior, or DFE oscillation.
+            # Tacking on the step, composed of step_len '0's followed by step_len '1's.
+            step_len = 64
+            step_mag = 0.2
+            wave_in = append(rx_in.copy(), array([-step_mag / 2.] * step_len * nspui + [step_mag / 2.] * step_len * nspui))
+            input_len = len(wave_in)
+            row_size = 128  # Some models are persnickity about integral power of 2.
+            idx = 0          # Holds the starting index of the next processing chunk.
+            wave_out = []
+            while(idx < input_len):
+                if((input_len - idx) >= row_size):
+                    wave_out.extend(rx_model.getWave(wave_in[idx : idx + row_size], row_size))
+                else:
+                    wave_out.extend(rx_model.getWave(wave_in[idx :].resize(row_size), row_size))
+                self.log("AMI output parameters from GetWave call:\n{}".format(rx_model.ami_params_out))
+                idx += row_size
+            ctle_out = array(wave_out[:-2 * step_len * nspui])
+            ctle_s = array(wave_out[-step_len * nspui:])
+            ctle_s = (ctle_s - ctle_s[0]) / step_mag  # Compensating for choice of input amplitude/offset.
+            # Calculate the associated impulse response.
             ctle_h = diff(ctle_s)
-            ctle_out = rx_model.getWave(rx_in)
+            ctle_h.resize(len(t))
         else:
             ctle_s = ctle_h.cumsum()
-            ctle_out = convolve(ctle_h, self.rx_in)[:len(self.rx_in)]
+            ctle_out = convolve(ctle_h, rx_in)[:len(rx_in)]
+            ctle_h.resize(len(t))
         ctle_H = fft(ctle_h)
         ctle_H *= ctle_s[-1] / abs(ctle_H[0])
     else:
@@ -368,7 +367,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     temp            = ctle_out_h.copy()
     temp.resize(len(w))
     ctle_out_H      = fft(temp)
-    self.rel_opt = -self.cost  # Triggers update to EQ tuning plot data.
+    # self.rel_opt = -self.cost  # Triggers update to EQ tuning plot data.
     # - Store local variables to class instance.
     self.ctle_out_s = ctle_out_s
     # Consider changing this; it could be sensitive to insufficient "front porch" in the CTLE output step response.

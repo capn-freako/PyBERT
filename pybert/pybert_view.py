@@ -12,7 +12,8 @@ from threading import Thread
 from traits.api import Instance
 from traitsui.api import View, Item, Group, VGroup, HGroup, Action, Handler, \
                          DefaultOverride, CheckListEditor, StatusItem, \
-                         TextEditor, TableEditor, ObjectColumn
+                         TextEditor, TableEditor, ObjectColumn, spring, TabularEditor
+from traitsui.tabular_adapter import TabularAdapter
 from enable.component_editor import ComponentEditor
 
 from pybert_cntrl import my_run_sweeps
@@ -125,33 +126,27 @@ traits_view = View(
                         label='IBIS-AMI', show_border=True,
                     ),
                     VGroup(
-                        HGroup(
-                            Item(name='pretap_enable', label='Enable',    tooltip="Enable this tap."),
-                            Item(name='pretap',       label='Pre-tap',    tooltip="pre-cursor tap weight",         enabled_when='pretap_enable == True' ),
-                            Item(name='pretap_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
-                            Item(name='pretap_final', show_label=False,   tooltip="final pretap value",            enabled_when='pretap_sweep == True'),
-                            Item(name='pretap_steps', label='# of Steps', tooltip="number of pretap steps",        enabled_when='pretap_sweep == True'),
-                        ),
-                        HGroup(
-                            Item(name='posttap_enable', label='Enable',    tooltip="Enable this tap."),
-                            Item(name='posttap',       label='Post-tap',   tooltip="post-cursor tap weight",       enabled_when='posttap_enable == True' ),
-                            Item(name='posttap_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
-                            Item(name='posttap_final', show_label=False,   tooltip="final posttap value",          enabled_when='posttap_sweep == True'),
-                            Item(name='posttap_steps', label='# of Steps', tooltip="number of posttap steps",      enabled_when='posttap_sweep == True'),
-                        ),
-                        HGroup(
-                            Item(name='posttap2_enable', label='Enable',    tooltip="Enable this tap."),
-                            Item(name='posttap2',       label='Post-tap2',  tooltip="2nd post-cursor tap weight",  enabled_when='posttap2_enable == True' ),
-                            Item(name='posttap2_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
-                            Item(name='posttap2_final', show_label=False,   tooltip="final value",                 enabled_when='posttap_sweep == True'),
-                            Item(name='posttap2_steps', label='# of Steps', tooltip="number of steps",             enabled_when='posttap_sweep == True'),
-                        ),
-                        HGroup(
-                            Item(name='posttap3_enable', label='Enable',    tooltip="Enable this tap."),
-                            Item(name='posttap3',       label='Post-tap3',  tooltip="3rd post-cursor tap weight",  enabled_when='posttap3_enable == True' ),
-                            Item(name='posttap3_sweep', label='SweepTo',    tooltip="Perform automated parameter sweep."),
-                            Item(name='posttap3_final', show_label=False,   tooltip="final value",                 enabled_when='posttap_sweep == True'),
-                            Item(name='posttap3_steps', label='# of Steps', tooltip="number of steps",             enabled_when='posttap_sweep == True'),
+                        Item(   name='tx_taps',
+                                editor=TableEditor(columns=[ObjectColumn(name='name', editable=False),
+                                                            ObjectColumn(name='enabled', style='simple'),
+                                                            ObjectColumn(name='min_val', horizontal_alignment='center'),
+                                                            ObjectColumn(name='max_val', horizontal_alignment='center'),
+                                                            ObjectColumn(name='value', format='%+05.3f', horizontal_alignment='center'),
+                                                            ObjectColumn(name='steps', horizontal_alignment='center'),
+                                                           ],
+                                                    configurable=False,
+                                                    reorderable=False,
+                                                    sortable=False,
+                                                    selection_mode='cell',
+                                                    auto_size=True,
+                                                    rows=4,
+                                                    # v_size_policy='ignored',
+                                                    # h_size_policy='minimum',
+                                                    # orientation='vertical',
+                                                    # is_grid_cell=True,
+                                                    # show_toolbar=False,
+                                                   ),
+                                show_label=False,
                         ),
                         label='Native', show_border=True,
                         enabled_when='tx_use_ami == False'
@@ -184,11 +179,15 @@ traits_view = View(
                     ),
                     HGroup(
                         VGroup(
-                            Item(name='use_ctle_file', label='fromFile', tooltip='Select CTLE impulse/step response from file.', ),
-                            Item(name='ctle_file', label='Filename',    enabled_when='use_ctle_file == True'),
                             HGroup(
-                                Item(name='peak_freq', label='CTLE fp (GHz)',   tooltip="CTLE peaking frequency (GHz)", enabled_when='use_ctle_file == False' ),
-                                Item(name='rx_bw',     label='Bandwidth (GHz)', tooltip="unequalized signal path bandwidth (GHz).", enabled_when='use_ctle_file == False' ),
+                                Item(name='use_ctle_file', label='fromFile', tooltip='Select CTLE impulse/step response from file.', ),
+                                Item(name='ctle_file', label='Filename',    enabled_when='use_ctle_file == True'),
+                            ),
+                            HGroup(
+                                Item(name='peak_freq', label='CTLE fp (GHz)',   tooltip="CTLE peaking frequency (GHz)",
+                                        enabled_when='use_ctle_file == False' ),
+                                Item(name='rx_bw',     label='Bandwidth (GHz)', tooltip="unequalized signal path bandwidth (GHz).",
+                                        enabled_when='use_ctle_file == False' ),
                             ),
                             HGroup(
                                 Item(name='peak_mag',  label='CTLE boost (dB)', tooltip="CTLE peaking magnitude (dB)",
@@ -216,7 +215,7 @@ traits_view = View(
                         Item(name='lock_sustain', label='Lock Sus.',     tooltip="length of lock determining hysteresis vector", ),
                     ),
                     label='CDR Parameters', show_border=True,
-                    enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
+                    # enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
                 ),
                 HGroup(
                     VGroup(
@@ -237,13 +236,14 @@ traits_view = View(
                         ),
                     ),
                     label='DFE Parameters', show_border=True,
-                    enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
+                    # enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
                 ),
                 VGroup(
                     Item(name='thresh',          label='Pj Thresh.',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
                     label='Analysis Parameters', show_border=True,
                 ),
             ),
+            spring,
             label = 'Config.', id = 'config',
         ),
         Group(
@@ -373,6 +373,6 @@ traits_view = View(
     buttons = [run_simulation, ],
     statusbar = "status_str",
     title='PyBERT',
-    width=0.9, # height=800
+    width=0.95, height=0.95
 )
 

@@ -40,6 +40,9 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
+# from traits.trait_base import ETSConfig
+# ETSConfig.toolkit = 'qt4'
+
 from datetime        import datetime
 from threading       import Thread
 
@@ -73,7 +76,13 @@ from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, \
 from pybert_plot     import make_plots
 from pybert_help     import help_str
 
-debug          = False
+debug = True
+def handle_error(err):
+    if(debug):
+        raise
+    else:
+        error(err.message, 'PyBERT Alert')
+
 gDebugStatus   = False
 gDebugOptimize = False
 gMaxCTLEPeak   = 20.      # max. allowed CTLE peaking (dB) (when optimizing, only)
@@ -179,7 +188,7 @@ class TxOptThread(Thread):
         for tuner in tuners:
             if(tuner.enabled):
                 tuner.value = taps.pop(0)
-        pybert.rel_opt = -pybert.cost
+        # pybert.rel_opt = -pybert.cost
         return pybert.cost
 
 
@@ -212,7 +221,7 @@ class RxOptThread(Thread):
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
         cost = pybert.cost
-        pybert.rel_opt = -cost
+        # pybert.rel_opt = -cost
         return cost
 
 
@@ -274,7 +283,7 @@ class CoOptThread(Thread):
         pybert.peak_mag_tune = vals.pop(0)
 
         # Go to sleep here, to give 'cost' a chance to completely update?
-        pybert.rel_opt = -pybert.cost
+        # pybert.rel_opt = -pybert.cost
 
         return pybert.cost
 
@@ -287,12 +296,14 @@ class TxTapTuner(HasTraits):
     min_val = Float(0.0)
     max_val = Float(0.0)
     value = Float(0.0)
+    steps = Int(0)  # Non-zero means we want to sweep it.
     
     def __init__(self,  name='(noname)',
-                        enabled = Bool(False),
-                        min_val = Float(0.0),
-                        max_val = Float(0.0),
-                        value = Float(0.0),
+                        enabled = False,
+                        min_val = 0.0,
+                        max_val = 0.0,
+                        value = 0.0,
+                        steps = 0,
                 ):
         'Allows user to define properties, at instantiation.'
 
@@ -305,6 +316,7 @@ class TxTapTuner(HasTraits):
         self.min_val = min_val
         self.max_val = max_val
         self.value = value
+        self.steps = steps
 
 
 class PyBERT(HasTraits):
@@ -351,7 +363,6 @@ class PyBERT(HasTraits):
     ctle_mode_tune  = Enum('Off', 'Passive', 'AGC', 'Manual')
     use_dfe_tune    = Bool(gUseDfe)
     max_iter        = Int(50)                                               # max. # of optimization iterations
-    rel_opt         = Float(0.)
     tx_opt_thread   = Instance(TxOptThread)
     rx_opt_thread   = Instance(RxOptThread)
     coopt_thread    = Instance(CoOptThread)
@@ -362,26 +373,11 @@ class PyBERT(HasTraits):
     pn_mag          = Float(gPnMag)                                         # (ps)
     pn_freq         = Float(gPnFreq)                                        # (MHz)
     rn              = Float(gRn)                                            # (V)
-    pretap          = Float(-0.05)
-    pretap_enable   = Bool(True)
-    pretap_sweep    = Bool(False)
-    pretap_final    = Float(-0.05)
-    pretap_steps    = Int(5)
-    posttap         = Float(-0.10)
-    posttap_enable  = Bool(False)
-    posttap_sweep   = Bool(False)
-    posttap_final   = Float(-0.10)
-    posttap_steps   = Int(10)
-    posttap2        = Float(0.0)
-    posttap2_enable = Bool(False)
-    posttap2_sweep  = Bool(False)
-    posttap2_final  = Float(0.0)
-    posttap2_steps  = Int(10)
-    posttap3        = Float(0.0)
-    posttap3_enable = Bool(False)
-    posttap3_sweep  = Bool(False)
-    posttap3_final  = Float(0.0)
-    posttap3_steps  = Int(10)
+    tx_taps = List([TxTapTuner(name='Pre-tap',   enabled=True,  min_val=-0.2, max_val=0.2, value=0.0),
+                    TxTapTuner(name='Post-tap1', enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
+                    TxTapTuner(name='Post-tap2', enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
+                    TxTapTuner(name='Post-tap3', enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
+                   ])
     rel_power       = Float(1.0)
     tx_use_ami      = Bool(False)
     tx_use_getwave  = Bool(False)
@@ -445,9 +441,9 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v2.0.0 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v2.0.1 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    December 29, 2016\n\n \
+    January 1, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -466,16 +462,17 @@ class PyBERT(HasTraits):
     sweep_info      = Property(HTML,    depends_on=['sweep_results'])
     tx_h_tune       = Property(Array,   depends_on=['tx_tap_tuners.value', 'nspui'])
     ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune',
-                                                    'w', 'len_h', 'ctle_mode_tune', 'ctle_offset_tune'])
+                                                    'w', 'len_h', 'ctle_mode_tune', 'ctle_offset_tune', 'use_dfe_tune'])
     ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune', 'chnl_h'])
     cost            = Property(Float,   depends_on=['ctle_out_h_tune', 'nspui'])
+    rel_opt         = Property(Float,   depends_on=['cost'])
     t               = Property(Array,   depends_on=['ui', 'nspb', 'nbits'])
     t_ns            = Property(Array,   depends_on=['t'])
     f               = Property(Array,   depends_on=['t'])
     w               = Property(Array,   depends_on=['f'])
     bits            = Property(Array,   depends_on=['pattern_len', 'nbits', 'run_count'])
     symbols         = Property(Array,   depends_on=['bits', 'mod_type', 'vod'])
-    ffe             = Property(Array,   depends_on=['pretap', 'posttap', 'posttap2', 'posttap3'])
+    ffe             = Property(Array,   depends_on=['tx_taps.value', 'tx_taps.enabled'])
     ui              = Property(Float,   depends_on=['bit_rate', 'mod_type'])
     nui             = Property(Int,     depends_on=['nbits', 'mod_type'])
     nspui           = Property(Int,     depends_on=['nspb', 'mod_type'])
@@ -522,14 +519,9 @@ class PyBERT(HasTraits):
 
     # Button handlers
     def _btn_rst_eq_fired(self):
-        self.tx_tap_tuners[0].value = self.pretap
-        self.tx_tap_tuners[0].enable = self.pretap_enable
-        self.tx_tap_tuners[1].value = self.posttap
-        self.tx_tap_tuners[1].enable = self.posttap_enable
-        self.tx_tap_tuners[2].value = self.posttap2
-        self.tx_tap_tuners[2].enable = self.posttap2_enable
-        self.tx_tap_tuners[3].value = self.posttap3
-        self.tx_tap_tuners[3].enable = self.posttap3_enable
+        for i in range(4):
+            self.tx_tap_tuners[i].value = self.tx_taps[i].value
+            self.tx_tap_tuners[i].enabled = self.tx_taps[i].enabled
         self.peak_freq_tune = self.peak_freq
         self.peak_mag_tune  = self.peak_mag
         self.rx_bw_tune     = self.rx_bw
@@ -538,14 +530,9 @@ class PyBERT(HasTraits):
         self.use_dfe_tune = self.use_dfe
 
     def _btn_save_eq_fired(self):
-        self.pretap = self.tx_tap_tuners[0].value
-        self.pretap_enable = self.tx_tap_tuners[0].enabled
-        self.posttap = self.tx_tap_tuners[1].value
-        self.posttap_enable = self.tx_tap_tuners[1].enabled
-        self.posttap2 = self.tx_tap_tuners[2].value
-        self.posttap2_enable = self.tx_tap_tuners[2].enabled
-        self.posttap3 = self.tx_tap_tuners[3].value
-        self.posttap3_enable = self.tx_tap_tuners[3].enabled
+        for i in range(4):
+            self.tx_taps[i].value = self.tx_tap_tuners[i].value
+            self.tx_taps[i].enabled = self.tx_tap_tuners[i].enabled
         self.peak_freq = self.peak_freq_tune
         self.peak_mag  = self.peak_mag_tune
         self.rx_bw     = self.rx_bw_tune
@@ -802,14 +789,17 @@ class PyBERT(HasTraits):
         Generate the Tx pre-emphasis FIR numerator.
         """
         
-        pretap   = self.pretap
-        posttap  = self.posttap
-        posttap2 = self.posttap2
-        posttap3 = self.posttap3
+        tap_tuners = self.tx_taps
 
-        main_tap = 1.0 - abs(pretap) - abs(posttap) - abs(posttap2) - abs(posttap3)
+        taps = []
+        for tuner in tap_tuners:
+            if(tuner.enabled):
+                taps.append(tuner.value)
+            else:
+                taps.append(0.0)
+        taps.insert(1, 1.0 - sum(map(abs, taps)))  # Assume one pre-tap.
 
-        return [pretap, main_tap, posttap, posttap2, posttap3]
+        return taps
 
     @cached_property
     def _get_jitter_info(self):
@@ -1156,98 +1146,76 @@ class PyBERT(HasTraits):
         else:
             return isi - p[clock_pos]
 
+    @cached_property
+    def _get_rel_opt(self):
+        return -self.cost
+
     # Changed property handlers.
     def _status_str_changed(self):
         if(gDebugStatus):
             print self.status_str
 
-    def _pretap_enable_changed(self, new_value):
-        if(new_value == False):
-            self.pretap = 0.
-
-    def _posttap_enable_changed(self, new_value):
-        if(new_value == False):
-            self.posttap = 0.
-
-    def _posttap2_enable_changed(self, new_value):
-        if(new_value == False):
-            self.posttap2 = 0.
-
-    def _posttap3_enable_changed(self, new_value):
-        if(new_value == False):
-            self.posttap3 = 0.
-
     def _use_dfe_changed(self, new_value):
         if(new_value == False):
-            self.posttap_enable = True
-            self.posttap2_enable = True
-            self.posttap3_enable = True
+            for i in range(1, 4):
+                self.tx_taps[i].enabled = True
         else:
-            self.posttap_enable = False
-            self.posttap2_enable = False
-            self.posttap3_enable = False
-
-    def _pretap_tune_enable_changed(self, new_value):
-        if(new_value == False):
-            self.pretap_tune = 0.
-
-    def _posttap_tune_enable_changed(self, new_value):
-        if(new_value == False):
-            self.posttap_tune = 0.
-
-    def _posttap2_tune_enable_changed(self, new_value):
-        if(new_value == False):
-            self.posttap2_tune = 0.
-
-    def _posttap3_tune_enable_changed(self, new_value):
-        if(new_value == False):
-            self.posttap3_tune = 0.
+            for i in range(1, 4):
+                self.tx_taps[i].enabled = False
 
     def _use_dfe_tune_changed(self, new_value):
         if(new_value == False):
-            self.tx_tap_tuners[1].enabled = True
-            self.tx_tap_tuners[2].enabled = True
-            self.tx_tap_tuners[3].enabled = True
+            for i in range(1, 4):
+                self.tx_tap_tuners[i].enabled = True
         else:
-            self.tx_tap_tuners[1].enabled = False
-            self.tx_tap_tuners[2].enabled = False
-            self.tx_tap_tuners[3].enabled = False
+            for i in range(1, 4):
+                self.tx_tap_tuners[i].enabled = False
 
     def _tx_ami_file_changed(self, new_value):
         try:
+            self.tx_ami_valid = False
             with open(new_value) as pfile:
                 pcfg = AMIParamConfigurator(pfile.read())
+            self.log("Parsing Tx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
             self.tx_has_getwave = pcfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])
             self._tx_cfg = pcfg
             self.tx_ami_valid = True
         except Exception as err:
-            error('Failed to open and/or parse AMI file!\n{}'.format(err.message), 'PyBert Alert')
+            err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
+            handle_error(err)
 
     def _tx_dll_file_changed(self, new_value):
         try:
+            self.tx_dll_valid = False
             model = AMIModel(new_value)
             self._tx_model = model
             self.tx_dll_valid = True
         except Exception as err:
-            error('Failed to open DLL file!\n{}'.format(err.message), 'PyBert Alert')
+            err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
+            handle_error(err)
 
     def _rx_ami_file_changed(self, new_value):
         try:
+            self.rx_ami_valid = False
             with open(new_value) as pfile:
                 pcfg = AMIParamConfigurator(pfile.read())
+            self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
             self.rx_has_getwave = pcfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])
             self._rx_cfg = pcfg
             self.rx_ami_valid = True
         except Exception as err:
-            error('Failed to open and/or parse AMI file!\n{}'.format(err.message), 'PyBert Alert')
+            err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
+            handle_error(err)
 
     def _rx_dll_file_changed(self, new_value):
         try:
+            self.rx_dll_valid = False
             model = AMIModel(new_value)
             self._rx_model = model
             self.rx_dll_valid = True
         except Exception as err:
-            error('Failed to open DLL file!\n{}'.format(err.message), 'PyBert Alert')
+            err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
+            handle_error(err)
 
 
     # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,

@@ -8,7 +8,7 @@ from setuptools import setup
 
 setup(
     name='PyBERT',
-    version='2.0.0',
+    version='2.0.1',
     packages=['pybert',],
     license='BSD',
     description='Serial communication link bit error rate tester simulator, written in Python.',
@@ -17,14 +17,15 @@ setup(
     author='David Banas',
     author_email='capn.freako@gmail.com',
     install_requires = [
-        'numpy',
-        'scipy',
-        'traits',
-        'traitsui',
-        'enable',
-        'chaco',
-        'Sphinx',
-        'pyibisami >= 2.0.0',
+        'traits == 4.4.0',
+        'traitsui == 4.4.0',
+        'enable == 4.4.1',
+        'chaco == 4.5.0',
+        'Sphinx == 1.2.3',
+        'Jinja2 == 2.7.3',
+        'docutils == 0.12',
+        'Pygments == 2.1.3',
+        'PyIBIS-AMI >= 2.0.1',
         ],
     keywords = ['bert', 'communication', 'simulator'],
     classifiers=[
