@@ -8,7 +8,7 @@ from setuptools import setup
 
 setup(
     name='PyBERT',
-    version='2.0.2',
+    version='2.0.3',
     packages=['pybert',],
     license='BSD',
     description='Serial communication link bit error rate tester simulator, written in Python.',
@@ -25,7 +25,7 @@ setup(
         'Jinja2',
         'docutils',
         'Pygments',
-        'PyIBIS-AMI',
+        'PyIBIS-AMI>=2.0.3',
         ],
     keywords = ['bert', 'communication', 'simulator'],
     classifiers=[

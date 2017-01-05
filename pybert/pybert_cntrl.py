@@ -9,6 +9,9 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 from time         import clock, sleep
 
+from chaco.api       import Plot
+from chaco.tools.api import PanTool, ZoomTool
+
 from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt, histogram, arange, append
 from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff, std, pad
 from numpy.random import normal
@@ -572,6 +575,7 @@ def update_results(self):
     t_ns          = self.t_ns
     t_ns_chnl     = self.t_ns_chnl
     conv_dly_ix   = self.conv_dly_ix
+    n_taps        = self.n_taps
 
     Ts = t[1]
     ignore_until  = (num_ui - eye_uis) * ui
@@ -590,6 +594,22 @@ def update_results(self):
     for tap_weight in tap_weights:
         self.plotdata.set_data("tap%d_weights" % i, tap_weight)
         i += 1
+    self.plotdata.set_data("tap_weight_index", range(len(tap_weight)))
+    if(self._old_n_taps != n_taps):
+        new_plot = Plot(self.plotdata, auto_colors=['red', 'orange', 'yellow', 'green', 'blue', 'purple'], padding_left=75)
+        for i in range(self.n_taps):
+            new_plot.plot(("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d"%(i+1))
+        new_plot.title  = "DFE Adaptation"
+        new_plot.tools.append(PanTool(new_plot, constrain=True, constrain_key=None, constrain_direction='x'))
+        zoom9 = ZoomTool(new_plot, tool_mode="range", axis='index', always_on=False)
+        new_plot.overlays.append(zoom9)
+        new_plot.legend.visible = True
+        new_plot.legend.align = 'ul'
+        self.plots_dfe.remove(self._dfe_plot)
+        self.plots_dfe.insert(1, new_plot)
+        self._dfe_plot = new_plot
+        self._old_n_taps = n_taps
+
     clock_pers = diff(clock_times)
     start_t = t[where(self.lockeds)[0][0]]
     start_ix = where(clock_times > start_t)[0][0]
@@ -603,7 +623,6 @@ def update_results(self):
     self.plotdata.set_data("clk_per_hist_vals",  bin_counts)
     self.plotdata.set_data("clk_spec",  10. * log10(clock_spec[1:]))  # Omit the d.c. value.
     self.plotdata.set_data("clk_freqs",  spec_freqs[1:])
-    self.plotdata.set_data("tap_weight_index", range(len(tap_weight)))
     self.plotdata.set_data("dfe_out",  self.dfe_out)
     self.plotdata.set_data("ui_ests",  self.ui_ests)
     self.plotdata.set_data("clocks",   self.clocks)

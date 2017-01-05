@@ -79,6 +79,7 @@ from pybert_help     import help_str
 debug = True
 def handle_error(err):
     if(debug):
+        error(err.message + "\nPlease, check terminal for more information.", 'PyBERT Alert')
         raise
     else:
         error(err.message, 'PyBERT Alert')
@@ -411,6 +412,7 @@ class PyBERT(HasTraits):
     gain            = Float(gGain)
     n_ave           = Float(gNave)
     n_taps          = Int(gNtaps)
+    _old_n_taps     = n_taps
     sum_bw          = Float(gDfeBW)                                         # (GHz)
     # - CDR
     delta_t         = Float(gDeltaT)                                        # (ps)
@@ -441,9 +443,9 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v2.0.2 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v2.0.3 - a serial communication link design tool, written in Python\n\n \
     David Banas\n \
-    January 1, 2017\n\n \
+    January 5, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -1187,7 +1189,7 @@ class PyBERT(HasTraits):
     def _tx_dll_file_changed(self, new_value):
         try:
             self.tx_dll_valid = False
-            model = AMIModel(new_value)
+            model = AMIModel(str(new_value))
             self._tx_model = model
             self.tx_dll_valid = True
         except Exception as err:
@@ -1210,7 +1212,7 @@ class PyBERT(HasTraits):
     def _rx_dll_file_changed(self, new_value):
         try:
             self.rx_dll_valid = False
-            model = AMIModel(new_value)
+            model = AMIModel(str(new_value))
             self._rx_model = model
             self.rx_dll_valid = True
         except Exception as err:

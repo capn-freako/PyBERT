@@ -55,6 +55,7 @@ def make_plots(self, n_dfe_taps):
     container_dfe.add(plot_clk_per_hist)
     container_dfe.add(plot_clk_per_spec)
     self.plots_dfe = container_dfe
+    self._dfe_plot = plot9
 
     # - EQ Tune tab
     plot_h_tune = Plot(plotdata, padding_left=75)
