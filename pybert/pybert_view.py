@@ -288,7 +288,10 @@ traits_view = View(
                             Item(name='ctle_offset_tune', tooltip="CTLE d.c. offset (dB)",
                                     show_label=False, enabled_when='ctle_mode_tune == "Manual"'),
                         ),
-                        Item(name='use_dfe_tune', label='Use DFE.', tooltip="Include ideal DFE in optimization."),
+                        HGroup(
+                            Item(name='use_dfe_tune', label='Use DFE.', tooltip="Include ideal DFE in optimization."),
+                            Item(name='n_taps_tune',  label='Taps',     tooltip="Number of DFE taps."),
+                        ),
                     ),
                     Item(label="Note: Only peaking magnitude\nwill be optimized; please, set\npeak frequency, bandwidth, and\nmode appropriately."),
                     label='Rx Equalization', show_border=True,

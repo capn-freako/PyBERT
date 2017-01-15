@@ -363,6 +363,7 @@ class PyBERT(HasTraits):
     ctle_offset_tune = Float(gCTLEOffset)                                   # CTLE d.c. offset (dB)
     ctle_mode_tune  = Enum('Off', 'Passive', 'AGC', 'Manual')
     use_dfe_tune    = Bool(gUseDfe)
+    n_taps_tune     = Int(gNtaps)
     max_iter        = Int(50)                                               # max. # of optimization iterations
     tx_opt_thread   = Instance(TxOptThread)
     rx_opt_thread   = Instance(RxOptThread)
@@ -464,7 +465,7 @@ class PyBERT(HasTraits):
     sweep_info      = Property(HTML,    depends_on=['sweep_results'])
     tx_h_tune       = Property(Array,   depends_on=['tx_tap_tuners.value', 'nspui'])
     ctle_h_tune     = Property(Array,   depends_on=['peak_freq_tune', 'peak_mag_tune', 'rx_bw_tune',
-                                                    'w', 'len_h', 'ctle_mode_tune', 'ctle_offset_tune', 'use_dfe_tune'])
+                                                    'w', 'len_h', 'ctle_mode_tune', 'ctle_offset_tune', 'use_dfe_tune', 'n_taps_tune'])
     ctle_out_h_tune = Property(Array,   depends_on=['tx_h_tune', 'ctle_h_tune', 'chnl_h'])
     cost            = Property(Float,   depends_on=['ctle_out_h_tune', 'nspui'])
     rel_opt         = Property(Float,   depends_on=['cost'])
@@ -530,6 +531,7 @@ class PyBERT(HasTraits):
         self.ctle_mode_tune = self.ctle_mode
         self.ctle_offset_tune = self.ctle_offset
         self.use_dfe_tune = self.use_dfe
+        self.n_taps_tune = self.n_taps
 
     def _btn_save_eq_fired(self):
         for i in range(4):
@@ -541,6 +543,7 @@ class PyBERT(HasTraits):
         self.ctle_mode = self.ctle_mode_tune 
         self.ctle_offset = self.ctle_offset_tune 
         self.use_dfe = self.use_dfe_tune
+        self.n_taps = self.n_taps_tune
 
     def _btn_opt_tx_fired(self):
         if self.tx_opt_thread and self.tx_opt_thread.isAlive() \
@@ -1136,7 +1139,7 @@ class PyBERT(HasTraits):
                 isi += abs(p[ix])
             ix += nspui
         if(self.use_dfe_tune):
-            for i in range(gNtaps):
+            for i in range(self.n_taps_tune):
                 if(clock_pos + nspui * (1 + i) < len(p)):
                     p[clock_pos + nspui * (0.5 + i) :] -= p[clock_pos + nspui * (1 + i)] 
 
