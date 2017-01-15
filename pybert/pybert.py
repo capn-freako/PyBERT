@@ -77,12 +77,6 @@ from pybert_plot     import make_plots
 from pybert_help     import help_str
 
 debug = True
-def handle_error(err):
-    if(debug):
-        error(err.message + "\nPlease, check terminal for more information.", 'PyBERT Alert')
-        raise
-    else:
-        error(err.message, 'PyBERT Alert')
 
 gDebugStatus   = False
 gDebugOptimize = False
@@ -494,6 +488,14 @@ class PyBERT(HasTraits):
     # Logger
     def log(self, msg):
         self.console_log += "\n[{}]: {}\n".format(datetime.now(), msg.strip())
+
+    def handle_error(self, err):
+        self.log(err.message)
+        if(debug):
+            error(err.message + "\nPlease, check terminal for more information.", 'PyBERT Alert')
+            raise
+        else:
+            error(err.message, 'PyBERT Alert')
 
     # Default initialization
     def __init__(self, run_simulation = True):
@@ -1187,7 +1189,7 @@ class PyBERT(HasTraits):
             self.tx_ami_valid = True
         except Exception as err:
             err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
-            handle_error(err)
+            self.handle_error(err)
 
     def _tx_dll_file_changed(self, new_value):
         try:
@@ -1196,8 +1198,8 @@ class PyBERT(HasTraits):
             self._tx_model = model
             self.tx_dll_valid = True
         except Exception as err:
-            err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
-            handle_error(err)
+            err.message = 'Failed to open DLL/SO file!\n{}'.format(err.message)
+            self.handle_error(err)
 
     def _rx_ami_file_changed(self, new_value):
         try:
@@ -1210,7 +1212,7 @@ class PyBERT(HasTraits):
             self.rx_ami_valid = True
         except Exception as err:
             err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
-            handle_error(err)
+            self.handle_error(err)
 
     def _rx_dll_file_changed(self, new_value):
         try:
@@ -1219,8 +1221,8 @@ class PyBERT(HasTraits):
             self._rx_model = model
             self.rx_dll_valid = True
         except Exception as err:
-            err.message = 'Failed to open and/or parse AMI file!\n{}'.format(err.message)
-            handle_error(err)
+            err.message = 'Failed to open DLL/SO file!\n{}'.format(err.message)
+            self.handle_error(err)
 
 
     # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
