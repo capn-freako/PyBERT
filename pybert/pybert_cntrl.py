@@ -1,7 +1,8 @@
 """
 Default controller definition for PyBERT class.
 
-Original author: David Banas <capn.freako@gmail.com>
+Original author: David Banas <capn.freako@gmail.com>  
+
 Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major code cleanup.)
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
@@ -32,6 +33,9 @@ gFc     = 1.e6     # Corner frequency of high-pass filter used to model capaciti
 def my_run_sweeps(self):
     """
     Runs the simulation sweeps.
+
+    Args:
+        self(PyBERT): Reference to an instance of the *PyBERT* class.
 
     """
 
@@ -78,19 +82,15 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     """
     Runs the simulation.
 
-    Inputs:
-
-      - initial_run     If True, don't update the eye diagrams, since
-                        they haven't been created, yet.
-                        (Optional; default = False.)
-
-      - update_plots    If True, update the plots, after simulation completes.
-                        This option can be used by larger scripts, which
-                        import *pybert*, in order to avoid graphical
-                        back-end conflicts and speed up this function's
-                        execution time.
-                        (Optional; default = True.)
-
+    Args:
+        self(PyBERT): Reference to an instance of the *PyBERT* class.
+        initial_run(Bool): If True, don't update the eye diagrams, since
+            they haven't been created, yet. (Optional; default = False.)
+        update_plots(Bool): If True, update the plots, after simulation
+            completes. This option can be used by larger scripts, which
+            import *pybert*, in order to avoid graphical back-end
+            conflicts and speed up this function's execution time.
+            (Optional; default = True.)
     """
 
     num_sweeps = self.num_sweeps
@@ -562,7 +562,13 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
 # Plot updating
 def update_results(self):
-    """Updates all plot data used by GUI."""
+    """
+    Updates all plot data used by GUI.
+
+    Args:
+        self(PyBERT): Reference to an instance of the *PyBERT* class.
+
+    """
 
     # Copy globals into local namespace.
     ui            = self.ui
@@ -756,7 +762,13 @@ def update_results(self):
     self.plotdata.set_data("eye_dfe",   eye_dfe)
 
 def update_eyes(self):
-    """ Update the heat plots representing the eye diagrams."""
+    """
+    Update the heat plots representing the eye diagrams.
+
+    Args:
+        self(PyBERT): Reference to an instance of the *PyBERT* class.
+
+    """
 
     ui            = self.ui
     samps_per_ui  = self.nspui

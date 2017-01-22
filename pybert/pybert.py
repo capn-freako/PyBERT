@@ -12,31 +12,6 @@ Testing by: Mark Marlett <mark.marlett@gmail.com>
 This Python script provides a GUI interface to a BERT simulator, which
 can be used to explore the concepts of serial communication link design.
 
-The application source is divided among several files, as follows:
-
-    pybert.py       - This file. The M in MVC, it contains:
-                      - independent variable declarations
-                      - default initialization
-                      - the definitions of those dependent variables, which are handled
-                        automatically by the Traits/UI machinery.
-                
-    pybert_view.py  - The V in MVC, it contains the main window layout definition, as
-                      well as the definitions of user invoked actions
-                      (i.e.- buttons).
-
-    pybert_cntrl.py - The C in MVC, it contains the definitions for those dependent
-                      variables, which are updated not automatically by
-                      the Traits/UI machinery, but rather by explicit
-                      user action (i.e. - button clicks).
-
-    pybert_plot.py  - Contains all plot definitions.
-
-    pybert_util.py  - Contains general purpose utility functionality.
-
-    dfe.py          - Contains the decision feedback equalizer model.
-
-    cdr.py          - Contains the clock data recovery unit model.
-
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
@@ -438,9 +413,9 @@ class PyBERT(HasTraits):
     bit_errs        = Int(0)
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
     # - About
-    ident  = String('PyBERT v2.0.5 - a serial communication link design tool, written in Python\n\n \
+    ident  = String('PyBERT v2.1.0 - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    January 17, 2017\n\n \
+    January 22, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
     # - Help
@@ -505,6 +480,13 @@ class PyBERT(HasTraits):
         In order to populate the data structure we need to
         construct the plots, we must run the simulation.
 
+        Args:
+            run_simulation(Bool): If true, run the simulation, as part
+                of class initialization. This is provided as an argument
+                for the sake of larger applications, which may be
+                importing PyBERT for its attributes and methods, and may
+                not want to run the full simulation. (Optional;
+                default = True)
         """
 
         # Super-class initialization is ABSOLUTELY NECESSARY, in order
@@ -1225,20 +1207,26 @@ class PyBERT(HasTraits):
             self.handle_error(err)
 
 
-    # These getters have been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
-    # in order to more tightly control their times of execution. I wasn't able to get truly lazy evaluation, and
+    # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
+    # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
     def calc_chnl_h(self):
         """
         Calculates the channel impulse response.
 
         Also sets, in 'self':
-         - chnl_dly     group delay of channel
-         - start_ix     first element of trimmed response
-         - t_ns_chnl    the x-values, in ns, for plotting 'chnl_h'
-         - chnl_H       channel frequency response
-         - chnl_s       channel step response
-         - chnl_p       channel pulse response
+         - chnl_dly:
+             group delay of channel
+         - start_ix:
+             first element of trimmed response
+         - t_ns_chnl:
+             the x-values, in ns, for plotting 'chnl_h'
+         - chnl_H:
+             channel frequency response
+         - chnl_s:
+             channel step response
+         - chnl_p:
+             channel pulse response
 
         """
 

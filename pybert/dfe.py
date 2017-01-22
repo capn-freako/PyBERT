@@ -7,7 +7,7 @@ Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a decision feedback
 equalizer (DFE). The class defined, here, is intended for integration
-into the larger 'PyBERT' framework.
+into the larger *PyBERT* framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
@@ -23,14 +23,11 @@ class LfilterSS(object):
 
     def __init__(self, b, a):
         """
-        Inputs:
-            
-            Required:
-
-            - b : coefficients of the numerator of the rational transfer function.
-            
-            - a : coefficients of the denominator of the rational transfer function.
+        Args:
+            b([float]): Coefficients of the numerator of the rational transfer function.
+            a([float]): Coefficients of the denominator of the rational transfer function.
         """
+
         if(a[0] != 1.):
             b = array(b) / a[0]
             a = array(a) / a[0]
@@ -41,7 +38,15 @@ class LfilterSS(object):
         self.ys = [0.] * (len(a)- 1)
 
     def step(self, x):
-        """Step the filter, using the supplied next input value, and return the next output value."""
+        """
+        Step the filter.
+        
+        Args:
+            x(float): Next input value.
+            
+        Returns:
+            (float): Next output value.
+        """
 
         b  = self.b
         a  = self.a
@@ -104,6 +109,9 @@ class DFE(object):
                              lock flagging.
 
           - ideal            Boolean flag. When true, use an ideal summing node.
+
+        Raises:
+            Exception: If the requested modulation type is unknown.
         """
 
         # Design summing node filter.
@@ -138,7 +146,17 @@ class DFE(object):
         self.thresholds = thresholds
 
     def step(self, decision, error, update):
-        """Step the DFE, according to the new decision and error inputs."""
+        """
+        Step the DFE, according to the new decision and error inputs.
+
+        Args:
+            decision(float): Current slicer output.
+            error(float): Difference between summing node and slicer outputs.
+            update(bool): If true, update tap weights.
+
+        Returns:
+            res(float): New backward filter output value.
+        """
 
         # Copy class object variables into local function namespace, for efficiency.
         tap_weights = self.tap_weights
@@ -171,20 +189,27 @@ class DFE(object):
         """
         Make the bit decisions, according to modulation type.
 
-        Inputs:
-          - x: The signal value, at the decision time.
+        Args:
+            x(float): The signal value, at the decision time.
 
-        Outputs:
-          - decision: One of:
+        Returns:
+            tuple(float, [int]): The members of the returned tuple are:
 
-                        {-1, 1}              (NRZ)
-                        {-1, 0, +1}          (Duo-binary)
-                        {-1, -1/3, +1/3, +1} (PAM-4)
+                decision:
+                    One of:
 
-                      , according to what the ideal signal level should
-                      have been. ('decision_scaler' normalized)
+                        - {-1, 1}              (NRZ)
+                        - {-1, 0, +1}          (Duo-binary)
+                        - {-1, -1/3, +1/3, +1} (PAM-4)
 
-          - bits:     The list of bits recovered.
+                        according to what the ideal signal level should have been.
+                        ('decision_scaler' normalized)
+
+                bits: The list of bits recovered.
+
+        Raises:
+            Exception: If the requested modulation type is unknown.
+
         """
 
         mod_type   = self.mod_type
@@ -222,7 +247,41 @@ class DFE(object):
         return decision, bits
 
     def run(self, sample_times, signal):
-        """Run the DFE on the input signal."""
+        """
+        Run the DFE on the input signal.
+
+        Args:
+            sample_times([float]): Vector of time values at wich
+                corresponding signal values were sampled.
+            signal([float]): Vector of sampled signal values.
+
+        Returns:
+            tuple(([float], [[float]], [float], [int], [bool], [float], [int])):
+                The members of the returned tuple, in order, are:
+
+                    res([float]):
+                        Samples of the summing node output, taken at the
+                        times given in *sample_times*.
+                    tap_weights([[float]]):
+                        List of list of tap weights showing how the DFE
+                        adapted over time.
+                    ui_ests([float]):
+                        List of unit interval estimates, showing how the
+                        CDR adapted.
+                    clocks([int]):
+                        List of mostly zeros with ones at the recovered
+                        clocking instants. Useful for overlaying the
+                        clock times on signal waveforms, in plots.
+                    lockeds([bool]):
+                        List of Booleans indicating state of CDR lock.
+                    clock_times([float]):
+                        List of clocking instants, as recovered by the CDR.
+                    bits([int]):
+                        List of recovered bits.
+
+        Raises:
+            Exception: If the requested modulation type is unknown.
+        """
 
         ui                = self.ui
         decision_scaler   = self.decision_scaler

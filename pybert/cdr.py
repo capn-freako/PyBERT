@@ -7,7 +7,7 @@ Original Date:   17 June 2014
 
 This Python script provides a behavioral model of a "bang-bang" clock
 data recovery (CDR) unit. The class defined, here, is intended for
-integration into the larger 'PyBERT' framework.
+integration into the larger *PyBERT* framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
@@ -22,28 +22,21 @@ class CDR(object):
 
     def __init__(self, delta_t, alpha, ui, n_lock_ave=500, rel_lock_tol=0.01, lock_sustain=500):
         """
-        Inputs:
+        Args:
+            delta_t (float): The proportional branch correction, in seconds.
+            alpha (float): The integral branch correction, normalized to
+                proportional branch correction.
+            ui (float): The nominal unit interval, in seconds.
+            n_lock_ave (Optional, int): Number of unit intervals to use for
+                determining lock. Defaults to 500.
+            rel_lock_tol(Optional, float): Lock tolerance, relative to
+                *delta_t*. Defaults to 0.01.
+            lock_sustain(Optional, int): Length of lock sustain vector
+                used to provide histerysis. Defaults to 500.
 
-          Required:
-
-          - delta_t  the proportional branch correction (s)
-
-          - alpha    the integral branch correction (norm.)
-                     (Normalized to proportional branch correction.)
-
-          - ui       the nominal unit interval (s)
-
-          Optional:
-
-          - n_lock_ave    Number of unit intervals to use for determining
-                          lock.
-
-          - rel_lock_tol  Lock tolerance, relative to 'delta_t'.
-
-          - lock_sustain  Length of lock sustain vector used to provide histerysis.
-
-        Note that the code does not care what units are actually used
-        for 'delta_t' and 'ui'; only that they are the same.
+        Notes:
+            The code does not care what units are actually used for
+            'delta_t' and 'ui'; only that they are the same.
         """
 
         self.delta_t             = delta_t
@@ -74,23 +67,25 @@ class CDR(object):
         """
         Adapt period/phase, according to 3 samples.
 
+        Should be called, when the clock has just struck.
+
         Synopsis:
           (ui, locked) = adapt(samples)
 
-        Should be called, when the clock has just struck.
+        Args:
+            samples ([float]): A list of 3 samples of the input waveform, as follows:
 
-        Inputs:
+                - at the last clock time
+                - at the last unit interval boundary time
+                - at the current clock time
 
-          - samples  a list of 3 samples of the input waveform:
-            - at the last clock time
-            - at the last unit interval boundary time
-            - at the current clock time
+        Returns:
+            tuple (float, bool):
 
-        Outputs:
-
-          - ui       the new unit interval estimate
-
-          - locked   Boolean flag indicating 'locked' status
+                ui:
+                    The new unit interval estimate, in seconds.
+                locked:
+                    Boolean flag indicating 'locked' status.
 
         """
 

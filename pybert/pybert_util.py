@@ -2,6 +2,7 @@
 General purpose utilities for PyBERT.
 
 Original author: David Banas <capn.freako@gmail.com>
+
 Original date:   September 27, 2014 (Copied from `pybert_cntrl.py'.)
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
@@ -26,7 +27,17 @@ gDebugOptimize = False
 gMaxCTLEPeak   = 20          # max. allowed CTLE peaking (dB) (when optimizing, only)
 
 def moving_average(a, n=3) :
-    """Calculates a sliding average over the input vector."""
+    """
+    Calculates a sliding average over the input vector.
+    
+    Args:
+        a([float]): Input vector to be averaged.
+        n(int): Width of averaging window, in vector samples. (Optional;
+            default = 3.)
+
+    Returns: the moving average of the input vector, leaving the input
+        vector unchanged.
+    """
 
     ret     = cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
@@ -36,35 +47,26 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
     """
     Finds the threshold crossing times of the input signal.
 
-    Inputs:
+    Args:
+        t([float]): Vector of sample times. Intervals do NOT need to be
+            uniform.
+        x([float]): Sampled input vector.
+        min_delay(float): Minimum delay required, before allowing
+            crossings. (Helps avoid false crossings at beginning of
+            signal.) (Optional; default = 0.)
+        rising_first(bool): When True, start with the first rising edge
+            found. (Optional; default = True.) When this option is True,
+            the first rising edge crossing is the first crossing returned.
+            This is the desired behavior for PyBERT, because we always
+            initialize the bit stream with [0, 0, 1, 1], in order to
+            provide a known synchronization point for jitter analysis.
+        min_init_dev(float): The minimum initial deviation from zero,
+            which must be detected, before searching for crossings.
+            Normalized to maximum input signal magnitude.
+            (Optional; default = 0.1.)
+        thresh(float): Vertical crossing threshold.
 
-      - t          Vector of sample times. Intervals do NOT need to be uniform.
-
-      - x          Sampled input vector.
-
-      - min_delay  Minimum delay required, before allowing crossings.
-                   (Helps avoid false crossings at beginning of signal.)
-                   Optional. Default = 0.
-
-      - rising_first When True, start with the first rising edge found.
-                     Optional. Default = True.
-                     When this option is True, the first rising edge crossing
-                     is the first crossing returned. This is the desired
-                     behavior for PyBERT, because we always initialize the
-                     bit stream with [0, 0, 1, 1], in order to provide a known
-                     synchronization point for jitter analysis.
-
-      - min_init_dev The minimum initial deviation from zero, which must
-                     be detected, before searching for crossings.
-                     Normalized to maximum input signal magnitude.
-                     Optional. Default = 0.1.
-
-      - thresh       Vertical crossing threshold.
-
-    Outputs:
-
-      - xings      The crossing times.
-
+    Returns: an array of signal threshold crossing times.
     """
 
     assert len(t) == len(x), "len(t) (%d) and len(x) (%d) need to be the same." % (len(t), len(x))
@@ -125,44 +127,30 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
     """
     Finds the crossing times in a signal, according to the modulation type.
 
-    Inputs:
+    Args:
+        t([float]): The times associated with each signal sample.
+        x([float]): The signal samples.
+        amplitude(float): The nominal signal amplitude. (Used for
+            determining thresholds, in the case of some modulation
+            types.)
+        min_delay(float): The earliest possible sample time we want
+            returned. (Optional; default = 0.)
+        rising_first(bool): When True, start with the first rising edge
+            found. When this option is True, the first rising edge
+            crossing is the first crossing returned. This is the desired
+            behavior for PyBERT, because we always initialize the bit
+            stream with [0, 1, 1], in order to provide a known
+            synchronization point for jitter analysis.
+            (Optional; default = True.)
+        min_init_dev(float): The minimum initial deviation from zero,
+            which must be detected, before searching for crossings.
+            Normalized to maximum input signal magnitude.
+            (Optional; default = 0.1.)
+        mod_type(int): The modulation type. Allowed values are:
+            {0: NRZ, 1: Duo-binary, 2: PAM-4}
+            (Optional; default = 0.)
 
-      Required:
-
-      - t:                   The times associated with each signal sample.
-
-      - x:                   The signal samples.
-
-      - amplitude:           The nominal signal amplitude.
-                             (Used for determining thresholds, in the case of some modulation types.)
-
-      Optional:
-
-      - min_delay:           The earliest possible sample time we want returned.
-                             Default = 0.
-
-      - rising_first         When True, start with the first rising edge found.
-                             When this option is True, the first rising edge crossing
-                             is the first crossing returned. This is the desired
-                             behavior for PyBERT, because we always initialize the
-                             bit stream with [0, 1, 1], in order to provide a known
-                             synchronization point for jitter analysis.
-                             Default = True.
-
-      - min_init_dev         The minimum initial deviation from zero, which must
-                             be detected, before searching for crossings.
-                             Normalized to maximum input signal magnitude.
-                             Default = 0.1.
-
-      - mod_type:            The modulation type. Allowed values are: (Default = 0.)
-                               - 0: NRZ
-                               - 1: Duo-binary
-                               - 2: PAM-4
-
-    Outputs:
-
-      - xings:               The crossing times.
-
+    Returns: The signal threshold crossing times.
     """
 
     assert mod_type >= 0 and mod_type <= 2, \
@@ -189,24 +177,12 @@ def find_crossings(t, x, amplitude, min_delay = 0., rising_first = True, min_ini
                                         )
                     )
     else:  # PAM-4 (Enabling the +/-0.67 cases yields multiple ideal crossings at the same edge.)
-#        xings.append(find_crossing_times(t, x, min_delay=min_delay,
-#                                               rising_first=rising_first,
-#                                               min_init_dev=min_init_dev,
-#                                               thresh=(-0.67 * amplitude),
-#                                        )
-#                    )
         xings.append(find_crossing_times(t, x, min_delay=min_delay,
                                                rising_first=rising_first,
                                                min_init_dev=min_init_dev,
                                                thresh=(0.0 * amplitude),
                                         )
                     )
-#        xings.append(find_crossing_times(t, x, min_delay=min_delay,
-#                                               rising_first=rising_first,
-#                                               min_init_dev=min_init_dev,
-#                                               thresh=(0.67 * amplitude),
-#                                        )
-#                    )
 
     return sort(concatenate(xings))
 
@@ -554,26 +530,23 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
     """
     Calculates the "eye" diagram of the input signal vector.
 
-    Inputs:
-      - ui             unit interval (s)
-      - samps_per_ui   # of samples per unit interval
-      - height         height of output image data array
-      - ys             signal vector of interest
-      - y_max          max. +/- vertical extremity of plot
-      - clock_times    (optional)
-                       vector of clock times to use for eye centers.
-                       If not provided, just use mean zero-crossing and
-                       assume constant UI and no phase jumps.
-                       (This allows the same function to be used for
-                       eye diagram creation,
-                       for both pre and post-CDR signals.)
+    Args:
+        ui(float): unit interval (s)
+        samps_per_ui(int): # of samples per unit interval
+        height(int): height of output image data array
+        ys([float]): signal vector of interest
+        y_max(float): max. +/- vertical extremity of plot
 
-    Outputs:
-      - img_array      The "heat map" representing the eye diagram.
-                       Each grid location contains a value indicating
-                       the number of times the signal passed through
-                       that location.
+    Keyword Args:
+        clock_times([float]): (optional) vector of clock times to use
+            for eye centers. If not provided, just use mean
+            zero-crossing and assume constant UI and no phase jumps.
+            (This allows the same function to be used for eye diagram
+            creation, for both pre and post-CDR signals.)
 
+    Returns: The "heat map" representing the eye diagram. Each grid
+        location contains a value indicating the number of times the
+        signal passed through that location.
     """
 
     # List/array necessities.
@@ -746,15 +719,15 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     return (g[start_ix : i], start_ix)
 
 def import_qucs_csv(filename, sample_per):
-    """ Read in a CSV waveform file exported by QUCS,
-        resampling as appropriate, via linear interpolation.
+    """
+    Read in a CSV waveform file exported by QUCS, resampling as
+    appropriate, via linear interpolation.
 
-        Inputs:
-        - filename:   Name of waveform file to read in.
-        - sample_per: New sample interval
+    Args:
+        filename(str): Name of waveform file to read in.
+        sample_per(float): New sample interval
 
-        Outputs:
-        - res:        Resampled waveform.
+    Returns: Resampled waveform.
     """
 
     # Read in original data from file.

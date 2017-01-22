@@ -2,6 +2,7 @@
 User instructions for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
+
 Original date:   April 15, 2015 (Copied from `pybert.py'.)
 
 Copyright (c) 2015 David Banas; all rights reserved World wide.
