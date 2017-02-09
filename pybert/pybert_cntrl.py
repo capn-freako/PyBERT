@@ -215,6 +215,9 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             # Position the input edge at the center of the vector, in
             # order to minimize high frequency artifactual energy
             # introduced by frequency domain processing in some models.
+            #
+            # TODO: Change this, so as to push the actual stimulus
+            #       waveform through GetWave(). Thanks, Todd Westerhoff!
             half_len = len(chnl_h) // 2
             tx_s = tx_model.getWave([0.] * half_len + [1.] * half_len)
             # Shift the result back to the correct location, extending the last sample.
