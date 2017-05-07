@@ -244,6 +244,11 @@ traits_view = View(
                     label='Analysis Parameters', show_border=True,
                 ),
             ),
+            HGroup(
+                Item('btn_save_cfg',  show_label=False, tooltip="Store the current simulation configuration data to a file.",),
+                Item('btn_load_cfg',  show_label=False, tooltip="Load the simulation configuration data from a file.",),
+                Item('cfg_file',      show_label=False, style='readonly'),
+            ),
             spring,
             label = 'Config.', id = 'config',
         ),

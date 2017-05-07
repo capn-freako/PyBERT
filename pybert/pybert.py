@@ -17,8 +17,12 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 
 # from traits.trait_base import ETSConfig
 # ETSConfig.toolkit = 'qt4'
+# ETSConfig.toolkit = 'wx'
+
+import pickle
 
 from datetime        import datetime
+from pyface.api      import FileDialog, OK
 from threading       import Thread
 
 from numpy           import array, linspace, zeros, histogram, mean, diff, \
@@ -50,6 +54,7 @@ from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, \
                             make_ctle, lfsr_bits, safe_log10
 from pybert_plot     import make_plots
 from pybert_help     import help_str
+from pybert_cfg      import PyBertCfg
 
 debug = True
 
@@ -297,6 +302,7 @@ class PyBERT(HasTraits):
     """
 
     # Independent variables
+
     # - Simulation Control
     bit_rate        = Range(low=0.1, high=100.0, value=gBitRate)            # (Gbps)
     nbits           = Range(low=1000, high=10000000, value=gNbits)
@@ -308,6 +314,7 @@ class PyBERT(HasTraits):
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
     do_sweep        = Bool(False)
+
     # - Channel Control
     use_ch_file     = Bool(False)
     ch_file         = File('', entries=5, filter=['*.csv'])
@@ -319,6 +326,7 @@ class PyBERT(HasTraits):
     Z0              = Float(gZ0)
     v0              = Float(gv0)
     l_ch            = Float(gl_ch)
+
     # - EQ Tune
     tx_tap_tuners = List(  [TxTapTuner(name='Pre-tap',   enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
                             TxTapTuner(name='Post-tap1', enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
@@ -337,6 +345,7 @@ class PyBERT(HasTraits):
     tx_opt_thread   = Instance(TxOptThread)
     rx_opt_thread   = Instance(RxOptThread)
     coopt_thread    = Instance(CoOptThread)
+
     # - Tx
     vod             = Float(gVod)                                           # (V)
     rs              = Float(gRs)                                            # (Ohms)
@@ -357,6 +366,7 @@ class PyBERT(HasTraits):
     tx_ami_valid    = Bool(False)
     tx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])
     tx_dll_valid    = Bool(False)
+
     # - Rx
     rin             = Float(gRin)                                           # (Ohmin)
     cin             = Range(low=0.001, value=gCin)                          # (pF)
@@ -375,6 +385,7 @@ class PyBERT(HasTraits):
     rx_ami_valid    = Bool(False)
     rx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])
     rx_dll_valid    = Bool(False)
+
     # - DFE
     use_dfe         = Bool(gUseDfe)
     sum_ideal       = Bool(gDfeIdeal)
@@ -384,15 +395,21 @@ class PyBERT(HasTraits):
     n_taps          = Int(gNtaps)
     _old_n_taps     = n_taps
     sum_bw          = Float(gDfeBW)                                         # (GHz)
+
     # - CDR
     delta_t         = Float(gDeltaT)                                        # (ps)
     alpha           = Float(gAlpha)
     n_lock_ave      = Int(gNLockAve)
     rel_lock_tol    = Float(gRelLockTol)
     lock_sustain    = Int(gLockSustain)
+
     # - Analysis
     thresh          = Int(gThresh)
-    # - Plots (plot containers, actually)
+
+    # Misc.
+    cfg_file = File('', entries=5, filter=['*.pybert_cfg'])
+
+    # Plots (plot containers, actually)
     plotdata          = ArrayPlotData()
     plots_h           = Instance(GridPlotContainer)
     plots_s           = Instance(GridPlotContainer)
@@ -403,7 +420,8 @@ class PyBERT(HasTraits):
     plots_jitter_dist = Instance(GridPlotContainer)
     plots_jitter_spec = Instance(GridPlotContainer)
     plots_bathtub     = Instance(GridPlotContainer)
-    # - Status
+
+    # Status
     status          = String("Ready.")
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
@@ -412,15 +430,18 @@ class PyBERT(HasTraits):
     chnl_dly        = Float(0.)
     bit_errs        = Int(0)
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
-    # - About
+
+    # About
     ident  = String('PyBERT v2.1.0 - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
     January 22, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
-    # - Help
+
+    # Help
     instructions = help_str
-    # - Console
+
+    # Console
     console_log = String("PyBERT Console Log\n\n")
 
     # Dependent variables
@@ -459,6 +480,8 @@ class PyBERT(HasTraits):
     btn_coopt   = Button(label = 'CoOpt')
     btn_cfg_tx  = Button(label = 'Configure')
     btn_cfg_rx  = Button(label = 'Configure')
+    btn_save_cfg = Button(label = 'Save Config.')
+    btn_load_cfg = Button(label = 'Load Config.')
 
     # Logger
     def log(self, msg):
@@ -467,10 +490,10 @@ class PyBERT(HasTraits):
     def handle_error(self, err):
         self.log(err.message)
         if(debug):
-            error(err.message + "\nPlease, check terminal for more information.", 'PyBERT Alert')
+            message(err.message + "\nPlease, check terminal for more information.", 'PyBERT Alert')
             raise
         else:
-            error(err.message, 'PyBERT Alert')
+            message(err.message, 'PyBERT Alert')
 
     # Default initialization
     def __init__(self, run_simulation = True):
@@ -559,6 +582,40 @@ class PyBERT(HasTraits):
 
     def _btn_cfg_rx_fired(self):
         self._rx_cfg()
+
+    def _btn_save_cfg_fired(self):
+        dlg = FileDialog(action='save as', wildcard='*.pybert_cfg', default_path=self.cfg_file)
+        if dlg.open() == OK:
+            the_PyBertCfg = PyBertCfg(self)
+            try:
+                with open(dlg.path, 'wt') as the_file:
+                    pickle.dump(the_PyBertCfg, the_file)
+                self.cfg_file = dlg.path
+            except Exception as err:
+                err.message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(err.message)
+                self.handle_error(err)
+
+    def _btn_load_cfg_fired(self):
+        dlg = FileDialog(action='open', wildcard='*.pybert_cfg', default_path=self.cfg_file)
+        if dlg.open() == OK:
+            try:
+                with open(dlg.path, 'rt') as the_file:
+                    the_PyBertCfg = pickle.load(the_file)
+                if(type(the_PyBertCfg) is not PyBertCfg):
+                    raise Exception("The data structure read in is NOT of type: PyBertCfg!")
+                for prop, value in vars(the_PyBertCfg).iteritems():
+                    if(prop == 'tx_taps'):
+                        i = 0
+                        for (enabled, val) in value:
+                            setattr(self.tx_taps[i], 'enabled', enabled)
+                            setattr(self.tx_taps[i], 'value',   val)
+                            i += 1
+                    else:
+                        setattr(self, prop, value)
+            except Exception as err:
+                err.message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err.message)
+                self.handle_error(err)
+
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
@@ -1287,6 +1344,8 @@ class PyBERT(HasTraits):
 
         return chnl_h
 
+
+# So that we can be used in stand-alone, or imported, fashion.
 if __name__ == '__main__':
     PyBERT().configure_traits(view = traits_view)
 
