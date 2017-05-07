@@ -22,8 +22,8 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 import pickle
 
 from datetime        import datetime
-from pyface.api      import FileDialog, OK
 from threading       import Thread
+from time            import sleep
 
 from numpy           import array, linspace, zeros, histogram, mean, diff, \
                             transpose, shape, exp, real, pad, pi, resize, cos, \
@@ -33,6 +33,7 @@ from numpy.random    import randint
 from scipy.signal    import lfilter, iirfilter
 from scipy.optimize  import minimize, minimize_scalar
 
+from pyface.api      import FileDialog, OK
 from traits.api      import HasTraits, Array, Range, Float, Int, Property, \
                             String, cached_property, Instance, HTML, List, \
                             Bool, File, Button, Enum
@@ -196,7 +197,6 @@ class RxOptThread(Thread):
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
         cost = pybert.cost
-        # pybert.rel_opt = -cost
         return cost
 
 
@@ -209,57 +209,33 @@ class CoOptThread(Thread):
         pybert.status = "Co-optimizing..."
         max_iter  = pybert.max_iter
 
-        vals = []
-        min_vals = []
-        max_vals = []
-        for tuner in pybert.tx_tap_tuners:
-            if tuner.enabled:
-                vals.append(tuner.value)
-                min_vals.append(tuner.min_val)
-                max_vals.append(tuner.max_val)
-
-        vals.append(pybert.peak_mag_tune)
-        min_vals.append(0.0)
-        max_vals.append(gMaxCTLEPeak)
-
-        cons = ({   'type': 'ineq',
-                    'fun' : lambda x: 0.7 - sum(abs(x[:-1]))
-                })
-
-        bounds = zip(min_vals, max_vals)
-
         if(gDebugOptimize):
-            res = minimize( self.do_coopt, vals, constraints=cons,
-                            bounds=bounds, options={'disp'    : True,
-                                                    'maxiter' : max_iter
-                                                   }
-                          )
+            res  = minimize_scalar(self.do_coopt, bounds=(0, gMaxCTLEPeak),
+                                   method='Bounded', options={'disp'    : True,
+                                                              'maxiter' : max_iter}
+                                  )
         else:
-            res = minimize( self.do_coopt, vals, constraints=cons,
-                            bounds=bounds, options={'disp'    : False,
-                                                    'maxiter' : max_iter
-                                                   }
-                          )
+            res  = minimize_scalar(self.do_coopt, bounds=(0, gMaxCTLEPeak),
+                                   method='Bounded', options={'disp'    : False,
+                                                              'maxiter' : max_iter}
+                                  )
 
         if(res['success']):
             pybert.status = "Optimization succeeded."
         else:
             pybert.status = "Optimization failed: {}".format(res['message'])
 
-    def do_coopt(self, vals):
+    def do_coopt(self, peak_mag):
         pybert = self.pybert
-
-        vals = list(vals)
-        tuners = pybert.tx_tap_tuners
-        for tuner in tuners:
-            if(tuner.enabled):
-                tuner.value = vals.pop(0)
-
-        pybert.peak_mag_tune = vals.pop(0)
-
-        # Go to sleep here, to give 'cost' a chance to completely update?
-        # pybert.rel_opt = -pybert.cost
-
+        pybert.status = "Co-optimizing..."
+        pybert.peak_mag_tune = peak_mag
+        if(any([pybert.tx_tap_tuners[i].enabled for i in range(len(pybert.tx_tap_tuners))])):
+            while(pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive()):
+                sleep(0.001)
+            pybert._btn_opt_tx_fired()
+            while(pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive()):
+                sleep(0.001)
+        pybert.status = "Co-optimizing..."
         return pybert.cost
 
 
