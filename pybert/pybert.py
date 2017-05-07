@@ -121,7 +121,9 @@ class TxOptThread(Thread):
     def run(self):
         pybert = self.pybert
 
-        pybert.status = "Optimizing Tx..."
+        if(self.update_status):
+            pybert.status = "Optimizing Tx..."
+
         max_iter  = pybert.max_iter
 
         old_taps  = []
@@ -152,10 +154,11 @@ class TxOptThread(Thread):
                                                       }
                           )
 
-        if(res['success']):
-            pybert.status = "Optimization succeeded."
-        else:
-            pybert.status = "Optimization failed: {}".format(res['message'])
+        if(self.update_status):
+            if(res['success']):
+                pybert.status = "Optimization succeeded."
+            else:
+                pybert.status = "Optimization failed: {}".format(res['message'])
 
     def do_opt_tx(self, taps):
         pybert = self.pybert
@@ -164,7 +167,6 @@ class TxOptThread(Thread):
         for tuner in tuners:
             if(tuner.enabled):
                 tuner.value = taps.pop(0)
-        # pybert.rel_opt = -pybert.cost
         return pybert.cost
 
 
@@ -196,8 +198,7 @@ class RxOptThread(Thread):
     def do_opt_rx(self, peak_mag):
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
-        cost = pybert.cost
-        return cost
+        return pybert.cost
 
 
 class CoOptThread(Thread):
@@ -227,15 +228,13 @@ class CoOptThread(Thread):
 
     def do_coopt(self, peak_mag):
         pybert = self.pybert
-        pybert.status = "Co-optimizing..."
         pybert.peak_mag_tune = peak_mag
         if(any([pybert.tx_tap_tuners[i].enabled for i in range(len(pybert.tx_tap_tuners))])):
             while(pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive()):
                 sleep(0.001)
-            pybert._btn_opt_tx_fired()
+            pybert._do_opt_tx(update_status=False)
             while(pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive()):
                 sleep(0.001)
-        pybert.status = "Co-optimizing..."
         return pybert.cost
 
 
@@ -533,9 +532,13 @@ class PyBERT(HasTraits):
                               or not any([self.tx_tap_tuners[i].enabled for i in range(len(self.tx_tap_tuners))]):
             pass
         else:
-            self.tx_opt_thread = TxOptThread()
-            self.tx_opt_thread.pybert = self
-            self.tx_opt_thread.start()
+            self._do_opt_tx()
+
+    def _do_opt_tx(self, update_status=True):
+        self.tx_opt_thread = TxOptThread()
+        self.tx_opt_thread.pybert = self
+        self.tx_opt_thread.update_status = update_status
+        self.tx_opt_thread.start()
 
     def _btn_opt_rx_fired(self):
         if self.rx_opt_thread and self.rx_opt_thread.isAlive() or self.ctle_mode_tune == "Off":
