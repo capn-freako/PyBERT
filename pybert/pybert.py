@@ -15,8 +15,9 @@ can be used to explore the concepts of serial communication link design.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-# from traits.trait_base import ETSConfig
-# ETSConfig.toolkit = 'qt4'
+from traits.trait_base import ETSConfig
+ETSConfig.toolkit = 'qt4'
+# ETSConfig.toolkit = 'wx'
 
 from datetime        import datetime
 from threading       import Thread

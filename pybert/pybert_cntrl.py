@@ -218,12 +218,17 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             #
             # TODO: Change this, so as to push the actual stimulus
             #       waveform through GetWave(). Thanks, Todd Westerhoff!
+            #
+            # D'oh! It looks like I was already doing that.
+            # The step/impulse response calculations were not being
+            # done for output generation purposes; they're needed, so
+            # that I have something to plot in the respective GUI tabs.
             half_len = len(chnl_h) // 2
             tx_s = tx_model.getWave([0.] * half_len + [1.] * half_len)
             # Shift the result back to the correct location, extending the last sample.
             tx_s = pad(tx_s[half_len:], (0, half_len), 'edge')
             tx_h = diff(tx_s)
-            tx_out = tx_model.getWave(x)
+            tx_out = tx_model.getWave(x)  # Check this for correct behavior with duobinary!
         else:
             tx_s = tx_h.cumsum()
             tx_out = convolve(tx_h, self.x)[:len(self.x)]
