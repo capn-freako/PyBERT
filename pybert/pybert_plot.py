@@ -70,10 +70,12 @@ def make_plots(self, n_dfe_taps):
 
     # - Impulse Responses tab
     plot_h_chnl = Plot(plotdata, padding_left=75)
-    plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue")
+    plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue",  name="Incremental")
     plot_h_chnl.title            = "Channel"
     plot_h_chnl.index_axis.title = "Time (ns)"
     plot_h_chnl.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_chnl.legend.visible   = True
+    plot_h_chnl.legend.align     = 'ur'
     zoom_h = ZoomTool(plot_h_chnl, tool_mode="range", axis='index', always_on=False)
     plot_h_chnl.overlays.append(zoom_h)
 
@@ -82,6 +84,8 @@ def make_plots(self, n_dfe_taps):
     plot_h_tx.title            = "Channel + Tx Preemphasis"
     plot_h_tx.index_axis.title = "Time (ns)"
     plot_h_tx.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_tx.legend.visible   = True
+    plot_h_tx.legend.align     = 'ur'
     plot_h_tx.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
     plot_h_ctle = Plot(plotdata, padding_left=75)
@@ -89,6 +93,8 @@ def make_plots(self, n_dfe_taps):
     plot_h_ctle.title            = "Channel + Tx Preemphasis + CTLE"
     plot_h_ctle.index_axis.title = "Time (ns)"
     plot_h_ctle.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_ctle.legend.visible   = True
+    plot_h_ctle.legend.align     = 'ur'
     plot_h_ctle.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
     plot_h_dfe = Plot(plotdata, padding_left=75)
@@ -96,6 +102,8 @@ def make_plots(self, n_dfe_taps):
     plot_h_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_h_dfe.index_axis.title = "Time (ns)"
     plot_h_dfe.y_axis.title     = "Impulse Response (V/ns)"
+    plot_h_dfe.legend.visible   = True
+    plot_h_dfe.legend.align     = 'ur'
     plot_h_dfe.index_range = plot_h_chnl.index_range # Zoom x-axes in tandem.
 
     container_h = GridPlotContainer(shape=(2,2))
@@ -107,10 +115,12 @@ def make_plots(self, n_dfe_taps):
 
     # - Step Responses tab
     plot_s_chnl = Plot(plotdata, padding_left=75)
-    plot_s_chnl.plot(("t_ns_chnl", "chnl_s"), type="line", color="blue")
+    plot_s_chnl.plot(("t_ns_chnl", "chnl_s"), type="line", color="blue",  name="Incremental")
     plot_s_chnl.title            = "Channel"
     plot_s_chnl.index_axis.title = "Time (ns)"
     plot_s_chnl.y_axis.title     = "Step Response (V)"
+    plot_s_chnl.legend.visible   = True
+    plot_s_chnl.legend.align     = 'lr'
     zoom_s = ZoomTool(plot_s_chnl, tool_mode="range", axis='index', always_on=False)
     plot_s_chnl.overlays.append(zoom_s)
 
@@ -153,10 +163,12 @@ def make_plots(self, n_dfe_taps):
 
     # - Pulse Responses tab
     plot_p_chnl = Plot(plotdata, padding_left=75)
-    plot_p_chnl.plot(("t_ns_chnl", "chnl_p"), type="line", color="blue")
+    plot_p_chnl.plot(("t_ns_chnl", "chnl_p"), type="line", color="blue",  name="Incremental")
     plot_p_chnl.title            = "Channel"
     plot_p_chnl.index_axis.title = "Time (ns)"
     plot_p_chnl.y_axis.title     = "Pulse Response (V)"
+    plot_p_chnl.legend.visible   = True
+    plot_p_chnl.legend.align     = 'ur'
     zoom_p = ZoomTool(plot_p_chnl, tool_mode="range", axis='index', always_on=False)
     plot_p_chnl.overlays.append(zoom_p)
 
@@ -165,7 +177,8 @@ def make_plots(self, n_dfe_taps):
     plot_p_tx.title            = "Channel + Tx Preemphasis"
     plot_p_tx.index_axis.title = "Time (ns)"
     plot_p_tx.y_axis.title     = "Pulse Response (V)"
-    plot_p_tx.legend.align     = 'lr'
+    plot_p_tx.legend.visible   = True
+    plot_p_tx.legend.align     = 'ur'
     plot_p_tx.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
     plot_p_ctle = Plot(plotdata, padding_left=75)
@@ -173,7 +186,8 @@ def make_plots(self, n_dfe_taps):
     plot_p_ctle.title            = "Channel + Tx Preemphasis + CTLE"
     plot_p_ctle.index_axis.title = "Time (ns)"
     plot_p_ctle.y_axis.title     = "Pulse Response (V)"
-    plot_p_ctle.legend.align     = 'lr'
+    plot_p_ctle.legend.visible   = True
+    plot_p_ctle.legend.align     = 'ur'
     plot_p_ctle.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
     plot_p_dfe = Plot(plotdata, padding_left=75)
@@ -181,7 +195,8 @@ def make_plots(self, n_dfe_taps):
     plot_p_dfe.title            = "Channel + Tx Preemphasis + CTLE + DFE"
     plot_p_dfe.index_axis.title = "Time (ns)"
     plot_p_dfe.y_axis.title     = "Pulse Response (V)"
-    plot_p_dfe.legend.align     = 'lr'
+    plot_p_dfe.legend.visible   = True
+    plot_p_dfe.legend.align     = 'ur'
     plot_p_dfe.index_range = plot_p_chnl.index_range # Zoom x-axes in tandem.
 
     container_p = GridPlotContainer(shape=(2,2))
@@ -193,12 +208,14 @@ def make_plots(self, n_dfe_taps):
 
     # - Frequency Responses tab
     plot_H_chnl = Plot(plotdata, padding_left=75)
-    plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue", index_scale='log')
+    plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue",  name="Incremental", index_scale='log')
     plot_H_chnl.title            = "Channel"
     plot_H_chnl.index_axis.title = "Frequency (GHz)"
     plot_H_chnl.y_axis.title     = "Frequency Response (dB)"
     plot_H_chnl.index_range.low_setting  = 0.01
     plot_H_chnl.index_range.high_setting = 40.
+    plot_H_chnl.legend.visible   = True
+    plot_H_chnl.legend.align     = 'll'
 
     plot_H_tx = Plot(plotdata, padding_left=75)
     plot_H_tx.plot(("f_GHz", "tx_H"),     type="line", color="blue", name="Incremental", index_scale='log')

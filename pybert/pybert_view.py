@@ -8,8 +8,11 @@ Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major co
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
+import pickle
+
 from threading import Thread
 
+from pyface.api import FileDialog, OK
 from traits.api import Instance
 from traitsui.api import View, Item, Group, VGroup, HGroup, Action, Handler, \
                          DefaultOverride, CheckListEditor, StatusItem, \
@@ -17,7 +20,10 @@ from traitsui.api import View, Item, Group, VGroup, HGroup, Action, Handler, \
 from traitsui.tabular_adapter import TabularAdapter
 from enable.component_editor import ComponentEditor
 
+from chaco.api import ArrayPlotData
+
 from pybert_cntrl import my_run_sweeps
+from pybert_data  import PyBertData
 
 class RunSimThread(Thread):
     'Used to run the simulation in its own thread, in order to preserve GUI responsiveness.'
@@ -39,7 +45,93 @@ class MyHandler(Handler):
             self.run_sim_thread.the_pybert = the_pybert
             self.run_sim_thread.start()
 
+    def do_save_data(self, info):
+        the_pybert = info.object
+        dlg = FileDialog(action='save as', wildcard='*.pybert_data', default_path=the_pybert.data_file)
+        if dlg.open() == OK:
+            try:
+                plotdata = PyBertData(the_pybert)
+                with open(dlg.path, 'wt') as the_file:
+                    pickle.dump(plotdata, the_file)
+                the_pybert.data_file = dlg.path
+            except Exception as err:
+                err.message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(err.message)
+                the_pybert.handle_error(err)
+
+    def do_load_data(self, info):
+        the_pybert = info.object
+        dlg = FileDialog(action='open', wildcard='*.pybert_data', default_path=the_pybert.data_file)
+        if dlg.open() == OK:
+            try:
+                with open(dlg.path, 'rt') as the_file:
+                    the_plotdata = pickle.load(the_file)
+                if(type(the_plotdata) is not PyBertData):
+                    raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
+                for prop, value in the_plotdata.the_data.arrays.iteritems():
+                    the_pybert.plotdata.set_data(prop + '_ref', value)
+                the_pybert.data_file = dlg.path
+
+                # Add reference plots, if necessary.
+                # - time domain
+                for (container, suffix, has_both) in [
+                        (the_pybert.plots_h.component_grid.flat, 'h', False),
+                        (the_pybert.plots_s.component_grid.flat, 's', True),
+                        (the_pybert.plots_p.component_grid.flat, 'p', False),
+                        ]:
+                    if(not 'Reference' in container[0].plots):
+                        (ix, prefix) = (0, 'chnl')
+                        item_name = prefix + "_" + suffix + "_ref"
+                        container[ix].plot(("t_ns_chnl", item_name),
+                                type="line", color="darkcyan",  name="Inc_ref")
+                        for (ix, prefix) in [
+                                (1, 'tx'),
+                                (2, 'ctle'),
+                                (3, 'dfe'), ]:
+                            item_name = prefix + "_out_" + suffix + "_ref"
+                            container[ix].plot(("t_ns_chnl", item_name),
+                                    type="line", color="darkmagenta",  name="Cum_ref")
+                        if(has_both):
+                            for (ix, prefix) in [
+                                    (1, 'tx'),
+                                    (2, 'ctle'),
+                                    (3, 'dfe'), ]:
+                                item_name = prefix + "_" + suffix + "_ref"
+                                container[ix].plot(("t_ns_chnl", item_name),
+                                        type="line", color="darkcyan",  name="Inc_ref")
+
+                # - frequency domain
+                for (container, suffix, has_both) in [
+                        (the_pybert.plots_H.component_grid.flat, 'H', True)
+                        ]:
+                    if(not 'Reference' in container[0].plots):
+                        (ix, prefix) = (0, 'chnl')
+                        item_name = prefix + "_" + suffix + "_ref"
+                        container[ix].plot(("f_GHz", item_name),
+                                type="line", color="darkcyan",  name="Inc_ref", index_scale='log')
+                        for (ix, prefix) in [
+                                (1, 'tx'),
+                                (2, 'ctle'),
+                                (3, 'dfe'), ]:
+                            item_name = prefix + "_out_" + suffix + "_ref"
+                            container[ix].plot(("f_GHz", item_name),
+                                    type="line", color="darkmagenta",  name="Cum_ref", index_scale='log')
+                        if(has_both):
+                            for (ix, prefix) in [
+                                    (1, 'tx'),
+                                    (2, 'ctle'),
+                                    (3, 'dfe'), ]:
+                                item_name = prefix + "_" + suffix + "_ref"
+                                container[ix].plot(("f_GHz", item_name),
+                                        type="line", color="darkcyan",  name="Inc_ref", index_scale='log')
+
+            except Exception as err:
+                print item_name
+                err.message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(err.message)
+                the_pybert.handle_error(err)
+
 run_simulation = Action(name="Run",     action="do_run_simulation")
+save_data = Action(name="Save Results", action="do_save_data")
+load_data = Action(name="Load Results", action="do_load_data")
     
 # Main window layout definition.
 traits_view = View(
@@ -379,7 +471,7 @@ traits_view = View(
     ),
     resizable = False,
     handler = MyHandler(),
-    buttons = [run_simulation, ],
+    buttons = [run_simulation, save_data, load_data],
     statusbar = "status_str",
     title='PyBERT',
     width=0.95, height=0.95

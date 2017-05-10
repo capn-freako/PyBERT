@@ -383,6 +383,7 @@ class PyBERT(HasTraits):
 
     # Misc.
     cfg_file = File('', entries=5, filter=['*.pybert_cfg'])
+    data_file = File('', entries=5, filter=['*.pybert_data'])
 
     # Plots (plot containers, actually)
     plotdata          = ArrayPlotData()
@@ -591,6 +592,7 @@ class PyBERT(HasTraits):
                             i += 1
                     else:
                         setattr(self, prop, value)
+                self.cfg_file = dlg.path
             except Exception as err:
                 err.message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err.message)
                 self.handle_error(err)
