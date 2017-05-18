@@ -16,7 +16,7 @@ from chaco.api       import Plot
 from chaco.tools.api import PanTool, ZoomTool
 
 from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt, histogram, arange, append
-from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff, std, pad
+from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff, std, pad, concatenate
 from numpy.random import normal
 from numpy.fft    import fft, ifft
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
@@ -193,20 +193,23 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     try:
         if(self.tx_use_ami):
+            # Note: Within the PyBERT computational environment, we use normalized impulse responses,
+            #       which have units of (V/ts), where 'ts' is the sample interval. However, IBIS-AMI models expect
+            #       units of (V/s). So, we have to scale accordingly, as we transit the boundary between these two worlds.
             tx_cfg = self._tx_cfg  # Grab the 'AMIParamConfigurator' instance for this model.
             # Get the model invoked and initialized, except for 'channel_response', which
             # we need to do several different ways, in order to gather all the data we need.
             tx_param_dict = tx_cfg.input_ami_params
             tx_model_init = AMIModelInitializer(tx_param_dict)
             tx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
-            tx_model_init.channel_response = [1.] + [0.] * (len(chnl_h) - 1)  # Start with a delta function, to capture the model's impulse response.
+            tx_model_init.channel_response = [1. / ts] + [0.] * (len(chnl_h) - 1)  # Start with a delta function, to capture the model's impulse response.
             tx_model_init.bit_time = ui
             tx_model = AMIModel(self.tx_dll_file)
             tx_model.initialize(tx_model_init)
             self.log("Tx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
                 tx_model.ami_params_in, tx_model.ami_params_out, tx_model.msg))
             if(tx_cfg.fetch_param_val(['Reserved_Parameters', 'Init_Returns_Impulse'])):
-                tx_h = array(tx_model.initOut)
+                tx_h = array(tx_model.initOut) * ts
             elif(not tx_cfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])):
                 error("ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
                         I cannot continue.\nThis condition is supposed to be caught sooner in the flow.")
@@ -223,11 +226,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 # order to minimize high frequency artifactual energy
                 # introduced by frequency domain processing in some models.
                 half_len = len(chnl_h) // 2
-                tx_s = tx_model.getWave([0.] * half_len + [1.] * half_len)
+                tx_s = tx_model.getWave(array([0.] * half_len + [1.] * half_len))
                 # Shift the result back to the correct location, extending the last sample.
                 tx_s = pad(tx_s[half_len:], (0, half_len), 'edge')
-                tx_h = diff(tx_s)
-                tx_out = tx_model.getWave(x)
+                tx_h = diff(concatenate((array([0.0]), tx_s)))  # Without the leading 0, we miss the pre-tap.
+                tx_out = tx_model.getWave(self.x)
             else:
                 tx_s = tx_h.cumsum()
                 tx_out = convolve(tx_h, self.x)[:len(self.x)]
@@ -299,14 +302,14 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             rx_param_dict = rx_cfg.input_ami_params
             rx_model_init = AMIModelInitializer(rx_param_dict)
             rx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
-            rx_model_init.channel_response = [1.] + [0.] * (len(chnl_h) - 1)  # Start with a delta function, to capture the model's impulse response.
+            rx_model_init.channel_response = [1. / ts] + [0.] * (len(chnl_h) - 1)  # Start with a delta function, to capture the model's impulse response.
             rx_model_init.bit_time = ui
             rx_model = AMIModel(self.rx_dll_file)
             rx_model.initialize(rx_model_init)
             self.log("Rx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
                 rx_model.ami_params_in, rx_model.ami_params_out, rx_model.msg))
             if(rx_cfg.fetch_param_val(['Reserved_Parameters', 'Init_Returns_Impulse'])):
-                ctle_h = array(rx_model.initOut)
+                ctle_h = array(rx_model.initOut) * ts
             elif(not rx_cfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])):
                 error("ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
                         I cannot continue.\nThis condition is supposed to be caught sooner in the flow.")
@@ -339,7 +342,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                     self.log("AMI output parameters from GetWave call:\n{}".format(rx_model.ami_params_out))
                     idx += row_size
                 ctle_out = array(wave_out[:-2 * step_len * nspui])
-                ctle_s = array(wave_out[-step_len * nspui:])
+                ctle_s = array(wave_out[-step_len * nspui - 1:])
                 ctle_s = (ctle_s - ctle_s[0]) / step_mag  # Compensating for choice of input amplitude/offset.
                 # Calculate the associated impulse response.
                 ctle_h = diff(ctle_s)
@@ -381,7 +384,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         temp            = ctle_out_h.copy()
         temp.resize(len(w))
         ctle_out_H      = fft(temp)
-        # self.rel_opt = -self.cost  # Triggers update to EQ tuning plot data.
         # - Store local variables to class instance.
         self.ctle_out_s = ctle_out_s
         # Consider changing this; it could be sensitive to insufficient "front porch" in the CTLE output step response.
@@ -436,7 +438,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         dfe_out_H      = ctle_out_H * dfe_H
         dfe_out_h      = convolve(ctle_out_h, dfe_h)[:len(ctle_out_h)]
         dfe_out_s      = dfe_out_h.cumsum()
-        # self.dfe_out_p = self.dfe_out_s[nspui:] - self.dfe_out_s[:-nspui] 
         self.dfe_out_p = dfe_out_s - pad(dfe_out_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
         self.dfe_H     = dfe_H
         self.dfe_h     = dfe_h
