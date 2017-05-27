@@ -15,10 +15,13 @@ from time         import clock, sleep
 from chaco.api       import Plot
 from chaco.tools.api import PanTool, ZoomTool
 
-from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat, where, sqrt, histogram, arange, append
-from numpy        import diff, log10, correlate, convolve, mean, resize, real, transpose, cumsum, diff, std, pad, concatenate
+from numpy        import sign, sin, pi, array, linspace, zeros, ones, repeat
+from numpy        import where, sqrt, histogram, arange, append, square, shape
+from numpy        import diff, log10, correlate, convolve, mean, resize, real
+from numpy        import transpose, cumsum, diff, std, pad, concatenate
 from numpy.random import normal
 from numpy.fft    import fft, ifft
+from scipy        import signal
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
 
 from dfe          import DFE
@@ -231,7 +234,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 tx_s = pad(tx_s[half_len:], (0, half_len), 'edge')
                 tx_h = diff(concatenate((array([0.0]), tx_s)))  # Without the leading 0, we miss the pre-tap.
                 tx_out = tx_model.getWave(self.x)
-            else:
+            else:  # Init()-only.
                 tx_s = tx_h.cumsum()
                 tx_out = convolve(tx_h, self.x)[:len(self.x)]
         else:
@@ -302,14 +305,14 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             rx_param_dict = rx_cfg.input_ami_params
             rx_model_init = AMIModelInitializer(rx_param_dict)
             rx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
-            rx_model_init.channel_response = [1. / ts] + [0.] * (len(chnl_h) - 1)  # Start with a delta function, to capture the model's impulse response.
+            rx_model_init.channel_response = tx_out_h / ts
             rx_model_init.bit_time = ui
             rx_model = AMIModel(self.rx_dll_file)
             rx_model.initialize(rx_model_init)
-            self.log("Rx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
-                rx_model.ami_params_in, rx_model.ami_params_out, rx_model.msg))
+            self.log("Rx IBIS-AMI model initialization results:\nInput parameters: {}\nMessage: {}\nOutput parameters: {}".format(
+                rx_model.ami_params_in, rx_model.msg, rx_model.ami_params_out))
             if(rx_cfg.fetch_param_val(['Reserved_Parameters', 'Init_Returns_Impulse'])):
-                ctle_h = array(rx_model.initOut) * ts
+                ctle_out_h = array(rx_model.initOut) * ts
             elif(not rx_cfg.fetch_param_val(['Reserved_Parameters', 'GetWave_Exists'])):
                 error("ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
                         I cannot continue.\nThis condition is supposed to be caught sooner in the flow.")
@@ -321,38 +324,24 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 self.status = "Simulation Error."
                 return
             if(self.rx_use_getwave):
-                # For GetWave, use a step to extract the model's native properties.
-                # In case the model is adaptive, place this step at the end
-                # of the actual signal vector. And make it large amplitude
-                # and d.c. balanced, to avoid triggering d.c. blocking
-                # behavior, or DFE oscillation.
-                # Tacking on the step, composed of step_len '0's followed by step_len '1's.
-                step_len = 64
-                step_mag = 0.2
-                wave_in = append(rx_in.copy(), array([-step_mag / 2.] * step_len * nspui + [step_mag / 2.] * step_len * nspui))
-                input_len = len(wave_in)
-                row_size = 128  # Some models are persnickity about integral power of 2.
-                idx = 0          # Holds the starting index of the next processing chunk.
-                wave_out = []
-                while(idx < input_len):
-                    if((input_len - idx) >= row_size):
-                        wave_out.extend(rx_model.getWave(wave_in[idx : idx + row_size], row_size))
-                    else:
-                        wave_out.extend(rx_model.getWave(wave_in[idx :].resize(row_size), row_size))
-                    self.log("AMI output parameters from GetWave call:\n{}".format(rx_model.ami_params_out))
-                    idx += row_size
-                ctle_out = array(wave_out[:-2 * step_len * nspui])
-                ctle_s = array(wave_out[-step_len * nspui - 1:])
-                ctle_s = (ctle_s - ctle_s[0]) / step_mag  # Compensating for choice of input amplitude/offset.
-                # Calculate the associated impulse response.
-                ctle_h = diff(ctle_s)
-                ctle_h.resize(len(t))
-            else:
-                ctle_s = ctle_h.cumsum()
-                ctle_out = convolve(ctle_h, rx_in)[:len(rx_in)]
-                ctle_h.resize(len(t))
-            ctle_H = fft(ctle_h)
-            ctle_H *= ctle_s[-1] / abs(ctle_H[0])
+                if(False):
+                    ctle_out, clock_times = rx_model.getWave(rx_in, 32)
+                else:
+                    ctle_out, clock_times = rx_model.getWave(rx_in, len(rx_in))
+                self.log(rx_model.ami_params_out)
+
+                ctle_H = fft(ctle_out * signal.hann(len(ctle_out))) / fft(rx_in * signal.hann(len(rx_in)))
+                ctle_h = real(ifft(ctle_H)[:len(chnl_h)])
+                ctle_out_h = convolve(ctle_h, tx_out_h)[:len(chnl_h)]
+            else:  # Init() only.
+                ctle_out_h_padded = pad(ctle_out_h, (nspb, len(rx_in) - nspb - len(ctle_out_h)),
+                        'linear_ramp', end_values=(0., 0.))
+                tx_out_h_padded = pad(tx_out_h, (nspb, len(rx_in) - nspb - len(tx_out_h)),
+                        'linear_ramp', end_values=(0., 0.))
+                ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)
+                ctle_h = real(ifft(ctle_H)[:len(chnl_h)])
+                ctle_out = convolve(tx_out, ctle_out_h)[:len(tx_out)]
+            ctle_s = ctle_h.cumsum()
         else:
             if(self.use_ctle_file):
                 ctle_h           = import_qucs_csv(self.ctle_file, ts)
@@ -372,8 +361,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             if(self.ctle_mode == 'AGC'):                 # Automatic gain control engaged?
                 ctle_out   *= 2. * decision_scaler / ctle_out.ptp()
             ctle_s = ctle_h.cumsum()
+            ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
         self.ctle_s     = ctle_s
-        ctle_out_h      = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
         ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.)[0]
         if(len(ctle_out_h_main_lobe)):
             conv_dly_ix = ctle_out_h_main_lobe[0]
@@ -605,6 +594,8 @@ def update_results(self):
     t_ns_chnl     = self.t_ns_chnl
     conv_dly_ix   = self.conv_dly_ix
     n_taps        = self.n_taps
+
+    self.log("f[1]: {:6.3f} MHz, len(f): {}".format(f[1] / 1.e6, len(f)))
 
     Ts = t[1]
     ignore_until  = (num_ui - eye_uis) * ui
