@@ -1,0 +1,80 @@
+package:
+  name: pybert
+  version: "2.2.0"
+
+source:
+  fn: PyBERT-2.2.0.tar.gz
+  url: https://pypi.python.org/packages/38/8e/a5ffafb383733454d248604188e07706c160d73315ffc755d2bc53adb945/PyBERT-2.2.0.tar.gz
+  md5: fd0369c9d526466e386cbfef0f5e4c3b
+#  patches:
+   # List any patch files here
+   # - fix.patch
+
+# build:
+  # noarch_python: True
+  # preserve_egg_dir: True
+  # entry_points:
+    # Put any entry points (scripts to be generated automatically) here. The
+    # syntax is module:function.  For example
+    #
+    # - pybert = pybert:main
+    #
+    # Would create an entry point called pybert that calls pybert.main()
+
+
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  # number: 1
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - traits
+    - traitsui
+    - enable
+    - chaco
+    - sphinx
+    - jinja2
+    - docutils
+    - pygments
+    - pyibis-ami >=2.2.0
+
+  run:
+    - python
+    - traits
+    - traitsui
+    - enable
+    - chaco
+    - sphinx
+    - jinja2
+    - docutils
+    - pygments
+    - pyibis-ami >=2.2.0
+
+test:
+  # Python imports
+  imports:
+    - pybert
+
+  # commands:
+    # You can put test commands to be run here.  Use this to test that the
+    # entry points work.
+
+
+  # You can also put a file called run_test.py in the recipe that will be run
+  # at test time.
+
+  # requires:
+    # Put any additional test requirements here.  For example
+    # - nose
+
+about:
+  home: https://github.com/capn-freako/PyBERT/wiki
+  license: BSD License
+  summary: 'Serial communication link bit error rate tester simulator, written in Python.'
+  license_family: BSD
+
+# See
+# http://docs.continuum.io/conda/build.html for
+# more information about meta.yaml

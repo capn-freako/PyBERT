@@ -1,0 +1,72 @@
+package:
+  name: pyibis-ami
+  version: "2.2.0"
+
+source:
+  fn: PyIBIS-AMI-2.2.0.tar.gz
+  url: https://pypi.python.org/packages/21/73/5d9c2eb518c87f4d5b3cf6c4225bfd73f8a454aa83821bfe9be4edfbcc6b/PyIBIS-AMI-2.2.0.tar.gz
+  md5: 395c64319c54a00a11dace6f801a1aea
+#  patches:
+   # List any patch files here
+   # - fix.patch
+
+# build:
+  # noarch_python: True
+  # preserve_egg_dir: True
+  # entry_points:
+    # Put any entry points (scripts to be generated automatically) here. The
+    # syntax is module:function.  For example
+    #
+    # - pyibis-ami = pyibis-ami:main
+    #
+    # Would create an entry point called pyibis-ami that calls pyibis-ami.main()
+
+
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  # number: 1
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - empy
+    - numpy
+    - scipy
+    - matplotlib
+    - parsec
+
+  run:
+    - python
+    - empy
+    - numpy
+    - scipy
+    - matplotlib
+    - parsec
+
+test:
+  # Python imports
+  imports:
+    - pyibisami
+
+  # commands:
+    # You can put test commands to be run here.  Use this to test that the
+    # entry points work.
+
+
+  # You can also put a file called run_test.py in the recipe that will be run
+  # at test time.
+
+  # requires:
+    # Put any additional test requirements here.  For example
+    # - nose
+
+about:
+  home: https://github.com/capn-freako/PyAMI/wiki
+  license: BSD License
+  summary: 'Facilitates working directly with IBIS-AMI DLLs from the Python command prompt.'
+  license_family: BSD
+
+# See
+# http://docs.continuum.io/conda/build.html for
+# more information about meta.yaml
