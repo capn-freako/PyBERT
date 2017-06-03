@@ -1,0 +1,78 @@
+package:
+  name: chaco
+  version: "4.6.1"
+
+source:
+  fn: chaco-4.6.1.tar.gz
+  url: https://pypi.python.org/packages/d8/5f/82539366bb321f6f07fada6278e320bb52916a36b43fbe0e30e5ef9f9166/chaco-4.6.1.tar.gz
+  md5: d28117730f942f7cecb281b07abac3f4
+#  patches:
+   # List any patch files here
+   # - fix.patch
+
+# build:
+  # noarch_python: True
+  # preserve_egg_dir: True
+  # entry_points:
+    # Put any entry points (scripts to be generated automatically) here. The
+    # syntax is module:function.  For example
+    #
+    # - chaco = chaco:main
+    #
+    # Would create an entry point called chaco that calls chaco.main()
+
+
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  # number: 1
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - enable
+
+  run:
+    - python
+    - enable
+
+test:
+  # Python imports
+  imports:
+    - chaco
+    - chaco.contour
+    - chaco.downsample
+    - chaco.downsample.tests
+    - chaco.layers
+    - chaco.overlays
+    - chaco.plugin
+    - chaco.scales
+    - chaco.scales.tests
+    - chaco.shell
+    - chaco.tests
+    - chaco.tools
+    - chaco.tools.tests
+    - chaco.tools.toolbars
+    - chaco.ui
+
+  # commands:
+    # You can put test commands to be run here.  Use this to test that the
+    # entry points work.
+
+
+  # You can also put a file called run_test.py in the recipe that will be run
+  # at test time.
+
+  # requires:
+    # Put any additional test requirements here.  For example
+    # - nose
+
+about:
+  home: http://docs.enthought.com/chaco
+  license: BSD License
+  summary: 'interactive 2-dimensional plotting'
+  license_family: BSD
+
+# See
+# http://docs.continuum.io/conda/build.html for
+# more information about meta.yaml
