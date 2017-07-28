@@ -1327,6 +1327,9 @@ class PyBERT(HasTraits):
 
 
 # So that we can be used in stand-alone, or imported, fashion.
+def main():
+    PyBERT().configure_traits(view=traits_view)
+
 if __name__ == '__main__':
-    PyBERT().configure_traits(view = traits_view)
+    main()
 

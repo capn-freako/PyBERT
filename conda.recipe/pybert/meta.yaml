@@ -10,21 +10,21 @@ source:
    # List any patch files here
    # - fix.patch
 
-# build:
-  # noarch_python: True
+build:
+  noarch_python: True
   # preserve_egg_dir: True
-  # entry_points:
+  entry_points:
     # Put any entry points (scripts to be generated automatically) here. The
     # syntax is module:function.  For example
     #
-    # - pybert = pybert:main
+    - pybert = pybert:main
     #
     # Would create an entry point called pybert that calls pybert.main()
 
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  # number: 1
+  number: 2
 
 requirements:
   build:
@@ -39,6 +39,7 @@ requirements:
     - docutils
     - pygments
     - pyibis-ami >=2.2.0
+    - cython
 
   run:
     - python
@@ -51,6 +52,8 @@ requirements:
     - docutils
     - pygments
     - pyibis-ami >=2.2.0
+    - cython
+    - kiwisolver
 
 test:
   # Python imports

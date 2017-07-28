@@ -31,10 +31,14 @@ requirements:
     - python
     - setuptools
     - enable
+    - cython
+    - PIL
 
   run:
     - python
     - enable
+    - cython
+    - PIL
 
 test:
   # Python imports

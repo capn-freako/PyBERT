@@ -595,8 +595,6 @@ def update_results(self):
     conv_dly_ix   = self.conv_dly_ix
     n_taps        = self.n_taps
 
-    self.log("f[1]: {:6.3f} MHz, len(f): {}".format(f[1] / 1.e6, len(f)))
-
     Ts = t[1]
     ignore_until  = (num_ui - eye_uis) * ui
     ignore_samps  = (num_ui - eye_uis) * samps_per_ui

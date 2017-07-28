@@ -48,3 +48,5 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 # 
 # __all__ = ['pybert', 'pybert_view', 'pybert_cntrl', 'pybert_util', 'dfe', 'cdr']
 
+__version__ = '2.2.0'
+
