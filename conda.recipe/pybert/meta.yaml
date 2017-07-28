@@ -1,32 +1,36 @@
+{% set name = "pybert" %}
+{% set version = "2.2.2" %}
+{% set hash_type = "sha256" %}
+{% set hash_value = "2d98d963f3f33ebc7904768af0092134beeb53c7fbd63ef1182bf75c1416e493" %}
+
 package:
-  name: pybert
-  version: "2.2.0"
+  version: '{{ version }}'
+  name: '{{ name|lower }}'
 
 source:
-  fn: PyBERT-2.2.0.tar.gz
-  url: https://pypi.python.org/packages/38/8e/a5ffafb383733454d248604188e07706c160d73315ffc755d2bc53adb945/PyBERT-2.2.0.tar.gz
-  md5: fd0369c9d526466e386cbfef0f5e4c3b
-#  patches:
-   # List any patch files here
-   # - fix.patch
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  '{{ hash_type }}': '{{ hash_value }}'
+  fn: '{{ name }}-{{ version }}.tar.gz'
 
 build:
+  number: 0
+  script: python setup.py install  --single-version-externally-managed --record=record.txt
   noarch_python: True
-  # preserve_egg_dir: True
   entry_points:
-    # Put any entry points (scripts to be generated automatically) here. The
-    # syntax is module:function.  For example
-    #
     - pybert = pybert:main
-    #
-    # Would create an entry point called pybert that calls pybert.main()
-
-
-  # If this is a new build for the same version, increment the build
-  # number. If you do not include this key, it defaults to 0.
-  number: 2
 
 requirements:
+  run:
+    - python
+    - traits
+    - traitsui
+    - enable
+    - chaco
+    - sphinx
+    - jinja2
+    - docutils
+    - pygments
+    - pyibis-ami >=2.2.0
   build:
     - python
     - setuptools
@@ -39,45 +43,31 @@ requirements:
     - docutils
     - pygments
     - pyibis-ami >=2.2.0
-    - cython
-
-  run:
-    - python
-    - traits
-    - traitsui
-    - enable
-    - chaco
-    - sphinx
-    - jinja2
-    - docutils
-    - pygments
-    - pyibis-ami >=2.2.0
-    - cython
-    - kiwisolver
 
 test:
-  # Python imports
   imports:
     - pybert
 
-  # commands:
-    # You can put test commands to be run here.  Use this to test that the
-    # entry points work.
-
-
-  # You can also put a file called run_test.py in the recipe that will be run
-  # at test time.
-
-  # requires:
-    # Put any additional test requirements here.  For example
-    # - nose
-
 about:
-  home: https://github.com/capn-freako/PyBERT/wiki
+  dev_url: ''
+  description: "===========\nPyBERT\n===========\n\nPyBERT is a serial communication link bit error rate tester simulator with a graphical user interface (GUI).\n\nIt uses the Traits/UI package of the Enthought\
+    \ Python Distribution (EPD) <http://www.enthought.com/products/epd.php>,\nas well as the NumPy and SciPy packages.\n\nNotice: Before using this package for any purpose, you MUST read and understand\
+    \ the terms put forward in the accompanying \"LICENSE\" file.\n\nDocumentation\n=============\nPyBERT documentation exists in 2 separate forms:\n\n- For developers: pybert/doc/build/html/index.html\n\
+    \n- For users:\n\n  - Quick installation instructions at <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>\n  - The 'Help' tab of the PyBERT GUI\n  - The PyBERT FAQ at <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>\n\
+    \  - Sending e-mail to David Banas at <capn.freako@gmail.com>\n\nLicense\n=======\n\nCopyright (c) 2014, David Banas\nAll rights reserved World wide.\n\nRedistribution and use in source and binary forms,\
+    \ with or without modification, are permitted provided that the following conditions are met:\n\nRedistributions of source code must retain the above copyright notice, this list of conditions and the\
+    \ following disclaimer.\nRedistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided\
+    \ with the distribution.\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF\
+    \ MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\
+    \ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER\
+    \ IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\nAcknowledgements\n\
+    ================\n\nI would like to thank the following individuals, for their contributions to PyBERT:  \n\n- Mark Marlett  \n- Low Kian Seong  \n- Amanda Bukur <amandabukur11@gmail.com>  \n\n"
   license: BSD License
-  summary: 'Serial communication link bit error rate tester simulator, written in Python.'
   license_family: BSD
+  summary: Serial communication link bit error rate tester simulator, written in Python.
+  home: https://github.com/capn-freako/PyBERT/wiki
+  license_file: ''
+  doc_url: ''
 
-# See
-# http://docs.continuum.io/conda/build.html for
-# more information about meta.yaml
+extra:
+  recipe-maintainers: ''

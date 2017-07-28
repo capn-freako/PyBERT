@@ -7,11 +7,6 @@ PyBERT is a serial communication link bit error rate tester simulator with a gra
 It uses the Traits/UI package of the Enthought Python Distribution (EPD) <http://www.enthought.com/products/epd.php>,
 as well as the NumPy and SciPy packages.
 
-In order to install and run PyBERT on a system with Python already installed:
-
-- easy_install PyBERT
-- python -m pybert
-
 Notice: Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
 
 Documentation
@@ -22,6 +17,7 @@ PyBERT documentation exists in 2 separate forms:
 
 - For users:
 
+  - Quick installation instructions at <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
   - The 'Help' tab of the PyBERT GUI
   - The PyBERT FAQ at <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>
   - Sending e-mail to David Banas at <capn.freako@gmail.com>
@@ -41,8 +37,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 Acknowledgements
 ================
 
-I would like to thank the following individuals, for their contributions to PyBERT:
-- Mark Marlett
-- Low Kian Seong
-- Amanda Bukur <amandabukur11@gmail.com>
+I would like to thank the following individuals, for their contributions to PyBERT:  
+
+- Mark Marlett  
+- Low Kian Seong  
+- Amanda Bukur <amandabukur11@gmail.com>  
 
