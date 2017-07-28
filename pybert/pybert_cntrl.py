@@ -340,7 +340,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                         'linear_ramp', end_values=(0., 0.))
                 ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)
                 ctle_h = real(ifft(ctle_H)[:len(chnl_h)])
-                ctle_out = convolve(tx_out, ctle_out_h)[:len(tx_out)]
+                ctle_out = convolve(rx_in, ctle_h)[:len(tx_out)]
             ctle_s = ctle_h.cumsum()
         else:
             if(self.use_ctle_file):
