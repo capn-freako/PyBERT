@@ -1,0 +1,13 @@
+#! /usr/bin/env sh
+
+# Build the YAML files needed to make Conda packages for PyBERT and PyIBIS-AMI.
+#
+# Original author: David Banas <capn.freako@gmail.com>
+# Original date:   September 29, 2017
+#
+# Copyright (c) 2017 David Banas; all rights reserved World wide.
+
+rm -rf conda.recipe/pybert/
+rm -rf conda.recipe/pyibis-ami/
+conda skeleton pypi --noarch-python --output-dir=conda.recipe pybert pyibis-ami
+

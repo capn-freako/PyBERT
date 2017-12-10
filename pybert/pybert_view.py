@@ -352,6 +352,7 @@ traits_view = View(
             Item('plots_dfe', editor=ComponentEditor(), show_label=False,),
             label = 'DFE', id = 'plots_dfe'
         ),
+        # "EQ Tune" tab.
         VGroup(
             HGroup(
                 Group(
@@ -397,8 +398,10 @@ traits_view = View(
                 VGroup(
                     Item(   name='max_iter', label='Max. Iterations',
                             tooltip="Maximum number of iterations to allow, during optimization.", ),
-                    Item(   name='rel_opt', label='Rel. Opt.', format_str='%7.4f',
-                            tooltip="Relative optimization metric.", enabled_when='False'),
+                    Item(   name='rel_opt', label='Rel. Opt.:', format_str='%7.4f',
+                            tooltip="Relative optimization metric.", style='readonly'),
+                    Item(   name='przf_err', label='PRZF Err.:', format_str='%5.3f',
+                            tooltip="Pulse Response Zero Forcing approximation error.", style='readonly'),
                     label = 'Tuning Options', show_border = True,
                 ),
                 springy=False,
@@ -411,6 +414,7 @@ traits_view = View(
                 Item('btn_opt_tx',  show_label=False, tooltip="Run Tx tap weight optimization.",),
                 Item('btn_opt_rx',  show_label=False, tooltip="Run Rx CTLE optimization.",),
                 Item('btn_coopt',   show_label=False, tooltip="Run co-optimization.",),
+                Item('btn_abort',   show_label=False, tooltip="Abort all optimizations.",),
             ),
             label = 'EQ Tune', id = 'eq_tune',
         ),

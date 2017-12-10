@@ -22,7 +22,7 @@ ETSConfig.toolkit = 'qt4'
 import pickle
 
 from datetime        import datetime
-from threading       import Thread
+from threading       import Thread, Event
 from time            import sleep
 
 from numpy           import array, linspace, zeros, histogram, mean, diff, \
@@ -51,8 +51,8 @@ from pyibisami.ami_parse import AMIParamConfigurator
 
 from pybert_view     import traits_view
 from pybert_cntrl    import my_run_simulation, update_results, update_eyes
-from pybert_util     import calc_gamma, calc_G, trim_impulse, import_qucs_csv, \
-                            make_ctle, lfsr_bits, safe_log10
+from pybert_util     import calc_gamma, calc_G, trim_impulse, import_channel, \
+                            make_ctle, lfsr_bits, safe_log10, pulse_center
 from pybert_plot     import make_plots
 from pybert_help     import help_str
 from pybert_cfg      import PyBertCfg
@@ -115,7 +115,23 @@ gLockSustain    = 500
 gThresh         = 6       # threshold for identifying periodic jitter spectral elements (sigma)
 
 
-class TxOptThread(Thread):
+class StoppableThread(Thread):
+    """
+    Thread class with a stop() method.
+    The thread itself has to check regularly for the stopped() condition.
+    """
+
+    def __init__(self):
+        super(StoppableThread, self).__init__()
+        self._stop_event = Event()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def stopped(self):
+        return self._stop_event.is_set()
+
+class TxOptThread(StoppableThread):
     'Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
@@ -141,26 +157,35 @@ class TxOptThread(Thread):
 
         bounds = zip(min_vals, max_vals)
 
-        if(gDebugOptimize):
-            res = minimize( self.do_opt_tx, old_taps, bounds=bounds,
-                            constraints=cons, options={'disp'    : True,
-                                                       'maxiter' : max_iter
-                                                      }
-                          )
-        else:
-            res = minimize( self.do_opt_tx, old_taps, bounds=bounds,
-                            constraints=cons, options={'disp'    : False,
-                                                       'maxiter' : max_iter
-                                                      }
-                          )
-
-        if(self.update_status):
-            if(res['success']):
-                pybert.status = "Optimization succeeded."
+        try:
+            if(gDebugOptimize):
+                res = minimize( self.do_opt_tx, old_taps, bounds=bounds,
+                                constraints=cons, options={'disp'    : True,
+                                                           'maxiter' : max_iter
+                                                          }
+                              )
             else:
-                pybert.status = "Optimization failed: {}".format(res['message'])
+                res = minimize( self.do_opt_tx, old_taps, bounds=bounds,
+                                constraints=cons, options={'disp'    : False,
+                                                           'maxiter' : max_iter
+                                                          }
+                              )
+
+            if(self.update_status):
+                if(res['success']):
+                    pybert.status = "Optimization succeeded."
+                else:
+                    pybert.status = "Optimization failed: {}".format(res['message'])
+
+        except Exception as err:
+            pybert.status = err.message
 
     def do_opt_tx(self, taps):
+        sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
+
+        if(self.stopped()):
+            raise RuntimeError("Optimization aborted.")
+
         pybert = self.pybert
         tuners = pybert.tx_tap_tuners
         taps = list(taps)
@@ -170,7 +195,7 @@ class TxOptThread(Thread):
         return pybert.cost
 
 
-class RxOptThread(Thread):
+class RxOptThread(StoppableThread):
     'Used to run Rx tap weight optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
@@ -179,29 +204,38 @@ class RxOptThread(Thread):
         pybert.status = "Optimizing Rx..."
         max_iter = pybert.max_iter
 
-        if(gDebugOptimize):
-            res  = minimize_scalar(self.do_opt_rx, bounds=(0, gMaxCTLEPeak),
-                                   method='Bounded', options={'disp'    : True,
-                                                              'maxiter' : max_iter}
-                                  )
-        else:
-            res  = minimize_scalar(self.do_opt_rx, bounds=(0, gMaxCTLEPeak),
-                                   method='Bounded', options={'disp'    : False,
-                                                              'maxiter' : max_iter}
-                                  )
+        try:
+            if(gDebugOptimize):
+                res  = minimize_scalar(self.do_opt_rx, bounds=(0, gMaxCTLEPeak),
+                                       method='Bounded', options={'disp'    : True,
+                                                                  'maxiter' : max_iter}
+                                      )
+            else:
+                res  = minimize_scalar(self.do_opt_rx, bounds=(0, gMaxCTLEPeak),
+                                       method='Bounded', options={'disp'    : False,
+                                                                  'maxiter' : max_iter}
+                                      )
 
-        if(res['success']):
-            pybert.status = "Optimization succeeded."
-        else:
-            pybert.status = "Optimization failed: {}".format(res['message'])
+            if(res['success']):
+                pybert.status = "Optimization succeeded."
+            else:
+                pybert.status = "Optimization failed: {}".format(res['message'])
+
+        except Exception as err:
+            pybert.status = err.message
 
     def do_opt_rx(self, peak_mag):
+        sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
+
+        if(self.stopped()):
+            raise RuntimeError("Optimization aborted.")
+
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
         return pybert.cost
 
 
-class CoOptThread(Thread):
+class CoOptThread(StoppableThread):
     'Used to run co-optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
@@ -210,23 +244,32 @@ class CoOptThread(Thread):
         pybert.status = "Co-optimizing..."
         max_iter  = pybert.max_iter
 
-        if(gDebugOptimize):
-            res  = minimize_scalar(self.do_coopt, bounds=(0, gMaxCTLEPeak),
-                                   method='Bounded', options={'disp'    : True,
-                                                              'maxiter' : max_iter}
-                                  )
-        else:
-            res  = minimize_scalar(self.do_coopt, bounds=(0, gMaxCTLEPeak),
-                                   method='Bounded', options={'disp'    : False,
-                                                              'maxiter' : max_iter}
-                                  )
+        try:
+            if(gDebugOptimize):
+                res  = minimize_scalar(self.do_coopt, bounds=(0, gMaxCTLEPeak),
+                                       method='Bounded', options={'disp'    : True,
+                                                                  'maxiter' : max_iter}
+                                      )
+            else:
+                res  = minimize_scalar(self.do_coopt, bounds=(0, gMaxCTLEPeak),
+                                       method='Bounded', options={'disp'    : False,
+                                                                  'maxiter' : max_iter}
+                                      )
 
-        if(res['success']):
-            pybert.status = "Optimization succeeded."
-        else:
-            pybert.status = "Optimization failed: {}".format(res['message'])
+            if(res['success']):
+                pybert.status = "Optimization succeeded."
+            else:
+                pybert.status = "Optimization failed: {}".format(res['message'])
+
+        except Exception as err:
+            pybert.status = err.message
 
     def do_coopt(self, peak_mag):
+        sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
+
+        if(self.stopped()):
+            raise RuntimeError("Optimization aborted.")
+
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
         if(any([pybert.tx_tap_tuners[i].enabled for i in range(len(pybert.tx_tap_tuners))])):
@@ -292,7 +335,7 @@ class PyBERT(HasTraits):
 
     # - Channel Control
     use_ch_file     = Bool(False)
-    ch_file         = File('', entries=5, filter=['*.csv'])
+    ch_file         = File('', entries=5, filter=['*.s4p', '*.S4P', '*.csv', '*.CSV', '*.txt', '*.TXT', '*.*'])
     impulse_length  = Float(0.0)
     Rdc             = Float(gRdc)
     w0              = Float(gw0)
@@ -408,9 +451,9 @@ class PyBERT(HasTraits):
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
-    ident  = String('PyBERT v2.2.2 - a serial communication link design tool, written in Python.\n\n \
+    ident  = String('PyBERT v2.3.0 - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    July 28, 2017\n\n \
+    December 10, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -446,6 +489,8 @@ class PyBERT(HasTraits):
     nui             = Property(Int,     depends_on=['nbits', 'mod_type'])
     nspui           = Property(Int,     depends_on=['nspb', 'mod_type'])
     eye_uis         = Property(Int,     depends_on=['eye_bits', 'mod_type'])
+    dfe_out_p       = Array()
+    przf_err        = Property(Float,   depends_on=['dfe_out_p'])
 
     # Custom buttons, which we'll use in particular tabs.
     # (Globally applicable buttons, such as "Run" and "Ok", are handled more simply, in the View.)
@@ -454,6 +499,7 @@ class PyBERT(HasTraits):
     btn_opt_tx  = Button(label = 'OptTx')
     btn_opt_rx  = Button(label = 'OptRx')
     btn_coopt   = Button(label = 'CoOpt')
+    btn_abort   = Button(label = 'Abort')
     btn_cfg_tx  = Button(label = 'Configure')
     btn_cfg_rx  = Button(label = 'Configure')
     btn_save_cfg = Button(label = 'Save Config.')
@@ -556,6 +602,17 @@ class PyBERT(HasTraits):
             self.coopt_thread = CoOptThread()
             self.coopt_thread.pybert = self
             self.coopt_thread.start()
+
+    def _btn_abort_fired(self):
+        if self.coopt_thread  and self.coopt_thread.isAlive():
+            self.coopt_thread.stop()
+            self.coopt_thread.join(10)
+        if self.tx_opt_thread and self.tx_opt_thread.isAlive():
+            self.tx_opt_thread.stop()
+            self.tx_opt_thread.join(10)
+        if self.rx_opt_thread and self.rx_opt_thread.isAlive():
+            self.rx_opt_thread.stop()
+            self.rx_opt_thread.join(10)
 
     def _btn_cfg_tx_fired(self):
         self._tx_cfg()
@@ -1119,24 +1176,10 @@ class PyBERT(HasTraits):
 
         s = h.cumsum()
         p = s - pad(s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
-        p_max = p.max()
 
-        # "Hula Hoop" algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
-        div = 2.
-        thresh = p_max / div
-        main_lobe_ixs = where(p > thresh)[0]
-        if(not len(main_lobe_ixs)):  # Sometimes, the optimizer really whacks out.
+        (clock_pos, thresh) = pulse_center(p, nspui)
+        if(clock_pos == -1):
             return 1.0               # Returning a large cost lets it know it took a wrong turn.
-        err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui
-        while(err and div < 5000):
-            div *= 2.
-            if(err > 0):
-                thresh += p_max / div
-            else:
-                thresh -= p_max / div
-            main_lobe_ixs = where(p > thresh)[0]
-            err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui
-        clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
         clocks = thresh * ones(len(p))
         if(mod_type == 1):  # Handle duo-binary.
             clock_pos -= nspui // 2
@@ -1176,6 +1219,19 @@ class PyBERT(HasTraits):
     @cached_property
     def _get_rel_opt(self):
         return -self.cost
+
+    @cached_property
+    def _get_przf_err(self):
+        p      = self.dfe_out_p
+        nspui  = self.nspui
+        n_taps = self.n_taps
+
+        (clock_pos, thresh) = pulse_center(p, nspui)
+        err = 0
+        for i in range(n_taps):
+            err += p[clock_pos + (i+1)*nspui] ** 2
+
+        return err / p[clock_pos]**2
 
     # Changed property handlers.
     def _status_str_changed(self):
@@ -1274,7 +1330,7 @@ class PyBERT(HasTraits):
         impulse_length       = self.impulse_length * 1.e-9
 
         if(self.use_ch_file):
-            chnl_h           = import_qucs_csv(self.ch_file, ts)
+            chnl_h           = import_channel(self.ch_file, ts)
             if(chnl_h[-1] > (max(chnl_h) / 2.)):  # step response?
                 chnl_h       = diff(chnl_h)       # impulse response is derivative of step response.
             else:

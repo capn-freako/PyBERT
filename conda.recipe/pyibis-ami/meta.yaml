@@ -1,32 +1,30 @@
+{% set name = "pyibis-ami" %}
+{% set version = "2.2.2" %}
+{% set hash_type = "sha256" %}
+{% set hash_value = "03cd97ba09850d673bc6c3fd6e769fd48aa3c4e2212300dce219873204d53b6c" %}
+
 package:
-  name: pyibis-ami
-  version: "2.2.0"
+  version: '{{ version }}'
+  name: '{{ name|lower }}'
 
 source:
-  fn: PyIBIS-AMI-2.2.0.tar.gz
-  url: https://pypi.python.org/packages/21/73/5d9c2eb518c87f4d5b3cf6c4225bfd73f8a454aa83821bfe9be4edfbcc6b/PyIBIS-AMI-2.2.0.tar.gz
-  md5: 395c64319c54a00a11dace6f801a1aea
-#  patches:
-   # List any patch files here
-   # - fix.patch
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  '{{ hash_type }}': '{{ hash_value }}'
+  fn: '{{ name }}-{{ version }}.tar.gz'
 
 build:
-  noarch_python: True
-  # preserve_egg_dir: True
-  # entry_points:
-    # Put any entry points (scripts to be generated automatically) here. The
-    # syntax is module:function.  For example
-    #
-    # - pyibis-ami = pyibis-ami:main
-    #
-    # Would create an entry point called pyibis-ami that calls pyibis-ami.main()
-
-
-  # If this is a new build for the same version, increment the build
-  # number. If you do not include this key, it defaults to 0.
-  number: 1
+  script: python setup.py install  --single-version-externally-managed --record=record.txt
+  number: 0
+  noarch: python
 
 requirements:
+  run:
+    - python
+    - empy
+    - numpy
+    - scipy
+    - matplotlib
+    - parsec
   build:
     - python
     - setuptools
@@ -36,37 +34,52 @@ requirements:
     - matplotlib
     - parsec
 
-  run:
-    - python
-    - empy
-    - numpy
-    - scipy
-    - matplotlib
-    - parsec
-
 test:
-  # Python imports
   imports:
     - pyibisami
 
-  # commands:
-    # You can put test commands to be run here.  Use this to test that the
-    # entry points work.
-
-
-  # You can also put a file called run_test.py in the recipe that will be run
-  # at test time.
-
-  # requires:
-    # Put any additional test requirements here.  For example
-    # - nose
-
 about:
-  home: https://github.com/capn-freako/PyAMI/wiki
-  license: BSD License
-  summary: 'Facilitates working directly with IBIS-AMI DLLs from the Python command prompt.'
-  license_family: BSD
+  dev_url: ''
+  description: '===========
 
-# See
-# http://docs.continuum.io/conda/build.html for
-# more information about meta.yaml
+    PyIBIS-AMI
+
+    ===========
+
+
+    PyIBIS-AMI is a Python package of tools useful in the development and testing of IBIS-AMI models.
+
+
+    License
+
+    =======
+
+
+    Copyright (c) 2012, David Banas
+
+    All rights reserved World wide.
+
+
+    Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+
+    Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+    Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+    '
+  license: BSD License
+  license_family: BSD
+  summary: Facilitates working directly with IBIS-AMI DLLs from the Python command prompt.
+  home: https://github.com/capn-freako/PyAMI/wiki
+  license_file: ''
+  doc_url: ''
+
+extra:
+  recipe-maintainers: ''

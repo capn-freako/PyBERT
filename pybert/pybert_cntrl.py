@@ -28,7 +28,7 @@ from dfe          import DFE
 from cdr          import CDR
 
 from pyibisami.amimodel import AMIModel, AMIModelInitializer
-from pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye, import_qucs_csv
+from pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye, import_channel
 
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.e-18
@@ -193,6 +193,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.status       = 'Exception: channel'
         raise
 
+    self.chnl_out    = chnl_out
+
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     try:
         if(self.tx_use_ami):
@@ -344,7 +346,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             ctle_s = ctle_h.cumsum()
         else:
             if(self.use_ctle_file):
-                ctle_h           = import_qucs_csv(self.ctle_file, ts)
+                ctle_h           = import_channel(self.ctle_file, ts)
                 if(max(abs(ctle_h)) < 100.):          # step response?
                     ctle_h       = diff(ctle_h)       # impulse response is derivative of step response.
                 else:
@@ -441,6 +443,13 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     except Exception:
         self.status       = 'Exception: DFE'
         raise
+
+    # Save local variables to class instance for state preservation, performing unit conversion where necessary.
+    self.adaptation  = tap_weights
+    self.ui_ests     = array(ui_ests) * 1.e12 # (ps)
+    self.clocks      = clocks
+    self.lockeds     = lockeds
+    self.clock_times = clock_times
 
     # Analyze the jitter.
     self.thresh_tx              = array([])
@@ -548,16 +557,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.status      = 'Updating plots...(sweep %d of %d)' % (sweep_num, num_sweeps)
     except Exception:
         self.status       = 'Exception: jitter'
-        raise
-
-    # Save local variables to class instance for state preservation, performing unit conversion where necessary.
-    self.chnl_out    = chnl_out
-
-    self.adaptation = tap_weights
-    self.ui_ests    = array(ui_ests) * 1.e12 # (ps)
-    self.clocks     = clocks
-    self.lockeds    = lockeds
-    self.clock_times = clock_times
+        # raise
 
     # Update plots.
     try:

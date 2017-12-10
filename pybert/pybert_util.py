@@ -8,6 +8,11 @@ Original date:   September 27, 2014 (Copied from `pybert_cntrl.py'.)
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
+import os.path
+import numpy as np
+import scipy.signal as sig
+import skrf as rf
+
 from numpy import sign, sin, pi, array, linspace, float, zeros, ones, \
                   repeat, where, diff, append, pad, real, histogram, \
                   log10, sqrt, power, exp, cumsum, mean, power, \
@@ -668,9 +673,9 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode='Passive', dc_offset=0):
 def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     """
     Trim impulse response, for more useful display, by:
-      - eliminating 90% of the overall delay from the beginning, and
-      - clipping off the tail, after 99.8% of the total power has been captured.
-        (Using 99.9% was causing problems; I don't know why.)
+      - clipping off the tail, after 99.8% of the total power has been
+        captured (Using 99.9% was causing problems; I don't know why.), and
+      - setting the "front porch" length equal to 20% of the total length.
 
     Inputs:
     
@@ -692,35 +697,64 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
 
     """
 
-    g = array(g[:int(0.9 * len(g))])  # Trim off potential FFT artifacts from the end.
+    # Trim off potential FFT artifacts from the end and capture peak location.
+    g = array(g[:int(0.9 * len(g))])
+    max_ix = np.argmax(g)
 
-    if(Ts and chnl_dly):
-        start_ix  = int(0.9 * chnl_dly / Ts)
-    else:
-        min_mag = 0.01 * max(abs(g))
-        i = 0
-        while(abs(g[i]) < min_mag):
-            i += 1
-        start_ix = max(0, min(i - 10, int(0.9 * i)))
-
-    Pt        = 0.998 * sum(g[start_ix:] ** 2)
-    i         = start_ix
-    P         = 0
+    # Capture 99.8% of the total energy.
+    Pt = 0.998 * sum(g ** 2)
+    i  = 0
+    P  = 0
     while(P < Pt):
         P += g[i] ** 2
         i += 1
+    stop_ix = i
 
-    vec_len = i - start_ix
-    if(vec_len < min_len):
-        i = min(len(g), start_ix + min_len)
-    if(vec_len > max_len):
-        i = start_ix + max_len
+    # Set "front porch" to 20%, guarding against negative start index.
+    start_ix = max(0, max_ix - (stop_ix - max_ix) // 4)
 
-    return (g[start_ix : i], start_ix)
+    return (g[start_ix : stop_ix], start_ix)
 
-def import_qucs_csv(filename, sample_per):
+
+## @name External channel definition importing.
+## @{
+def import_channel(filename, sample_per):
     """
-    Read in a CSV waveform file exported by QUCS, resampling as
+    Read in a channel file.
+    """
+
+    extension = os.path.splitext(filename)[1][1:]
+    if(extension == 's4p' or extension == 'S4P'):
+        return import_freq(filename, sample_per)
+    else:
+        return import_time(filename, sample_per)
+
+def interp_time(ts, xs, sample_per):
+    """
+    Resample time domain data, using linear interpolation.
+
+    Args:
+        ts([float]): Original time values.
+        xs([float]): Original signal values.
+        sample_per(float): System sample period.
+
+    Returns: Resampled waveform.
+    """
+    tmax = ts[-1]
+    res  = []
+    t    = 0.0
+    i    = 0
+    while(t < tmax):
+        while(ts[i] <= t):
+            i = i + 1
+        res.append(xs[i - 1] + (xs[i] - xs[i - 1]) * (t - ts[i - 1]) / (ts[i] - ts[i - 1]))
+        t += sample_per
+
+    return array(res)
+
+def import_time(filename, sample_per):
+    """
+    Read in a time domain waveform file, resampling as
     appropriate, via linear interpolation.
 
     Args:
@@ -733,27 +767,75 @@ def import_qucs_csv(filename, sample_per):
     # Read in original data from file.
     ts = []
     xs = []
-    with open(filename, mode='rU') as csv_file:
-        for line in csv_file:
+    with open(filename, mode='rU') as file:
+        for line in file:
             try:
-                tmp = map(float, concatenate(map(lambda s: s.split(','), line.split(';'))))
+                tmp = map(float, concatenate(map(lambda s: s.split(', '), line.split(';'))))
             except:
                 continue
             ts.append(tmp[0])
             xs.append(tmp[1])
 
-    # Resample data, using linear interpolation.
-    tmax = ts[-1]
-    res  = []
-    t    = 0.0
-    i    = 0
-    while(t < tmax):
-        while(ts[i] <= t):
-            i = i + 1
-        res.append(xs[i - 1] + (xs[i] - xs[i - 1]) * (t - ts[i - 1]) / (ts[i] - ts[i - 1]))
-        t += sample_per
+    return interp_time(ts, xs, sample_per)
 
-    return array(res)
+def sdd_21(ntwk):
+    """
+    Given a 4-port single-ended network, return its differential throughput.
+
+    Args:
+        ntwk(skrf.Network): 4-port single ended network.
+
+    Returns: Sdd[2,1].
+    """
+    
+    if(real(ntwk.s21.s[0,0,0]) < 0.5):  # 1 ==> 3 port numbering?
+        ntwk.renumber((2,3), (3,2))
+
+    return 0.5*(ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
+
+def import_freq(filename, sample_per):
+    """
+    Read in a single ended 4-port Touchstone file, and extract the
+    differential throughput impulse response, resampling as
+    appropriate, via linear interpolation.
+
+    Args:
+        filename(str): Name of Touchstone file to read in.
+        sample_per(float): New sample interval
+
+    Returns: Resampled waveform.
+    """
+
+    ntwk = rf.Network(filename)
+
+    # Form frequency vector.
+    f = ntwk.f
+    fmin = f[0]
+    if(fmin == 0):  # Correct, if d.c. point was included in original data.
+        fmin = f[1]
+    fmax = f[-1]
+    f = np.arange(fmin, fmax + fmin, fmin)
+    F = rf.Frequency.from_f(f / 1e9)  # skrf.Frequency.from_f() expects its argument to be in units of GHz.
+
+    # Form impulse response from frequency response.
+    ntwk = ntwk.interpolate_from_f(F)
+    H = sdd_21(ntwk).s[:,0,0]
+    H = np.concatenate((H, np.conj(np.flipud(H[:-1]))))  # Forming the vector that fft() would've outputted.
+    H = np.pad(H, (1,0), 'constant', constant_values=1.0)  # Presume d.c. value = 1.
+
+    h = np.real(np.fft.ifft(H))
+    h /= np.abs(h.sum())  # Equivalent to assuming that step response settles at 1.
+    
+    # Form step response from impulse response.
+    s = np.cumsum(h)
+    
+    # Form time vector.
+    t0 = 1. / (2. * fmax)  # Sampling interval = 1 / (2 fNyquist).
+    t = np.array([n * t0 for n in range(len(h))])
+
+    return interp_time(t, s, sample_per)
+## @}
+
 
 def lfsr_bits(taps, seed):
     """
@@ -780,4 +862,40 @@ def safe_log10(x):
             x = 1.e-20
 
     return log10(x)
+
+def pulse_center(p, nspui):
+    """
+    Determines the center of the pulse response, using the "Hula Hoop"
+    algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
+
+    Args:
+        p([Float]): The single bit pulse response.
+        nspui(Int): The number of vector elements per unit interval.
+
+    Returns:
+        clock_pos(Int): The estimated index at which the clock will
+                        sample the main lobe.
+        thresh(Float):  The vertical threshold at which the main lobe is
+                        UI wide.
+    """
+    
+    div = 2.
+    p_max = p.max()
+    thresh = p_max / div
+    main_lobe_ixs = where(p > thresh)[0]
+    if(not len(main_lobe_ixs)):  # Sometimes, the optimizer really whacks out.
+        return (-1, 0)           # Flag this, by returning an impossible index.
+
+    err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui
+    while(err and div < 5000):
+        div *= 2.
+        if(err > 0):
+            thresh += p_max / div
+        else:
+            thresh -= p_max / div
+        main_lobe_ixs = where(p > thresh)[0]
+        err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui
+
+    clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
+    return (clock_pos, thresh)
 
