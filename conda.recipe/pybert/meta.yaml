@@ -1,46 +1,50 @@
 {% set name = "pybert" %}
-{% set version = "2.2.2" %}
-{% set hash_type = "sha256" %}
-{% set hash_value = "2d98d963f3f33ebc7904768af0092134beeb53c7fbd63ef1182bf75c1416e493" %}
+{% set version = "2.3.0" %}
 
 package:
   version: '{{ version }}'
   name: '{{ name|lower }}'
 
 source:
-  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  '{{ hash_type }}': '{{ hash_value }}'
-  fn: '{{ name }}-{{ version }}.tar.gz'
+  path: ../../
 
 build:
   script: python setup.py install  --single-version-externally-managed --record=record.txt
   number: 0
   noarch: python
+  entry_points:
+    - pybert = pybert.pybert:main
 
 requirements:
   run:
     - python
+    - numpy 1.10.*
+    - scipy
     - traits
     - traitsui
-    - enable
+    - enable 4.5.1.*
     - chaco
     - sphinx
     - jinja2
     - docutils
     - pygments
     - pyibis-ami >=2.2.0
+    - scikit-rf
   build:
     - python
     - setuptools
+    - numpy 1.10
+    - scipy
     - traits
     - traitsui
-    - enable
+    - enable 4.5.1
     - chaco
     - sphinx
     - jinja2
     - docutils
     - pygments
     - pyibis-ami >=2.2.0
+    - scikit-rf
 
 test:
   imports:
@@ -64,8 +68,9 @@ about:
   license_family: BSD
   summary: Serial communication link bit error rate tester simulator, written in Python.
   home: https://github.com/capn-freako/PyBERT/wiki
-  license_file: ''
+  license_file: 'LICENSE'
   doc_url: ''
 
 extra:
-  recipe-maintainers: ''
+  recipe-maintainers: 'capn.freako@gmail.com'
+

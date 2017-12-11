@@ -1,0 +1,3 @@
+#! /usr/bin/env sh
+conda build conda.recipe/pybert
+
