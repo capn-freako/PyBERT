@@ -10,6 +10,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 import os.path
 import numpy as np
+import re
 import scipy.signal as sig
 import skrf as rf
 
@@ -708,7 +709,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     while(P < Pt):
         P += g[i] ** 2
         i += 1
-    stop_ix = i
+    stop_ix = min(max_ix + max_len, max(i, max_ix + min_len))
 
     # Set "front porch" to 20%, guarding against negative start index.
     start_ix = max(0, max_ix - (stop_ix - max_ix) // 4)
@@ -770,7 +771,7 @@ def import_time(filename, sample_per):
     with open(filename, mode='rU') as file:
         for line in file:
             try:
-                tmp = map(float, concatenate(map(lambda s: s.split(', '), line.split(';'))))
+                tmp = map(float, filter(None, re.split("[, ;:]+", line))[0:2])
             except:
                 continue
             ts.append(tmp[0])

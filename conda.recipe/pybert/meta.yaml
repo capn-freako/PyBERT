@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "2.3.0" %}
+{% set version = "2.3.1" %}
 
 package:
   version: '{{ version }}'

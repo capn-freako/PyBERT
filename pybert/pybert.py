@@ -451,9 +451,9 @@ class PyBERT(HasTraits):
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
-    ident  = String('PyBERT v2.3.0 - a serial communication link design tool, written in Python.\n\n \
+    ident  = String('PyBERT v2.3.1 - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    December 10, 2017\n\n \
+    December 13, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -1333,12 +1333,10 @@ class PyBERT(HasTraits):
             chnl_h           = import_channel(self.ch_file, ts)
             if(chnl_h[-1] > (max(chnl_h) / 2.)):  # step response?
                 chnl_h       = diff(chnl_h)       # impulse response is derivative of step response.
-            else:
-                chnl_h      *= ts                 # Normalize to (V/sample)
+            chnl_h          /= sum(chnl_h)        # Normalize d.c. to one.
             chnl_dly         = t[where(chnl_h == max(chnl_h))[0][0]]
             chnl_h.resize(len(t))
             chnl_H           = fft(chnl_h)
-            chnl_H          *= sum(chnl_h) / chnl_H[0]
         else:
             l_ch             = self.l_ch
             v0               = self.v0 * 3.e8
@@ -1366,6 +1364,9 @@ class PyBERT(HasTraits):
             min_len = max_len = impulse_length / ts
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
         chnl_h          /= sum(chnl_h)                                   # a temporary crutch.
+        temp             = chnl_h.copy()
+        temp.resize(len(t))
+        chnl_trimmed_H   = fft(temp)
 
         chnl_s    = chnl_h.cumsum()
         chnl_p    = chnl_s - pad(chnl_s[:-nspui], (nspui,0), 'constant', constant_values=(0,0))
@@ -1374,6 +1375,7 @@ class PyBERT(HasTraits):
         self.len_h           = len(chnl_h)
         self.chnl_dly        = chnl_dly
         self.chnl_H          = chnl_H
+        self.chnl_trimmed_H  = chnl_trimmed_H
         self.start_ix        = start_ix
         self.t_ns_chnl       = array(t[start_ix : start_ix + len(chnl_h)]) * 1.e9
         self.chnl_s          = chnl_s

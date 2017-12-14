@@ -194,6 +194,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         raise
 
     self.chnl_out    = chnl_out
+    self.chnl_out_H  = fft(chnl_out)
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     try:
@@ -680,6 +681,7 @@ def update_results(self):
 
     # Frequency responses
     self.plotdata.set_data("chnl_H",     20. * log10(abs(self.chnl_H    [1 : len_f_GHz])))
+    self.plotdata.set_data("chnl_trimmed_H", 20. * log10(abs(self.chnl_trimmed_H [1 : len_f_GHz])))
     self.plotdata.set_data("tx_H",       20. * log10(abs(self.tx_H      [1 : len_f_GHz])))
     self.plotdata.set_data("tx_out_H",   20. * log10(abs(self.tx_out_H  [1 : len_f_GHz])))
     self.plotdata.set_data("ctle_H",     20. * log10(abs(self.ctle_H    [1 : len_f_GHz])))
