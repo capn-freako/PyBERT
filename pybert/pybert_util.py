@@ -3,7 +3,7 @@ General purpose utilities for PyBERT.
 
 Original author: David Banas <capn.freako@gmail.com>
 
-Original date:   September 27, 2014 (Copied from `pybert_cntrl.py'.)
+Original date:   September 27, 2014 (Copied from pybert_cntrl.py.)
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
@@ -21,7 +21,7 @@ from numpy import sign, sin, pi, array, linspace, float, zeros, ones, \
                   concatenate, sort
 from numpy.random   import normal
 from numpy.fft      import fft, ifft
-from scipy.signal   import lfilter, iirfilter, invres, freqs, medfilt
+from scipy.signal   import lfilter, iirfilter, invres, freqs, medfilt, get_window
 from scipy.optimize import minimize, minimize_scalar
 from scipy.stats    import norm
 from dfe            import DFE
@@ -719,14 +719,22 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
 
 ## @name External channel definition importing.
 ## @{
-def import_channel(filename, sample_per):
+def import_channel(filename, sample_per, padded=False, windowed=False):
     """
     Read in a channel file.
+
+    Args:
+        filename(str): Name of file from which to import channel description.
+        sample_per(float): Sample period of signal vector (s).
+        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
+        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)
+
+    Returns: Imported channel impulse, or step, response.
     """
 
     extension = os.path.splitext(filename)[1][1:]
     if(extension == 's4p' or extension == 'S4P'):
-        return import_freq(filename, sample_per)
+        return import_freq(filename, sample_per, padded=padded, windowed=windowed)
     else:
         return import_time(filename, sample_per)
 
@@ -794,7 +802,7 @@ def sdd_21(ntwk):
 
     return 0.5*(ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
 
-def import_freq(filename, sample_per):
+def import_freq(filename, sample_per, padded=False, windowed=False):
     """
     Read in a single ended 4-port Touchstone file, and extract the
     differential throughput impulse response, resampling as
@@ -803,6 +811,8 @@ def import_freq(filename, sample_per):
     Args:
         filename(str): Name of Touchstone file to read in.
         sample_per(float): New sample interval
+        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
+        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)
 
     Returns: Resampled waveform.
     """
@@ -821,10 +831,18 @@ def import_freq(filename, sample_per):
     # Form impulse response from frequency response.
     ntwk = ntwk.interpolate_from_f(F)
     H = sdd_21(ntwk).s[:,0,0]
-    H = np.concatenate((H, np.conj(np.flipud(H[:-1]))))  # Forming the vector that fft() would've outputted.
+    # H = np.concatenate((H, np.conj(np.flipud(H[:-1]))))  # Forming the vector that fft() would've outputted.
     H = np.pad(H, (1,0), 'constant', constant_values=1.0)  # Presume d.c. value = 1.
+    if(windowed):
+        window = get_window(6.0, 2*len(H))[len(H):]
+        H *= window
 
-    h = np.real(np.fft.ifft(H))
+    # h = np.real(np.fft.ifft(H))
+    if(padded):
+        h = np.fft.irfft(H, int(1. / (fmin * sample_per)) + 1)
+        fmax = 1. / (2. * sample_per)
+    else:
+        h = np.fft.irfft(H)
     h /= np.abs(h.sum())  # Equivalent to assuming that step response settles at 1.
     
     # Form step response from impulse response.

@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>pybert.pybert_util &mdash; PyBERT Developer Guide 2.0.5 documentation</title>
+    <title>pybert.pybert_util &#8212; PyBERT Developer/Importer Guide 2.4.0 documentation</title>
     
     <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
@@ -14,17 +14,18 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../',
-        VERSION:     '2.0.5',
+        VERSION:     '2.4.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
       };
     </script>
     <script type="text/javascript" src="../../_static/jquery.js"></script>
     <script type="text/javascript" src="../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../_static/doctools.js"></script>
-    <link rel="top" title="PyBERT Developer Guide 2.0.5 documentation" href="../../index.html" />
-    <link rel="up" title="Module code" href="../index.html" /> 
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
   </head>
   <body role="document">
     <div class="related" role="navigation" aria-label="related navigation">
@@ -36,8 +37,8 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer Guide 2.0.5 documentation</a> &raquo;</li>
-          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer/Importer Guide 2.4.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
 
@@ -47,32 +48,38 @@
           <div class="body" role="main">
             
   <h1>Source code for pybert.pybert_util</h1><div class="highlight"><pre>
-<span class="sd">&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">General purpose utilities for PyBERT.</span>
 
 <span class="sd">Original author: David Banas &lt;capn.freako@gmail.com&gt;</span>
 
-<span class="sd">Original date:   September 27, 2014 (Copied from `pybert_cntrl.py&#39;.)</span>
+<span class="sd">Original date:   September 27, 2014 (Copied from pybert_cntrl.py.)</span>
 
 <span class="sd">Copyright (c) 2014 David Banas; all rights reserved World wide.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">sign</span><span class="p">,</span> <span class="n">sin</span><span class="p">,</span> <span class="n">pi</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">linspace</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">zeros</span><span class="p">,</span> <span class="n">ones</span><span class="p">,</span> \
+<span class="kn">import</span> <span class="nn">os.path</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">scipy.signal</span> <span class="k">as</span> <span class="nn">sig</span>
+<span class="kn">import</span> <span class="nn">skrf</span> <span class="k">as</span> <span class="nn">rf</span>
+
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">sign</span><span class="p">,</span> <span class="n">sin</span><span class="p">,</span> <span class="n">pi</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">linspace</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">zeros</span><span class="p">,</span> <span class="n">ones</span><span class="p">,</span> \
                   <span class="n">repeat</span><span class="p">,</span> <span class="n">where</span><span class="p">,</span> <span class="n">diff</span><span class="p">,</span> <span class="n">append</span><span class="p">,</span> <span class="n">pad</span><span class="p">,</span> <span class="n">real</span><span class="p">,</span> <span class="n">histogram</span><span class="p">,</span> \
                   <span class="n">log10</span><span class="p">,</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">cumsum</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> \
                   <span class="n">convolve</span><span class="p">,</span> <span class="n">correlate</span><span class="p">,</span> <span class="n">reshape</span><span class="p">,</span> <span class="n">resize</span><span class="p">,</span> <span class="n">insert</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> \
                   <span class="n">concatenate</span><span class="p">,</span> <span class="n">sort</span>
-<span class="kn">from</span> <span class="nn">numpy.random</span>   <span class="kn">import</span> <span class="n">normal</span>
-<span class="kn">from</span> <span class="nn">numpy.fft</span>      <span class="kn">import</span> <span class="n">fft</span><span class="p">,</span> <span class="n">ifft</span>
-<span class="kn">from</span> <span class="nn">scipy.signal</span>   <span class="kn">import</span> <span class="n">lfilter</span><span class="p">,</span> <span class="n">iirfilter</span><span class="p">,</span> <span class="n">invres</span><span class="p">,</span> <span class="n">freqs</span><span class="p">,</span> <span class="n">medfilt</span>
-<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">minimize</span><span class="p">,</span> <span class="n">minimize_scalar</span>
-<span class="kn">from</span> <span class="nn">scipy.stats</span>    <span class="kn">import</span> <span class="n">norm</span>
-<span class="kn">from</span> <span class="nn">dfe</span>            <span class="kn">import</span> <span class="n">DFE</span>
-<span class="kn">from</span> <span class="nn">cdr</span>            <span class="kn">import</span> <span class="n">CDR</span>
-<span class="kn">from</span> <span class="nn">pylab</span>          <span class="kn">import</span> <span class="n">plot</span><span class="p">,</span> <span class="n">show</span><span class="p">,</span> <span class="n">legend</span>
+<span class="kn">from</span> <span class="nn">numpy.random</span>   <span class="k">import</span> <span class="n">normal</span>
+<span class="kn">from</span> <span class="nn">numpy.fft</span>      <span class="k">import</span> <span class="n">fft</span><span class="p">,</span> <span class="n">ifft</span>
+<span class="kn">from</span> <span class="nn">scipy.signal</span>   <span class="k">import</span> <span class="n">lfilter</span><span class="p">,</span> <span class="n">iirfilter</span><span class="p">,</span> <span class="n">invres</span><span class="p">,</span> <span class="n">freqs</span><span class="p">,</span> <span class="n">medfilt</span><span class="p">,</span> <span class="n">get_window</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="k">import</span> <span class="n">minimize</span><span class="p">,</span> <span class="n">minimize_scalar</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span>    <span class="k">import</span> <span class="n">norm</span>
+<span class="kn">from</span> <span class="nn">dfe</span>            <span class="k">import</span> <span class="n">DFE</span>
+<span class="kn">from</span> <span class="nn">cdr</span>            <span class="k">import</span> <span class="n">CDR</span>
+<span class="kn">from</span> <span class="nn">pylab</span>          <span class="k">import</span> <span class="n">plot</span><span class="p">,</span> <span class="n">show</span><span class="p">,</span> <span class="n">legend</span>
 
-<span class="n">debug</span>          <span class="o">=</span> <span class="bp">False</span>
-<span class="n">gDebugOptimize</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="n">debug</span>          <span class="o">=</span> <span class="kc">False</span>
+<span class="n">gDebugOptimize</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">gMaxCTLEPeak</span>   <span class="o">=</span> <span class="mi">20</span>          <span class="c1"># max. allowed CTLE peaking (dB) (when optimizing, only)</span>
 
 <div class="viewcode-block" id="moving_average"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.moving_average">[docs]</a><span class="k">def</span> <span class="nf">moving_average</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span> <span class="p">:</span>
@@ -92,7 +99,7 @@
     <span class="n">ret</span><span class="p">[</span><span class="n">n</span><span class="p">:]</span> <span class="o">=</span> <span class="n">ret</span><span class="p">[</span><span class="n">n</span><span class="p">:]</span> <span class="o">-</span> <span class="n">ret</span><span class="p">[:</span><span class="o">-</span><span class="n">n</span><span class="p">]</span>
     <span class="k">return</span> <span class="n">insert</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:],</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ret</span><span class="p">[</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">ones</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="n">n</span></div>
 
-<div class="viewcode-block" id="find_crossing_times"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.find_crossing_times">[docs]</a><span class="k">def</span> <span class="nf">find_crossing_times</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">min_delay</span><span class="o">=</span><span class="mf">0.</span><span class="p">,</span> <span class="n">rising_first</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">min_init_dev</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">thresh</span> <span class="o">=</span> <span class="mf">0.</span><span class="p">):</span>
+<div class="viewcode-block" id="find_crossing_times"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.find_crossing_times">[docs]</a><span class="k">def</span> <span class="nf">find_crossing_times</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">min_delay</span><span class="o">=</span><span class="mf">0.</span><span class="p">,</span> <span class="n">rising_first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_init_dev</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">thresh</span> <span class="o">=</span> <span class="mf">0.</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Finds the threshold crossing times of the input signal.</span>
 
@@ -126,7 +133,7 @@
     <span class="k">try</span><span class="p">:</span>
         <span class="n">max_mag_x</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
     <span class="k">except</span><span class="p">:</span>
-        <span class="k">print</span> <span class="s2">&quot;len(x):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;len(x):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="k">raise</span>
     <span class="n">min_mag_x</span> <span class="o">=</span> <span class="n">min_init_dev</span> <span class="o">*</span> <span class="n">max_mag_x</span>
     <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
@@ -147,32 +154,32 @@
 
     <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">if</span><span class="p">(</span><span class="n">min_delay</span><span class="p">):</span>
-        <span class="k">assert</span> <span class="n">min_delay</span> <span class="o">&lt;</span> <span class="n">xings</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;min_delay ({}) must be less than last crossing time ({}).&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">min_delay</span><span class="p">,</span> <span class="n">xings</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">assert</span> <span class="n">min_delay</span> <span class="o">&lt;</span> <span class="n">xings</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;min_delay (</span><span class="si">{}</span><span class="s2">) must be less than last crossing time (</span><span class="si">{}</span><span class="s2">).&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">min_delay</span><span class="p">,</span> <span class="n">xings</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
         <span class="k">while</span><span class="p">(</span><span class="n">xings</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">min_delay</span><span class="p">):</span>
             <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
 
     <span class="k">if</span><span class="p">(</span><span class="n">debug</span><span class="p">):</span>
-        <span class="k">print</span> <span class="s2">&quot;min_delay: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">min_delay</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;rising_first: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rising_first</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;i: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;max_mag_x: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">max_mag_x</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;min_mag_x: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">min_mag_x</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;xings[0]: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">xings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="k">print</span> <span class="s2">&quot;xings[i]: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">xings</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="nb">print</span> <span class="s2">&quot;min_delay: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">min_delay</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;rising_first: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rising_first</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;i: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;max_mag_x: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">max_mag_x</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;min_mag_x: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">min_mag_x</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;xings[0]: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">xings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="nb">print</span> <span class="s2">&quot;xings[i]: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">xings</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="k">if</span><span class="p">(</span><span class="n">rising_first</span> <span class="ow">and</span> <span class="n">diff_sign_x</span><span class="p">[</span><span class="n">xing_ix</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">&lt;</span> <span class="mf">0.</span><span class="p">):</span>
             <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">except</span><span class="p">:</span>
-        <span class="k">print</span> <span class="s2">&quot;len(diff_sign_x):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">diff_sign_x</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;len(xing_ix):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xing_ix</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;i:&quot;</span><span class="p">,</span> <span class="n">i</span>
+        <span class="nb">print</span> <span class="s2">&quot;len(diff_sign_x):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">diff_sign_x</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;len(xing_ix):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xing_ix</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;i:&quot;</span><span class="p">,</span> <span class="n">i</span>
         <span class="k">raise</span>
 
     <span class="k">return</span> <span class="n">array</span><span class="p">(</span><span class="n">xings</span><span class="p">[</span><span class="n">i</span><span class="p">:])</span></div>
 
 
-<div class="viewcode-block" id="find_crossings"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.find_crossings">[docs]</a><span class="k">def</span> <span class="nf">find_crossings</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">amplitude</span><span class="p">,</span> <span class="n">min_delay</span> <span class="o">=</span> <span class="mf">0.</span><span class="p">,</span> <span class="n">rising_first</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">min_init_dev</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">mod_type</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
+<div class="viewcode-block" id="find_crossings"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.find_crossings">[docs]</a><span class="k">def</span> <span class="nf">find_crossings</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">amplitude</span><span class="p">,</span> <span class="n">min_delay</span> <span class="o">=</span> <span class="mf">0.</span><span class="p">,</span> <span class="n">rising_first</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">min_init_dev</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">mod_type</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Finds the crossing times in a signal, according to the modulation type.</span>
 
@@ -203,7 +210,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">assert</span> <span class="n">mod_type</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">mod_type</span> <span class="o">&lt;=</span> <span class="mi">2</span><span class="p">,</span> \
-            <span class="s2">&quot;ERROR: pybert_util.find_crossings(): Unknown modulation type: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mod_type</span><span class="p">)</span>
+            <span class="s2">&quot;ERROR: pybert_util.find_crossings(): Unknown modulation type: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mod_type</span><span class="p">)</span>
 
     <span class="n">xings</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">if</span><span class="p">(</span><span class="n">mod_type</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>    <span class="c1"># NRZ</span>
@@ -236,7 +243,7 @@
     <span class="k">return</span> <span class="n">sort</span><span class="p">(</span><span class="n">concatenate</span><span class="p">(</span><span class="n">xings</span><span class="p">))</span></div>
 
 
-<div class="viewcode-block" id="calc_jitter"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.calc_jitter">[docs]</a><span class="k">def</span> <span class="nf">calc_jitter</span><span class="p">(</span><span class="n">ui</span><span class="p">,</span> <span class="n">nui</span><span class="p">,</span> <span class="n">pattern_len</span><span class="p">,</span> <span class="n">ideal_xings</span><span class="p">,</span> <span class="n">actual_xings</span><span class="p">,</span> <span class="n">rel_thresh</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">num_bins</span><span class="o">=</span><span class="mi">99</span><span class="p">,</span> <span class="n">zero_mean</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+<div class="viewcode-block" id="calc_jitter"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.calc_jitter">[docs]</a><span class="k">def</span> <span class="nf">calc_jitter</span><span class="p">(</span><span class="n">ui</span><span class="p">,</span> <span class="n">nui</span><span class="p">,</span> <span class="n">pattern_len</span><span class="p">,</span> <span class="n">ideal_xings</span><span class="p">,</span> <span class="n">actual_xings</span><span class="p">,</span> <span class="n">rel_thresh</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">num_bins</span><span class="o">=</span><span class="mi">99</span><span class="p">,</span> <span class="n">zero_mean</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the jitter in a set of actual zero crossings, given the ideal crossings and unit interval.</span>
 
@@ -313,10 +320,10 @@
     <span class="n">actual_xings</span> <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">actual_xings</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">actual_xings</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">ui</span> <span class="o">/</span> <span class="mf">2.</span><span class="p">)</span>
     <span class="n">xings_per_pattern</span> <span class="o">=</span> <span class="n">where</span><span class="p">(</span><span class="n">ideal_xings</span> <span class="o">&gt;</span> <span class="p">(</span><span class="n">pattern_len</span> <span class="o">*</span> <span class="n">ui</span><span class="p">))[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">if</span><span class="p">(</span><span class="n">xings_per_pattern</span> <span class="o">%</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">xings_per_pattern</span><span class="p">):</span>
-        <span class="k">print</span> <span class="s2">&quot;xings_per_pattern:&quot;</span><span class="p">,</span> <span class="n">xings_per_pattern</span>
-        <span class="k">print</span> <span class="s2">&quot;len(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;min(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;max(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;xings_per_pattern:&quot;</span><span class="p">,</span> <span class="n">xings_per_pattern</span>
+        <span class="nb">print</span> <span class="s2">&quot;len(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;min(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;max(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;pybert_util.calc_jitter(): Odd number of (or, no) crossings per pattern detected!&quot;</span><span class="p">)</span>
     <span class="n">num_patterns</span> <span class="o">=</span> <span class="n">nui</span> <span class="o">//</span> <span class="n">pattern_len</span>
 
@@ -324,11 +331,11 @@
     <span class="n">i</span>        <span class="o">=</span> <span class="mi">0</span>
     <span class="n">jitter</span>   <span class="o">=</span> <span class="p">[]</span>
     <span class="n">t_jitter</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">skip_next_ideal_xing</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="n">skip_next_ideal_xing</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="k">for</span> <span class="n">ideal_xing</span> <span class="ow">in</span> <span class="n">ideal_xings</span><span class="p">:</span>
         <span class="k">if</span><span class="p">(</span><span class="n">skip_next_ideal_xing</span><span class="p">):</span>
             <span class="n">t_jitter</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ideal_xing</span><span class="p">)</span>
-            <span class="n">skip_next_ideal_xing</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="n">skip_next_ideal_xing</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="k">continue</span>
         <span class="c1"># Confine our attention to those actual crossings occuring</span>
         <span class="c1"># within the interval [-UI/2, +UI/2] centered around the</span>
@@ -342,7 +349,7 @@
         <span class="k">if</span><span class="p">(</span><span class="n">actual_xings</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">max_t</span><span class="p">):</span>      <span class="c1"># Means the xing we&#39;re looking for didn&#39;t occur, in the actual signal.</span>
             <span class="n">jitter</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="mf">3.</span> <span class="o">*</span> <span class="n">ui</span> <span class="o">/</span> <span class="mf">4.</span><span class="p">)</span>  <span class="c1"># Pad the jitter w/ alternating +/- 3UI/4.</span>
             <span class="n">jitter</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="o">-</span><span class="mf">3.</span> <span class="o">*</span> <span class="n">ui</span> <span class="o">/</span> <span class="mf">4.</span><span class="p">)</span>  <span class="c1"># (Will get pulled into [-UI/2, UI/2], later.</span>
-            <span class="n">skip_next_ideal_xing</span> <span class="o">=</span> <span class="bp">True</span>   <span class="c1"># If we missed one, we missed two.</span>
+            <span class="n">skip_next_ideal_xing</span> <span class="o">=</span> <span class="kc">True</span>   <span class="c1"># If we missed one, we missed two.</span>
         <span class="k">else</span><span class="p">:</span>                             <span class="c1"># Noise may produce several crossings. We find all those</span>
             <span class="n">xings</span> <span class="o">=</span> <span class="p">[]</span>                    <span class="c1"># within the interval [-UI/2, +UI/2] centered</span>
             <span class="n">j</span> <span class="o">=</span> <span class="n">i</span>                         <span class="c1"># around the ideal crossing, and take the average.</span>
@@ -355,8 +362,8 @@
     <span class="n">jitter</span>  <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">jitter</span><span class="p">)</span>
 
     <span class="k">if</span><span class="p">(</span><span class="n">debug</span><span class="p">):</span>
-        <span class="k">print</span> <span class="s2">&quot;mean(jitter):&quot;</span><span class="p">,</span> <span class="n">mean</span><span class="p">(</span><span class="n">jitter</span><span class="p">)</span>
-        <span class="k">print</span> <span class="s2">&quot;len(jitter):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">jitter</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;mean(jitter):&quot;</span><span class="p">,</span> <span class="n">mean</span><span class="p">(</span><span class="n">jitter</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;len(jitter):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">jitter</span><span class="p">)</span>
 
     <span class="k">if</span><span class="p">(</span><span class="n">zero_mean</span><span class="p">):</span>
         <span class="n">jitter</span> <span class="o">-=</span> <span class="n">mean</span><span class="p">(</span><span class="n">jitter</span><span class="p">)</span>
@@ -376,8 +383,8 @@
         <span class="n">tie_fallings_ave</span> <span class="o">=</span> <span class="n">tie_fallings</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="n">isi</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">tie_risings_ave</span><span class="o">.</span><span class="n">ptp</span><span class="p">(),</span> <span class="n">tie_fallings_ave</span><span class="o">.</span><span class="n">ptp</span><span class="p">())</span>
     <span class="k">except</span><span class="p">:</span>
-        <span class="k">print</span> <span class="s2">&quot;xings_per_pattern:&quot;</span><span class="p">,</span> <span class="n">xings_per_pattern</span>
-        <span class="k">print</span> <span class="s2">&quot;len(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="s2">&quot;xings_per_pattern:&quot;</span><span class="p">,</span> <span class="n">xings_per_pattern</span>
+        <span class="nb">print</span> <span class="s2">&quot;len(ideal_xings):&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ideal_xings</span><span class="p">)</span>
         <span class="k">raise</span>
     <span class="n">isi</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">isi</span><span class="p">,</span> <span class="n">ui</span><span class="p">)</span> <span class="c1"># Cap the ISI at the unit interval.</span>
     <span class="n">dcd</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">mean</span><span class="p">(</span><span class="n">tie_risings_ave</span><span class="p">)</span> <span class="o">-</span> <span class="n">mean</span><span class="p">(</span><span class="n">tie_fallings_ave</span><span class="p">))</span>
@@ -523,13 +530,13 @@
     <span class="k">if</span><span class="p">(</span><span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
         <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.e-12</span>
 
-    <span class="n">Rac</span>   <span class="o">=</span> <span class="n">R0</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">/</span> <span class="n">w0</span><span class="p">)</span>                        <span class="c1"># AC resistance vector</span>
+    <span class="n">Rac</span>   <span class="o">=</span> <span class="n">R0</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">/</span> <span class="n">w0</span><span class="p">)</span>                        <span class="c1"># AC resistance vector</span>
     <span class="n">R</span>     <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">power</span><span class="p">(</span><span class="n">Rdc</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">power</span><span class="p">(</span><span class="n">Rac</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>               <span class="c1"># total resistance vector</span>
     <span class="n">L0</span>    <span class="o">=</span> <span class="n">Z0</span> <span class="o">/</span> <span class="n">v0</span>                                           <span class="c1"># &quot;external&quot; inductance per unit length (H/m)</span>
     <span class="n">C0</span>    <span class="o">=</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="n">Z0</span> <span class="o">*</span> <span class="n">v0</span><span class="p">)</span>                                    <span class="c1"># nominal capacitance per unit length (F/m)</span>
-    <span class="n">C</span>     <span class="o">=</span> <span class="n">C0</span> <span class="o">*</span> <span class="n">power</span><span class="p">((</span><span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">/</span> <span class="n">w0</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mf">2.</span> <span class="o">*</span> <span class="n">Theta0</span> <span class="o">/</span> <span class="n">pi</span><span class="p">))</span>    <span class="c1"># complex capacitance per unit length (F/m)</span>
-    <span class="n">gamma</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">((</span><span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">L0</span> <span class="o">+</span> <span class="n">R</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">C</span><span class="p">))</span>            <span class="c1"># propagation constant (nepers/m)</span>
-    <span class="n">Zc</span>    <span class="o">=</span> <span class="n">sqrt</span><span class="p">((</span><span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">L0</span> <span class="o">+</span> <span class="n">R</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">C</span><span class="p">))</span>            <span class="c1"># characteristic impedance (Ohms)</span>
+    <span class="n">C</span>     <span class="o">=</span> <span class="n">C0</span> <span class="o">*</span> <span class="n">power</span><span class="p">((</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">/</span> <span class="n">w0</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mf">2.</span> <span class="o">*</span> <span class="n">Theta0</span> <span class="o">/</span> <span class="n">pi</span><span class="p">))</span>    <span class="c1"># complex capacitance per unit length (F/m)</span>
+    <span class="n">gamma</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">((</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">L0</span> <span class="o">+</span> <span class="n">R</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">C</span><span class="p">))</span>            <span class="c1"># propagation constant (nepers/m)</span>
+    <span class="n">Zc</span>    <span class="o">=</span> <span class="n">sqrt</span><span class="p">((</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">L0</span> <span class="o">+</span> <span class="n">R</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">C</span><span class="p">))</span>            <span class="c1"># characteristic impedance (Ohms)</span>
 
     <span class="k">return</span> <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="n">Zc</span><span class="p">)</span></div>
 
@@ -558,12 +565,12 @@
         <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.e-12</span>
 
     <span class="c1"># Impedance looking back into the Tx output is a simple parallel RC network.</span>
-    <span class="n">Zs</span> <span class="o">=</span> <span class="n">Rs</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">Rs</span> <span class="o">*</span> <span class="n">Cs</span><span class="p">)</span>
+    <span class="n">Zs</span> <span class="o">=</span> <span class="n">Rs</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">Rs</span> <span class="o">*</span> <span class="n">Cs</span><span class="p">)</span>
     <span class="c1"># Rx load impedance is 2 series, a.c.-coupling capacitors, in series w/ parallel comb. of Rterm &amp; parasitic cap.</span>
     <span class="c1"># (The two parasitic capacitances are in series.)</span>
-    <span class="n">ZL</span> <span class="o">=</span> <span class="mf">2.</span> <span class="o">*</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">CL</span><span class="p">)</span> <span class="o">+</span> <span class="n">RL</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">RL</span> <span class="o">*</span> <span class="n">Cp</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">ZL</span> <span class="o">=</span> <span class="mf">2.</span> <span class="o">*</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">CL</span><span class="p">)</span> <span class="o">+</span> <span class="n">RL</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">RL</span> <span class="o">*</span> <span class="n">Cp</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
     <span class="c1"># Admittance into the interconnect is (Cs || Zc) / (Rs + (Cs || Zc)).</span>
-    <span class="n">Cs_par_Zc</span> <span class="o">=</span> <span class="n">Zc</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="mi">1j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">Zc</span> <span class="o">*</span> <span class="n">Cs</span><span class="p">)</span>
+    <span class="n">Cs_par_Zc</span> <span class="o">=</span> <span class="n">Zc</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">Zc</span> <span class="o">*</span> <span class="n">Cs</span><span class="p">)</span>
     <span class="n">A</span>         <span class="o">=</span> <span class="n">Cs_par_Zc</span> <span class="o">/</span> <span class="p">(</span><span class="n">Rs</span> <span class="o">+</span> <span class="n">Cs_par_Zc</span><span class="p">)</span>
     <span class="c1"># Reflection coefficient at Rx:</span>
     <span class="n">R1</span>        <span class="o">=</span> <span class="p">(</span><span class="n">ZL</span> <span class="o">-</span> <span class="n">Zc</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">ZL</span> <span class="o">+</span> <span class="n">Zc</span><span class="p">)</span>
@@ -571,11 +578,11 @@
     <span class="n">R2</span>        <span class="o">=</span> <span class="p">(</span><span class="n">Zs</span> <span class="o">-</span> <span class="n">Zc</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">Zs</span> <span class="o">+</span> <span class="n">Zc</span><span class="p">)</span>
     <span class="c1"># Fully loaded channel transfer function:</span>
     <span class="n">G</span> <span class="o">=</span> <span class="n">A</span> <span class="o">*</span> <span class="n">H</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">R1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">R1</span> <span class="o">*</span> <span class="n">R2</span> <span class="o">*</span> <span class="n">H</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
-    <span class="n">G</span> <span class="o">=</span> <span class="n">G</span> <span class="o">*</span> <span class="p">(((</span><span class="n">RL</span><span class="o">/</span><span class="p">(</span><span class="mi">1j</span><span class="o">*</span><span class="n">w</span><span class="o">*</span><span class="n">Cp</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span><span class="o">/</span><span class="p">(</span><span class="n">RL</span> <span class="o">+</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="mi">1j</span><span class="o">*</span><span class="n">w</span><span class="o">*</span><span class="n">Cp</span><span class="o">/</span><span class="mi">2</span><span class="p">)))</span> <span class="o">/</span> <span class="n">ZL</span><span class="p">)</span> <span class="c1"># Corrected for divider action.</span>
+    <span class="n">G</span> <span class="o">=</span> <span class="n">G</span> <span class="o">*</span> <span class="p">(((</span><span class="n">RL</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="n">w</span><span class="o">*</span><span class="n">Cp</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span><span class="o">/</span><span class="p">(</span><span class="n">RL</span> <span class="o">+</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="n">w</span><span class="o">*</span><span class="n">Cp</span><span class="o">/</span><span class="mi">2</span><span class="p">)))</span> <span class="o">/</span> <span class="n">ZL</span><span class="p">)</span> <span class="c1"># Corrected for divider action.</span>
                                                            <span class="c1"># (i.e. - We&#39;re interested in what appears across RL.)</span>
     <span class="k">return</span> <span class="n">G</span></div>
 
-<div class="viewcode-block" id="calc_eye"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.calc_eye">[docs]</a><span class="k">def</span> <span class="nf">calc_eye</span><span class="p">(</span><span class="n">ui</span><span class="p">,</span> <span class="n">samps_per_ui</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">y_max</span><span class="p">,</span> <span class="n">clock_times</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<div class="viewcode-block" id="calc_eye"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.calc_eye">[docs]</a><span class="k">def</span> <span class="nf">calc_eye</span><span class="p">(</span><span class="n">ui</span><span class="p">,</span> <span class="n">samps_per_ui</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">y_max</span><span class="p">,</span> <span class="n">clock_times</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculates the &quot;eye&quot; diagram of the input signal vector.</span>
 
@@ -710,16 +717,16 @@
     <span class="k">elif</span><span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;Manual&#39;</span> <span class="ow">or</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;AGC&#39;</span><span class="p">):</span>
         <span class="n">H</span> <span class="o">*=</span> <span class="nb">pow</span><span class="p">(</span><span class="mf">10.</span><span class="p">,</span> <span class="n">dc_offset</span> <span class="o">/</span> <span class="mf">20.</span><span class="p">)</span> <span class="o">/</span> <span class="nb">abs</span><span class="p">(</span><span class="n">H</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># Enforce d.c. offset.</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="n">RunTimeException</span><span class="p">(</span><span class="s2">&quot;pybert_util.make_ctle(): Unrecognized value for &#39;mode&#39; parameter: {}.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="n">RunTimeException</span><span class="p">(</span><span class="s2">&quot;pybert_util.make_ctle(): Unrecognized value for &#39;mode&#39; parameter: </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="p">))</span>
 
     <span class="k">return</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="trim_impulse"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.trim_impulse">[docs]</a><span class="k">def</span> <span class="nf">trim_impulse</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">Ts</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">chnl_dly</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">min_len</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_len</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Trim impulse response, for more useful display, by:</span>
-<span class="sd">      - eliminating 90% of the overall delay from the beginning, and</span>
-<span class="sd">      - clipping off the tail, after 99.8% of the total power has been captured.</span>
-<span class="sd">        (Using 99.9% was causing problems; I don&#39;t know why.)</span>
+<span class="sd">      - clipping off the tail, after 99.8% of the total power has been</span>
+<span class="sd">        captured (Using 99.9% was causing problems; I don&#39;t know why.), and</span>
+<span class="sd">      - setting the &quot;front porch&quot; length equal to 20% of the total length.</span>
 
 <span class="sd">    Inputs:</span>
 <span class="sd">    </span>
@@ -741,35 +748,72 @@
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">g</span> <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">g</span><span class="p">[:</span><span class="nb">int</span><span class="p">(</span><span class="mf">0.9</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">g</span><span class="p">))])</span>  <span class="c1"># Trim off potential FFT artifacts from the end.</span>
+    <span class="c1"># Trim off potential FFT artifacts from the end and capture peak location.</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">g</span><span class="p">[:</span><span class="nb">int</span><span class="p">(</span><span class="mf">0.9</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">g</span><span class="p">))])</span>
+    <span class="n">max_ix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
 
-    <span class="k">if</span><span class="p">(</span><span class="n">Ts</span> <span class="ow">and</span> <span class="n">chnl_dly</span><span class="p">):</span>
-        <span class="n">start_ix</span>  <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">0.9</span> <span class="o">*</span> <span class="n">chnl_dly</span> <span class="o">/</span> <span class="n">Ts</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">min_mag</span> <span class="o">=</span> <span class="mf">0.01</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g</span><span class="p">))</span>
-        <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">while</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">&lt;</span> <span class="n">min_mag</span><span class="p">):</span>
-            <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
-        <span class="n">start_ix</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="mi">10</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="mf">0.9</span> <span class="o">*</span> <span class="n">i</span><span class="p">)))</span>
-
-    <span class="n">Pt</span>        <span class="o">=</span> <span class="mf">0.998</span> <span class="o">*</span> <span class="nb">sum</span><span class="p">(</span><span class="n">g</span><span class="p">[</span><span class="n">start_ix</span><span class="p">:]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
-    <span class="n">i</span>         <span class="o">=</span> <span class="n">start_ix</span>
-    <span class="n">P</span>         <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1"># Capture 99.8% of the total energy.</span>
+    <span class="n">Pt</span> <span class="o">=</span> <span class="mf">0.998</span> <span class="o">*</span> <span class="nb">sum</span><span class="p">(</span><span class="n">g</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">i</span>  <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">P</span>  <span class="o">=</span> <span class="mi">0</span>
     <span class="k">while</span><span class="p">(</span><span class="n">P</span> <span class="o">&lt;</span> <span class="n">Pt</span><span class="p">):</span>
         <span class="n">P</span> <span class="o">+=</span> <span class="n">g</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
         <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="n">stop_ix</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">max_ix</span> <span class="o">+</span> <span class="n">max_len</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">max_ix</span> <span class="o">+</span> <span class="n">min_len</span><span class="p">))</span>
 
-    <span class="n">vec_len</span> <span class="o">=</span> <span class="n">i</span> <span class="o">-</span> <span class="n">start_ix</span>
-    <span class="k">if</span><span class="p">(</span><span class="n">vec_len</span> <span class="o">&lt;</span> <span class="n">min_len</span><span class="p">):</span>
-        <span class="n">i</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">g</span><span class="p">),</span> <span class="n">start_ix</span> <span class="o">+</span> <span class="n">min_len</span><span class="p">)</span>
-    <span class="k">if</span><span class="p">(</span><span class="n">vec_len</span> <span class="o">&gt;</span> <span class="n">max_len</span><span class="p">):</span>
-        <span class="n">i</span> <span class="o">=</span> <span class="n">start_ix</span> <span class="o">+</span> <span class="n">max_len</span>
+    <span class="c1"># Set &quot;front porch&quot; to 20%, guarding against negative start index.</span>
+    <span class="n">start_ix</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_ix</span> <span class="o">-</span> <span class="p">(</span><span class="n">stop_ix</span> <span class="o">-</span> <span class="n">max_ix</span><span class="p">)</span> <span class="o">//</span> <span class="mi">4</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="p">(</span><span class="n">g</span><span class="p">[</span><span class="n">start_ix</span> <span class="p">:</span> <span class="n">i</span><span class="p">],</span> <span class="n">start_ix</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="p">(</span><span class="n">g</span><span class="p">[</span><span class="n">start_ix</span> <span class="p">:</span> <span class="n">stop_ix</span><span class="p">],</span> <span class="n">start_ix</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="import_qucs_csv"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.import_qucs_csv">[docs]</a><span class="k">def</span> <span class="nf">import_qucs_csv</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">):</span>
+
+<span class="c1">## @name External channel definition importing.</span>
+<span class="c1">## @{</span>
+<span class="k">def</span> <span class="nf">import_channel</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Read in a CSV waveform file exported by QUCS, resampling as</span>
+<span class="sd">    Read in a channel file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        filename(str): Name of file from which to import channel description.</span>
+<span class="sd">        sample_per(float): Sample period of signal vector (s).</span>
+<span class="sd">        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</span>
+<span class="sd">        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)</span>
+
+<span class="sd">    Returns: Imported channel impulse, or step, response.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">extension</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filename</span><span class="p">)[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">extension</span> <span class="o">==</span> <span class="s1">&#39;s4p&#39;</span> <span class="ow">or</span> <span class="n">extension</span> <span class="o">==</span> <span class="s1">&#39;S4P&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">import_freq</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="n">padded</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="n">windowed</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">import_time</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">interp_time</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Resample time domain data, using linear interpolation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ts([float]): Original time values.</span>
+<span class="sd">        xs([float]): Original signal values.</span>
+<span class="sd">        sample_per(float): System sample period.</span>
+
+<span class="sd">    Returns: Resampled waveform.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">tmax</span> <span class="o">=</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">res</span>  <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">t</span>    <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">i</span>    <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span><span class="p">(</span><span class="n">t</span> <span class="o">&lt;</span> <span class="n">tmax</span><span class="p">):</span>
+        <span class="k">while</span><span class="p">(</span><span class="n">ts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">t</span><span class="p">):</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">xs</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">xs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">xs</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">t</span> <span class="o">-</span> <span class="n">ts</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">ts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ts</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]))</span>
+        <span class="n">t</span> <span class="o">+=</span> <span class="n">sample_per</span>
+
+    <span class="k">return</span> <span class="n">array</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">import_time</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read in a time domain waveform file, resampling as</span>
 <span class="sd">    appropriate, via linear interpolation.</span>
 
 <span class="sd">    Args:</span>
@@ -782,27 +826,87 @@
     <span class="c1"># Read in original data from file.</span>
     <span class="n">ts</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">xs</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rU&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">csv_file</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">csv_file</span><span class="p">:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;rU&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">tmp</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">concatenate</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">),</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;;&#39;</span><span class="p">))))</span>
+                <span class="n">tmp</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="nb">filter</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;[, ;:]+&quot;</span><span class="p">,</span> <span class="n">line</span><span class="p">))[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
             <span class="k">except</span><span class="p">:</span>
                 <span class="k">continue</span>
             <span class="n">ts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tmp</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
             <span class="n">xs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tmp</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 
-    <span class="c1"># Resample data, using linear interpolation.</span>
-    <span class="n">tmax</span> <span class="o">=</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-    <span class="n">res</span>  <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">t</span>    <span class="o">=</span> <span class="mf">0.0</span>
-    <span class="n">i</span>    <span class="o">=</span> <span class="mi">0</span>
-    <span class="k">while</span><span class="p">(</span><span class="n">t</span> <span class="o">&lt;</span> <span class="n">tmax</span><span class="p">):</span>
-        <span class="k">while</span><span class="p">(</span><span class="n">ts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">t</span><span class="p">):</span>
-            <span class="n">i</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
-        <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">xs</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">xs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">xs</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">t</span> <span class="o">-</span> <span class="n">ts</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">ts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ts</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]))</span>
-        <span class="n">t</span> <span class="o">+=</span> <span class="n">sample_per</span>
+    <span class="k">return</span> <span class="n">interp_time</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">array</span><span class="p">(</span><span class="n">res</span><span class="p">)</span></div>
+<span class="k">def</span> <span class="nf">sdd_21</span><span class="p">(</span><span class="n">ntwk</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a 4-port single-ended network, return its differential throughput.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ntwk(skrf.Network): 4-port single ended network.</span>
+
+<span class="sd">    Returns: Sdd[2,1].</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">if</span><span class="p">(</span><span class="n">real</span><span class="p">(</span><span class="n">ntwk</span><span class="o">.</span><span class="n">s21</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="p">):</span>  <span class="c1"># 1 ==&gt; 3 port numbering?</span>
+        <span class="n">ntwk</span><span class="o">.</span><span class="n">renumber</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">ntwk</span><span class="o">.</span><span class="n">s21</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s23</span> <span class="o">+</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s43</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s41</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">import_freq</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read in a single ended 4-port Touchstone file, and extract the</span>
+<span class="sd">    differential throughput impulse response, resampling as</span>
+<span class="sd">    appropriate, via linear interpolation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        filename(str): Name of Touchstone file to read in.</span>
+<span class="sd">        sample_per(float): New sample interval</span>
+<span class="sd">        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</span>
+<span class="sd">        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)</span>
+
+<span class="sd">    Returns: Resampled waveform.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;padded = </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">padded</span><span class="p">))</span>
+    <span class="n">ntwk</span> <span class="o">=</span> <span class="n">rf</span><span class="o">.</span><span class="n">Network</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+    <span class="c1"># Form frequency vector.</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">f</span>
+    <span class="n">fmin</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">fmin</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>  <span class="c1"># Correct, if d.c. point was included in original data.</span>
+        <span class="n">fmin</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">fmax</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">fmin</span><span class="p">,</span> <span class="n">fmax</span> <span class="o">+</span> <span class="n">fmin</span><span class="p">,</span> <span class="n">fmin</span><span class="p">)</span>
+    <span class="n">F</span> <span class="o">=</span> <span class="n">rf</span><span class="o">.</span><span class="n">Frequency</span><span class="o">.</span><span class="n">from_f</span><span class="p">(</span><span class="n">f</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">)</span>  <span class="c1"># skrf.Frequency.from_f() expects its argument to be in units of GHz.</span>
+
+    <span class="c1"># Form impulse response from frequency response.</span>
+    <span class="n">ntwk</span> <span class="o">=</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">interpolate_from_f</span><span class="p">(</span><span class="n">F</span><span class="p">)</span>
+    <span class="n">H</span> <span class="o">=</span> <span class="n">sdd_21</span><span class="p">(</span><span class="n">ntwk</span><span class="p">)</span><span class="o">.</span><span class="n">s</span><span class="p">[:,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span>
+    <span class="c1"># H = np.concatenate((H, np.conj(np.flipud(H[:-1]))))  # Forming the vector that fft() would&#39;ve outputted.</span>
+    <span class="n">H</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="n">constant_values</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>  <span class="c1"># Presume d.c. value = 1.</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">windowed</span><span class="p">):</span>
+        <span class="n">window</span> <span class="o">=</span> <span class="n">get_window</span><span class="p">(</span><span class="mf">6.0</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">H</span><span class="p">))[</span><span class="nb">len</span><span class="p">(</span><span class="n">H</span><span class="p">):]</span>
+        <span class="n">H</span> <span class="o">*=</span> <span class="n">window</span>
+
+    <span class="c1"># h = np.real(np.fft.ifft(H))</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">padded</span><span class="p">):</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">irfft</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="n">fmin</span> <span class="o">*</span> <span class="n">sample_per</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">fmax</span> <span class="o">=</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.</span> <span class="o">*</span> <span class="n">sample_per</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">irfft</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
+    <span class="n">h</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>  <span class="c1"># Equivalent to assuming that step response settles at 1.</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;fmax = </span><span class="si">{}</span><span class="s2">; len(h) = </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fmax</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">h</span><span class="p">)))</span>
+    
+    <span class="c1"># Form step response from impulse response.</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+    
+    <span class="c1"># Form time vector.</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.</span> <span class="o">*</span> <span class="n">fmax</span><span class="p">)</span>  <span class="c1"># Sampling interval = 1 / (2 fNyquist).</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">n</span> <span class="o">*</span> <span class="n">t0</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">h</span><span class="p">))])</span>
+
+    <span class="k">return</span> <span class="n">interp_time</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span>
+<span class="c1">## @}</span>
+
 
 <span class="k">def</span> <span class="nf">lfsr_bits</span><span class="p">(</span><span class="n">taps</span><span class="p">,</span> <span class="n">seed</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -812,8 +916,8 @@
     <span class="n">num_taps</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">taps</span><span class="p">)</span>
     <span class="n">mask</span>     <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_taps</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
 
-    <span class="k">while</span><span class="p">(</span><span class="bp">True</span><span class="p">):</span>
-        <span class="n">xor_res</span> <span class="o">=</span> <span class="nb">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">x</span> <span class="o">^</span> <span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="nb">bool</span><span class="p">(</span><span class="n">val</span> <span class="o">&amp;</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">tap</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span> <span class="k">for</span> <span class="n">tap</span> <span class="ow">in</span> <span class="n">taps</span><span class="p">])</span>
+    <span class="k">while</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">xor_res</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">x</span> <span class="o">^</span> <span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="nb">bool</span><span class="p">(</span><span class="n">val</span> <span class="o">&amp;</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">tap</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span> <span class="k">for</span> <span class="n">tap</span> <span class="ow">in</span> <span class="n">taps</span><span class="p">])</span>
         <span class="n">val</span>     <span class="o">=</span> <span class="p">(</span><span class="n">val</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">mask</span>  <span class="c1"># Just to keep &#39;val&#39; from growing without bound.</span>
         <span class="k">if</span><span class="p">(</span><span class="n">xor_res</span><span class="p">):</span>
             <span class="n">val</span> <span class="o">+=</span> <span class="mi">1</span>
@@ -830,6 +934,42 @@
 
     <span class="k">return</span> <span class="n">log10</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 
+<span class="k">def</span> <span class="nf">pulse_center</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">nspui</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Determines the center of the pulse response, using the &quot;Hula Hoop&quot;</span>
+<span class="sd">    algorithm (See SiSoft/Tellian&#39;s DesignCon 2016 paper.)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        p([Float]): The single bit pulse response.</span>
+<span class="sd">        nspui(Int): The number of vector elements per unit interval.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        clock_pos(Int): The estimated index at which the clock will</span>
+<span class="sd">                        sample the main lobe.</span>
+<span class="sd">        thresh(Float):  The vertical threshold at which the main lobe is</span>
+<span class="sd">                        UI wide.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">div</span> <span class="o">=</span> <span class="mf">2.</span>
+    <span class="n">p_max</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">thresh</span> <span class="o">=</span> <span class="n">p_max</span> <span class="o">/</span> <span class="n">div</span>
+    <span class="n">main_lobe_ixs</span> <span class="o">=</span> <span class="n">where</span><span class="p">(</span><span class="n">p</span> <span class="o">&gt;</span> <span class="n">thresh</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span><span class="p">(</span><span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">main_lobe_ixs</span><span class="p">)):</span>  <span class="c1"># Sometimes, the optimizer really whacks out.</span>
+        <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>           <span class="c1"># Flag this, by returning an impossible index.</span>
+
+    <span class="n">err</span> <span class="o">=</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">nspui</span>
+    <span class="k">while</span><span class="p">(</span><span class="n">err</span> <span class="ow">and</span> <span class="n">div</span> <span class="o">&lt;</span> <span class="mi">5000</span><span class="p">):</span>
+        <span class="n">div</span> <span class="o">*=</span> <span class="mf">2.</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">err</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="n">thresh</span> <span class="o">+=</span> <span class="n">p_max</span> <span class="o">/</span> <span class="n">div</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">thresh</span> <span class="o">-=</span> <span class="n">p_max</span> <span class="o">/</span> <span class="n">div</span>
+        <span class="n">main_lobe_ixs</span> <span class="o">=</span> <span class="n">where</span><span class="p">(</span><span class="n">p</span> <span class="o">&gt;</span> <span class="n">thresh</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">nspui</span>
+
+    <span class="n">clock_pos</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mean</span><span class="p">([</span><span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]))</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">clock_pos</span><span class="p">,</span> <span class="n">thresh</span><span class="p">)</span>
+
 </pre></div>
 
           </div>
@@ -840,14 +980,11 @@
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
     <form class="search" action="../../search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
-    </p>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -863,13 +1000,13 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer Guide 2.0.5 documentation</a> &raquo;</li>
-          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer/Importer Guide 2.4.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &copy; Copyright 2015, David Banas.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.5.
+        &#169; Copyright 2015, David Banas.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.4.
     </div>
   </body>
 </html>

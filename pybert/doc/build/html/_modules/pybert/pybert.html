@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>pybert.pybert &mdash; PyBERT Developer Guide 2.0.5 documentation</title>
+    <title>pybert.pybert &#8212; PyBERT Developer/Importer Guide 2.4.0 documentation</title>
     
     <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
@@ -14,17 +14,18 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../',
-        VERSION:     '2.0.5',
+        VERSION:     '2.4.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
       };
     </script>
     <script type="text/javascript" src="../../_static/jquery.js"></script>
     <script type="text/javascript" src="../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../_static/doctools.js"></script>
-    <link rel="top" title="PyBERT Developer Guide 2.0.5 documentation" href="../../index.html" />
-    <link rel="up" title="Module code" href="../index.html" /> 
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
   </head>
   <body role="document">
     <div class="related" role="navigation" aria-label="related navigation">
@@ -36,8 +37,8 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer Guide 2.0.5 documentation</a> &raquo;</li>
-          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer/Importer Guide 2.4.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
 
@@ -47,7 +48,7 @@
           <div class="body" role="main">
             
   <h1>Source code for pybert.pybert</h1><div class="highlight"><pre>
-<span class="ch">#! /usr/bin/env python</span>
+<span></span><span class="ch">#! /usr/bin/env python</span>
 
 <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">Bit error rate tester (BERT) simulator, written in Python.</span>
@@ -64,46 +65,52 @@
 <span class="sd">Copyright (c) 2014 by David Banas; All rights reserved World wide.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="c1"># from traits.trait_base import ETSConfig</span>
-<span class="c1"># ETSConfig.toolkit = &#39;qt4&#39;</span>
+<span class="kn">from</span> <span class="nn">traits.trait_base</span> <span class="k">import</span> <span class="n">ETSConfig</span>
+<span class="n">ETSConfig</span><span class="o">.</span><span class="n">toolkit</span> <span class="o">=</span> <span class="s1">&#39;qt4&#39;</span>
+<span class="c1"># ETSConfig.toolkit = &#39;wx&#39;</span>
 
-<span class="kn">from</span> <span class="nn">datetime</span>        <span class="kn">import</span> <span class="n">datetime</span>
-<span class="kn">from</span> <span class="nn">threading</span>       <span class="kn">import</span> <span class="n">Thread</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
 
-<span class="kn">from</span> <span class="nn">numpy</span>           <span class="kn">import</span> <span class="n">array</span><span class="p">,</span> <span class="n">linspace</span><span class="p">,</span> <span class="n">zeros</span><span class="p">,</span> <span class="n">histogram</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">diff</span><span class="p">,</span> \
+<span class="kn">from</span> <span class="nn">datetime</span>        <span class="k">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">threading</span>       <span class="k">import</span> <span class="n">Thread</span><span class="p">,</span> <span class="n">Event</span>
+<span class="kn">from</span> <span class="nn">time</span>            <span class="k">import</span> <span class="n">sleep</span>
+
+<span class="kn">from</span> <span class="nn">numpy</span>           <span class="k">import</span> <span class="n">array</span><span class="p">,</span> <span class="n">linspace</span><span class="p">,</span> <span class="n">zeros</span><span class="p">,</span> <span class="n">histogram</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">diff</span><span class="p">,</span> \
                             <span class="n">transpose</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">real</span><span class="p">,</span> <span class="n">pad</span><span class="p">,</span> <span class="n">pi</span><span class="p">,</span> <span class="n">resize</span><span class="p">,</span> <span class="n">cos</span><span class="p">,</span> \
                             <span class="n">where</span><span class="p">,</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">convolve</span><span class="p">,</span> <span class="n">sinc</span><span class="p">,</span> <span class="n">log10</span><span class="p">,</span> <span class="n">ones</span>
-<span class="kn">from</span> <span class="nn">numpy.fft</span>       <span class="kn">import</span> <span class="n">fft</span><span class="p">,</span> <span class="n">ifft</span>
-<span class="kn">from</span> <span class="nn">numpy.random</span>    <span class="kn">import</span> <span class="n">randint</span>
-<span class="kn">from</span> <span class="nn">scipy.signal</span>    <span class="kn">import</span> <span class="n">lfilter</span><span class="p">,</span> <span class="n">iirfilter</span>
-<span class="kn">from</span> <span class="nn">scipy.optimize</span>  <span class="kn">import</span> <span class="n">minimize</span><span class="p">,</span> <span class="n">minimize_scalar</span>
+<span class="kn">from</span> <span class="nn">numpy.fft</span>       <span class="k">import</span> <span class="n">fft</span><span class="p">,</span> <span class="n">ifft</span>
+<span class="kn">from</span> <span class="nn">numpy.random</span>    <span class="k">import</span> <span class="n">randint</span>
+<span class="kn">from</span> <span class="nn">scipy.signal</span>    <span class="k">import</span> <span class="n">lfilter</span><span class="p">,</span> <span class="n">iirfilter</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span>  <span class="k">import</span> <span class="n">minimize</span><span class="p">,</span> <span class="n">minimize_scalar</span>
 
-<span class="kn">from</span> <span class="nn">traits.api</span>      <span class="kn">import</span> <span class="n">HasTraits</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">Range</span><span class="p">,</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Int</span><span class="p">,</span> <span class="n">Property</span><span class="p">,</span> \
+<span class="kn">from</span> <span class="nn">pyface.api</span>      <span class="k">import</span> <span class="n">FileDialog</span><span class="p">,</span> <span class="n">OK</span>
+<span class="kn">from</span> <span class="nn">traits.api</span>      <span class="k">import</span> <span class="n">HasTraits</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">Range</span><span class="p">,</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Int</span><span class="p">,</span> <span class="n">Property</span><span class="p">,</span> \
                             <span class="n">String</span><span class="p">,</span> <span class="n">cached_property</span><span class="p">,</span> <span class="n">Instance</span><span class="p">,</span> <span class="n">HTML</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> \
                             <span class="n">Bool</span><span class="p">,</span> <span class="n">File</span><span class="p">,</span> <span class="n">Button</span><span class="p">,</span> <span class="n">Enum</span>
-<span class="kn">from</span> <span class="nn">traitsui.api</span>    <span class="kn">import</span> <span class="n">View</span><span class="p">,</span> <span class="n">Item</span><span class="p">,</span> <span class="n">Group</span>
-<span class="kn">from</span> <span class="nn">traitsui.message</span> <span class="kn">import</span> <span class="n">auto_close_message</span><span class="p">,</span> <span class="n">error</span><span class="p">,</span> <span class="n">message</span>
+<span class="kn">from</span> <span class="nn">traitsui.api</span>    <span class="k">import</span> <span class="n">View</span><span class="p">,</span> <span class="n">Item</span><span class="p">,</span> <span class="n">Group</span>
+<span class="kn">from</span> <span class="nn">traitsui.message</span> <span class="k">import</span> <span class="n">auto_close_message</span><span class="p">,</span> <span class="n">error</span><span class="p">,</span> <span class="n">message</span>
 
-<span class="kn">from</span> <span class="nn">chaco.api</span>       <span class="kn">import</span> <span class="n">Plot</span><span class="p">,</span> <span class="n">ArrayPlotData</span><span class="p">,</span> <span class="n">VPlotContainer</span><span class="p">,</span> \
+<span class="kn">from</span> <span class="nn">chaco.api</span>       <span class="k">import</span> <span class="n">Plot</span><span class="p">,</span> <span class="n">ArrayPlotData</span><span class="p">,</span> <span class="n">VPlotContainer</span><span class="p">,</span> \
                             <span class="n">GridPlotContainer</span><span class="p">,</span> <span class="n">ColorMapper</span><span class="p">,</span> <span class="n">Legend</span><span class="p">,</span> \
                             <span class="n">OverlayPlotContainer</span><span class="p">,</span> <span class="n">PlotAxis</span>
-<span class="kn">from</span> <span class="nn">chaco.tools.api</span> <span class="kn">import</span> <span class="n">PanTool</span><span class="p">,</span> <span class="n">ZoomTool</span><span class="p">,</span> <span class="n">LegendTool</span><span class="p">,</span> <span class="n">TraitsTool</span><span class="p">,</span> <span class="n">DragZoom</span>
-<span class="kn">from</span> <span class="nn">enable.component_editor</span> <span class="kn">import</span> <span class="n">ComponentEditor</span>
+<span class="kn">from</span> <span class="nn">chaco.tools.api</span> <span class="k">import</span> <span class="n">PanTool</span><span class="p">,</span> <span class="n">ZoomTool</span><span class="p">,</span> <span class="n">LegendTool</span><span class="p">,</span> <span class="n">TraitsTool</span><span class="p">,</span> <span class="n">DragZoom</span>
+<span class="kn">from</span> <span class="nn">enable.component_editor</span> <span class="k">import</span> <span class="n">ComponentEditor</span>
 
-<span class="kn">from</span> <span class="nn">pyibisami.amimodel</span>  <span class="kn">import</span> <span class="n">AMIModel</span><span class="p">,</span> <span class="n">AMIModelInitializer</span>
-<span class="kn">from</span> <span class="nn">pyibisami.ami_parse</span> <span class="kn">import</span> <span class="n">AMIParamConfigurator</span>
+<span class="kn">from</span> <span class="nn">pyibisami.amimodel</span>  <span class="k">import</span> <span class="n">AMIModel</span><span class="p">,</span> <span class="n">AMIModelInitializer</span>
+<span class="kn">from</span> <span class="nn">pyibisami.ami_parse</span> <span class="k">import</span> <span class="n">AMIParamConfigurator</span>
 
-<span class="kn">from</span> <span class="nn">pybert_view</span>     <span class="kn">import</span> <span class="n">traits_view</span>
-<span class="kn">from</span> <span class="nn">pybert_cntrl</span>    <span class="kn">import</span> <span class="n">my_run_simulation</span><span class="p">,</span> <span class="n">update_results</span><span class="p">,</span> <span class="n">update_eyes</span>
-<span class="kn">from</span> <span class="nn">pybert_util</span>     <span class="kn">import</span> <span class="n">calc_gamma</span><span class="p">,</span> <span class="n">calc_G</span><span class="p">,</span> <span class="n">trim_impulse</span><span class="p">,</span> <span class="n">import_qucs_csv</span><span class="p">,</span> \
-                            <span class="n">make_ctle</span><span class="p">,</span> <span class="n">lfsr_bits</span><span class="p">,</span> <span class="n">safe_log10</span>
-<span class="kn">from</span> <span class="nn">pybert_plot</span>     <span class="kn">import</span> <span class="n">make_plots</span>
-<span class="kn">from</span> <span class="nn">pybert_help</span>     <span class="kn">import</span> <span class="n">help_str</span>
+<span class="kn">from</span> <span class="nn">pybert_view</span>     <span class="k">import</span> <span class="n">traits_view</span>
+<span class="kn">from</span> <span class="nn">pybert_cntrl</span>    <span class="k">import</span> <span class="n">my_run_simulation</span><span class="p">,</span> <span class="n">update_results</span><span class="p">,</span> <span class="n">update_eyes</span>
+<span class="kn">from</span> <span class="nn">pybert_util</span>     <span class="k">import</span> <span class="n">calc_gamma</span><span class="p">,</span> <span class="n">calc_G</span><span class="p">,</span> <span class="n">trim_impulse</span><span class="p">,</span> <span class="n">import_channel</span><span class="p">,</span> \
+                            <span class="n">make_ctle</span><span class="p">,</span> <span class="n">lfsr_bits</span><span class="p">,</span> <span class="n">safe_log10</span><span class="p">,</span> <span class="n">pulse_center</span>
+<span class="kn">from</span> <span class="nn">pybert_plot</span>     <span class="k">import</span> <span class="n">make_plots</span>
+<span class="kn">from</span> <span class="nn">pybert_help</span>     <span class="k">import</span> <span class="n">help_str</span>
+<span class="kn">from</span> <span class="nn">pybert_cfg</span>      <span class="k">import</span> <span class="n">PyBertCfg</span>
 
-<span class="n">debug</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="n">debug</span> <span class="o">=</span> <span class="kc">True</span>
 
-<span class="n">gDebugStatus</span>   <span class="o">=</span> <span class="bp">False</span>
-<span class="n">gDebugOptimize</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="n">gDebugStatus</span>   <span class="o">=</span> <span class="kc">False</span>
+<span class="n">gDebugOptimize</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">gMaxCTLEPeak</span>   <span class="o">=</span> <span class="mf">20.</span>      <span class="c1"># max. allowed CTLE peaking (dB) (when optimizing, only)</span>
 <span class="n">gMaxCTLEFreq</span>   <span class="o">=</span> <span class="mf">20.</span>      <span class="c1"># max. allowed CTLE peak frequency (GHz) (when optimizing, only)</span>
 
@@ -121,7 +128,7 @@
 <span class="n">gRdc</span>            <span class="o">=</span> <span class="mf">0.1876</span>  <span class="c1"># Ohms/m</span>
 <span class="n">gw0</span>             <span class="o">=</span> <span class="mf">10.e6</span>   <span class="c1"># 10 MHz is recommended in Ch. 8 of his second book, in which UTP is described in detail.</span>
 <span class="n">gR0</span>             <span class="o">=</span> <span class="mf">1.452</span>   <span class="c1"># skin-effect resistance (Ohms/m)</span>
-<span class="n">gTheta0</span>         <span class="o">=</span> <span class="o">.</span><span class="mo">02</span>     <span class="c1"># loss tangent</span>
+<span class="n">gTheta0</span>         <span class="o">=</span> <span class="o">.</span><span class="mi">02</span>     <span class="c1"># loss tangent</span>
 <span class="n">gZ0</span>             <span class="o">=</span> <span class="mf">100.</span>    <span class="c1"># characteristic impedance in LC region (Ohms)</span>
 <span class="n">gv0</span>             <span class="o">=</span> <span class="mf">0.67</span>    <span class="c1"># relative propagation velocity (c)</span>
 <span class="n">gl_ch</span>           <span class="o">=</span> <span class="mf">1.0</span>     <span class="c1"># cable length (m)</span>
@@ -137,8 +144,8 @@
 <span class="n">gCin</span>            <span class="o">=</span> <span class="mf">0.50</span>    <span class="c1"># parasitic input capacitance (pF) (Assumed to exist at both &#39;P&#39; and &#39;N&#39; nodes.)</span>
 <span class="n">gCac</span>            <span class="o">=</span> <span class="mf">1.</span>      <span class="c1"># a.c. coupling capacitance (uF) (Assumed to exist at both &#39;P&#39; and &#39;N&#39; nodes.)</span>
 <span class="n">gBW</span>             <span class="o">=</span> <span class="mf">12.</span>     <span class="c1"># Rx signal path bandwidth, assuming no CTLE action. (GHz)</span>
-<span class="n">gUseDfe</span>         <span class="o">=</span> <span class="bp">True</span>    <span class="c1"># Include DFE when running simulation.</span>
-<span class="n">gDfeIdeal</span>       <span class="o">=</span> <span class="bp">True</span>    <span class="c1"># DFE ideal summing node selector</span>
+<span class="n">gUseDfe</span>         <span class="o">=</span> <span class="kc">True</span>    <span class="c1"># Include DFE when running simulation.</span>
+<span class="n">gDfeIdeal</span>       <span class="o">=</span> <span class="kc">True</span>    <span class="c1"># DFE ideal summing node selector</span>
 <span class="n">gPeakFreq</span>       <span class="o">=</span> <span class="mf">5.</span>      <span class="c1"># CTLE peaking frequency (GHz)</span>
 <span class="n">gPeakMag</span>        <span class="o">=</span> <span class="mf">10.</span>     <span class="c1"># CTLE peaking magnitude (dB)</span>
 <span class="n">gCTLEOffset</span>     <span class="o">=</span> <span class="mf">0.</span>      <span class="c1"># CTLE d.c. offset (dB)</span>
@@ -158,13 +165,38 @@
 <span class="n">gThresh</span>         <span class="o">=</span> <span class="mi">6</span>       <span class="c1"># threshold for identifying periodic jitter spectral elements (sigma)</span>
 
 
-<div class="viewcode-block" id="TxOptThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert.TxOptThread">[docs]</a><span class="k">class</span> <span class="nc">TxOptThread</span><span class="p">(</span><span class="n">Thread</span><span class="p">):</span>
+<div class="viewcode-block" id="StoppableThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert.StoppableThread">[docs]</a><span class="k">class</span> <span class="nc">StoppableThread</span><span class="p">(</span><span class="n">Thread</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Thread class with a stop() method.</span>
+
+<span class="sd">    The thread itself has to check regularly for the stopped() condition.</span>
+
+<span class="sd">    All PyBERT thread classes are subclasses of this class.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">StoppableThread</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stop_event</span> <span class="o">=</span> <span class="n">Event</span><span class="p">()</span>
+
+<div class="viewcode-block" id="StoppableThread.stop"><a class="viewcode-back" href="../../modules.html#pybert.pybert.StoppableThread.stop">[docs]</a>    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s1">&#39;Called by thread invoker, when thread should be stopped prematurely.&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stop_event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="StoppableThread.stopped"><a class="viewcode-back" href="../../modules.html#pybert.pybert.StoppableThread.stopped">[docs]</a>    <span class="k">def</span> <span class="nf">stopped</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s1">&#39;Should be called by thread (i.e. - subclass) periodically and, if this function returns True, thread should clean itself up and quit ASAP.&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stop_event</span><span class="o">.</span><span class="n">is_set</span><span class="p">()</span></div></div>
+
+<div class="viewcode-block" id="TxOptThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert.TxOptThread">[docs]</a><span class="k">class</span> <span class="nc">TxOptThread</span><span class="p">(</span><span class="n">StoppableThread</span><span class="p">):</span>
     <span class="s1">&#39;Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness.&#39;</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="TxOptThread.run"><a class="viewcode-back" href="../../modules.html#pybert.pybert.TxOptThread.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s1">&#39;Run the Tx equalization optimization thread.&#39;</span>
+
         <span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pybert</span>
 
-        <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimizing Tx...&quot;</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">update_status</span><span class="p">):</span>
+            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimizing Tx...&quot;</span>
+
         <span class="n">max_iter</span>  <span class="o">=</span> <span class="n">pybert</span><span class="o">.</span><span class="n">max_iter</span>
 
         <span class="n">old_taps</span>  <span class="o">=</span> <span class="p">[]</span>
@@ -182,128 +214,131 @@
 
         <span class="n">bounds</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">min_vals</span><span class="p">,</span> <span class="n">max_vals</span><span class="p">)</span>
 
-        <span class="k">if</span><span class="p">(</span><span class="n">gDebugOptimize</span><span class="p">):</span>
-            <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_opt_tx</span><span class="p">,</span> <span class="n">old_taps</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
-                            <span class="n">constraints</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
-                                                       <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span>
-                                                      <span class="p">}</span>
-                          <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_opt_tx</span><span class="p">,</span> <span class="n">old_taps</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
-                            <span class="n">constraints</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
-                                                       <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span>
-                                                      <span class="p">}</span>
-                          <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">gDebugOptimize</span><span class="p">):</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_opt_tx</span><span class="p">,</span> <span class="n">old_taps</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
+                                <span class="n">constraints</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                                           <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span>
+                                                          <span class="p">}</span>
+                              <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_opt_tx</span><span class="p">,</span> <span class="n">old_taps</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
+                                <span class="n">constraints</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                                                           <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span>
+                                                          <span class="p">}</span>
+                              <span class="p">)</span>
 
-        <span class="k">if</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]):</span>
-            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization succeeded.&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization failed: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+            <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">update_status</span><span class="p">):</span>
+                <span class="k">if</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]):</span>
+                    <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization succeeded.&quot;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization failed: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">err</span><span class="o">.</span><span class="n">message</span></div>
 
     <span class="k">def</span> <span class="nf">do_opt_tx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">taps</span><span class="p">):</span>
+        <span class="n">sleep</span><span class="p">(</span><span class="mf">0.001</span><span class="p">)</span>  <span class="c1"># Give the GUI a chance to acknowledge user clicking the Abort button.</span>
+
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stopped</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Optimization aborted.&quot;</span><span class="p">)</span>
+
         <span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pybert</span>
         <span class="n">tuners</span> <span class="o">=</span> <span class="n">pybert</span><span class="o">.</span><span class="n">tx_tap_tuners</span>
         <span class="n">taps</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">taps</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">tuner</span> <span class="ow">in</span> <span class="n">tuners</span><span class="p">:</span>
             <span class="k">if</span><span class="p">(</span><span class="n">tuner</span><span class="o">.</span><span class="n">enabled</span><span class="p">):</span>
                 <span class="n">tuner</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">taps</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-        <span class="c1"># pybert.rel_opt = -pybert.cost</span>
         <span class="k">return</span> <span class="n">pybert</span><span class="o">.</span><span class="n">cost</span></div>
 
 
-<div class="viewcode-block" id="RxOptThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert.RxOptThread">[docs]</a><span class="k">class</span> <span class="nc">RxOptThread</span><span class="p">(</span><span class="n">Thread</span><span class="p">):</span>
+<div class="viewcode-block" id="RxOptThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert.RxOptThread">[docs]</a><span class="k">class</span> <span class="nc">RxOptThread</span><span class="p">(</span><span class="n">StoppableThread</span><span class="p">):</span>
     <span class="s1">&#39;Used to run Rx tap weight optimization in its own thread, in order to preserve GUI responsiveness.&#39;</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="RxOptThread.run"><a class="viewcode-back" href="../../modules.html#pybert.pybert.RxOptThread.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s1">&#39;Run the Rx equalization optimization thread.&#39;</span>
+
         <span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pybert</span>
 
         <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimizing Rx...&quot;</span>
         <span class="n">max_iter</span> <span class="o">=</span> <span class="n">pybert</span><span class="o">.</span><span class="n">max_iter</span>
 
-        <span class="k">if</span><span class="p">(</span><span class="n">gDebugOptimize</span><span class="p">):</span>
-            <span class="n">res</span>  <span class="o">=</span> <span class="n">minimize_scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">do_opt_rx</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">gMaxCTLEPeak</span><span class="p">),</span>
-                                   <span class="n">method</span><span class="o">=</span><span class="s1">&#39;Bounded&#39;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
-                                                              <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span><span class="p">}</span>
-                                  <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">res</span>  <span class="o">=</span> <span class="n">minimize_scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">do_opt_rx</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">gMaxCTLEPeak</span><span class="p">),</span>
-                                   <span class="n">method</span><span class="o">=</span><span class="s1">&#39;Bounded&#39;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
-                                                              <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span><span class="p">}</span>
-                                  <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">gDebugOptimize</span><span class="p">):</span>
+                <span class="n">res</span>  <span class="o">=</span> <span class="n">minimize_scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">do_opt_rx</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">gMaxCTLEPeak</span><span class="p">),</span>
+                                       <span class="n">method</span><span class="o">=</span><span class="s1">&#39;Bounded&#39;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                                                  <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span><span class="p">}</span>
+                                      <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">res</span>  <span class="o">=</span> <span class="n">minimize_scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">do_opt_rx</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">gMaxCTLEPeak</span><span class="p">),</span>
+                                       <span class="n">method</span><span class="o">=</span><span class="s1">&#39;Bounded&#39;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                                                                  <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span><span class="p">}</span>
+                                      <span class="p">)</span>
 
-        <span class="k">if</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]):</span>
-            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization succeeded.&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization failed: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]):</span>
+                <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization succeeded.&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization failed: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">err</span><span class="o">.</span><span class="n">message</span></div>
 
     <span class="k">def</span> <span class="nf">do_opt_rx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peak_mag</span><span class="p">):</span>
+        <span class="n">sleep</span><span class="p">(</span><span class="mf">0.001</span><span class="p">)</span>  <span class="c1"># Give the GUI a chance to acknowledge user clicking the Abort button.</span>
+
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stopped</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Optimization aborted.&quot;</span><span class="p">)</span>
+
         <span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pybert</span>
         <span class="n">pybert</span><span class="o">.</span><span class="n">peak_mag_tune</span> <span class="o">=</span> <span class="n">peak_mag</span>
-        <span class="n">cost</span> <span class="o">=</span> <span class="n">pybert</span><span class="o">.</span><span class="n">cost</span>
-        <span class="c1"># pybert.rel_opt = -cost</span>
-        <span class="k">return</span> <span class="n">cost</span></div>
+        <span class="k">return</span> <span class="n">pybert</span><span class="o">.</span><span class="n">cost</span></div>
 
 
-<div class="viewcode-block" id="CoOptThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert.CoOptThread">[docs]</a><span class="k">class</span> <span class="nc">CoOptThread</span><span class="p">(</span><span class="n">Thread</span><span class="p">):</span>
+<div class="viewcode-block" id="CoOptThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert.CoOptThread">[docs]</a><span class="k">class</span> <span class="nc">CoOptThread</span><span class="p">(</span><span class="n">StoppableThread</span><span class="p">):</span>
     <span class="s1">&#39;Used to run co-optimization in its own thread, in order to preserve GUI responsiveness.&#39;</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="CoOptThread.run"><a class="viewcode-back" href="../../modules.html#pybert.pybert.CoOptThread.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s1">&#39;Run the Tx/Rx equalization co-optimization thread.&#39;</span>
+
         <span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pybert</span>
 
         <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Co-optimizing...&quot;</span>
         <span class="n">max_iter</span>  <span class="o">=</span> <span class="n">pybert</span><span class="o">.</span><span class="n">max_iter</span>
 
-        <span class="n">vals</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">min_vals</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">max_vals</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">tuner</span> <span class="ow">in</span> <span class="n">pybert</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">tuner</span><span class="o">.</span><span class="n">enabled</span><span class="p">:</span>
-                <span class="n">vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tuner</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
-                <span class="n">min_vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tuner</span><span class="o">.</span><span class="n">min_val</span><span class="p">)</span>
-                <span class="n">max_vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tuner</span><span class="o">.</span><span class="n">max_val</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">gDebugOptimize</span><span class="p">):</span>
+                <span class="n">res</span>  <span class="o">=</span> <span class="n">minimize_scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">do_coopt</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">gMaxCTLEPeak</span><span class="p">),</span>
+                                       <span class="n">method</span><span class="o">=</span><span class="s1">&#39;Bounded&#39;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                                                  <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span><span class="p">}</span>
+                                      <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">res</span>  <span class="o">=</span> <span class="n">minimize_scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">do_coopt</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">gMaxCTLEPeak</span><span class="p">),</span>
+                                       <span class="n">method</span><span class="o">=</span><span class="s1">&#39;Bounded&#39;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                                                                  <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span><span class="p">}</span>
+                                      <span class="p">)</span>
 
-        <span class="n">vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pybert</span><span class="o">.</span><span class="n">peak_mag_tune</span><span class="p">)</span>
-        <span class="n">min_vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
-        <span class="n">max_vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gMaxCTLEPeak</span><span class="p">)</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]):</span>
+                <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization succeeded.&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization failed: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
 
-        <span class="n">cons</span> <span class="o">=</span> <span class="p">({</span>   <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;ineq&#39;</span><span class="p">,</span>
-                    <span class="s1">&#39;fun&#39;</span> <span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="mf">0.7</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">x</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
-                <span class="p">})</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">err</span><span class="o">.</span><span class="n">message</span></div>
 
-        <span class="n">bounds</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">min_vals</span><span class="p">,</span> <span class="n">max_vals</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">do_coopt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peak_mag</span><span class="p">):</span>
+        <span class="n">sleep</span><span class="p">(</span><span class="mf">0.001</span><span class="p">)</span>  <span class="c1"># Give the GUI a chance to acknowledge user clicking the Abort button.</span>
 
-        <span class="k">if</span><span class="p">(</span><span class="n">gDebugOptimize</span><span class="p">):</span>
-            <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_coopt</span><span class="p">,</span> <span class="n">vals</span><span class="p">,</span> <span class="n">constraints</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span>
-                            <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
-                                                    <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span>
-                                                   <span class="p">}</span>
-                          <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_coopt</span><span class="p">,</span> <span class="n">vals</span><span class="p">,</span> <span class="n">constraints</span><span class="o">=</span><span class="n">cons</span><span class="p">,</span>
-                            <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;disp&#39;</span>    <span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
-                                                    <span class="s1">&#39;maxiter&#39;</span> <span class="p">:</span> <span class="n">max_iter</span>
-                                                   <span class="p">}</span>
-                          <span class="p">)</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stopped</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Optimization aborted.&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]):</span>
-            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization succeeded.&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">pybert</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;Optimization failed: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
-
-    <span class="k">def</span> <span class="nf">do_coopt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
         <span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pybert</span>
-
-        <span class="n">vals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
-        <span class="n">tuners</span> <span class="o">=</span> <span class="n">pybert</span><span class="o">.</span><span class="n">tx_tap_tuners</span>
-        <span class="k">for</span> <span class="n">tuner</span> <span class="ow">in</span> <span class="n">tuners</span><span class="p">:</span>
-            <span class="k">if</span><span class="p">(</span><span class="n">tuner</span><span class="o">.</span><span class="n">enabled</span><span class="p">):</span>
-                <span class="n">tuner</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">vals</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-
-        <span class="n">pybert</span><span class="o">.</span><span class="n">peak_mag_tune</span> <span class="o">=</span> <span class="n">vals</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-
-        <span class="c1"># Go to sleep here, to give &#39;cost&#39; a chance to completely update?</span>
-        <span class="c1"># pybert.rel_opt = -pybert.cost</span>
-
+        <span class="n">pybert</span><span class="o">.</span><span class="n">peak_mag_tune</span> <span class="o">=</span> <span class="n">peak_mag</span>
+        <span class="k">if</span><span class="p">(</span><span class="nb">any</span><span class="p">([</span><span class="n">pybert</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pybert</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">))])):</span>
+            <span class="k">while</span><span class="p">(</span><span class="n">pybert</span><span class="o">.</span><span class="n">tx_opt_thread</span> <span class="ow">and</span> <span class="n">pybert</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">()):</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mf">0.001</span><span class="p">)</span>
+            <span class="n">pybert</span><span class="o">.</span><span class="n">_do_opt_tx</span><span class="p">(</span><span class="n">update_status</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">while</span><span class="p">(</span><span class="n">pybert</span><span class="o">.</span><span class="n">tx_opt_thread</span> <span class="ow">and</span> <span class="n">pybert</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">()):</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mf">0.001</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">pybert</span><span class="o">.</span><span class="n">cost</span></div>
 
 
@@ -311,14 +346,14 @@
     <span class="s1">&#39;Object used to populate the rows of the Tx FFE tap tuning table.&#39;</span>
 
     <span class="n">name</span> <span class="o">=</span> <span class="n">String</span><span class="p">(</span><span class="s1">&#39;(noname)&#39;</span><span class="p">)</span>
-    <span class="n">enabled</span> <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">enabled</span> <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">min_val</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
     <span class="n">max_val</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
     <span class="n">value</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
     <span class="n">steps</span> <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># Non-zero means we want to sweep it.</span>
     
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">name</span><span class="o">=</span><span class="s1">&#39;(noname)&#39;</span><span class="p">,</span>
-                        <span class="n">enabled</span> <span class="o">=</span> <span class="bp">False</span><span class="p">,</span>
+                        <span class="n">enabled</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
                         <span class="n">min_val</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
                         <span class="n">max_val</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
                         <span class="n">value</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
@@ -328,7 +363,7 @@
 
         <span class="c1"># Super-class initialization is ABSOLUTELY NECESSARY, in order</span>
         <span class="c1"># to get all the Traits/UI machinery setup correctly.</span>
-        <span class="nb">super</span><span class="p">(</span><span class="n">TxTapTuner</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TxTapTuner</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="n">enabled</span>
@@ -346,20 +381,24 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># Independent variables</span>
+
     <span class="c1"># - Simulation Control</span>
-    <span class="n">bit_rate</span>        <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mf">100.0</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gBitRate</span><span class="p">)</span>            <span class="c1"># (Gbps)</span>
-    <span class="n">nbits</span>           <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">10000000</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gNbits</span><span class="p">)</span>
-    <span class="n">pattern_len</span>     <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">10000000</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gPatLen</span><span class="p">)</span>
-    <span class="n">nspb</span>            <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gNspb</span><span class="p">)</span>
-    <span class="n">eye_bits</span>        <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">gNbits</span> <span class="o">//</span> <span class="mi">5</span><span class="p">)</span>
-    <span class="n">mod_type</span>        <span class="o">=</span> <span class="n">List</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>                                             <span class="c1"># 0 = NRZ; 1 = Duo-binary; 2 = PAM-4</span>
-    <span class="n">num_sweeps</span>      <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">bit_rate</span>        <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mf">100.0</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gBitRate</span><span class="p">)</span>            <span class="c1">#: (Gbps)</span>
+    <span class="n">nbits</span>           <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">10000000</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gNbits</span><span class="p">)</span>          <span class="c1">#: Number of bits to simulate.</span>
+    <span class="n">pattern_len</span>     <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">10000000</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gPatLen</span><span class="p">)</span>            <span class="c1">#: PRBS pattern length.</span>
+    <span class="n">nspb</span>            <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gNspb</span><span class="p">)</span>                   <span class="c1">#: Signal vector samples per bit.</span>
+    <span class="n">eye_bits</span>        <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">gNbits</span> <span class="o">//</span> <span class="mi">5</span><span class="p">)</span>                                      <span class="c1">#: # of bits used to form eye. (Default = last 20%)</span>
+    <span class="n">mod_type</span>        <span class="o">=</span> <span class="n">List</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>                                             <span class="c1">#: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4</span>
+    <span class="n">num_sweeps</span>      <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>                                                <span class="c1">#: Number of sweeps to run.</span>
     <span class="n">sweep_num</span>       <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
     <span class="n">sweep_aves</span>      <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">gNumAve</span><span class="p">)</span>
-    <span class="n">do_sweep</span>        <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">do_sweep</span>        <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>                                           <span class="c1">#: Run sweeps? (Default = False)</span>
+
     <span class="c1"># - Channel Control</span>
-    <span class="n">use_ch_file</span>     <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
-    <span class="n">ch_file</span>         <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.csv&#39;</span><span class="p">])</span>
+    <span class="n">use_ch_file</span>     <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>                                           <span class="c1">#: Import channel description from file? (Default = False)</span>
+    <span class="n">padded</span>          <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>                                           <span class="c1">#: Zero pad imported Touchstone data? (Default = False)</span>
+    <span class="n">windowed</span>        <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">ch_file</span>         <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.s4p&#39;</span><span class="p">,</span> <span class="s1">&#39;*.S4P&#39;</span><span class="p">,</span> <span class="s1">&#39;*.csv&#39;</span><span class="p">,</span> <span class="s1">&#39;*.CSV&#39;</span><span class="p">,</span> <span class="s1">&#39;*.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;*.TXT&#39;</span><span class="p">,</span> <span class="s1">&#39;*.*&#39;</span><span class="p">])</span>
     <span class="n">impulse_length</span>  <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
     <span class="n">Rdc</span>             <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gRdc</span><span class="p">)</span>
     <span class="n">w0</span>              <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gw0</span><span class="p">)</span>
@@ -368,11 +407,12 @@
     <span class="n">Z0</span>              <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gZ0</span><span class="p">)</span>
     <span class="n">v0</span>              <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gv0</span><span class="p">)</span>
     <span class="n">l_ch</span>            <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gl_ch</span><span class="p">)</span>
+
     <span class="c1"># - EQ Tune</span>
-    <span class="n">tx_tap_tuners</span> <span class="o">=</span> <span class="n">List</span><span class="p">(</span>  <span class="p">[</span><span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Pre-tap&#39;</span><span class="p">,</span>   <span class="n">enabled</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                            <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap1&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                            <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap2&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                            <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap3&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+    <span class="n">tx_tap_tuners</span> <span class="o">=</span> <span class="n">List</span><span class="p">(</span>  <span class="p">[</span><span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Pre-tap&#39;</span><span class="p">,</span>   <span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+                            <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap1&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+                            <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap2&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+                            <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap3&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
                            <span class="p">]</span>
                         <span class="p">)</span>
     <span class="n">rx_bw_tune</span>      <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gBW</span><span class="p">)</span>
@@ -386,6 +426,7 @@
     <span class="n">tx_opt_thread</span>   <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">TxOptThread</span><span class="p">)</span>
     <span class="n">rx_opt_thread</span>   <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">RxOptThread</span><span class="p">)</span>
     <span class="n">coopt_thread</span>    <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">CoOptThread</span><span class="p">)</span>
+
     <span class="c1"># - Tx</span>
     <span class="n">vod</span>             <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gVod</span><span class="p">)</span>                                           <span class="c1"># (V)</span>
     <span class="n">rs</span>              <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gRs</span><span class="p">)</span>                                            <span class="c1"># (Ohms)</span>
@@ -393,37 +434,39 @@
     <span class="n">pn_mag</span>          <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gPnMag</span><span class="p">)</span>                                         <span class="c1"># (ps)</span>
     <span class="n">pn_freq</span>         <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gPnFreq</span><span class="p">)</span>                                        <span class="c1"># (MHz)</span>
     <span class="n">rn</span>              <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gRn</span><span class="p">)</span>                                            <span class="c1"># (V)</span>
-    <span class="n">tx_taps</span> <span class="o">=</span> <span class="n">List</span><span class="p">([</span><span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Pre-tap&#39;</span><span class="p">,</span>   <span class="n">enabled</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>  <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                    <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap1&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                    <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap2&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                    <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap3&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+    <span class="n">tx_taps</span> <span class="o">=</span> <span class="n">List</span><span class="p">([</span><span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Pre-tap&#39;</span><span class="p">,</span>   <span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+                    <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap1&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+                    <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap2&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+                    <span class="n">TxTapTuner</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Post-tap3&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">min_val</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
                    <span class="p">])</span>
     <span class="n">rel_power</span>       <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
-    <span class="n">tx_use_ami</span>      <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
-    <span class="n">tx_use_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
-    <span class="n">tx_has_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">tx_use_ami</span>      <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">tx_use_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">tx_has_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">tx_ami_file</span>     <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.ami&#39;</span><span class="p">])</span>
-    <span class="n">tx_ami_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">tx_ami_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">tx_dll_file</span>     <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.dll&#39;</span><span class="p">,</span> <span class="s1">&#39;*.so&#39;</span><span class="p">])</span>
-    <span class="n">tx_dll_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">tx_dll_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
     <span class="c1"># - Rx</span>
     <span class="n">rin</span>             <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gRin</span><span class="p">)</span>                                           <span class="c1"># (Ohmin)</span>
     <span class="n">cin</span>             <span class="o">=</span> <span class="n">Range</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">gCin</span><span class="p">)</span>                          <span class="c1"># (pF)</span>
     <span class="n">cac</span>             <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gCac</span><span class="p">)</span>                                           <span class="c1"># (uF)</span>
-    <span class="n">use_ctle_file</span>   <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>                                           <span class="c1"># For importing CTLE impulse/step response directly.</span>
+    <span class="n">use_ctle_file</span>   <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>                                           <span class="c1"># For importing CTLE impulse/step response directly.</span>
     <span class="n">ctle_file</span>       <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.csv&#39;</span><span class="p">])</span>
     <span class="n">rx_bw</span>           <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gBW</span><span class="p">)</span>                                            <span class="c1"># (GHz)</span>
     <span class="n">peak_freq</span>       <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gPeakFreq</span><span class="p">)</span>                                      <span class="c1"># CTLE peaking frequency (GHz)</span>
     <span class="n">peak_mag</span>        <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gPeakMag</span><span class="p">)</span>                                       <span class="c1"># CTLE peaking magnitude (dB)</span>
     <span class="n">ctle_offset</span>     <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gCTLEOffset</span><span class="p">)</span>                                    <span class="c1"># CTLE d.c. offset (dB)</span>
     <span class="n">ctle_mode</span>       <span class="o">=</span> <span class="n">Enum</span><span class="p">(</span><span class="s1">&#39;Off&#39;</span><span class="p">,</span> <span class="s1">&#39;Passive&#39;</span><span class="p">,</span> <span class="s1">&#39;AGC&#39;</span><span class="p">,</span> <span class="s1">&#39;Manual&#39;</span><span class="p">)</span>
-    <span class="n">rx_use_ami</span>      <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
-    <span class="n">rx_use_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
-    <span class="n">rx_has_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">rx_use_ami</span>      <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">rx_use_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">rx_has_getwave</span>  <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">rx_ami_file</span>     <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.ami&#39;</span><span class="p">])</span>
-    <span class="n">rx_ami_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">rx_ami_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">rx_dll_file</span>     <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.dll&#39;</span><span class="p">,</span> <span class="s1">&#39;*.so&#39;</span><span class="p">])</span>
-    <span class="n">rx_dll_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">rx_dll_valid</span>    <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
     <span class="c1"># - DFE</span>
     <span class="n">use_dfe</span>         <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="n">gUseDfe</span><span class="p">)</span>
     <span class="n">sum_ideal</span>       <span class="o">=</span> <span class="n">Bool</span><span class="p">(</span><span class="n">gDfeIdeal</span><span class="p">)</span>
@@ -433,15 +476,22 @@
     <span class="n">n_taps</span>          <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">gNtaps</span><span class="p">)</span>
     <span class="n">_old_n_taps</span>     <span class="o">=</span> <span class="n">n_taps</span>
     <span class="n">sum_bw</span>          <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gDfeBW</span><span class="p">)</span>                                         <span class="c1"># (GHz)</span>
+
     <span class="c1"># - CDR</span>
     <span class="n">delta_t</span>         <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gDeltaT</span><span class="p">)</span>                                        <span class="c1"># (ps)</span>
     <span class="n">alpha</span>           <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gAlpha</span><span class="p">)</span>
     <span class="n">n_lock_ave</span>      <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">gNLockAve</span><span class="p">)</span>
     <span class="n">rel_lock_tol</span>    <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="n">gRelLockTol</span><span class="p">)</span>
     <span class="n">lock_sustain</span>    <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">gLockSustain</span><span class="p">)</span>
+
     <span class="c1"># - Analysis</span>
     <span class="n">thresh</span>          <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">gThresh</span><span class="p">)</span>
-    <span class="c1"># - Plots (plot containers, actually)</span>
+
+    <span class="c1"># Misc.</span>
+    <span class="n">cfg_file</span> <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.pybert_cfg&#39;</span><span class="p">])</span>
+    <span class="n">data_file</span> <span class="o">=</span> <span class="n">File</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">entries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;*.pybert_data&#39;</span><span class="p">])</span>
+
+    <span class="c1"># Plots (plot containers, actually)</span>
     <span class="n">plotdata</span>          <span class="o">=</span> <span class="n">ArrayPlotData</span><span class="p">()</span>
     <span class="n">plots_h</span>           <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">GridPlotContainer</span><span class="p">)</span>
     <span class="n">plots_s</span>           <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">GridPlotContainer</span><span class="p">)</span>
@@ -452,7 +502,8 @@
     <span class="n">plots_jitter_dist</span> <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">GridPlotContainer</span><span class="p">)</span>
     <span class="n">plots_jitter_spec</span> <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">GridPlotContainer</span><span class="p">)</span>
     <span class="n">plots_bathtub</span>     <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">GridPlotContainer</span><span class="p">)</span>
-    <span class="c1"># - Status</span>
+
+    <span class="c1"># Status</span>
     <span class="n">status</span>          <span class="o">=</span> <span class="n">String</span><span class="p">(</span><span class="s2">&quot;Ready.&quot;</span><span class="p">)</span>
     <span class="n">jitter_perf</span>     <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.</span><span class="p">)</span>
     <span class="n">total_perf</span>      <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.</span><span class="p">)</span>
@@ -461,15 +512,18 @@
     <span class="n">chnl_dly</span>        <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.</span><span class="p">)</span>
     <span class="n">bit_errs</span>        <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
     <span class="n">run_count</span>       <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># Used as a mechanism to force bit stream regeneration.</span>
-    <span class="c1"># - About</span>
-    <span class="n">ident</span>  <span class="o">=</span> <span class="n">String</span><span class="p">(</span><span class="s1">&#39;PyBERT v2.1.0 - a serial communication link design tool, written in Python.</span><span class="se">\n\n</span><span class="s1"> </span><span class="se">\</span>
+
+    <span class="c1"># About</span>
+    <span class="n">ident</span>  <span class="o">=</span> <span class="n">String</span><span class="p">(</span><span class="s1">&#39;PyBERT v2.4.0 - a serial communication link design tool, written in Python.</span><span class="se">\n\n</span><span class="s1"> </span><span class="se">\</span>
 <span class="s1">    David Banas</span><span class="se">\n</span><span class="s1"> </span><span class="se">\</span>
-<span class="s1">    January 22, 2017</span><span class="se">\n\n</span><span class="s1"> </span><span class="se">\</span>
+<span class="s1">    December 20, 2017</span><span class="se">\n\n</span><span class="s1"> </span><span class="se">\</span>
 <span class="s1">    Copyright (c) 2014 David Banas;</span><span class="se">\n</span><span class="s1"> </span><span class="se">\</span>
 <span class="s1">    All rights reserved World wide.&#39;</span><span class="p">)</span>
-    <span class="c1"># - Help</span>
+
+    <span class="c1"># Help</span>
     <span class="n">instructions</span> <span class="o">=</span> <span class="n">help_str</span>
-    <span class="c1"># - Console</span>
+
+    <span class="c1"># Console</span>
     <span class="n">console_log</span> <span class="o">=</span> <span class="n">String</span><span class="p">(</span><span class="s2">&quot;PyBERT Console Log</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Dependent variables</span>
@@ -498,6 +552,8 @@
     <span class="n">nui</span>             <span class="o">=</span> <span class="n">Property</span><span class="p">(</span><span class="n">Int</span><span class="p">,</span>     <span class="n">depends_on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;nbits&#39;</span><span class="p">,</span> <span class="s1">&#39;mod_type&#39;</span><span class="p">])</span>
     <span class="n">nspui</span>           <span class="o">=</span> <span class="n">Property</span><span class="p">(</span><span class="n">Int</span><span class="p">,</span>     <span class="n">depends_on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;nspb&#39;</span><span class="p">,</span> <span class="s1">&#39;mod_type&#39;</span><span class="p">])</span>
     <span class="n">eye_uis</span>         <span class="o">=</span> <span class="n">Property</span><span class="p">(</span><span class="n">Int</span><span class="p">,</span>     <span class="n">depends_on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;eye_bits&#39;</span><span class="p">,</span> <span class="s1">&#39;mod_type&#39;</span><span class="p">])</span>
+    <span class="n">dfe_out_p</span>       <span class="o">=</span> <span class="n">Array</span><span class="p">()</span>
+    <span class="n">przf_err</span>        <span class="o">=</span> <span class="n">Property</span><span class="p">(</span><span class="n">Float</span><span class="p">,</span>   <span class="n">depends_on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;dfe_out_p&#39;</span><span class="p">])</span>
 
     <span class="c1"># Custom buttons, which we&#39;ll use in particular tabs.</span>
     <span class="c1"># (Globally applicable buttons, such as &quot;Run&quot; and &quot;Ok&quot;, are handled more simply, in the View.)</span>
@@ -506,23 +562,26 @@
     <span class="n">btn_opt_tx</span>  <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;OptTx&#39;</span><span class="p">)</span>
     <span class="n">btn_opt_rx</span>  <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;OptRx&#39;</span><span class="p">)</span>
     <span class="n">btn_coopt</span>   <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;CoOpt&#39;</span><span class="p">)</span>
+    <span class="n">btn_abort</span>   <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;Abort&#39;</span><span class="p">)</span>
     <span class="n">btn_cfg_tx</span>  <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;Configure&#39;</span><span class="p">)</span>
     <span class="n">btn_cfg_rx</span>  <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;Configure&#39;</span><span class="p">)</span>
+    <span class="n">btn_save_cfg</span> <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;Save Config.&#39;</span><span class="p">)</span>
+    <span class="n">btn_load_cfg</span> <span class="o">=</span> <span class="n">Button</span><span class="p">(</span><span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;Load Config.&#39;</span><span class="p">)</span>
 
     <span class="c1"># Logger</span>
     <span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">console_log</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">[{}]: {}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(),</span> <span class="n">msg</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">console_log</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">[</span><span class="si">{}</span><span class="s2">]: </span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(),</span> <span class="n">msg</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
 
     <span class="k">def</span> <span class="nf">handle_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">err</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
         <span class="k">if</span><span class="p">(</span><span class="n">debug</span><span class="p">):</span>
-            <span class="n">error</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Please, check terminal for more information.&quot;</span><span class="p">,</span> <span class="s1">&#39;PyBERT Alert&#39;</span><span class="p">)</span>
+            <span class="n">message</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Please, check terminal for more information.&quot;</span><span class="p">,</span> <span class="s1">&#39;PyBERT Alert&#39;</span><span class="p">)</span>
             <span class="k">raise</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">error</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="s1">&#39;PyBERT Alert&#39;</span><span class="p">)</span>
+            <span class="n">message</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="s1">&#39;PyBERT Alert&#39;</span><span class="p">)</span>
 
     <span class="c1"># Default initialization</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_simulation</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_simulation</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Initial plot setup occurs here.</span>
 
@@ -540,13 +599,13 @@
 
         <span class="c1"># Super-class initialization is ABSOLUTELY NECESSARY, in order</span>
         <span class="c1"># to get all the Traits/UI machinery setup correctly.</span>
-        <span class="nb">super</span><span class="p">(</span><span class="n">PyBERT</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">PyBERT</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Started.&quot;</span><span class="p">)</span>
 
         <span class="k">if</span><span class="p">(</span><span class="n">run_simulation</span><span class="p">):</span>
             <span class="c1"># Running the simulation will fill in the required data structure.</span>
-            <span class="n">my_run_simulation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">initial_run</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+            <span class="n">my_run_simulation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">initial_run</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
             <span class="c1"># Once the required data structure is filled in, we can create the plots.</span>
             <span class="n">make_plots</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_dfe_taps</span> <span class="o">=</span> <span class="n">gNtaps</span><span class="p">)</span>
@@ -583,9 +642,13 @@
                               <span class="ow">or</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">))]):</span>
             <span class="k">pass</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span> <span class="o">=</span> <span class="n">TxOptThread</span><span class="p">()</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_do_opt_tx</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_do_opt_tx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">update_status</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span> <span class="o">=</span> <span class="n">TxOptThread</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">update_status</span> <span class="o">=</span> <span class="n">update_status</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">_btn_opt_rx_fired</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rx_opt_thread</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">rx_opt_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctle_mode_tune</span> <span class="o">==</span> <span class="s2">&quot;Off&quot;</span><span class="p">:</span>
@@ -603,11 +666,57 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">coopt_thread</span><span class="o">.</span><span class="n">pybert</span> <span class="o">=</span> <span class="bp">self</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">coopt_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 
+    <span class="k">def</span> <span class="nf">_btn_abort_fired</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">coopt_thread</span>  <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">coopt_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">coopt_thread</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">coopt_thread</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tx_opt_thread</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rx_opt_thread</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">rx_opt_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rx_opt_thread</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rx_opt_thread</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+
     <span class="k">def</span> <span class="nf">_btn_cfg_tx_fired</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tx_cfg</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">_btn_cfg_rx_fired</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rx_cfg</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_btn_save_cfg_fired</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">dlg</span> <span class="o">=</span> <span class="n">FileDialog</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s1">&#39;save as&#39;</span><span class="p">,</span> <span class="n">wildcard</span><span class="o">=</span><span class="s1">&#39;*.pybert_cfg&#39;</span><span class="p">,</span> <span class="n">default_path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dlg</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="o">==</span> <span class="n">OK</span><span class="p">:</span>
+            <span class="n">the_PyBertCfg</span> <span class="o">=</span> <span class="n">PyBertCfg</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dlg</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;wt&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">the_file</span><span class="p">:</span>
+                    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">the_PyBertCfg</span><span class="p">,</span> <span class="n">the_file</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cfg_file</span> <span class="o">=</span> <span class="n">dlg</span><span class="o">.</span><span class="n">path</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;The following error occured:</span><span class="se">\n\t</span><span class="si">{}</span><span class="se">\n</span><span class="s2">The configuration was NOT saved.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_btn_load_cfg_fired</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">dlg</span> <span class="o">=</span> <span class="n">FileDialog</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s1">&#39;open&#39;</span><span class="p">,</span> <span class="n">wildcard</span><span class="o">=</span><span class="s1">&#39;*.pybert_cfg&#39;</span><span class="p">,</span> <span class="n">default_path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dlg</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="o">==</span> <span class="n">OK</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dlg</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;rt&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">the_file</span><span class="p">:</span>
+                    <span class="n">the_PyBertCfg</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">the_file</span><span class="p">)</span>
+                <span class="k">if</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">the_PyBertCfg</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">PyBertCfg</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;The data structure read in is NOT of type: PyBertCfg!&quot;</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">prop</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="n">the_PyBertCfg</span><span class="p">)</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+                    <span class="k">if</span><span class="p">(</span><span class="n">prop</span> <span class="o">==</span> <span class="s1">&#39;tx_taps&#39;</span><span class="p">):</span>
+                        <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+                        <span class="k">for</span> <span class="p">(</span><span class="n">enabled</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+                            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="s1">&#39;enabled&#39;</span><span class="p">,</span> <span class="n">enabled</span><span class="p">)</span>
+                            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="s1">&#39;value&#39;</span><span class="p">,</span>   <span class="n">val</span><span class="p">)</span>
+                            <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prop</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cfg_file</span> <span class="o">=</span> <span class="n">dlg</span><span class="o">.</span><span class="n">path</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;The following error occured:</span><span class="se">\n\t</span><span class="si">{}</span><span class="se">\n</span><span class="s2">The configuration was NOT loaded.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+
 
     <span class="c1"># Independent variable setting intercepts</span>
     <span class="c1"># (Primarily, for debugging.)</span>
@@ -1130,24 +1239,10 @@
 
         <span class="n">s</span> <span class="o">=</span> <span class="n">h</span><span class="o">.</span><span class="n">cumsum</span><span class="p">()</span>
         <span class="n">p</span> <span class="o">=</span> <span class="n">s</span> <span class="o">-</span> <span class="n">pad</span><span class="p">(</span><span class="n">s</span><span class="p">[:</span><span class="o">-</span><span class="n">nspui</span><span class="p">],</span> <span class="p">(</span><span class="n">nspui</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="n">constant_values</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
-        <span class="n">p_max</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
 
-        <span class="c1"># &quot;Hula Hoop&quot; algorithm (See SiSoft/Tellian&#39;s DesignCon 2016 paper.)</span>
-        <span class="n">div</span> <span class="o">=</span> <span class="mf">2.</span>
-        <span class="n">thresh</span> <span class="o">=</span> <span class="n">p_max</span> <span class="o">/</span> <span class="n">div</span>
-        <span class="n">main_lobe_ixs</span> <span class="o">=</span> <span class="n">where</span><span class="p">(</span><span class="n">p</span> <span class="o">&gt;</span> <span class="n">thresh</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">if</span><span class="p">(</span><span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">main_lobe_ixs</span><span class="p">)):</span>  <span class="c1"># Sometimes, the optimizer really whacks out.</span>
+        <span class="p">(</span><span class="n">clock_pos</span><span class="p">,</span> <span class="n">thresh</span><span class="p">)</span> <span class="o">=</span> <span class="n">pulse_center</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">nspui</span><span class="p">)</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">clock_pos</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
             <span class="k">return</span> <span class="mf">1.0</span>               <span class="c1"># Returning a large cost lets it know it took a wrong turn.</span>
-        <span class="n">err</span> <span class="o">=</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">nspui</span>
-        <span class="k">while</span><span class="p">(</span><span class="n">err</span> <span class="ow">and</span> <span class="n">div</span> <span class="o">&lt;</span> <span class="mi">5000</span><span class="p">):</span>
-            <span class="n">div</span> <span class="o">*=</span> <span class="mf">2.</span>
-            <span class="k">if</span><span class="p">(</span><span class="n">err</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
-                <span class="n">thresh</span> <span class="o">+=</span> <span class="n">p_max</span> <span class="o">/</span> <span class="n">div</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">thresh</span> <span class="o">-=</span> <span class="n">p_max</span> <span class="o">/</span> <span class="n">div</span>
-            <span class="n">main_lobe_ixs</span> <span class="o">=</span> <span class="n">where</span><span class="p">(</span><span class="n">p</span> <span class="o">&gt;</span> <span class="n">thresh</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="n">err</span> <span class="o">=</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">nspui</span>
-        <span class="n">clock_pos</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mean</span><span class="p">([</span><span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]))</span>
         <span class="n">clocks</span> <span class="o">=</span> <span class="n">thresh</span> <span class="o">*</span> <span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">))</span>
         <span class="k">if</span><span class="p">(</span><span class="n">mod_type</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>  <span class="c1"># Handle duo-binary.</span>
             <span class="n">clock_pos</span> <span class="o">-=</span> <span class="n">nspui</span> <span class="o">//</span> <span class="mi">2</span>
@@ -1188,71 +1283,84 @@
     <span class="k">def</span> <span class="nf">_get_rel_opt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">cost</span>
 
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">_get_przf_err</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">p</span>      <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dfe_out_p</span>
+        <span class="n">nspui</span>  <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nspui</span>
+        <span class="n">n_taps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_taps</span>
+
+        <span class="p">(</span><span class="n">clock_pos</span><span class="p">,</span> <span class="n">thresh</span><span class="p">)</span> <span class="o">=</span> <span class="n">pulse_center</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">nspui</span><span class="p">)</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_taps</span><span class="p">):</span>
+            <span class="n">err</span> <span class="o">+=</span> <span class="n">p</span><span class="p">[</span><span class="n">clock_pos</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">nspui</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+
+        <span class="k">return</span> <span class="n">err</span> <span class="o">/</span> <span class="n">p</span><span class="p">[</span><span class="n">clock_pos</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span>
+
     <span class="c1"># Changed property handlers.</span>
     <span class="k">def</span> <span class="nf">_status_str_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span><span class="p">(</span><span class="n">gDebugStatus</span><span class="p">):</span>
-            <span class="k">print</span> <span class="bp">self</span><span class="o">.</span><span class="n">status_str</span>
+            <span class="nb">print</span> <span class="bp">self</span><span class="o">.</span><span class="n">status_str</span>
 
     <span class="k">def</span> <span class="nf">_use_dfe_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="p">):</span>
-        <span class="k">if</span><span class="p">(</span><span class="n">new_value</span> <span class="o">==</span> <span class="bp">False</span><span class="p">):</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">new_value</span> <span class="o">==</span> <span class="kc">False</span><span class="p">):</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="bp">True</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="bp">False</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="k">def</span> <span class="nf">_use_dfe_tune_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="p">):</span>
-        <span class="k">if</span><span class="p">(</span><span class="n">new_value</span> <span class="o">==</span> <span class="bp">False</span><span class="p">):</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">new_value</span> <span class="o">==</span> <span class="kc">False</span><span class="p">):</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="bp">True</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="bp">False</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="k">def</span> <span class="nf">_tx_ami_file_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tx_ami_valid</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tx_ami_valid</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">new_value</span><span class="p">)</span> <span class="k">as</span> <span class="n">pfile</span><span class="p">:</span>
                 <span class="n">pcfg</span> <span class="o">=</span> <span class="n">AMIParamConfigurator</span><span class="p">(</span><span class="n">pfile</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Parsing Tx AMI file, &#39;{}&#39;...</span><span class="se">\n</span><span class="s2">{}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">new_value</span><span class="p">,</span> <span class="n">pcfg</span><span class="o">.</span><span class="n">ami_parsing_errors</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Parsing Tx AMI file, &#39;</span><span class="si">{}</span><span class="s2">&#39;...</span><span class="se">\n</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">new_value</span><span class="p">,</span> <span class="n">pcfg</span><span class="o">.</span><span class="n">ami_parsing_errors</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">tx_has_getwave</span> <span class="o">=</span> <span class="n">pcfg</span><span class="o">.</span><span class="n">fetch_param_val</span><span class="p">([</span><span class="s1">&#39;Reserved_Parameters&#39;</span><span class="p">,</span> <span class="s1">&#39;GetWave_Exists&#39;</span><span class="p">])</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_tx_cfg</span> <span class="o">=</span> <span class="n">pcfg</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tx_ami_valid</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tx_ami_valid</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
-            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open and/or parse AMI file!</span><span class="se">\n</span><span class="s1">{}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open and/or parse AMI file!</span><span class="se">\n</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_tx_dll_file_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tx_dll_valid</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tx_dll_valid</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">model</span> <span class="o">=</span> <span class="n">AMIModel</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">new_value</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_tx_model</span> <span class="o">=</span> <span class="n">model</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tx_dll_valid</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tx_dll_valid</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
-            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open DLL/SO file!</span><span class="se">\n</span><span class="s1">{}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open DLL/SO file!</span><span class="se">\n</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_rx_ami_file_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">rx_ami_valid</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rx_ami_valid</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">new_value</span><span class="p">)</span> <span class="k">as</span> <span class="n">pfile</span><span class="p">:</span>
                 <span class="n">pcfg</span> <span class="o">=</span> <span class="n">AMIParamConfigurator</span><span class="p">(</span><span class="n">pfile</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Parsing Rx AMI file, &#39;{}&#39;...</span><span class="se">\n</span><span class="s2">{}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">new_value</span><span class="p">,</span> <span class="n">pcfg</span><span class="o">.</span><span class="n">ami_parsing_errors</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Parsing Rx AMI file, &#39;</span><span class="si">{}</span><span class="s2">&#39;...</span><span class="se">\n</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">new_value</span><span class="p">,</span> <span class="n">pcfg</span><span class="o">.</span><span class="n">ami_parsing_errors</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">rx_has_getwave</span> <span class="o">=</span> <span class="n">pcfg</span><span class="o">.</span><span class="n">fetch_param_val</span><span class="p">([</span><span class="s1">&#39;Reserved_Parameters&#39;</span><span class="p">,</span> <span class="s1">&#39;GetWave_Exists&#39;</span><span class="p">])</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_rx_cfg</span> <span class="o">=</span> <span class="n">pcfg</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">rx_ami_valid</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rx_ami_valid</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
-            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open and/or parse AMI file!</span><span class="se">\n</span><span class="s1">{}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open and/or parse AMI file!</span><span class="se">\n</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_rx_dll_file_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">rx_dll_valid</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rx_dll_valid</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">model</span> <span class="o">=</span> <span class="n">AMIModel</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">new_value</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_rx_model</span> <span class="o">=</span> <span class="n">model</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">rx_dll_valid</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rx_dll_valid</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
-            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open DLL/SO file!</span><span class="se">\n</span><span class="s1">{}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+            <span class="n">err</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="s1">&#39;Failed to open DLL/SO file!</span><span class="se">\n</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
 
 
@@ -1285,15 +1393,13 @@
         <span class="n">impulse_length</span>       <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">impulse_length</span> <span class="o">*</span> <span class="mf">1.e-9</span>
 
         <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">use_ch_file</span><span class="p">):</span>
-            <span class="n">chnl_h</span>           <span class="o">=</span> <span class="n">import_qucs_csv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ch_file</span><span class="p">,</span> <span class="n">ts</span><span class="p">)</span>
+            <span class="n">chnl_h</span>           <span class="o">=</span> <span class="n">import_channel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ch_file</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">padded</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">windowed</span><span class="p">)</span>
             <span class="k">if</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.</span><span class="p">)):</span>  <span class="c1"># step response?</span>
                 <span class="n">chnl_h</span>       <span class="o">=</span> <span class="n">diff</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)</span>       <span class="c1"># impulse response is derivative of step response.</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">chnl_h</span>      <span class="o">*=</span> <span class="n">ts</span>                 <span class="c1"># Normalize to (V/sample)</span>
+            <span class="n">chnl_h</span>          <span class="o">/=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)</span>        <span class="c1"># Normalize d.c. to one.</span>
             <span class="n">chnl_dly</span>         <span class="o">=</span> <span class="n">t</span><span class="p">[</span><span class="n">where</span><span class="p">(</span><span class="n">chnl_h</span> <span class="o">==</span> <span class="nb">max</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">))[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]]</span>
             <span class="n">chnl_h</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">))</span>
             <span class="n">chnl_H</span>           <span class="o">=</span> <span class="n">fft</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)</span>
-            <span class="n">chnl_H</span>          <span class="o">*=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)</span> <span class="o">/</span> <span class="n">chnl_H</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">l_ch</span>             <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">l_ch</span>
             <span class="n">v0</span>               <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">v0</span> <span class="o">*</span> <span class="mf">3.e8</span>
@@ -1321,6 +1427,9 @@
             <span class="n">min_len</span> <span class="o">=</span> <span class="n">max_len</span> <span class="o">=</span> <span class="n">impulse_length</span> <span class="o">/</span> <span class="n">ts</span>
         <span class="n">chnl_h</span><span class="p">,</span> <span class="n">start_ix</span> <span class="o">=</span> <span class="n">trim_impulse</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">,</span> <span class="n">min_len</span><span class="o">=</span><span class="n">min_len</span><span class="p">,</span> <span class="n">max_len</span><span class="o">=</span><span class="n">max_len</span><span class="p">)</span>
         <span class="n">chnl_h</span>          <span class="o">/=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)</span>                                   <span class="c1"># a temporary crutch.</span>
+        <span class="n">temp</span>             <span class="o">=</span> <span class="n">chnl_h</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">temp</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">))</span>
+        <span class="n">chnl_trimmed_H</span>   <span class="o">=</span> <span class="n">fft</span><span class="p">(</span><span class="n">temp</span><span class="p">)</span>
 
         <span class="n">chnl_s</span>    <span class="o">=</span> <span class="n">chnl_h</span><span class="o">.</span><span class="n">cumsum</span><span class="p">()</span>
         <span class="n">chnl_p</span>    <span class="o">=</span> <span class="n">chnl_s</span> <span class="o">-</span> <span class="n">pad</span><span class="p">(</span><span class="n">chnl_s</span><span class="p">[:</span><span class="o">-</span><span class="n">nspui</span><span class="p">],</span> <span class="p">(</span><span class="n">nspui</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="n">constant_values</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
@@ -1329,6 +1438,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">len_h</span>           <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chnl_dly</span>        <span class="o">=</span> <span class="n">chnl_dly</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chnl_H</span>          <span class="o">=</span> <span class="n">chnl_H</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chnl_trimmed_H</span>  <span class="o">=</span> <span class="n">chnl_trimmed_H</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">start_ix</span>        <span class="o">=</span> <span class="n">start_ix</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">t_ns_chnl</span>       <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">start_ix</span> <span class="p">:</span> <span class="n">start_ix</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">chnl_h</span><span class="p">)])</span> <span class="o">*</span> <span class="mf">1.e9</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chnl_s</span>          <span class="o">=</span> <span class="n">chnl_s</span>
@@ -1336,8 +1446,13 @@
 
         <span class="k">return</span> <span class="n">chnl_h</span></div></div>
 
-<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
-    <span class="n">PyBERT</span><span class="p">()</span><span class="o">.</span><span class="n">configure_traits</span><span class="p">(</span><span class="n">view</span> <span class="o">=</span> <span class="n">traits_view</span><span class="p">)</span>
+
+<span class="c1"># So that we can be used in stand-alone, or imported, fashion.</span>
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="n">PyBERT</span><span class="p">()</span><span class="o">.</span><span class="n">configure_traits</span><span class="p">(</span><span class="n">view</span><span class="o">=</span><span class="n">traits_view</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
 
 </pre></div>
 
@@ -1349,14 +1464,11 @@
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
     <form class="search" action="../../search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
-    </p>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -1372,13 +1484,13 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer Guide 2.0.5 documentation</a> &raquo;</li>
-          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="../../index.html">PyBERT Developer/Importer Guide 2.4.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &copy; Copyright 2015, David Banas.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.5.
+        &#169; Copyright 2015, David Banas.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.4.
     </div>
   </body>
 </html>

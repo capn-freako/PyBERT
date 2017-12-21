@@ -3,7 +3,7 @@ Default view definition for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
-Original date:   August 24, 2014 (Copied from `pybert.py', as part of a major code cleanup.)
+Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code cleanup.)
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
@@ -138,57 +138,71 @@ traits_view = View(
     Group(
         VGroup(
             HGroup(
-                HGroup(
-                    VGroup(
-                        Item(name='bit_rate',    label='Bit Rate (Gbps)',  tooltip="bit rate", show_label=True, enabled_when='True',
-                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=float)
+                VGroup(
+                    HGroup(  # Simulation Control
+                        VGroup(
+                            Item(name='bit_rate',    label='Bit Rate (Gbps)',  tooltip="bit rate", show_label=True, enabled_when='True',
+                                editor=TextEditor(auto_set=False, enter_set=True, evaluate=float)
+                            ),
+                            Item(name='nbits',       label='Nbits',    tooltip="# of bits to run",
+                                editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                            ),
+                            Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit",
+                                editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                            ),
+                            Item(name='mod_type',    label='Modulation', tooltip="line signalling/modulation scheme",
+                                editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])
+                            ),
                         ),
-                        Item(name='nbits',       label='Nbits',    tooltip="# of bits to run",
-                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                        VGroup(
+                            Item(name='do_sweep',    label='Do Sweep',    tooltip="Run parameter sweeps.", ),
+                            Item(name='sweep_aves',  label='SweepAves',   tooltip="# of trials, per sweep, for averaging.", enabled_when='do_sweep == True'),
+                            Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream",
+                                editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                            ),
+                            Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams",
+                                editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
+                            ),
                         ),
-                        Item(name='nspb',        label='Nspb',     tooltip="# of samples per bit",
-                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
-                        ),
-                        Item(name='mod_type',    label='Modulation', tooltip="line signalling/modulation scheme",
-                            editor=CheckListEditor(values=[(0, 'NRZ'), (1, 'Duo-binary'), (2, 'PAM-4'),])
+                        VGroup(
+                            Item(name='vod',         label='Vod (V)',     tooltip="Tx output voltage into matched load", ),
+                            Item(name='rn',          label='Rn (V)',      tooltip="standard deviation of random noise", ),
+                            Item(name='pn_mag',      label='Pn (V)',      tooltip="peak magnitude of periodic noise", ),
+                            Item(name='pn_freq',     label='f(Pn) (MHz)', tooltip="frequency of periodic noise", ),
                         ),
                     ),
-                    VGroup(
-                        Item(name='do_sweep',    label='Do Sweep',    tooltip="Run parameter sweeps.", ),
-                        Item(name='sweep_aves',  label='SweepAves',   tooltip="# of trials, per sweep, for averaging.", enabled_when='do_sweep == True'),
-                        Item(name='pattern_len', label='PatLen',   tooltip="length of random pattern to use to construct bit stream",
-                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
-                        ),
-                        Item(name='eye_bits',    label='EyeBits',  tooltip="# of bits to use to form eye diagrams",
-                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=int)
-                        ),
-                    ),
-                    VGroup(
-                        Item(name='vod',         label='Vod (V)',     tooltip="Tx output voltage into matched load", ),
-                        Item(name='rn',          label='Rn (V)',      tooltip="standard deviation of random noise", ),
-                        Item(name='pn_mag',      label='Pn (V)',      tooltip="peak magnitude of periodic noise", ),
-                        Item(name='pn_freq',     label='f(Pn) (MHz)', tooltip="frequency of periodic noise", ),
+                    HGroup(
+                        Item('btn_save_cfg',  show_label=False, tooltip="Store the current simulation configuration data to a file.",),
+                        Item('btn_load_cfg',  show_label=False, tooltip="Load the simulation configuration data from a file.",),
+                        Item('cfg_file',      show_label=False, style='readonly'),
                     ),
                     label='Simulation Control', show_border=True,
                 ),
-                HGroup(
-                    VGroup(
-                        Item(name='use_ch_file', label='fromFile', tooltip='Select channel impulse/step response from file.', ),
-                        Item(name='ch_file', label='Filename',    enabled_when='use_ch_file == True'),
-                        Item(name='impulse_length', label='Impl. Len. (ns)', tooltip="Manual impulse response length override", ),
-                        Item(name='cac',     label='Rx_Cac (uF)',    enabled_when='use_ch_file == False', tooltip="Rx a.c. coupling capacitance (each pin)", ),
+                VGroup(  # Channel Parameters
+                    HGroup(  # From File
+                        Item(name='use_ch_file', show_label=False, tooltip='Select channel frequency/impulse/step response from file.', ),
+                        Item(name='ch_file', label='File',    enabled_when='use_ch_file == True'),
+                        Item(name='padded',   label='Zero-padded', enabled_when='use_ch_file == True'),
+                        Item(name='windowed', label='Windowed',    enabled_when='use_ch_file == True'),
+                        label='From File', show_border=True,
                     ),
-                    VGroup(
-                        Item(name='Theta0',  label='Loss Tan.',   enabled_when='use_ch_file == False', tooltip="dielectric loss tangent", ),
-                        Item(name='Z0',      label='Z0 (Ohms)',   enabled_when='use_ch_file == False', tooltip="characteristic differential impedance", ),
-                        Item(name='v0',      label='v_rel (c)',   enabled_when='use_ch_file == False', tooltip="normalized propagation velocity", ),
-                        Item(name='l_ch',    label='Length (m)',  enabled_when='use_ch_file == False', tooltip="interconnect length", ),
-                    ),
-                    VGroup(
-                        Item(name='rs',      label='Tx_Rs (Ohms)',   enabled_when='use_ch_file == False', tooltip="Tx differential source impedance", ),
-                        Item(name='cout',    label='Tx_Cout (pF)',   enabled_when='use_ch_file == False', tooltip="Tx parasitic output capacitance (each pin)", ),
-                        Item(name='rin',     label='Rx_Rin (Ohms)',  enabled_when='use_ch_file == False', tooltip="Rx differential input impedance", ),
-                        Item(name='cin',     label='Rx_Cin (pF)',    enabled_when='use_ch_file == False', tooltip="Rx parasitic input capacitance (each pin)", ),
+                    HGroup(  # Native
+                        VGroup(
+                            Item(name='rs',      label='Tx_Rs (Ohms)',   enabled_when='use_ch_file == False', tooltip="Tx differential source impedance", ),
+                            Item(name='cout',    label='Tx_Cout (pF)',   enabled_when='use_ch_file == False', tooltip="Tx parasitic output capacitance (each pin)", ),
+                            Item(name='l_ch',    label='Length (m)',  enabled_when='use_ch_file == False', tooltip="interconnect length", ),
+                        ),
+                        VGroup(
+                            Item(name='Theta0',  label='Loss Tan.',   enabled_when='use_ch_file == False', tooltip="dielectric loss tangent", ),
+                            Item(name='Z0',      label='Z0 (Ohms)',   enabled_when='use_ch_file == False', tooltip="characteristic differential impedance", ),
+                            Item(name='v0',      label='v_rel (c)',   enabled_when='use_ch_file == False', tooltip="normalized propagation velocity", ),
+                        ),
+                        VGroup(
+                            Item(name='rin',     label='Rx_Rin (Ohms)',  enabled_when='use_ch_file == False', tooltip="Rx differential input impedance", ),
+                            Item(name='cin',     label='Rx_Cin (pF)',    enabled_when='use_ch_file == False', tooltip="Rx parasitic input capacitance (each pin)", ),
+                            Item(name='cac',     label='Rx_Cac (uF)',    enabled_when='use_ch_file == False', tooltip="Rx a.c. coupling capacitance (each pin)", ),
+                        ),
+                        label='Native', show_border=True,
                     ),
                     label='Channel Parameters', show_border=True,
                 ),
@@ -332,16 +346,12 @@ traits_view = View(
                     # enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
                 ),
                 VGroup(
-                    Item(name='thresh',          label='Pj Thresh.',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
+                    Item(name='thresh',          label='Pj Threshold (sigma)',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
+                    Item(name='impulse_length', label='Impulse Response Length (ns)', tooltip="Manual impulse response length override", ),
                     label='Analysis Parameters', show_border=True,
                 ),
             ),
-            HGroup(
-                Item('btn_save_cfg',  show_label=False, tooltip="Store the current simulation configuration data to a file.",),
-                Item('btn_load_cfg',  show_label=False, tooltip="Load the simulation configuration data from a file.",),
-                Item('cfg_file',      show_label=False, style='readonly'),
-            ),
-            spring,
+            # spring,
             label = 'Config.', id = 'config',
         ),
         Group(
@@ -473,11 +483,11 @@ traits_view = View(
         ),
         layout = 'tabbed', springy = True, id = 'tabs',
     ),
-    resizable = False,
+    resizable = True,
     handler = MyHandler(),
     buttons = [run_simulation, save_data, load_data],
     statusbar = "status_str",
     title='PyBERT',
-    width=0.95, height=0.95
+    # width=0.95, height=0.95
 )
 

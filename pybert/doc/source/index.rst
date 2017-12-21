@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 ===============================================
- *PyBERT* Source Code Developer's Guide v2.0.5
+ *PyBERT* Source Code Developer's Guide v2.4.0
 ===============================================
 
 Welcome to the *PyBERT Developer's Guide*!
@@ -24,6 +24,14 @@ Instead, try:
   * Looking at the *Help* tab of the PyBERT GUI.
   * Looking at the `PyBERT FAQ <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>`_.
   * Sending me e-mail at: <capn.freako@gmail.com>.
+
+Note to PyBERT *importers*
+--------------------------
+
+If you are importing PyBERT funcionality into a larger body of work, this *is* the right place for you, since it provides:
+
+- module, class, and attribute definitions and specifications of intent, and
+- calling signatures for module/class member functions.
 
 Contents
 --------

@@ -118,7 +118,10 @@ gThresh         = 6       # threshold for identifying periodic jitter spectral e
 class StoppableThread(Thread):
     """
     Thread class with a stop() method.
+
     The thread itself has to check regularly for the stopped() condition.
+
+    All PyBERT thread classes are subclasses of this class.
     """
 
     def __init__(self):
@@ -126,15 +129,19 @@ class StoppableThread(Thread):
         self._stop_event = Event()
 
     def stop(self):
+        'Called by thread invoker, when thread should be stopped prematurely.'
         self._stop_event.set()
 
     def stopped(self):
+        'Should be called by thread (i.e. - subclass) periodically and, if this function returns True, thread should clean itself up and quit ASAP.'
         return self._stop_event.is_set()
 
 class TxOptThread(StoppableThread):
     'Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
+        'Run the Tx equalization optimization thread.'
+
         pybert = self.pybert
 
         if(self.update_status):
@@ -199,6 +206,8 @@ class RxOptThread(StoppableThread):
     'Used to run Rx tap weight optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
+        'Run the Rx equalization optimization thread.'
+
         pybert = self.pybert
 
         pybert.status = "Optimizing Rx..."
@@ -239,6 +248,8 @@ class CoOptThread(StoppableThread):
     'Used to run co-optimization in its own thread, in order to preserve GUI responsiveness.'
 
     def run(self):
+        'Run the Tx/Rx equalization co-optimization thread.'
+
         pybert = self.pybert
 
         pybert.status = "Co-optimizing..."
@@ -322,19 +333,21 @@ class PyBERT(HasTraits):
     # Independent variables
 
     # - Simulation Control
-    bit_rate        = Range(low=0.1, high=100.0, value=gBitRate)            # (Gbps)
-    nbits           = Range(low=1000, high=10000000, value=gNbits)
-    pattern_len     = Range(low=7, high=10000000, value=gPatLen)
-    nspb            = Range(low=2, high=256, value=gNspb)
-    eye_bits        = Int(gNbits // 5)
-    mod_type        = List([0])                                             # 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
-    num_sweeps      = Int(1)
+    bit_rate        = Range(low=0.1, high=100.0, value=gBitRate)            #: (Gbps)
+    nbits           = Range(low=1000, high=10000000, value=gNbits)          #: Number of bits to simulate.
+    pattern_len     = Range(low=7, high=10000000, value=gPatLen)            #: PRBS pattern length.
+    nspb            = Range(low=2, high=256, value=gNspb)                   #: Signal vector samples per bit.
+    eye_bits        = Int(gNbits // 5)                                      #: # of bits used to form eye. (Default = last 20%)
+    mod_type        = List([0])                                             #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    num_sweeps      = Int(1)                                                #: Number of sweeps to run.
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
-    do_sweep        = Bool(False)
+    do_sweep        = Bool(False)                                           #: Run sweeps? (Default = False)
 
     # - Channel Control
-    use_ch_file     = Bool(False)
+    use_ch_file     = Bool(False)                                           #: Import channel description from file? (Default = False)
+    padded          = Bool(False)                                           #: Zero pad imported Touchstone data? (Default = False)
+    windowed        = Bool(False)
     ch_file         = File('', entries=5, filter=['*.s4p', '*.S4P', '*.csv', '*.CSV', '*.txt', '*.TXT', '*.*'])
     impulse_length  = Float(0.0)
     Rdc             = Float(gRdc)
@@ -451,9 +464,9 @@ class PyBERT(HasTraits):
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
-    ident  = String('PyBERT v2.3.1 - a serial communication link design tool, written in Python.\n\n \
+    ident  = String('PyBERT v2.4.0 - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    December 13, 2017\n\n \
+    December 20, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.')
 
@@ -1330,7 +1343,7 @@ class PyBERT(HasTraits):
         impulse_length       = self.impulse_length * 1.e-9
 
         if(self.use_ch_file):
-            chnl_h           = import_channel(self.ch_file, ts)
+            chnl_h           = import_channel(self.ch_file, ts, self.padded, self.windowed)
             if(chnl_h[-1] > (max(chnl_h) / 2.)):  # step response?
                 chnl_h       = diff(chnl_h)       # impulse response is derivative of step response.
             chnl_h          /= sum(chnl_h)        # Normalize d.c. to one.

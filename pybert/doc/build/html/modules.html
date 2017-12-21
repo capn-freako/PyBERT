@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Modules in pybert package &mdash; PyBERT Developer Guide 2.0.5 documentation</title>
+    <title>Modules in pybert package &#8212; PyBERT Developer/Importer Guide 2.4.0 documentation</title>
     
     <link rel="stylesheet" href="_static/classic.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -14,16 +14,18 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '2.0.5',
+        VERSION:     '2.4.0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
       };
     </script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="PyBERT Developer Guide 2.0.5 documentation" href="index.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
     <link rel="prev" title="General description of pybert package." href="intro.html" /> 
   </head>
   <body role="document">
@@ -39,7 +41,7 @@
         <li class="right" >
           <a href="intro.html" title="General description of pybert package."
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">PyBERT Developer Guide 2.0.5 documentation</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="index.html">PyBERT Developer/Importer Guide 2.4.0 documentation</a> &#187;</li> 
       </ul>
     </div>  
 
@@ -59,6 +61,69 @@
 <p>This Python script provides a GUI interface to a BERT simulator, which
 can be used to explore the concepts of serial communication link design.</p>
 <p>Copyright (c) 2014 by David Banas; All rights reserved World wide.</p>
+<dl class="class">
+<dt id="pybert.pybert.StoppableThread">
+<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">StoppableThread</code><a class="reference internal" href="_modules/pybert/pybert.html#StoppableThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.StoppableThread" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thread class with a stop() method.</p>
+<p>The thread itself has to check regularly for the stopped() condition.</p>
+<p>All PyBERT thread classes are subclasses of this class.</p>
+<dl class="method">
+<dt id="pybert.pybert.StoppableThread.stop">
+<code class="descname">stop</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#StoppableThread.stop"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.StoppableThread.stop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called by thread invoker, when thread should be stopped prematurely.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pybert.pybert.StoppableThread.stopped">
+<code class="descname">stopped</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#StoppableThread.stopped"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.StoppableThread.stopped" title="Permalink to this definition">¶</a></dt>
+<dd><p>Should be called by thread (i.e. - subclass) periodically and, if this function returns True, thread should clean itself up and quit ASAP.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pybert.pybert.TxOptThread">
+<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">TxOptThread</code><a class="reference internal" href="_modules/pybert/pybert.html#TxOptThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.TxOptThread" title="Permalink to this definition">¶</a></dt>
+<dd><p>Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness.</p>
+<dl class="method">
+<dt id="pybert.pybert.TxOptThread.run">
+<code class="descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#TxOptThread.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.TxOptThread.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run the Tx equalization optimization thread.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pybert.pybert.RxOptThread">
+<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">RxOptThread</code><a class="reference internal" href="_modules/pybert/pybert.html#RxOptThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.RxOptThread" title="Permalink to this definition">¶</a></dt>
+<dd><p>Used to run Rx tap weight optimization in its own thread, in order to preserve GUI responsiveness.</p>
+<dl class="method">
+<dt id="pybert.pybert.RxOptThread.run">
+<code class="descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#RxOptThread.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.RxOptThread.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run the Rx equalization optimization thread.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pybert.pybert.CoOptThread">
+<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">CoOptThread</code><a class="reference internal" href="_modules/pybert/pybert.html#CoOptThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.CoOptThread" title="Permalink to this definition">¶</a></dt>
+<dd><p>Used to run co-optimization in its own thread, in order to preserve GUI responsiveness.</p>
+<dl class="method">
+<dt id="pybert.pybert.CoOptThread.run">
+<code class="descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#CoOptThread.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.CoOptThread.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run the Tx/Rx equalization co-optimization thread.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pybert.pybert.TxTapTuner">
+<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">TxTapTuner</code><span class="sig-paren">(</span><em>name='(noname)'</em>, <em>enabled=False</em>, <em>min_val=0.0</em>, <em>max_val=0.0</em>, <em>value=0.0</em>, <em>steps=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#TxTapTuner"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.TxTapTuner" title="Permalink to this definition">¶</a></dt>
+<dd><p>Object used to populate the rows of the Tx FFE tap tuning table.</p>
+<p>Allows user to define properties, at instantiation.</p>
+</dd></dl>
+
 <dl class="class">
 <dt id="pybert.pybert.PyBERT">
 <em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">PyBERT</code><span class="sig-paren">(</span><em>run_simulation=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#PyBERT"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.PyBERT" title="Permalink to this definition">¶</a></dt>
@@ -80,47 +145,101 @@ default = True)</td>
 </tr>
 </tbody>
 </table>
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.bit_rate">
+<code class="descname">bit_rate</code><a class="headerlink" href="#pybert.pybert.PyBERT.bit_rate" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Gbps)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.nbits">
+<code class="descname">nbits</code><a class="headerlink" href="#pybert.pybert.PyBERT.nbits" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of bits to simulate.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.pattern_len">
+<code class="descname">pattern_len</code><a class="headerlink" href="#pybert.pybert.PyBERT.pattern_len" title="Permalink to this definition">¶</a></dt>
+<dd><p>PRBS pattern length.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.nspb">
+<code class="descname">nspb</code><a class="headerlink" href="#pybert.pybert.PyBERT.nspb" title="Permalink to this definition">¶</a></dt>
+<dd><p>Signal vector samples per bit.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.eye_bits">
+<code class="descname">eye_bits</code><a class="headerlink" href="#pybert.pybert.PyBERT.eye_bits" title="Permalink to this definition">¶</a></dt>
+<dd><p># of bits used to form eye. (Default = last 20%)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.mod_type">
+<code class="descname">mod_type</code><a class="headerlink" href="#pybert.pybert.PyBERT.mod_type" title="Permalink to this definition">¶</a></dt>
+<dd><p>0 = NRZ; 1 = Duo-binary; 2 = PAM-4</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.num_sweeps">
+<code class="descname">num_sweeps</code><a class="headerlink" href="#pybert.pybert.PyBERT.num_sweeps" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of sweeps to run.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.do_sweep">
+<code class="descname">do_sweep</code><a class="headerlink" href="#pybert.pybert.PyBERT.do_sweep" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run sweeps? (Default = False)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.use_ch_file">
+<code class="descname">use_ch_file</code><a class="headerlink" href="#pybert.pybert.PyBERT.use_ch_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Import channel description from file? (Default = False)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.padded">
+<code class="descname">padded</code><a class="headerlink" href="#pybert.pybert.PyBERT.padded" title="Permalink to this definition">¶</a></dt>
+<dd><p>Zero pad imported Touchstone data? (Default = False)</p>
+</dd></dl>
+
 <dl class="method">
 <dt id="pybert.pybert.PyBERT.calc_chnl_h">
 <code class="descname">calc_chnl_h</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#PyBERT.calc_chnl_h"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.PyBERT.calc_chnl_h" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculates the channel impulse response.</p>
 <dl class="docutils">
 <dt>Also sets, in &#8216;self&#8217;:</dt>
-<dd><ul class="first last">
+<dd><ul class="first last simple">
 <li><dl class="first docutils">
 <dt>chnl_dly:</dt>
-<dd><p class="first last">group delay of channel</p>
-</dd>
+<dd>group delay of channel</dd>
 </dl>
 </li>
 <li><dl class="first docutils">
 <dt>start_ix:</dt>
-<dd><p class="first last">first element of trimmed response</p>
-</dd>
+<dd>first element of trimmed response</dd>
 </dl>
 </li>
 <li><dl class="first docutils">
 <dt>t_ns_chnl:</dt>
-<dd><p class="first last">the x-values, in ns, for plotting &#8216;chnl_h&#8217;</p>
-</dd>
+<dd>the x-values, in ns, for plotting &#8216;chnl_h&#8217;</dd>
 </dl>
 </li>
 <li><dl class="first docutils">
 <dt>chnl_H:</dt>
-<dd><p class="first last">channel frequency response</p>
-</dd>
+<dd>channel frequency response</dd>
 </dl>
 </li>
 <li><dl class="first docutils">
 <dt>chnl_s:</dt>
-<dd><p class="first last">channel step response</p>
-</dd>
+<dd>channel step response</dd>
 </dl>
 </li>
 <li><dl class="first docutils">
 <dt>chnl_p:</dt>
-<dd><p class="first last">channel pulse response</p>
-</dd>
+<dd>channel pulse response</dd>
 </dl>
 </li>
 </ul>
@@ -130,76 +249,12 @@ default = True)</td>
 
 </dd></dl>
 
-<dl class="class">
-<dt id="pybert.pybert.TxOptThread">
-<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">TxOptThread</code><span class="sig-paren">(</span><em>group=None</em>, <em>target=None</em>, <em>name=None</em>, <em>args=()</em>, <em>kwargs=None</em>, <em>verbose=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#TxOptThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.TxOptThread" title="Permalink to this definition">¶</a></dt>
-<dd><p>Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness.</p>
-<p>This constructor should always be called with keyword arguments. Arguments are:</p>
-<p><em>group</em> should be None; reserved for future extension when a ThreadGroup
-class is implemented.</p>
-<p><em>target</em> is the callable object to be invoked by the run()
-method. Defaults to None, meaning nothing is called.</p>
-<p><em>name</em> is the thread name. By default, a unique name is constructed of
-the form &#8220;Thread-N&#8221; where N is a small decimal number.</p>
-<p><em>args</em> is the argument tuple for the target invocation. Defaults to ().</p>
-<p><em>kwargs</em> is a dictionary of keyword arguments for the target
-invocation. Defaults to {}.</p>
-<p>If a subclass overrides the constructor, it must make sure to invoke
-the base class constructor (Thread.__init__()) before doing anything
-else to the thread.</p>
-</dd></dl>
-
-<dl class="class">
-<dt id="pybert.pybert.RxOptThread">
-<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">RxOptThread</code><span class="sig-paren">(</span><em>group=None</em>, <em>target=None</em>, <em>name=None</em>, <em>args=()</em>, <em>kwargs=None</em>, <em>verbose=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#RxOptThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.RxOptThread" title="Permalink to this definition">¶</a></dt>
-<dd><p>Used to run Rx tap weight optimization in its own thread, in order to preserve GUI responsiveness.</p>
-<p>This constructor should always be called with keyword arguments. Arguments are:</p>
-<p><em>group</em> should be None; reserved for future extension when a ThreadGroup
-class is implemented.</p>
-<p><em>target</em> is the callable object to be invoked by the run()
-method. Defaults to None, meaning nothing is called.</p>
-<p><em>name</em> is the thread name. By default, a unique name is constructed of
-the form &#8220;Thread-N&#8221; where N is a small decimal number.</p>
-<p><em>args</em> is the argument tuple for the target invocation. Defaults to ().</p>
-<p><em>kwargs</em> is a dictionary of keyword arguments for the target
-invocation. Defaults to {}.</p>
-<p>If a subclass overrides the constructor, it must make sure to invoke
-the base class constructor (Thread.__init__()) before doing anything
-else to the thread.</p>
-</dd></dl>
-
-<dl class="class">
-<dt id="pybert.pybert.CoOptThread">
-<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">CoOptThread</code><span class="sig-paren">(</span><em>group=None</em>, <em>target=None</em>, <em>name=None</em>, <em>args=()</em>, <em>kwargs=None</em>, <em>verbose=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#CoOptThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.CoOptThread" title="Permalink to this definition">¶</a></dt>
-<dd><p>Used to run co-optimization in its own thread, in order to preserve GUI responsiveness.</p>
-<p>This constructor should always be called with keyword arguments. Arguments are:</p>
-<p><em>group</em> should be None; reserved for future extension when a ThreadGroup
-class is implemented.</p>
-<p><em>target</em> is the callable object to be invoked by the run()
-method. Defaults to None, meaning nothing is called.</p>
-<p><em>name</em> is the thread name. By default, a unique name is constructed of
-the form &#8220;Thread-N&#8221; where N is a small decimal number.</p>
-<p><em>args</em> is the argument tuple for the target invocation. Defaults to ().</p>
-<p><em>kwargs</em> is a dictionary of keyword arguments for the target
-invocation. Defaults to {}.</p>
-<p>If a subclass overrides the constructor, it must make sure to invoke
-the base class constructor (Thread.__init__()) before doing anything
-else to the thread.</p>
-</dd></dl>
-
-<dl class="class">
-<dt id="pybert.pybert.TxTapTuner">
-<em class="property">class </em><code class="descclassname">pybert.pybert.</code><code class="descname">TxTapTuner</code><span class="sig-paren">(</span><em>name='(noname)'</em>, <em>enabled=False</em>, <em>min_val=0.0</em>, <em>max_val=0.0</em>, <em>value=0.0</em>, <em>steps=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert.html#TxTapTuner"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert.TxTapTuner" title="Permalink to this definition">¶</a></dt>
-<dd><p>Object used to populate the rows of the Tx FFE tap tuning table.</p>
-<p>Allows user to define properties, at instantiation.</p>
-</dd></dl>
-
 </div>
 <div class="section" id="module-pybert.pybert_cntrl">
 <span id="pybert-cntrl-model-control-logic"></span><h2>pybert_cntrl - Model control logic.<a class="headerlink" href="#module-pybert.pybert_cntrl" title="Permalink to this headline">¶</a></h2>
 <p>Default controller definition for PyBERT class.</p>
 <p>Original author: David Banas &lt;<a class="reference external" href="mailto:capn&#46;freako&#37;&#52;&#48;gmail&#46;com">capn<span>&#46;</span>freako<span>&#64;</span>gmail<span>&#46;</span>com</a>&gt;</p>
-<p>Original date:   August 24, 2014 (Copied from <a href="#id1"><span class="problematic" id="id2">`</span></a>pybert.py&#8217;, as part of a major code cleanup.)</p>
+<p>Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code cleanup.)</p>
 <p>Copyright (c) 2014 David Banas; all rights reserved World wide.</p>
 <dl class="function">
 <dt id="pybert.pybert_cntrl.my_run_sweeps">
@@ -272,14 +327,8 @@ conflicts and speed up this function&#8217;s execution time.
 <span id="pybert-view-main-gui-window-layout-definition"></span><h2>pybert_view - Main GUI window layout definition.<a class="headerlink" href="#module-pybert.pybert_view" title="Permalink to this headline">¶</a></h2>
 <p>Default view definition for PyBERT class.</p>
 <p>Original author: David Banas &lt;<a class="reference external" href="mailto:capn&#46;freako&#37;&#52;&#48;gmail&#46;com">capn<span>&#46;</span>freako<span>&#64;</span>gmail<span>&#46;</span>com</a>&gt;</p>
-<p>Original date:   August 24, 2014 (Copied from <a href="#id3"><span class="problematic" id="id4">`</span></a>pybert.py&#8217;, as part of a major code cleanup.)</p>
+<p>Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code cleanup.)</p>
 <p>Copyright (c) 2014 David Banas; all rights reserved World wide.</p>
-<dl class="class">
-<dt id="pybert.pybert_view.MyHandler">
-<em class="property">class </em><code class="descclassname">pybert.pybert_view.</code><code class="descname">MyHandler</code><a class="reference internal" href="_modules/pybert/pybert_view.html#MyHandler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_view.MyHandler" title="Permalink to this definition">¶</a></dt>
-<dd><p>This handler is instantiated by the View and handles user button clicks.</p>
-</dd></dl>
-
 <dl class="class">
 <dt id="pybert.pybert_view.RunSimThread">
 <em class="property">class </em><code class="descclassname">pybert.pybert_view.</code><code class="descname">RunSimThread</code><span class="sig-paren">(</span><em>group=None</em>, <em>target=None</em>, <em>name=None</em>, <em>args=()</em>, <em>kwargs=None</em>, <em>verbose=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_view.html#RunSimThread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_view.RunSimThread" title="Permalink to this definition">¶</a></dt>
@@ -299,12 +348,18 @@ the base class constructor (Thread.__init__()) before doing anything
 else to the thread.</p>
 </dd></dl>
 
+<dl class="class">
+<dt id="pybert.pybert_view.MyHandler">
+<em class="property">class </em><code class="descclassname">pybert.pybert_view.</code><code class="descname">MyHandler</code><a class="reference internal" href="_modules/pybert/pybert_view.html#MyHandler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_view.MyHandler" title="Permalink to this definition">¶</a></dt>
+<dd><p>This handler is instantiated by the View and handles user button clicks.</p>
+</dd></dl>
+
 </div>
 <div class="section" id="module-pybert.pybert_util">
 <span id="pybert-util-various-utilities-used-by-other-modules"></span><h2>pybert_util - Various utilities used by other modules.<a class="headerlink" href="#module-pybert.pybert_util" title="Permalink to this headline">¶</a></h2>
 <p>General purpose utilities for PyBERT.</p>
 <p>Original author: David Banas &lt;<a class="reference external" href="mailto:capn&#46;freako&#37;&#52;&#48;gmail&#46;com">capn<span>&#46;</span>freako<span>&#64;</span>gmail<span>&#46;</span>com</a>&gt;</p>
-<p>Original date:   September 27, 2014 (Copied from <a href="#id5"><span class="problematic" id="id6">`</span></a>pybert_cntrl.py&#8217;.)</p>
+<p>Original date:   September 27, 2014 (Copied from pybert_cntrl.py.)</p>
 <p>Copyright (c) 2014 David Banas; all rights reserved World wide.</p>
 <dl class="function">
 <dt id="pybert.pybert_util.moving_average">
@@ -315,7 +370,7 @@ else to the thread.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>a</strong> (<em>[float]</em>) &#8211; Input vector to be averaged.</li>
+<li><strong>a</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Input vector to be averaged.</li>
 <li><strong>n</strong> (<em>int</em>) &#8211; Width of averaging window, in vector samples. (Optional;
 default = 3.)</li>
 </ul>
@@ -338,9 +393,9 @@ default = 3.)</li>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>t</strong> (<em>[float]</em>) &#8211; Vector of sample times. Intervals do NOT need to be
+<li><strong>t</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Vector of sample times. Intervals do NOT need to be
 uniform.</li>
-<li><strong>x</strong> (<em>[float]</em>) &#8211; Sampled input vector.</li>
+<li><strong>x</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Sampled input vector.</li>
 <li><strong>min_delay</strong> (<em>float</em>) &#8211; Minimum delay required, before allowing
 crossings. (Helps avoid false crossings at beginning of
 signal.) (Optional; default = 0.)</li>
@@ -372,8 +427,8 @@ Normalized to maximum input signal magnitude.
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>t</strong> (<em>[float]</em>) &#8211; The times associated with each signal sample.</li>
-<li><strong>x</strong> (<em>[float]</em>) &#8211; The signal samples.</li>
+<li><strong>t</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; The times associated with each signal sample.</li>
+<li><strong>x</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; The signal samples.</li>
 <li><strong>amplitude</strong> (<em>float</em>) &#8211; The nominal signal amplitude. (Used for
 determining thresholds, in the case of some modulation
 types.)</li>
@@ -524,14 +579,13 @@ We do this by simply zero padding the missing samples.</p>
 <li><strong>ui</strong> (<em>float</em>) &#8211; unit interval (s)</li>
 <li><strong>samps_per_ui</strong> (<em>int</em>) &#8211; # of samples per unit interval</li>
 <li><strong>height</strong> (<em>int</em>) &#8211; height of output image data array</li>
-<li><strong>ys</strong> (<em>[float]</em>) &#8211; signal vector of interest</li>
+<li><strong>ys</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; signal vector of interest</li>
 <li><strong>y_max</strong> (<em>float</em>) &#8211; max. +/- vertical extremity of plot</li>
 </ul>
 </td>
 </tr>
 <tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
-<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><p class="first last"><strong>clock_times</strong> (<em>[float]</em>) &#8211;
-(optional) vector of clock times to use
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>clock_times</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; (optional) vector of clock times to use
 for eye centers. If not provided, just use mean
 zero-crossing and assume constant UI and no phase jumps.
 (This allows the same function to be used for eye diagram
@@ -563,38 +617,33 @@ itself as a natural approach, given our chosen use model of having
 the user provide the peaking frequency and degree of peaking.</p>
 <p>That is, we define our desired frequency response using one zero
 and two poles, where:</p>
-<ul>
+<ul class="simple">
 <li><dl class="first docutils">
 <dt>The pole locations are equal to:</dt>
-<dd><ul class="first last simple">
+<dd><ul class="first last">
 <li>the signal path natural bandwidth, and</li>
 <li>the user specified peaking frequency.</li>
 </ul>
 </dd>
 </dl>
 </li>
-<li><p class="first">The zero location is chosen, so as to provide the desired degree
-of peaking.</p>
-</li>
+<li>The zero location is chosen, so as to provide the desired degree
+of peaking.</li>
 </ul>
 <p>Inputs:</p>
 <blockquote>
-<div><ul>
-<li><p class="first">rx_bw        The natural (or, unequalized) signal path bandwidth (Hz).</p>
-</li>
+<div><ul class="simple">
+<li>rx_bw        The natural (or, unequalized) signal path bandwidth (Hz).</li>
 <li><dl class="first docutils">
 <dt>peak_freq    The location of the desired peak in the frequency</dt>
-<dd><p class="first last">response (Hz).</p>
-</dd>
+<dd>response (Hz).</dd>
 </dl>
 </li>
-<li><p class="first">peak_mag     The desired relative magnitude of the peak (dB). (mag(H(0)) = 1)</p>
-</li>
-<li><p class="first">w            The list of frequencies of interest (rads./s).</p>
-</li>
+<li>peak_mag     The desired relative magnitude of the peak (dB). (mag(H(0)) = 1)</li>
+<li>w            The list of frequencies of interest (rads./s).</li>
 <li><dl class="first docutils">
 <dt>mode         The operational mode; must be one of:</dt>
-<dd><ul class="first last simple">
+<dd><ul class="first last">
 <li>&#8216;Off&#8217;    : CTLE is disengaged.</li>
 <li>&#8216;Passive&#8217;: Maximum frequency response has magnitude one.</li>
 <li>&#8216;AGC&#8217;    : Automatic gain control. (Handled by calling routine.)</li>
@@ -605,19 +654,17 @@ of peaking.</p>
 </li>
 <li><dl class="first docutils">
 <dt>dc_offset    The d.c. offset of the CTLE gain curve (dB).</dt>
-<dd><p class="first last">(Only valid, when &#8216;mode&#8217; = &#8216;Manual&#8217;.)</p>
-</dd>
+<dd>(Only valid, when &#8216;mode&#8217; = &#8216;Manual&#8217;.)</dd>
 </dl>
 </li>
 </ul>
 </div></blockquote>
 <p>Outputs:</p>
 <blockquote>
-<div><ul>
+<div><ul class="simple">
 <li><dl class="first docutils">
 <dt>w, H         The resultant complex frequency response, at the</dt>
-<dd><p class="first last">given frequencies.</p>
-</dd>
+<dd>given frequencies.</dd>
 </dl>
 </li>
 </ul>
@@ -630,9 +677,9 @@ of peaking.</p>
 <dd><dl class="docutils">
 <dt>Trim impulse response, for more useful display, by:</dt>
 <dd><ul class="first last simple">
-<li>eliminating 90% of the overall delay from the beginning, and</li>
-<li>clipping off the tail, after 99.8% of the total power has been captured.
-(Using 99.9% was causing problems; I don&#8217;t know why.)</li>
+<li>clipping off the tail, after 99.8% of the total power has been
+captured (Using 99.9% was causing problems; I don&#8217;t know why.), and</li>
+<li>setting the &#8220;front porch&#8221; length equal to 20% of the total length.</li>
 </ul>
 </dd>
 </dl>
@@ -655,40 +702,64 @@ of peaking.</p>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="pybert.pybert_util.import_qucs_csv">
-<code class="descclassname">pybert.pybert_util.</code><code class="descname">import_qucs_csv</code><span class="sig-paren">(</span><em>filename</em>, <em>sample_per</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#import_qucs_csv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.import_qucs_csv" title="Permalink to this definition">¶</a></dt>
-<dd><p>Read in a CSV waveform file exported by QUCS, resampling as
-appropriate, via linear interpolation.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>filename</strong> (<em>str</em>) &#8211; Name of waveform file to read in.</li>
-<li><strong>sample_per</strong> (<em>float</em>) &#8211; New sample interval</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-<p>Returns: Resampled waveform.</p>
-</dd></dl>
-
 </div>
 <div class="section" id="module-pybert.pybert_plot">
 <span id="pybert-plot-plot-definitions-for-the-pybert-gui"></span><h2>pybert_plot - Plot definitions for the <em>PyBERT</em> GUI.<a class="headerlink" href="#module-pybert.pybert_plot" title="Permalink to this headline">¶</a></h2>
 <p>Plot definitions for PyBERT class.</p>
 <p>Original author: David Banas &lt;<a class="reference external" href="mailto:capn&#46;freako&#37;&#52;&#48;gmail&#46;com">capn<span>&#46;</span>freako<span>&#64;</span>gmail<span>&#46;</span>com</a>&gt;</p>
-<p>Original date:   February 21, 2015 (Copied from <a href="#id7"><span class="problematic" id="id8">`</span></a>pybert.py&#8217;, as part of a major code cleanup.)</p>
+<p>Original date:   February 21, 2015 (Copied from pybert.py, as part of a major code cleanup.)</p>
 <p>Copyright (c) 2015 David Banas; all rights reserved World wide.</p>
 </div>
 <div class="section" id="module-pybert.pybert_help">
 <span id="pybert-help-contents-of-the-help-tab-of-the-pybert-gui"></span><h2>pybert_help - Contents of the <em>Help</em> tab of the <em>PyBERT</em> GUI.<a class="headerlink" href="#module-pybert.pybert_help" title="Permalink to this headline">¶</a></h2>
 <p>User instructions for PyBERT class.</p>
 <p>Original author: David Banas &lt;<a class="reference external" href="mailto:capn&#46;freako&#37;&#52;&#48;gmail&#46;com">capn<span>&#46;</span>freako<span>&#64;</span>gmail<span>&#46;</span>com</a>&gt;</p>
-<p>Original date:   April 15, 2015 (Copied from <a href="#id9"><span class="problematic" id="id10">`</span></a>pybert.py&#8217;.)</p>
+<p>Original date:   April 15, 2015 (Copied from pybert.py.)</p>
 <p>Copyright (c) 2015 David Banas; all rights reserved World wide.</p>
+</div>
+<div class="section" id="module-pybert.pybert_cfg">
+<span id="pybert-cfg-data-structure-for-saving-pybert-configuration"></span><h2>pybert_cfg - Data structure for saving <em>PyBERT</em> configuration.<a class="headerlink" href="#module-pybert.pybert_cfg" title="Permalink to this headline">¶</a></h2>
+<p>Simulation configuration data encapsulation, for PyBERT.</p>
+<p>Original Author: David Banas &lt;<a class="reference external" href="mailto:capn&#46;freako&#37;&#52;&#48;gmail&#46;com">capn<span>&#46;</span>freako<span>&#64;</span>gmail<span>&#46;</span>com</a>&gt;</p>
+<p>Original Date:   5 May 2017</p>
+<p>This Python script provides a data structure for encapsulating the
+simulation configuration data of a PyBERT instance. It was first
+created, as a way to facilitate easier pickling, so that a particular
+configuration could be saved and later restored.</p>
+<p>Copyright (c) 2017 by David Banas; All rights reserved World wide.</p>
+<dl class="class">
+<dt id="pybert.pybert_cfg.PyBertCfg">
+<em class="property">class </em><code class="descclassname">pybert.pybert_cfg.</code><code class="descname">PyBertCfg</code><span class="sig-paren">(</span><em>the_PyBERT</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_cfg.html#PyBertCfg"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_cfg.PyBertCfg" title="Permalink to this definition">¶</a></dt>
+<dd><p>PyBERT simulation configuration data encapsulation class.</p>
+<p>This class is used to encapsulate that subset of the configuration
+data for a PyBERT instance, which is to be saved when the user
+clicks the &#8220;Save Config.&#8221; button.</p>
+<p>Copy just that subset of the supplied PyBERT instance&#8217;s
+__dict__, which should be saved during pickling.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-pybert.pybert_data">
+<span id="pybert-data-data-structure-for-saving-pybert-results"></span><h2>pybert_data - Data structure for saving <em>PyBERT</em> results.<a class="headerlink" href="#module-pybert.pybert_data" title="Permalink to this headline">¶</a></h2>
+<p>Simulation results data encapsulation, for PyBERT.</p>
+<p>Original Author: David Banas &lt;<a class="reference external" href="mailto:capn&#46;freako&#37;&#52;&#48;gmail&#46;com">capn<span>&#46;</span>freako<span>&#64;</span>gmail<span>&#46;</span>com</a>&gt;</p>
+<p>Original Date:   9 May 2017</p>
+<p>This Python script provides a data structure for encapsulating the
+simulation results data of a PyBERT instance. It was first
+created, as a way to facilitate easier pickling, so that a particular
+result could be saved and later restored, as a reference waveform.</p>
+<p>Copyright (c) 2017 by David Banas; All rights reserved World wide.</p>
+<dl class="class">
+<dt id="pybert.pybert_data.PyBertData">
+<em class="property">class </em><code class="descclassname">pybert.pybert_data.</code><code class="descname">PyBertData</code><span class="sig-paren">(</span><em>the_PyBERT</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_data.html#PyBertData"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_data.PyBertData" title="Permalink to this definition">¶</a></dt>
+<dd><p>PyBERT simulation results data encapsulation class.</p>
+<p>This class is used to encapsulate that subset of the results
+data for a PyBERT instance, which is to be saved when the user
+clicks the &#8220;Save Results&#8221; button.</p>
+<p>Copy just that subset of the supplied PyBERT instance&#8217;s
+&#8216;plotdata&#8217; attribute, which should be saved during pickling.</p>
+</dd></dl>
+
 </div>
 <div class="section" id="module-pybert.dfe">
 <span id="dfe-dfe-behavioral-model"></span><h2>dfe - DFE behavioral model.<a class="headerlink" href="#module-pybert.dfe" title="Permalink to this headline">¶</a></h2>
@@ -708,8 +779,8 @@ into the larger <em>PyBERT</em> framework.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>b</strong> (<em>[float]</em>) &#8211; Coefficients of the numerator of the rational transfer function.</li>
-<li><strong>a</strong> (<em>[float]</em>) &#8211; Coefficients of the denominator of the rational transfer function.</li>
+<li><strong>b</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Coefficients of the numerator of the rational transfer function.</li>
+<li><strong>a</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Coefficients of the denominator of the rational transfer function.</li>
 </ul>
 </td>
 </tr>
@@ -725,9 +796,12 @@ into the larger <em>PyBERT</em> framework.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>x</strong> (<em>float</em>) &#8211; Next input value.</td>
 </tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">Next output value.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">(float)</td>
+</tr>
 </tbody>
 </table>
-<p>Returns: Next output value.</p>
 </dd></dl>
 
 </dd></dl>
@@ -739,32 +813,25 @@ into the larger <em>PyBERT</em> framework.</p>
 <p>Inputs:</p>
 <blockquote>
 <div><p>Required:</p>
-<ul>
-<li><p class="first">n_taps           # of taps in adaptive filter</p>
-</li>
-<li><p class="first">gain             adaptive filter tap weight correction gain</p>
-</li>
-<li><p class="first">delta_t          CDR proportional branch constant (ps)</p>
-</li>
-<li><p class="first">alpha            CDR integral branch constant (normalized to delta_t)</p>
-</li>
-<li><p class="first">ui               nominal unit interval (ps)</p>
-</li>
-<li><p class="first">n_spb            # of samples per unit interval</p>
-</li>
+<ul class="simple">
+<li>n_taps           # of taps in adaptive filter</li>
+<li>gain             adaptive filter tap weight correction gain</li>
+<li>delta_t          CDR proportional branch constant (ps)</li>
+<li>alpha            CDR integral branch constant (normalized to delta_t)</li>
+<li>ui               nominal unit interval (ps)</li>
+<li>n_spb            # of samples per unit interval</li>
 <li><dl class="first docutils">
 <dt>decision_scaler  multiplicative constant applied to the result of</dt>
-<dd><p class="first last">the sign function, when making a &#8220;1 vs. 0&#8221; decision.
-Sets the target magnitude for the DFE.</p>
-</dd>
+<dd>the sign function, when making a &#8220;1 vs. 0&#8221; decision.
+Sets the target magnitude for the DFE.</dd>
 </dl>
 </li>
 </ul>
 <p>Optional:</p>
-<ul>
+<ul class="simple">
 <li><dl class="first docutils">
 <dt>mod_type         The modulation type:</dt>
-<dd><ul class="first last simple">
+<dd><ul class="first last">
 <li>0: NRZ</li>
 <li>1: Duo-binary</li>
 <li>2: PAM-4</li>
@@ -772,41 +839,59 @@ Sets the target magnitude for the DFE.</p>
 </dd>
 </dl>
 </li>
-<li><p class="first">bandwidth        The bandwidth, at the summing node (Hz).</p>
-</li>
+<li>bandwidth        The bandwidth, at the summing node (Hz).</li>
 <li><dl class="first docutils">
 <dt>n_ave            The number of averages to take, before adapting.</dt>
-<dd><p class="first last">(Also, the number of CDR adjustments per DFE adaptation.)</p>
-</dd>
+<dd>(Also, the number of CDR adjustments per DFE adaptation.)</dd>
 </dl>
 </li>
 <li><dl class="first docutils">
 <dt>n_lock_ave       The number of unit interval estimates to</dt>
-<dd><p class="first last">consider, when determining locked status.</p>
-</dd>
+<dd>consider, when determining locked status.</dd>
 </dl>
 </li>
-<li><p class="first">rel_lock_tol     The relative tolerance for determining lock.</p>
-</li>
+<li>rel_lock_tol     The relative tolerance for determining lock.</li>
 <li><dl class="first docutils">
 <dt>lock_sustain     Length of the histerysis vector used for</dt>
-<dd><p class="first last">lock flagging.</p>
-</dd>
+<dd>lock flagging.</dd>
 </dl>
 </li>
-<li><p class="first">ideal            Boolean flag. When true, use an ideal summing node.</p>
-</li>
+<li>ideal            Boolean flag. When true, use an ideal summing node.</li>
 </ul>
 </div></blockquote>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><code class="xref py py-exc docutils literal"><span class="pre">Exception</span></code> &#8211;
-If the requested modulation type is unknown.</td>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><code class="xref py py-exc docutils literal"><span class="pre">Exception</span></code> &#8211; If the requested modulation type is unknown.</td>
 </tr>
 </tbody>
 </table>
+<dl class="method">
+<dt id="pybert.dfe.DFE.step">
+<code class="descname">step</code><span class="sig-paren">(</span><em>decision</em>, <em>error</em>, <em>update</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/dfe.html#DFE.step"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.dfe.DFE.step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Step the DFE, according to the new decision and error inputs.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>decision</strong> (<em>float</em>) &#8211; Current slicer output.</li>
+<li><strong>error</strong> (<em>float</em>) &#8211; Difference between summing node and slicer outputs.</li>
+<li><strong>update</strong> (<em>bool</em>) &#8211; If true, update tap weights.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">New backward filter output value.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">res(float)</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="method">
 <dt id="pybert.dfe.DFE.decide">
 <code class="descname">decide</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/dfe.html#DFE.decide"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.dfe.DFE.decide" title="Permalink to this definition">¶</a></dt>
@@ -817,8 +902,7 @@ If the requested modulation type is unknown.</td>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>x</strong> (<em>float</em>) &#8211; The signal value, at the decision time.</td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><strong>tuple</strong> &#8211;
-The members of the returned tuple are:<blockquote>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">The members of the returned tuple are:<blockquote>
 <div><dl class="docutils">
 <dt>decision:</dt>
 <dd>One of:<blockquote class="last">
@@ -836,10 +920,9 @@ The members of the returned tuple are:<blockquote>
 </div></blockquote>
 </td>
 </tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">float, [int]</td>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">tuple(float, [int])</td>
 </tr>
-<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><code class="xref py py-exc docutils literal"><span class="pre">Exception</span></code> &#8211;
-If the requested modulation type is unknown.</td>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><code class="xref py py-exc docutils literal"><span class="pre">Exception</span></code> &#8211; If the requested modulation type is unknown.</td>
 </tr>
 </tbody>
 </table>
@@ -854,14 +937,13 @@ If the requested modulation type is unknown.</td>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>sample_times</strong> (<em>[float]</em>) &#8211; Vector of time values at wich
+<li><strong>sample_times</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Vector of time values at wich
 corresponding signal values were sampled.</li>
-<li><strong>signal</strong> (<em>[float]</em>) &#8211; Vector of sampled signal values.</li>
+<li><strong>signal</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Vector of sampled signal values.</li>
 </ul>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><p><strong>tuple</strong> &#8211;
-The members of the returned tuple, in order, are:</p>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><p>The members of the returned tuple, in order, are:</p>
 <blockquote>
 <div><dl class="docutils">
 <dt>res([float]):</dt>
@@ -895,37 +977,10 @@ clock times on signal waveforms, in plots.</p>
 </p>
 </td>
 </tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first">([float], [[float]], [float], [int], [bool], [float], [int]</p>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first">tuple(([float], [[float]], [float], [int], [bool], [float], [int]))</p>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><code class="xref py py-exc docutils literal"><span class="pre">Exception</span></code> &#8211;
-If the requested modulation type is unknown.</p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="pybert.dfe.DFE.step">
-<code class="descname">step</code><span class="sig-paren">(</span><em>decision</em>, <em>error</em>, <em>update</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/dfe.html#DFE.step"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.dfe.DFE.step" title="Permalink to this definition">¶</a></dt>
-<dd><p>Step the DFE, according to the new decision and error inputs.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>decision</strong> (<em>float</em>) &#8211; Current slicer output.</li>
-<li><strong>error</strong> (<em>float</em>) &#8211; Difference between summing node and slicer outputs.</li>
-<li><strong>update</strong> (<em>bool</em>) &#8211; If true, update tap weights.</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>res</strong> &#8211;
-New backward filter output value.</p>
-</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><code class="xref py py-exc docutils literal"><span class="pre">Exception</span></code> &#8211; If the requested modulation type is unknown.</p>
 </td>
 </tr>
 </tbody>
@@ -958,11 +1013,11 @@ data recovery (CDR) unit.</p>
 <li><strong>alpha</strong> (<em>float</em>) &#8211; The integral branch correction, normalized to
 proportional branch correction.</li>
 <li><strong>ui</strong> (<em>float</em>) &#8211; The nominal unit interval, in seconds.</li>
-<li><strong>n_lock_ave</strong> (<em>Optional, int</em>) &#8211; Number of unit intervals to use for
+<li><strong>n_lock_ave</strong> (<em>Optional</em><em>, </em><em>int</em>) &#8211; Number of unit intervals to use for
 determining lock. Defaults to 500.</li>
-<li><strong>rel_lock_tol</strong> (<em>Optional, float</em>) &#8211; Lock tolerance, relative to
+<li><strong>rel_lock_tol</strong> (<em>Optional</em><em>, </em><em>float</em>) &#8211; Lock tolerance, relative to
 <em>delta_t</em>. Defaults to 0.01.</li>
-<li><strong>lock_sustain</strong> (<em>Optional, int</em>) &#8211; Length of lock sustain vector
+<li><strong>lock_sustain</strong> (<em>Optional</em><em>, </em><em>int</em>) &#8211; Length of lock sustain vector
 used to provide histerysis. Defaults to 500.</li>
 </ul>
 </td>
@@ -972,6 +1027,18 @@ used to provide histerysis. Defaults to 500.</li>
 <p class="rubric">Notes</p>
 <p>The code does not care what units are actually used for
 &#8216;delta_t&#8217; and &#8216;ui&#8217;; only that they are the same.</p>
+<dl class="attribute">
+<dt id="pybert.cdr.CDR.ui">
+<code class="descname">ui</code><a class="headerlink" href="#pybert.cdr.CDR.ui" title="Permalink to this definition">¶</a></dt>
+<dd><p>The current unit interval estimate.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.cdr.CDR.locked">
+<code class="descname">locked</code><a class="headerlink" href="#pybert.cdr.CDR.locked" title="Permalink to this definition">¶</a></dt>
+<dd><p>The current locked state.</p>
+</dd></dl>
+
 <dl class="method">
 <dt id="pybert.cdr.CDR.adapt">
 <code class="descname">adapt</code><span class="sig-paren">(</span><em>samples</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/cdr.html#CDR.adapt"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.cdr.CDR.adapt" title="Permalink to this definition">¶</a></dt>
@@ -985,7 +1052,7 @@ used to provide histerysis. Defaults to 500.</li>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>samples</strong> (<em>[float]</em>) &#8211; <p>A list of 3 samples of the input waveform, as follows:</p>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>samples</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; <p>A list of 3 samples of the input waveform, as follows:</p>
 <ul class="simple">
 <li>at the last clock time</li>
 <li>at the last unit interval boundary time</li>
@@ -993,7 +1060,7 @@ used to provide histerysis. Defaults to 500.</li>
 </ul>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><strong>tuple</strong> &#8211;<dl class="docutils">
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><dl class="docutils">
 <dt>ui:</dt>
 <dd>The new unit interval estimate, in seconds.</dd>
 <dt>locked:</dt>
@@ -1001,22 +1068,10 @@ used to provide histerysis. Defaults to 500.</li>
 </dl>
 </td>
 </tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">float, bool</td>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">tuple (float, bool)</td>
 </tr>
 </tbody>
 </table>
-</dd></dl>
-
-<dl class="attribute">
-<dt id="pybert.cdr.CDR.locked">
-<code class="descname">locked</code><a class="headerlink" href="#pybert.cdr.CDR.locked" title="Permalink to this definition">¶</a></dt>
-<dd><p>The current locked state.</p>
-</dd></dl>
-
-<dl class="attribute">
-<dt id="pybert.cdr.CDR.ui">
-<code class="descname">ui</code><a class="headerlink" href="#pybert.cdr.CDR.ui" title="Permalink to this definition">¶</a></dt>
-<dd><p>The current unit interval estimate.</p>
 </dd></dl>
 
 </dd></dl>
@@ -1039,6 +1094,8 @@ used to provide histerysis. Defaults to 500.</li>
 <li><a class="reference internal" href="#module-pybert.pybert_util">pybert_util - Various utilities used by other modules.</a></li>
 <li><a class="reference internal" href="#module-pybert.pybert_plot">pybert_plot - Plot definitions for the <em>PyBERT</em> GUI.</a></li>
 <li><a class="reference internal" href="#module-pybert.pybert_help">pybert_help - Contents of the <em>Help</em> tab of the <em>PyBERT</em> GUI.</a></li>
+<li><a class="reference internal" href="#module-pybert.pybert_cfg">pybert_cfg - Data structure for saving <em>PyBERT</em> configuration.</a></li>
+<li><a class="reference internal" href="#module-pybert.pybert_data">pybert_data - Data structure for saving <em>PyBERT</em> results.</a></li>
 <li><a class="reference internal" href="#module-pybert.dfe">dfe - DFE behavioral model.</a></li>
 <li><a class="reference internal" href="#module-pybert.cdr">cdr - CDR behavioral model.</a></li>
 </ul>
@@ -1051,21 +1108,18 @@ used to provide histerysis. Defaults to 500.</li>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="_sources/modules.txt"
+      <li><a href="_sources/modules.rst.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
     <form class="search" action="search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
-    </p>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -1084,12 +1138,12 @@ used to provide histerysis. Defaults to 500.</li>
         <li class="right" >
           <a href="intro.html" title="General description of pybert package."
              >previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">PyBERT Developer Guide 2.0.5 documentation</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="index.html">PyBERT Developer/Importer Guide 2.4.0 documentation</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &copy; Copyright 2015, David Banas.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.5.
+        &#169; Copyright 2015, David Banas.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.5.4.
     </div>
   </body>
 </html>

@@ -8,7 +8,7 @@ from setuptools import setup
 
 setup(
     name='PyBERT',
-    version='2.3.1',
+    version='2.4.0',
     packages=['pybert',],
     license='BSD',
     description='Serial communication link bit error rate tester simulator, written in Python.',

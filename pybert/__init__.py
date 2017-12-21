@@ -32,6 +32,14 @@ The application source is divided among several files, as follows:
 
     pybert_util.py  - Contains general purpose utility functionality.
 
+    pybert_cfg.py   - Defines the data structure for storing PyBERT
+                      configurations, so they may be saved and later
+                      restored.
+
+    pybert_data.py  - Defines the data structure for storing PyBERT
+                      simulation results, so they may be saved and later
+                      recalled as reference waveforms for comparison.
+
     dfe.py          - Contains the decision feedback equalizer model.
 
     cdr.py          - Contains the clock data recovery unit model.
@@ -48,5 +56,5 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 # 
 # __all__ = ['pybert', 'pybert_view', 'pybert_cntrl', 'pybert_util', 'dfe', 'cdr']
 
-__version__ = '2.3.1'
+__version__ = '2.4.0'
 
