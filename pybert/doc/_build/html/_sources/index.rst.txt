@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 ===============================================
- *PyBERT* Source Code Developer's Guide v2.4.0
+ *PyBERT* Source Code Developer's Guide v2.4.1
 ===============================================
 
 Welcome to the *PyBERT Developer's Guide*!
@@ -14,10 +14,11 @@ Note to PyBERT *users*
 ----------------------
 
 The documentation for the *PyBERT* project has 2 parts:
-  * Help for *users*
-  * Help for *developers*
+  * help for stand-alone GUI application *users*, and
+  * help for PyBERT *developers* and *importers*
 
-This is the help for developers.
+This is the help for developers and importers.
+
 If you're looking for usage instructions, you're in the wrong place.
 Instead, try:
 

@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>pybert.pybert_util &#8212; PyBERT 2.4.0 documentation</title>
+    <title>pybert.pybert_util &#8212; PyBERT 2.4.1 documentation</title>
     
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../',
-        VERSION:     '2.4.0',
+        VERSION:     '2.4.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true,
@@ -761,17 +761,15 @@
     <span class="k">return</span> <span class="p">(</span><span class="n">g</span><span class="p">[</span><span class="n">start_ix</span> <span class="p">:</span> <span class="n">stop_ix</span><span class="p">],</span> <span class="n">start_ix</span><span class="p">)</span></div>
 
 
-<span class="c1">## @name External channel definition importing.</span>
-<span class="c1">## @{</span>
-<span class="k">def</span> <span class="nf">import_channel</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="import_channel"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.import_channel">[docs]</a><span class="k">def</span> <span class="nf">import_channel</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read in a channel file.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        filename(str): Name of file from which to import channel description.</span>
 <span class="sd">        sample_per(float): Sample period of signal vector (s).</span>
-<span class="sd">        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</span>
-<span class="sd">        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)</span>
+<span class="sd">        padded(Bool): (Optional) Zero pad s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</span>
+<span class="sd">        windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)</span>
 
 <span class="sd">    Returns: Imported channel impulse, or step, response.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -780,9 +778,9 @@
     <span class="k">if</span><span class="p">(</span><span class="n">extension</span> <span class="o">==</span> <span class="s1">&#39;s4p&#39;</span> <span class="ow">or</span> <span class="n">extension</span> <span class="o">==</span> <span class="s1">&#39;S4P&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">import_freq</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="n">padded</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="n">windowed</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">import_time</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">import_time</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span></div>
 
-<span class="k">def</span> <span class="nf">interp_time</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">):</span>
+<div class="viewcode-block" id="interp_time"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.interp_time">[docs]</a><span class="k">def</span> <span class="nf">interp_time</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Resample time domain data, using linear interpolation.</span>
 
@@ -803,9 +801,9 @@
         <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">xs</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">xs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">xs</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">t</span> <span class="o">-</span> <span class="n">ts</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">ts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ts</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]))</span>
         <span class="n">t</span> <span class="o">+=</span> <span class="n">sample_per</span>
 
-    <span class="k">return</span> <span class="n">array</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">array</span><span class="p">(</span><span class="n">res</span><span class="p">)</span></div>
 
-<span class="k">def</span> <span class="nf">import_time</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">):</span>
+<div class="viewcode-block" id="import_time"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.import_time">[docs]</a><span class="k">def</span> <span class="nf">import_time</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read in a time domain waveform file, resampling as</span>
 <span class="sd">    appropriate, via linear interpolation.</span>
@@ -829,9 +827,9 @@
             <span class="n">ts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tmp</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
             <span class="n">xs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tmp</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 
-    <span class="k">return</span> <span class="n">interp_time</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">interp_time</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span></div>
 
-<span class="k">def</span> <span class="nf">sdd_21</span><span class="p">(</span><span class="n">ntwk</span><span class="p">):</span>
+<div class="viewcode-block" id="sdd_21"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.sdd_21">[docs]</a><span class="k">def</span> <span class="nf">sdd_21</span><span class="p">(</span><span class="n">ntwk</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Given a 4-port single-ended network, return its differential throughput.</span>
 
@@ -844,21 +842,21 @@
     <span class="k">if</span><span class="p">(</span><span class="n">real</span><span class="p">(</span><span class="n">ntwk</span><span class="o">.</span><span class="n">s21</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="p">):</span>  <span class="c1"># 1 ==&gt; 3 port numbering?</span>
         <span class="n">ntwk</span><span class="o">.</span><span class="n">renumber</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
 
-    <span class="k">return</span> <span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">ntwk</span><span class="o">.</span><span class="n">s21</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s23</span> <span class="o">+</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s43</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s41</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">ntwk</span><span class="o">.</span><span class="n">s21</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s23</span> <span class="o">+</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s43</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s41</span><span class="p">)</span></div>
 
-<span class="k">def</span> <span class="nf">import_freq</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="import_freq"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.import_freq">[docs]</a><span class="k">def</span> <span class="nf">import_freq</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">,</span> <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">windowed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read in a single ended 4-port Touchstone file, and extract the</span>
-<span class="sd">    differential throughput impulse response, resampling as</span>
+<span class="sd">    differential throughput step response, resampling as</span>
 <span class="sd">    appropriate, via linear interpolation.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        filename(str): Name of Touchstone file to read in.</span>
 <span class="sd">        sample_per(float): New sample interval</span>
-<span class="sd">        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</span>
-<span class="sd">        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)</span>
+<span class="sd">        padded(Bool): (Optional) Zero pad s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</span>
+<span class="sd">        windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)</span>
 
-<span class="sd">    Returns: Resampled waveform.</span>
+<span class="sd">    Returns: Resampled step response waveform.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">ntwk</span> <span class="o">=</span> <span class="n">rf</span><span class="o">.</span><span class="n">Network</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
@@ -888,20 +886,29 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">irfft</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
     <span class="n">h</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>  <span class="c1"># Equivalent to assuming that step response settles at 1.</span>
-    
+
     <span class="c1"># Form step response from impulse response.</span>
     <span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
-    
+
     <span class="c1"># Form time vector.</span>
     <span class="n">t0</span> <span class="o">=</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.</span> <span class="o">*</span> <span class="n">fmax</span><span class="p">)</span>  <span class="c1"># Sampling interval = 1 / (2 fNyquist).</span>
     <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">n</span> <span class="o">*</span> <span class="n">t0</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">h</span><span class="p">))])</span>
 
-    <span class="k">return</span> <span class="n">interp_time</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span>
-<span class="c1">## @}</span>
+    <span class="k">return</span> <span class="n">interp_time</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">sample_per</span><span class="p">)</span></div>
 
 
-<span class="k">def</span> <span class="nf">lfsr_bits</span><span class="p">(</span><span class="n">taps</span><span class="p">,</span> <span class="n">seed</span><span class="p">):</span>
+<div class="viewcode-block" id="lfsr_bits"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.lfsr_bits">[docs]</a><span class="k">def</span> <span class="nf">lfsr_bits</span><span class="p">(</span><span class="n">taps</span><span class="p">,</span> <span class="n">seed</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a set of tap indices and a seed, generate a PRBS.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        taps([int]): The set of fed back taps.</span>
+<span class="sd">                     (Largest determines order of generator.)</span>
+<span class="sd">        seed(int): The initial value of the shift register.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A PRBS generator object with a next() method, for retrieving</span>
+<span class="sd">        the next bit in the sequence.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">val</span>      <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -913,9 +920,9 @@
         <span class="n">val</span>     <span class="o">=</span> <span class="p">(</span><span class="n">val</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">mask</span>  <span class="c1"># Just to keep &#39;val&#39; from growing without bound.</span>
         <span class="k">if</span><span class="p">(</span><span class="n">xor_res</span><span class="p">):</span>
             <span class="n">val</span> <span class="o">+=</span> <span class="mi">1</span>
-        <span class="k">yield</span><span class="p">(</span><span class="n">val</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">yield</span><span class="p">(</span><span class="n">val</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span></div>
 
-<span class="k">def</span> <span class="nf">safe_log10</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<div class="viewcode-block" id="safe_log10"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.safe_log10">[docs]</a><span class="k">def</span> <span class="nf">safe_log10</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
     <span class="s2">&quot;Guards against pesky &#39;Divide by 0&#39; error messages.&quot;</span>
 
     <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="s2">&quot;__len__&quot;</span><span class="p">):</span>
@@ -924,9 +931,9 @@
         <span class="k">if</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
             <span class="n">x</span> <span class="o">=</span> <span class="mf">1.e-20</span>
 
-    <span class="k">return</span> <span class="n">log10</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">log10</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></div>
 
-<span class="k">def</span> <span class="nf">pulse_center</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">nspui</span><span class="p">):</span>
+<div class="viewcode-block" id="pulse_center"><a class="viewcode-back" href="../../modules.html#pybert.pybert_util.pulse_center">[docs]</a><span class="k">def</span> <span class="nf">pulse_center</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">nspui</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Determines the center of the pulse response, using the &quot;Hula Hoop&quot;</span>
 <span class="sd">    algorithm (See SiSoft/Tellian&#39;s DesignCon 2016 paper.)</span>
@@ -960,7 +967,7 @@
         <span class="n">err</span> <span class="o">=</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">nspui</span>
 
     <span class="n">clock_pos</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mean</span><span class="p">([</span><span class="n">main_lobe_ixs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">main_lobe_ixs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]))</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">clock_pos</span><span class="p">,</span> <span class="n">thresh</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">clock_pos</span><span class="p">,</span> <span class="n">thresh</span><span class="p">)</span></div>
 
 </pre></div>
 

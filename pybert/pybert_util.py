@@ -717,8 +717,6 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     return (g[start_ix : stop_ix], start_ix)
 
 
-## @name External channel definition importing.
-## @{
 def import_channel(filename, sample_per, padded=False, windowed=False):
     """
     Read in a channel file.
@@ -726,8 +724,8 @@ def import_channel(filename, sample_per, padded=False, windowed=False):
     Args:
         filename(str): Name of file from which to import channel description.
         sample_per(float): Sample period of signal vector (s).
-        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
-        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)
+        padded(Bool): (Optional) Zero pad s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
+        windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)
 
     Returns: Imported channel impulse, or step, response.
     """
@@ -805,16 +803,16 @@ def sdd_21(ntwk):
 def import_freq(filename, sample_per, padded=False, windowed=False):
     """
     Read in a single ended 4-port Touchstone file, and extract the
-    differential throughput impulse response, resampling as
+    differential throughput step response, resampling as
     appropriate, via linear interpolation.
 
     Args:
         filename(str): Name of Touchstone file to read in.
         sample_per(float): New sample interval
-        padded(Bool): (Optional) Zero pad *.s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
-        windowed(Bool): (Optional) Window *.s4p data, before converting to time domain? (Default = False)
+        padded(Bool): (Optional) Zero pad s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
+        windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)
 
-    Returns: Resampled waveform.
+    Returns: Resampled step response waveform.
     """
 
     ntwk = rf.Network(filename)
@@ -844,20 +842,29 @@ def import_freq(filename, sample_per, padded=False, windowed=False):
     else:
         h = np.fft.irfft(H)
     h /= np.abs(h.sum())  # Equivalent to assuming that step response settles at 1.
-    
+
     # Form step response from impulse response.
     s = np.cumsum(h)
-    
+
     # Form time vector.
     t0 = 1. / (2. * fmax)  # Sampling interval = 1 / (2 fNyquist).
     t = np.array([n * t0 for n in range(len(h))])
 
     return interp_time(t, s, sample_per)
-## @}
 
 
 def lfsr_bits(taps, seed):
     """
+    Given a set of tap indices and a seed, generate a PRBS.
+
+    Args:
+        taps([int]): The set of fed back taps.
+                     (Largest determines order of generator.)
+        seed(int): The initial value of the shift register.
+
+    Returns:
+        A PRBS generator object with a next() method, for retrieving
+        the next bit in the sequence.
     """
 
     val      = int(seed)

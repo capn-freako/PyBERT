@@ -10,7 +10,7 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 
 help_str  = "<H2>PyBERT User's Guide</H2>\n" \
 +           "  <H3>Note to developers</H3>\n" \
-+           "    This is NOT for you. Instead, open 'pybert/doc/build/html/index.html' in a browser.\n" \
++           "    This is NOT for you. Instead, open 'pybert/doc/_build/html/index.html' in a browser.\n" \
 +           "  <H3>PyBERT User Help Options</H3>\n" \
 +           "    <UL>\n" \
 +           "      <LI>Hover over any user-settable value in the <em>Config.</em> tab, for help message.</LI>\n" \

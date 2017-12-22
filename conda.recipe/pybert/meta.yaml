@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "2.4.0" %}
+{% set version = "2.4.1" %}
 
 package:
   version: '{{ version }}'
@@ -10,7 +10,7 @@ source:
 
 build:
   script: python setup.py install  --single-version-externally-managed --record=record.txt
-  number: 0
+  number: 3
   noarch: python
   entry_points:
     - pybert = pybert.pybert:main

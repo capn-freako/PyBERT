@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Modules in pybert package &#8212; PyBERT 2.4.0 documentation</title>
+    <title>Modules in pybert package &#8212; PyBERT 2.4.1 documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '2.4.0',
+        VERSION:     '2.4.1',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true,
@@ -121,9 +121,51 @@ can be used to explore the concepts of serial communication link design.</p>
 <dd><p>A serial communication link bit error rate tester (BERT) simulator with a GUI interface.</p>
 <p>Useful for exploring the concepts of serial communication link design.</p>
 <dl class="attribute">
+<dt id="pybert.pybert.PyBERT.R0">
+<code class="descname">R0</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.R0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel skin effect resistance (Ohms/m).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.Rdc">
+<code class="descname">Rdc</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.Rdc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel d.c. resistance (Ohms/m).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.Theta0">
+<code class="descname">Theta0</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.Theta0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel loss tangent (unitless).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.Z0">
+<code class="descname">Z0</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.Z0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel characteristic impedance, in LC region (Ohms).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.alpha">
+<code class="descname">alpha</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.alpha" title="Permalink to this definition">¶</a></dt>
+<dd><p>CDR integral branch magnitude (unitless).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.bit_errs">
+<code class="descname">bit_errs</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.bit_errs" title="Permalink to this definition">¶</a></dt>
+<dd><p># of bit errors observed in last run.</p>
+</dd></dl>
+
+<dl class="attribute">
 <dt id="pybert.pybert.PyBERT.bit_rate">
 <code class="descname">bit_rate</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.bit_rate" title="Permalink to this definition">¶</a></dt>
 <dd><p>(Gbps)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.cac">
+<code class="descname">cac</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.cac" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rx a.c. coupling capacitance (uF)</p>
 </dd></dl>
 
 <dl class="method">
@@ -169,6 +211,90 @@ can be used to explore the concepts of serial communication link design.</p>
 </dd></dl>
 
 <dl class="attribute">
+<dt id="pybert.pybert.PyBERT.cfg_file">
+<code class="descname">cfg_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.cfg_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>PyBERT configuration data storage file (File).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.ch_file">
+<code class="descname">ch_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.ch_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel file name.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.chnl_dly">
+<code class="descname">chnl_dly</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.chnl_dly" title="Permalink to this definition">¶</a></dt>
+<dd><p>Estimated channel delay (s).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.cin">
+<code class="descname">cin</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.cin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rx parasitic input capacitance (pF)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.coopt_thread">
+<code class="descname">coopt_thread</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.coopt_thread" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ co-optimization thread.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.cout">
+<code class="descname">cout</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.cout" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tx parasitic output capacitance (pF)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.ctle_file">
+<code class="descname">ctle_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.ctle_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>CTLE response file (when use_ctle_file = True).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.ctle_mode">
+<code class="descname">ctle_mode</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.ctle_mode" title="Permalink to this definition">¶</a></dt>
+<dd><p>CTLE mode (&#8216;Off&#8217;, &#8216;Passive&#8217;, &#8216;AGC&#8217;, &#8216;Manual&#8217;).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.ctle_mode_tune">
+<code class="descname">ctle_mode_tune</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.ctle_mode_tune" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer CTLE mode (&#8216;Off&#8217;, &#8216;Passive&#8217;, &#8216;AGC&#8217;, &#8216;Manual&#8217;).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.ctle_offset">
+<code class="descname">ctle_offset</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.ctle_offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>CTLE d.c. offset (dB)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.ctle_offset_tune">
+<code class="descname">ctle_offset_tune</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.ctle_offset_tune" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer CTLE d.c. offset (dB).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.data_file">
+<code class="descname">data_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.data_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>PyBERT results data storage file (File).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.decision_scaler">
+<code class="descname">decision_scaler</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.decision_scaler" title="Permalink to this definition">¶</a></dt>
+<dd><p>DFE slicer output voltage (V).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.delta_t">
+<code class="descname">delta_t</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.delta_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>CDR proportional branch magnitude (ps).</p>
+</dd></dl>
+
+<dl class="attribute">
 <dt id="pybert.pybert.PyBERT.do_sweep">
 <code class="descname">do_sweep</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.do_sweep" title="Permalink to this definition">¶</a></dt>
 <dd><p>Run sweeps? (Default = False)</p>
@@ -181,9 +307,63 @@ can be used to explore the concepts of serial communication link design.</p>
 </dd></dl>
 
 <dl class="attribute">
+<dt id="pybert.pybert.PyBERT.gain">
+<code class="descname">gain</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.gain" title="Permalink to this definition">¶</a></dt>
+<dd><p>DFE error gain (unitless).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.impulse_length">
+<code class="descname">impulse_length</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.impulse_length" title="Permalink to this definition">¶</a></dt>
+<dd><p>Impulse response length. (Determined automatically, when 0.)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.l_ch">
+<code class="descname">l_ch</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.l_ch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel length (m).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.lock_sustain">
+<code class="descname">lock_sustain</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.lock_sustain" title="Permalink to this definition">¶</a></dt>
+<dd><p>CDR hysteresis to use in determining lock.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.max_iter">
+<code class="descname">max_iter</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.max_iter" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer max. # of optimization iterations.</p>
+</dd></dl>
+
+<dl class="attribute">
 <dt id="pybert.pybert.PyBERT.mod_type">
 <code class="descname">mod_type</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.mod_type" title="Permalink to this definition">¶</a></dt>
 <dd><p>0 = NRZ; 1 = Duo-binary; 2 = PAM-4</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.n_ave">
+<code class="descname">n_ave</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.n_ave" title="Permalink to this definition">¶</a></dt>
+<dd><p>DFE # of averages to take, before making tap corrections.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.n_lock_ave">
+<code class="descname">n_lock_ave</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.n_lock_ave" title="Permalink to this definition">¶</a></dt>
+<dd><p>CDR # of averages to take in determining lock.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.n_taps">
+<code class="descname">n_taps</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.n_taps" title="Permalink to this definition">¶</a></dt>
+<dd><p>DFE # of taps.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.n_taps_tune">
+<code class="descname">n_taps_tune</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.n_taps_tune" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer # DFE taps.</p>
 </dd></dl>
 
 <dl class="attribute">
@@ -217,9 +397,261 @@ can be used to explore the concepts of serial communication link design.</p>
 </dd></dl>
 
 <dl class="attribute">
+<dt id="pybert.pybert.PyBERT.peak_freq">
+<code class="descname">peak_freq</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.peak_freq" title="Permalink to this definition">¶</a></dt>
+<dd><p>CTLE peaking frequency (GHz)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.peak_freq_tune">
+<code class="descname">peak_freq_tune</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.peak_freq_tune" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer CTLE peaking freq. (GHz).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.peak_mag">
+<code class="descname">peak_mag</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.peak_mag" title="Permalink to this definition">¶</a></dt>
+<dd><p>CTLE peaking magnitude (dB)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.peak_mag_tune">
+<code class="descname">peak_mag_tune</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.peak_mag_tune" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer CTLE peaking mag. (dB).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.pn_freq">
+<code class="descname">pn_freq</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.pn_freq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Periodic noise frequency (MHz).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.pn_mag">
+<code class="descname">pn_mag</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.pn_mag" title="Permalink to this definition">¶</a></dt>
+<dd><p>Periodic noise magnitude (V).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rel_lock_tol">
+<code class="descname">rel_lock_tol</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rel_lock_tol" title="Permalink to this definition">¶</a></dt>
+<dd><p>CDR relative tolerance to use in determining lock.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rel_power">
+<code class="descname">rel_power</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rel_power" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tx power dissipation (W).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rin">
+<code class="descname">rin</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rx input impedance (Ohm)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rn">
+<code class="descname">rn</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rn" title="Permalink to this definition">¶</a></dt>
+<dd><p>Standard deviation of Gaussian random noise (V).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rs">
+<code class="descname">rs</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tx source impedance (Ohms)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_ami_file">
+<code class="descname">rx_ami_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_ami_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>(File)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_ami_valid">
+<code class="descname">rx_ami_valid</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_ami_valid" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_bw">
+<code class="descname">rx_bw</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_bw" title="Permalink to this definition">¶</a></dt>
+<dd><p>CTLE bandwidth (GHz).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_bw_tune">
+<code class="descname">rx_bw_tune</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_bw_tune" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer CTLE bandwidth (GHz).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_dll_file">
+<code class="descname">rx_dll_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_dll_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>(File)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_dll_valid">
+<code class="descname">rx_dll_valid</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_dll_valid" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_has_getwave">
+<code class="descname">rx_has_getwave</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_has_getwave" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_opt_thread">
+<code class="descname">rx_opt_thread</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_opt_thread" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rx EQ optimization thread.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_use_ami">
+<code class="descname">rx_use_ami</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_use_ami" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.rx_use_getwave">
+<code class="descname">rx_use_getwave</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.rx_use_getwave" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.status">
+<code class="descname">status</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.status" title="Permalink to this definition">¶</a></dt>
+<dd><p>PyBERT status (String).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.sum_bw">
+<code class="descname">sum_bw</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.sum_bw" title="Permalink to this definition">¶</a></dt>
+<dd><p>DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.sum_ideal">
+<code class="descname">sum_ideal</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.sum_ideal" title="Permalink to this definition">¶</a></dt>
+<dd><p>True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.thresh">
+<code class="descname">thresh</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.thresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Threshold for identifying periodic jitter components (sigma).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_ami_file">
+<code class="descname">tx_ami_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_ami_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>(File)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_ami_valid">
+<code class="descname">tx_ami_valid</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_ami_valid" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_dll_file">
+<code class="descname">tx_dll_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_dll_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>(File)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_dll_valid">
+<code class="descname">tx_dll_valid</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_dll_valid" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_has_getwave">
+<code class="descname">tx_has_getwave</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_has_getwave" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_opt_thread">
+<code class="descname">tx_opt_thread</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_opt_thread" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tx EQ optimization thread.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_tap_tuners">
+<code class="descname">tx_tap_tuners</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_tap_tuners" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer list of TxTapTuner objects.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_taps">
+<code class="descname">tx_taps</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_taps" title="Permalink to this definition">¶</a></dt>
+<dd><p>List of TxTapTuner objects.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_use_ami">
+<code class="descname">tx_use_ami</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_use_ami" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.tx_use_getwave">
+<code class="descname">tx_use_getwave</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.tx_use_getwave" title="Permalink to this definition">¶</a></dt>
+<dd><p>(Bool)</p>
+</dd></dl>
+
+<dl class="attribute">
 <dt id="pybert.pybert.PyBERT.use_ch_file">
 <code class="descname">use_ch_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.use_ch_file" title="Permalink to this definition">¶</a></dt>
 <dd><p>Import channel description from file? (Default = False)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.use_ctle_file">
+<code class="descname">use_ctle_file</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.use_ctle_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>For importing CTLE impulse/step response directly.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.use_dfe">
+<code class="descname">use_dfe</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.use_dfe" title="Permalink to this definition">¶</a></dt>
+<dd><p>True = use a DFE (Bool).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.use_dfe_tune">
+<code class="descname">use_dfe_tune</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.use_dfe_tune" title="Permalink to this definition">¶</a></dt>
+<dd><p>EQ optimizer DFE select (Bool).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.v0">
+<code class="descname">v0</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.v0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel relative propagation velocity (c).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.vod">
+<code class="descname">vod</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.vod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tx differential output voltage (V)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.w0">
+<code class="descname">w0</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.w0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Channel transition frequency (rads./s).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybert.pybert.PyBERT.windowed">
+<code class="descname">windowed</code><em class="property"> = None</em><a class="headerlink" href="#pybert.pybert.PyBERT.windowed" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply windowing to the Touchstone data? (Default = False)</p>
 </dd></dl>
 
 </dd></dl>
@@ -662,6 +1094,167 @@ captured (Using 99.9% was causing problems; I don&#8217;t know why.), and</li>
 <li>start_ix  index of first returned sample</li>
 </ul>
 </div></blockquote>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.import_channel">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">import_channel</code><span class="sig-paren">(</span><em>filename</em>, <em>sample_per</em>, <em>padded=False</em>, <em>windowed=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#import_channel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.import_channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read in a channel file.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>filename</strong> (<em>str</em>) &#8211; Name of file from which to import channel description.</li>
+<li><strong>sample_per</strong> (<em>float</em>) &#8211; Sample period of signal vector (s).</li>
+<li><strong>padded</strong> (<em>Bool</em>) &#8211; (Optional) Zero pad s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</li>
+<li><strong>windowed</strong> (<em>Bool</em>) &#8211; (Optional) Window s4p data, before converting to time domain? (Default = False)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Returns: Imported channel impulse, or step, response.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.interp_time">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">interp_time</code><span class="sig-paren">(</span><em>ts</em>, <em>xs</em>, <em>sample_per</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#interp_time"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.interp_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Resample time domain data, using linear interpolation.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ts</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Original time values.</li>
+<li><strong>xs</strong> (<em></em><em>[</em><em>float</em><em>]</em><em></em>) &#8211; Original signal values.</li>
+<li><strong>sample_per</strong> (<em>float</em>) &#8211; System sample period.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Returns: Resampled waveform.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.import_time">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">import_time</code><span class="sig-paren">(</span><em>filename</em>, <em>sample_per</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#import_time"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.import_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read in a time domain waveform file, resampling as
+appropriate, via linear interpolation.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>filename</strong> (<em>str</em>) &#8211; Name of waveform file to read in.</li>
+<li><strong>sample_per</strong> (<em>float</em>) &#8211; New sample interval</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Returns: Resampled waveform.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.sdd_21">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">sdd_21</code><span class="sig-paren">(</span><em>ntwk</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#sdd_21"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.sdd_21" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a 4-port single-ended network, return its differential throughput.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ntwk</strong> (<em>skrf.Network</em>) &#8211; 4-port single ended network.</td>
+</tr>
+</tbody>
+</table>
+<p>Returns: Sdd[2,1].</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.import_freq">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">import_freq</code><span class="sig-paren">(</span><em>filename</em>, <em>sample_per</em>, <em>padded=False</em>, <em>windowed=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#import_freq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.import_freq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read in a single ended 4-port Touchstone file, and extract the
+differential throughput step response, resampling as
+appropriate, via linear interpolation.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>filename</strong> (<em>str</em>) &#8211; Name of Touchstone file to read in.</li>
+<li><strong>sample_per</strong> (<em>float</em>) &#8211; New sample interval</li>
+<li><strong>padded</strong> (<em>Bool</em>) &#8211; (Optional) Zero pad s4p data, such that fmax &gt;= 1/(2*sample_per)? (Default = False)</li>
+<li><strong>windowed</strong> (<em>Bool</em>) &#8211; (Optional) Window s4p data, before converting to time domain? (Default = False)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Returns: Resampled step response waveform.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.lfsr_bits">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">lfsr_bits</code><span class="sig-paren">(</span><em>taps</em>, <em>seed</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#lfsr_bits"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.lfsr_bits" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a set of tap indices and a seed, generate a PRBS.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>taps</strong> (<em></em><em>[</em><em>int</em><em>]</em><em></em>) &#8211; The set of fed back taps.
+(Largest determines order of generator.)</li>
+<li><strong>seed</strong> (<em>int</em>) &#8211; The initial value of the shift register.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">A PRBS generator object with a next() method, for retrieving
+the next bit in the sequence.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.safe_log10">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">safe_log10</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#safe_log10"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.safe_log10" title="Permalink to this definition">¶</a></dt>
+<dd><p>Guards against pesky &#8216;Divide by 0&#8217; error messages.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybert.pybert_util.pulse_center">
+<code class="descclassname">pybert.pybert_util.</code><code class="descname">pulse_center</code><span class="sig-paren">(</span><em>p</em>, <em>nspui</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybert/pybert_util.html#pulse_center"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybert.pybert_util.pulse_center" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determines the center of the pulse response, using the &#8220;Hula Hoop&#8221;
+algorithm (See SiSoft/Tellian&#8217;s DesignCon 2016 paper.)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>p</strong> (<em></em><em>[</em><em>Float</em><em>]</em><em></em>) &#8211; The single bit pulse response.</li>
+<li><strong>nspui</strong> (<em>Int</em>) &#8211; The number of vector elements per unit interval.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><dl class="docutils">
+<dt>The estimated index at which the clock will</dt>
+<dd><p class="first last">sample the main lobe.</p>
+</dd>
+<dt>thresh(Float):  The vertical threshold at which the main lobe is</dt>
+<dd><p class="first last">UI wide.</p>
+</dd>
+</dl>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">clock_pos(Int)</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 </div>

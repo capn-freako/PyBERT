@@ -1,4 +1,6 @@
-recursive-include pybert/doc *
+recursive-include pybert/doc/_build/html *
+recursive-include pybert/doc/_static *
+recursive-include pybert/doc/_templates *
 global-exclude *.swp
 global-exclude *.DS_Store
 global-exclude *.buildinfo

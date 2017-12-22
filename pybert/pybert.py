@@ -15,6 +15,8 @@ can be used to explore the concepts of serial communication link design.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
+from __future__ import absolute_import
+
 from traits.trait_base import ETSConfig
 ETSConfig.toolkit = 'qt4'
 # ETSConfig.toolkit = 'wx'
@@ -49,13 +51,15 @@ from enable.component_editor import ComponentEditor
 from pyibisami.amimodel  import AMIModel, AMIModelInitializer
 from pyibisami.ami_parse import AMIParamConfigurator
 
-from pybert_view     import traits_view
-from pybert_cntrl    import my_run_simulation, update_results, update_eyes
-from pybert_util     import calc_gamma, calc_G, trim_impulse, import_channel, \
+from pybert.pybert_view     import traits_view
+from pybert.pybert_cntrl    import my_run_simulation, update_results, update_eyes
+from pybert.pybert_util     import calc_gamma, calc_G, trim_impulse, import_channel, \
                             make_ctle, lfsr_bits, safe_log10, pulse_center
-from pybert_plot     import make_plots
-from pybert_help     import help_str
-from pybert_cfg      import PyBertCfg
+from pybert.pybert_plot     import make_plots
+from pybert.pybert_help     import help_str
+from pybert.pybert_cfg      import PyBertCfg
+
+import pybert
 
 debug = True
 
@@ -347,16 +351,16 @@ class PyBERT(HasTraits):
     # - Channel Control
     use_ch_file     = Bool(False)                                           #: Import channel description from file? (Default = False)
     padded          = Bool(False)                                           #: Zero pad imported Touchstone data? (Default = False)
-    windowed        = Bool(False)
-    ch_file         = File('', entries=5, filter=['*.s4p', '*.S4P', '*.csv', '*.CSV', '*.txt', '*.TXT', '*.*'])
-    impulse_length  = Float(0.0)
-    Rdc             = Float(gRdc)
-    w0              = Float(gw0)
-    R0              = Float(gR0)
-    Theta0          = Float(gTheta0)
-    Z0              = Float(gZ0)
-    v0              = Float(gv0)
-    l_ch            = Float(gl_ch)
+    windowed        = Bool(False)                                           #: Apply windowing to the Touchstone data? (Default = False)
+    ch_file         = File('', entries=5, filter=['*.s4p', '*.S4P', '*.csv', '*.CSV', '*.txt', '*.TXT', '*.*'])  #: Channel file name.
+    impulse_length  = Float(0.0)                                            #: Impulse response length. (Determined automatically, when 0.)
+    Rdc             = Float(gRdc)       #: Channel d.c. resistance (Ohms/m).
+    w0              = Float(gw0)        #: Channel transition frequency (rads./s).
+    R0              = Float(gR0)        #: Channel skin effect resistance (Ohms/m).
+    Theta0          = Float(gTheta0)    #: Channel loss tangent (unitless).
+    Z0              = Float(gZ0)        #: Channel characteristic impedance, in LC region (Ohms).
+    v0              = Float(gv0)        #: Channel relative propagation velocity (c).
+    l_ch            = Float(gl_ch)      #: Channel length (m).
 
     # - EQ Tune
     tx_tap_tuners = List(  [TxTapTuner(name='Pre-tap',   enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
@@ -364,82 +368,82 @@ class PyBERT(HasTraits):
                             TxTapTuner(name='Post-tap2', enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
                             TxTapTuner(name='Post-tap3', enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
                            ]
-                        )
-    rx_bw_tune      = Float(gBW)
-    peak_freq_tune  = Float(gPeakFreq)
-    peak_mag_tune   = Float(gPeakMag)
-    ctle_offset_tune = Float(gCTLEOffset)                                   # CTLE d.c. offset (dB)
-    ctle_mode_tune  = Enum('Off', 'Passive', 'AGC', 'Manual')
-    use_dfe_tune    = Bool(gUseDfe)
-    n_taps_tune     = Int(gNtaps)
-    max_iter        = Int(50)                                               # max. # of optimization iterations
-    tx_opt_thread   = Instance(TxOptThread)
-    rx_opt_thread   = Instance(RxOptThread)
-    coopt_thread    = Instance(CoOptThread)
+                           )  #: EQ optimizer list of TxTapTuner objects.
+    rx_bw_tune      = Float(gBW)                                #: EQ optimizer CTLE bandwidth (GHz).
+    peak_freq_tune  = Float(gPeakFreq)                          #: EQ optimizer CTLE peaking freq. (GHz).
+    peak_mag_tune   = Float(gPeakMag)                           #: EQ optimizer CTLE peaking mag. (dB).
+    ctle_offset_tune = Float(gCTLEOffset)                       #: EQ optimizer CTLE d.c. offset (dB).
+    ctle_mode_tune  = Enum('Off', 'Passive', 'AGC', 'Manual')   #: EQ optimizer CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
+    use_dfe_tune    = Bool(gUseDfe)                             #: EQ optimizer DFE select (Bool).
+    n_taps_tune     = Int(gNtaps)                               #: EQ optimizer # DFE taps.
+    max_iter        = Int(50)                                   #: EQ optimizer max. # of optimization iterations.
+    tx_opt_thread   = Instance(TxOptThread)  #: Tx EQ optimization thread.
+    rx_opt_thread   = Instance(RxOptThread)  #: Rx EQ optimization thread.
+    coopt_thread    = Instance(CoOptThread)  #: EQ co-optimization thread.
 
     # - Tx
-    vod             = Float(gVod)                                           # (V)
-    rs              = Float(gRs)                                            # (Ohms)
-    cout            = Range(low=0.001, value=gCout)                         # (pF)
-    pn_mag          = Float(gPnMag)                                         # (ps)
-    pn_freq         = Float(gPnFreq)                                        # (MHz)
-    rn              = Float(gRn)                                            # (V)
+    vod             = Float(gVod)                    #: Tx differential output voltage (V)
+    rs              = Float(gRs)                     #: Tx source impedance (Ohms)
+    cout            = Range(low=0.001, value=gCout)  #: Tx parasitic output capacitance (pF)
+    pn_mag          = Float(gPnMag)                  #: Periodic noise magnitude (V).
+    pn_freq         = Float(gPnFreq)                 #: Periodic noise frequency (MHz).
+    rn              = Float(gRn)                     #: Standard deviation of Gaussian random noise (V).
     tx_taps = List([TxTapTuner(name='Pre-tap',   enabled=True,  min_val=-0.2, max_val=0.2, value=0.0),
                     TxTapTuner(name='Post-tap1', enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
                     TxTapTuner(name='Post-tap2', enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
                     TxTapTuner(name='Post-tap3', enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
-                   ])
-    rel_power       = Float(1.0)
-    tx_use_ami      = Bool(False)
-    tx_use_getwave  = Bool(False)
-    tx_has_getwave  = Bool(False)
-    tx_ami_file     = File('', entries=5, filter=['*.ami'])
-    tx_ami_valid    = Bool(False)
-    tx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])
-    tx_dll_valid    = Bool(False)
+                   ])  #: List of TxTapTuner objects.
+    rel_power       = Float(1.0)                                     #: Tx power dissipation (W).
+    tx_use_ami      = Bool(False)                                    #: (Bool)
+    tx_use_getwave  = Bool(False)                                    #: (Bool)
+    tx_has_getwave  = Bool(False)                                    #: (Bool)
+    tx_ami_file     = File('', entries=5, filter=['*.ami'])          #: (File)
+    tx_ami_valid    = Bool(False)                                    #: (Bool)
+    tx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])  #: (File)
+    tx_dll_valid    = Bool(False)                                    #: (Bool)
 
     # - Rx
-    rin             = Float(gRin)                                           # (Ohmin)
-    cin             = Range(low=0.001, value=gCin)                          # (pF)
-    cac             = Float(gCac)                                           # (uF)
-    use_ctle_file   = Bool(False)                                           # For importing CTLE impulse/step response directly.
-    ctle_file       = File('', entries=5, filter=['*.csv'])
-    rx_bw           = Float(gBW)                                            # (GHz)
-    peak_freq       = Float(gPeakFreq)                                      # CTLE peaking frequency (GHz)
-    peak_mag        = Float(gPeakMag)                                       # CTLE peaking magnitude (dB)
-    ctle_offset     = Float(gCTLEOffset)                                    # CTLE d.c. offset (dB)
-    ctle_mode       = Enum('Off', 'Passive', 'AGC', 'Manual')
-    rx_use_ami      = Bool(False)
-    rx_use_getwave  = Bool(False)
-    rx_has_getwave  = Bool(False)
-    rx_ami_file     = File('', entries=5, filter=['*.ami'])
-    rx_ami_valid    = Bool(False)
-    rx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])
-    rx_dll_valid    = Bool(False)
+    rin             = Float(gRin)                                    #: Rx input impedance (Ohm)
+    cin             = Range(low=0.001, value=gCin)                   #: Rx parasitic input capacitance (pF)
+    cac             = Float(gCac)                                    #: Rx a.c. coupling capacitance (uF)
+    use_ctle_file   = Bool(False)                                    #: For importing CTLE impulse/step response directly.
+    ctle_file       = File('', entries=5, filter=['*.csv'])          #: CTLE response file (when use_ctle_file = True).
+    rx_bw           = Float(gBW)                                     #: CTLE bandwidth (GHz).
+    peak_freq       = Float(gPeakFreq)                               #: CTLE peaking frequency (GHz)
+    peak_mag        = Float(gPeakMag)                                #: CTLE peaking magnitude (dB)
+    ctle_offset     = Float(gCTLEOffset)                             #: CTLE d.c. offset (dB)
+    ctle_mode       = Enum('Off', 'Passive', 'AGC', 'Manual')        #: CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
+    rx_use_ami      = Bool(False)                                    #: (Bool)
+    rx_use_getwave  = Bool(False)                                    #: (Bool)
+    rx_has_getwave  = Bool(False)                                    #: (Bool)
+    rx_ami_file     = File('', entries=5, filter=['*.ami'])          #: (File)
+    rx_ami_valid    = Bool(False)                                    #: (Bool)
+    rx_dll_file     = File('', entries=5, filter=['*.dll', '*.so'])  #: (File)
+    rx_dll_valid    = Bool(False)                                    #: (Bool)
 
     # - DFE
-    use_dfe         = Bool(gUseDfe)
-    sum_ideal       = Bool(gDfeIdeal)
-    decision_scaler = Float(gDecisionScaler)
-    gain            = Float(gGain)
-    n_ave           = Float(gNave)
-    n_taps          = Int(gNtaps)
+    use_dfe         = Bool(gUseDfe)           #: True = use a DFE (Bool).
+    sum_ideal       = Bool(gDfeIdeal)         #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
+    decision_scaler = Float(gDecisionScaler)  #: DFE slicer output voltage (V).
+    gain            = Float(gGain)            #: DFE error gain (unitless).
+    n_ave           = Float(gNave)            #: DFE # of averages to take, before making tap corrections.
+    n_taps          = Int(gNtaps)             #: DFE # of taps.
     _old_n_taps     = n_taps
-    sum_bw          = Float(gDfeBW)                                         # (GHz)
+    sum_bw          = Float(gDfeBW)           #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
 
     # - CDR
-    delta_t         = Float(gDeltaT)                                        # (ps)
-    alpha           = Float(gAlpha)
-    n_lock_ave      = Int(gNLockAve)
-    rel_lock_tol    = Float(gRelLockTol)
-    lock_sustain    = Int(gLockSustain)
+    delta_t         = Float(gDeltaT)          #: CDR proportional branch magnitude (ps).
+    alpha           = Float(gAlpha)           #: CDR integral branch magnitude (unitless).
+    n_lock_ave      = Int(gNLockAve)          #: CDR # of averages to take in determining lock.
+    rel_lock_tol    = Float(gRelLockTol)      #: CDR relative tolerance to use in determining lock.
+    lock_sustain    = Int(gLockSustain)       #: CDR hysteresis to use in determining lock.
 
     # - Analysis
-    thresh          = Int(gThresh)
+    thresh          = Int(gThresh)            #: Threshold for identifying periodic jitter components (sigma).
 
     # Misc.
-    cfg_file = File('', entries=5, filter=['*.pybert_cfg'])
-    data_file = File('', entries=5, filter=['*.pybert_data'])
+    cfg_file = File('', entries=5, filter=['*.pybert_cfg'])    #: PyBERT configuration data storage file (File).
+    data_file = File('', entries=5, filter=['*.pybert_data'])  #: PyBERT results data storage file (File).
 
     # Plots (plot containers, actually)
     plotdata          = ArrayPlotData()
@@ -454,21 +458,21 @@ class PyBERT(HasTraits):
     plots_bathtub     = Instance(GridPlotContainer)
 
     # Status
-    status          = String("Ready.")
+    status          = String("Ready.")  #: PyBERT status (String).
     jitter_perf     = Float(0.)
     total_perf      = Float(0.)
     sweep_results   = List([])
     len_h           = Int(0)
-    chnl_dly        = Float(0.)
-    bit_errs        = Int(0)
+    chnl_dly        = Float(0.)         #: Estimated channel delay (s).
+    bit_errs        = Int(0)            #: # of bit errors observed in last run.
     run_count       = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
-    ident  = String('PyBERT v2.4.0 - a serial communication link design tool, written in Python.\n\n \
+    ident  = String('PyBERT v{} - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    December 20, 2017\n\n \
+    December 22, 2017\n\n \
     Copyright (c) 2014 David Banas;\n \
-    All rights reserved World wide.')
+    All rights reserved World wide.'.format(pybert.__version__))
 
     # Help
     instructions = help_str

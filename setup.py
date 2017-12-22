@@ -5,11 +5,17 @@
 '''
 
 from setuptools import setup
+import pybert
 
 setup(
     name='PyBERT',
-    version='2.4.0',
+    version=pybert.__version__,
     packages=['pybert',],
+    package_data={'pybert': [ 'doc/_build/html/*',
+                              'doc/_build/html/*/*',
+                              'doc/_build/html/*/*/*',
+                            ],
+                 },
     license='BSD',
     description='Serial communication link bit error rate tester simulator, written in Python.',
     long_description=open('README.txt').read(),

@@ -488,6 +488,6 @@ traits_view = View(
     buttons = [run_simulation, save_data, load_data],
     statusbar = "status_str",
     title='PyBERT',
-    # width=0.95, height=0.95
+    width=0.95, height=0.95
 )
 
