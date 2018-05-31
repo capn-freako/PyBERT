@@ -1,1 +1,3 @@
 *.html linguist-documentation
+Simbeor linguist-vendored
+pybert linguist-source
