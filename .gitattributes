@@ -1,4 +1,5 @@
 *.html linguist-documentation
+*.ipynb linguist-documentation
 Simbeor linguist-vendored
 pybert linguist-source
 scikit-rf linguist-vendored
