@@ -2,4 +2,4 @@
 Simbeor linguist-vendored
 pybert linguist-source
 scikit-rf linguist-vendored
-conda.recipes linguist-documentation
+conda.recipe linguist-documentation
