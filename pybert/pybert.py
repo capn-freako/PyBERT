@@ -57,7 +57,6 @@ from pybert.pybert_util     import calc_gamma, calc_G, trim_impulse, import_chan
                             make_ctle, lfsr_bits, safe_log10, pulse_center
 from pybert.pybert_plot     import make_plots
 from pybert.pybert_help     import help_str
-from pybert.pybert_cfg      import PyBertCfg
 
 import pybert
 
@@ -139,6 +138,7 @@ class StoppableThread(Thread):
     def stopped(self):
         'Should be called by thread (i.e. - subclass) periodically and, if this function returns True, thread should clean itself up and quit ASAP.'
         return self._stop_event.is_set()
+
 
 class TxOptThread(StoppableThread):
     'Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness.'
@@ -519,8 +519,6 @@ class PyBERT(HasTraits):
     btn_abort   = Button(label = 'Abort')
     btn_cfg_tx  = Button(label = 'Configure')
     btn_cfg_rx  = Button(label = 'Configure')
-    btn_save_cfg = Button(label = 'Save Config.')
-    btn_load_cfg = Button(label = 'Load Config.')
 
     # Logger
     def log(self, msg):
@@ -636,40 +634,6 @@ class PyBERT(HasTraits):
 
     def _btn_cfg_rx_fired(self):
         self._rx_cfg()
-
-    def _btn_save_cfg_fired(self):
-        dlg = FileDialog(action='save as', wildcard='*.pybert_cfg', default_path=self.cfg_file)
-        if dlg.open() == OK:
-            the_PyBertCfg = PyBertCfg(self)
-            try:
-                with open(dlg.path, 'wt') as the_file:
-                    pickle.dump(the_PyBertCfg, the_file)
-                self.cfg_file = dlg.path
-            except Exception as err:
-                err.message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(err.message)
-                self.handle_error(err)
-
-    def _btn_load_cfg_fired(self):
-        dlg = FileDialog(action='open', wildcard='*.pybert_cfg', default_path=self.cfg_file)
-        if dlg.open() == OK:
-            try:
-                with open(dlg.path, 'rt') as the_file:
-                    the_PyBertCfg = pickle.load(the_file)
-                if(type(the_PyBertCfg) is not PyBertCfg):
-                    raise Exception("The data structure read in is NOT of type: PyBertCfg!")
-                for prop, value in vars(the_PyBertCfg).iteritems():
-                    if(prop == 'tx_taps'):
-                        i = 0
-                        for (enabled, val) in value:
-                            setattr(self.tx_taps[i], 'enabled', enabled)
-                            setattr(self.tx_taps[i], 'value',   val)
-                            i += 1
-                    else:
-                        setattr(self, prop, value)
-                self.cfg_file = dlg.path
-            except Exception as err:
-                err.message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err.message)
-                self.handle_error(err)
 
 
     # Independent variable setting intercepts

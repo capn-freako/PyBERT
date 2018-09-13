@@ -24,6 +24,8 @@ from chaco.api import ArrayPlotData
 
 from pybert_cntrl import my_run_sweeps
 from pybert_data  import PyBertData
+from pybert_cfg   import PyBertCfg
+
 
 class RunSimThread(Thread):
     'Used to run the simulation in its own thread, in order to preserve GUI responsiveness.'
@@ -31,6 +33,7 @@ class RunSimThread(Thread):
     def run(self):
         my_run_sweeps(self.the_pybert)
 
+        
 class MyHandler(Handler):
     """This handler is instantiated by the View and handles user button clicks."""
 
@@ -44,6 +47,47 @@ class MyHandler(Handler):
             self.run_sim_thread            = RunSimThread()
             self.run_sim_thread.the_pybert = the_pybert
             self.run_sim_thread.start()
+
+    def do_stop_simulation(self, info):
+        the_pybert = info.object
+        if self.run_sim_thread and self.run_sim_thread.isAlive():
+            self.run_sim_thread.stop()
+
+    def do_save_cfg(self, info):
+        the_pybert = info.object
+        dlg = FileDialog(action='save as', wildcard='*.pybert_cfg', default_path=the_pybert.cfg_file)
+        if dlg.open() == OK:
+            the_PyBertCfg = PyBertCfg(the_pybert)
+            try:
+                with open(dlg.path, 'wt') as the_file:
+                    pickle.dump(the_PyBertCfg, the_file)
+                the_pybert.cfg_file = dlg.path
+            except Exception as err:
+                err.message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(err.message)
+                the_pybert.handle_error(err)
+
+    def do_load_cfg(self, info):
+        the_pybert = info.object
+        dlg = FileDialog(action='open', wildcard='*.pybert_cfg', default_path=the_pybert.cfg_file)
+        if dlg.open() == OK:
+            try:
+                with open(dlg.path, 'rt') as the_file:
+                    the_PyBertCfg = pickle.load(the_file)
+                if(type(the_PyBertCfg) is not PyBertCfg):
+                    raise Exception("The data structure read in is NOT of type: PyBertCfg!")
+                for prop, value in vars(the_PyBertCfg).iteritems():
+                    if(prop == 'tx_taps'):
+                        i = 0
+                        for (enabled, val) in value:
+                            setattr(the_pybert.tx_taps[i], 'enabled', enabled)
+                            setattr(the_pybert.tx_taps[i], 'value',   val)
+                            i += 1
+                    else:
+                        setattr(the_pybert, prop, value)
+                the_pybert.cfg_file = dlg.path
+            except Exception as err:
+                err.message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err.message)
+                the_pybert.handle_error(err)
 
     def do_save_data(self, info):
         the_pybert = info.object
@@ -129,9 +173,12 @@ class MyHandler(Handler):
                 err.message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(err.message)
                 the_pybert.handle_error(err)
 
-run_simulation = Action(name="Run",     action="do_run_simulation")
+run_sim = Action(name="Run",     action="do_run_simulation")
+stop_sim = Action(name="Stop",   action="do_stop_simulation")
 save_data = Action(name="Save Results", action="do_save_data")
 load_data = Action(name="Load Results", action="do_load_data")
+save_cfg = Action(name="Save Config.", action="do_save_cfg")
+load_cfg = Action(name="Load Config.", action="do_load_cfg")
     
 # Main window layout definition.
 traits_view = View(
@@ -172,9 +219,9 @@ traits_view = View(
                         ),
                     ),
                     HGroup(
-                        Item('btn_save_cfg',  show_label=False, tooltip="Store the current simulation configuration data to a file.",),
-                        Item('btn_load_cfg',  show_label=False, tooltip="Load the simulation configuration data from a file.",),
-                        Item('cfg_file',      show_label=False, style='readonly'),
+                        Item(name='thresh',          label='Pj Threshold (sigma)',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
+                        Item(name='impulse_length', label='Impulse Response Length (ns)', tooltip="Manual impulse response length override", ),
+                        label='Analysis Parameters', show_border=True,
                     ),
                     label='Simulation Control', show_border=True,
                 ),
@@ -309,46 +356,39 @@ traits_view = View(
                     ),
                     label='Rx Equalization', show_border=True,
                 ),
+                springy=True,
             ),
             HGroup(
-                HGroup(
-                    VGroup(
+                VGroup(
+                    HGroup(
                         Item(name='delta_t',      label='Delta-t (ps)',  tooltip="magnitude of CDR proportional branch", ),
                         Item(name='alpha',        label='Alpha',         tooltip="relative magnitude of CDR integral branch", ),
-                        Item(name='n_lock_ave',   label='Lock Nave.',    tooltip="# of UI estimates to average, when determining lock", ),
                     ),
-                    VGroup(
+                    HGroup(
+                        Item(name='n_lock_ave',   label='Lock Nave.',    tooltip="# of UI estimates to average, when determining lock", ),
                         Item(name='rel_lock_tol', label='Lock Tol.',     tooltip="relative tolerance for determining lock", ),
                         Item(name='lock_sustain', label='Lock Sus.',     tooltip="length of lock determining hysteresis vector", ),
                     ),
                     label='CDR Parameters', show_border=True,
                     # enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
                 ),
-                HGroup(
-                    VGroup(
-                        Item(name='gain',            label='Gain',   tooltip="error feedback gain", ),
-                        Item(name='n_taps',          label='Taps',   tooltip="# of taps", ),
-                        Item(name='decision_scaler', label='Level',  tooltip="target output magnitude", ),
-                        enabled_when='use_dfe == True',
-                    ),
-                    VGroup(
-                        VGroup(
-                            Item(name='n_ave',           label='Nave.',    tooltip="# of CDR adaptations per DFE adaptation", ),
-                            Item(name='sum_bw',          label='BW (GHz)', tooltip="summing node bandwidth", enabled_when='sum_ideal == False'),
-                            enabled_when='use_dfe == True',
-                        ),
-                        HGroup(
-                            Item(name='use_dfe',   label='Use DFE',   tooltip="Include DFE in simulation.", ),
-                            Item(name='sum_ideal', label='Ideal DFE', tooltip="Use ideal DFE. (performance boost)", enabled_when='use_dfe == True', ),
-                        ),
-                    ),
-                    label='DFE Parameters', show_border=True,
-                    # enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
+                VGroup(
+                    Item(name='use_dfe',         label='Use DFE',   tooltip="Include DFE in simulation.", ),
+                    Item(name='sum_ideal',       label='Ideal DFE', tooltip="Use ideal DFE. (performance boost)", enabled_when='use_dfe == True', ),
                 ),
                 VGroup(
-                    Item(name='thresh',          label='Pj Threshold (sigma)',   tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)", ),
-                    Item(name='impulse_length', label='Impulse Response Length (ns)', tooltip="Manual impulse response length override", ),
-                    label='Analysis Parameters', show_border=True,
+                    HGroup(
+                        Item(name='n_taps',          label='Taps',      tooltip="# of taps",               ),
+                        Item(name='gain',            label='Gain',      tooltip="error feedback gain",     ),
+                        Item(name='decision_scaler', label='Level',     tooltip="target output magnitude", ),
+                    ),
+                    HGroup(
+                        Item(name='n_ave',           label='Nave.',     tooltip="# of CDR adaptations per DFE adaptation", ),
+                        Item(name='sum_bw',          label='BW (GHz)',  tooltip="summing node bandwidth", enabled_when='sum_ideal == False'),
+                    ),
+                    label='DFE Parameters', show_border=True,
+                    enabled_when='use_dfe == True',
+                # enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
                 ),
             ),
             # spring,
@@ -485,9 +525,10 @@ traits_view = View(
     ),
     resizable = True,
     handler = MyHandler(),
-    buttons = [run_simulation, save_data, load_data],
+    buttons = [run_sim, save_cfg, load_cfg, save_data, load_data],
     statusbar = "status_str",
     title='PyBERT',
-    width=0.95, height=0.95
+    width=0.95,
+    height=768,
 )
 
