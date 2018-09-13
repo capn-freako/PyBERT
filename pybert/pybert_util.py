@@ -827,14 +827,13 @@ def import_freq(filename, sample_per, padded=False, windowed=False):
     F = rf.Frequency.from_f(f / 1e9)  # skrf.Frequency.from_f() expects its argument to be in units of GHz.
 
     # Form impulse response from frequency response.
-    ntwk = ntwk.interpolate_from_f(F)
-    H = sdd_21(ntwk).s[:,0,0]
+    H = sdd_21(ntwk).interpolate_from_f(F).s[:,0,0]
+    # ntwk = ntwk.interpolate_from_f(F)
     # H = np.concatenate((H, np.conj(np.flipud(H[:-1]))))  # Forming the vector that fft() would've outputted.
     H = np.pad(H, (1,0), 'constant', constant_values=1.0)  # Presume d.c. value = 1.
     if(windowed):
         window = get_window(6.0, 2*len(H))[len(H):]
         H *= window
-
     # h = np.real(np.fft.ifft(H))
     if(padded):
         h = np.fft.irfft(H, int(1. / (fmin * sample_per)) + 1)

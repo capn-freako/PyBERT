@@ -184,6 +184,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         #       create the duobinary waveform. We only create it explicitly, above,
         #       so that we'll have an ideal reference for comparison.
         chnl_h   = self.calc_chnl_h()
+        self.dbg("Channel impulse response is {} samples long.".format(len(chnl_h)))
         chnl_out = convolve(self.x, chnl_h)[:len(x)]
 
         self.channel_perf = nbits * nspb / (clock() - start_time)

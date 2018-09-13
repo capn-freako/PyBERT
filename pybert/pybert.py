@@ -60,8 +60,6 @@ from pybert.pybert_help     import help_str
 
 import pybert
 
-debug = True
-
 gDebugStatus   = False
 gDebugOptimize = False
 gMaxCTLEPeak   = 20.      # max. allowed CTLE peaking (dB) (when optimizing, only)
@@ -347,6 +345,7 @@ class PyBERT(HasTraits):
     sweep_num       = Int(1)
     sweep_aves      = Int(gNumAve)
     do_sweep        = Bool(False)                                           #: Run sweeps? (Default = False)
+    debug           = Bool(True)                                           #: Log extra info to console when true. (Default = False)
 
     # - Channel Control
     use_ch_file     = Bool(False)                                           #: Import channel description from file? (Default = False)
@@ -470,7 +469,7 @@ class PyBERT(HasTraits):
     # About
     ident  = String('PyBERT v{} - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    December 22, 2017\n\n \
+    September 13, 2018\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.'.format(pybert.__version__))
 
@@ -524,9 +523,14 @@ class PyBERT(HasTraits):
     def log(self, msg):
         self.console_log += "\n[{}]: {}\n".format(datetime.now(), msg.strip())
 
+    def dbg(self, msg):
+        if(self.debug):
+            print "\n[{}]: {}\n".format(datetime.now(), msg.strip())
+            self.log(msg)
+
     def handle_error(self, err):
         self.log(err.message)
-        if(debug):
+        if(self.debug):
             message(err.message + "\nPlease, check terminal for more information.", 'PyBERT Alert')
             raise
         else:
