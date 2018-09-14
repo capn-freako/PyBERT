@@ -28,6 +28,7 @@ setup(
         'traits',
         'traitsui',
         'enable',
+        'kiwisolver',
         'chaco',
         'Sphinx',
         'Jinja2',

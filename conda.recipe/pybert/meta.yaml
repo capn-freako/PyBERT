@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "2.4.2" %}
+{% set version = "2.4.3" %}
 
 package:
   version: '{{ version }}'
@@ -10,7 +10,7 @@ source:
 
 build:
   script: python setup.py install  --single-version-externally-managed --record=record.txt
-  number: 3
+  number: 1
   noarch: python
   entry_points:
     - pybert = pybert.pybert:main
@@ -23,6 +23,7 @@ requirements:
     - traits
     - traitsui
     - enable 4.5.1.*
+    - kiwisolver
     - chaco
     - sphinx
     - jinja2
@@ -38,6 +39,7 @@ requirements:
     - traits
     - traitsui
     - enable 4.5.1
+    - kiwisolver
     - chaco
     - sphinx
     - jinja2
