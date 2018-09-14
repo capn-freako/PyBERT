@@ -530,6 +530,6 @@ traits_view = View(
     statusbar = "status_str",
     title='PyBERT',
     width=0.95,
-    height=768,
+    height=600,
 )
 
