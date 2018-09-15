@@ -717,7 +717,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     return (g[start_ix : stop_ix], start_ix)
 
 
-def import_channel(filename, sample_per, padded=False, windowed=False):
+def import_channel(filename, sample_per, padded=False, windowed=False, f_step=10e6):
     """
     Read in a channel file.
 
@@ -800,7 +800,7 @@ def sdd_21(ntwk):
 
     return 0.5*(ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
 
-def import_freq(filename, sample_per, padded=False, windowed=False):
+def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6):
     """
     Read in a single ended 4-port Touchstone file, and extract the
     differential throughput step response, resampling as
@@ -819,9 +819,10 @@ def import_freq(filename, sample_per, padded=False, windowed=False):
 
     # Form frequency vector.
     f = ntwk.f
-    fmin = f[0]
-    if(fmin == 0):  # Correct, if d.c. point was included in original data.
-        fmin = f[1]
+    # fmin = f[0]
+    # if(fmin == 0):  # Correct, if d.c. point was included in original data.
+    #     fmin = f[1]
+    fmin = f_step
     fmax = f[-1]
     f = np.arange(fmin, fmax + fmin, fmin)
     F = rf.Frequency.from_f(f / 1e9)  # skrf.Frequency.from_f() expects its argument to be in units of GHz.

@@ -351,6 +351,7 @@ class PyBERT(HasTraits):
     use_ch_file     = Bool(False)                                           #: Import channel description from file? (Default = False)
     padded          = Bool(False)                                           #: Zero pad imported Touchstone data? (Default = False)
     windowed        = Bool(False)                                           #: Apply windowing to the Touchstone data? (Default = False)
+    f_step          = Float(10)                                             #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     ch_file         = File('', entries=5, filter=['*.s4p', '*.S4P', '*.csv', '*.CSV', '*.txt', '*.TXT', '*.*'])  #: Channel file name.
     impulse_length  = Float(0.0)                                            #: Impulse response length. (Determined automatically, when 0.)
     Rdc             = Float(gRdc)       #: Channel d.c. resistance (Ohms/m).
@@ -469,7 +470,7 @@ class PyBERT(HasTraits):
     # About
     ident  = String('PyBERT v{} - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    September 13, 2018\n\n \
+    September 14, 2018\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.'.format(pybert.__version__))
 
@@ -1315,7 +1316,7 @@ class PyBERT(HasTraits):
         impulse_length       = self.impulse_length * 1.e-9
 
         if(self.use_ch_file):
-            chnl_h           = import_channel(self.ch_file, ts, self.padded, self.windowed)
+            chnl_h           = import_channel(self.ch_file, ts, self.padded, self.windowed, self.f_step)
             if(chnl_h[-1] > (max(chnl_h) / 2.)):  # step response?
                 chnl_h       = diff(chnl_h)       # impulse response is derivative of step response.
             chnl_h          /= sum(chnl_h)        # Normalize d.c. to one.

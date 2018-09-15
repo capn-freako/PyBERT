@@ -229,9 +229,11 @@ traits_view = View(
                 VGroup(  # Channel Parameters
                     HGroup(  # From File
                         Item(name='use_ch_file', show_label=False, tooltip='Select channel frequency/impulse/step response from file.', ),
-                        Item(name='ch_file', label='File',    enabled_when='use_ch_file == True'),
+                        Item(name='ch_file',  label='File',        enabled_when='use_ch_file == True', springy=True),
                         Item(name='padded',   label='Zero-padded', enabled_when='use_ch_file == True'),
                         Item(name='windowed', label='Windowed',    enabled_when='use_ch_file == True'),
+                        Item(name='f_step',   label='f_step',      enabled_when='use_ch_file == True', tooltip='Frequency step to use in generating H(f).'),
+                        Item(label='MHz'),
                         label='From File', show_border=True,
                     ),
                     HGroup(  # Native
