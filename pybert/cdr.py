@@ -100,7 +100,7 @@ class CDR(object):
 
         integral_correction      = integral_corrections[-1]
 
-        samples = map(sign, samples)
+        samples = list(map(sign, samples))
         if(samples[0] == samples[2]):   # No transition; no correction.
             proportional_correction = 0.0
         elif(samples[0] == samples[1]): # Early clock; increase period.

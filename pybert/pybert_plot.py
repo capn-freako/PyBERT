@@ -10,7 +10,7 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 
 from chaco.api       import Plot, GridPlotContainer, ColorMapper
 from chaco.tools.api import PanTool, ZoomTool
-from pybert_cntrl    import update_eyes
+from .pybert_cntrl    import update_eyes
 
 def make_plots(self, n_dfe_taps):
     """ Create the plots used by the PyBERT GUI."""

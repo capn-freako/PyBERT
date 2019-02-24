@@ -15,7 +15,7 @@ can be used to explore the concepts of serial communication link design.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from __future__ import absolute_import
+
 
 from traits.trait_base import ETSConfig
 ETSConfig.toolkit = 'qt4'
@@ -164,7 +164,7 @@ class TxOptThread(StoppableThread):
                     'fun' : lambda x: 0.7 - sum(abs(x))
                 })
 
-        bounds = zip(min_vals, max_vals)
+        bounds = list(zip(min_vals, max_vals))
 
         try:
             if(gDebugOptimize):
@@ -526,7 +526,7 @@ class PyBERT(HasTraits):
 
     def dbg(self, msg):
         if(self.debug):
-            print "\n[{}]: {}\n".format(datetime.now(), msg.strip())
+            print("\n[{}]: {}\n".format(datetime.now(), msg.strip()))
             self.log(msg)
 
     def handle_error(self, err):
@@ -714,7 +714,7 @@ class PyBERT(HasTraits):
             seed    = randint(128)
         bit_gen = lfsr_bits([7, 6], seed)
         for i in range(pattern_len - 4):
-            bits.append(bit_gen.next())
+            bits.append(next(bit_gen))
 
         # The 4-bit prequels, below, are to ensure that the first zero crossing
         # in the actual slicer input signal occurs. This is necessary, because
@@ -1222,7 +1222,7 @@ class PyBERT(HasTraits):
     # Changed property handlers.
     def _status_str_changed(self):
         if(gDebugStatus):
-            print self.status_str
+            print(self.status_str)
 
     def _use_dfe_changed(self, new_value):
         if(new_value == False):

@@ -24,9 +24,10 @@ from numpy.fft      import fft, ifft
 from scipy.signal   import lfilter, iirfilter, invres, freqs, medfilt, get_window
 from scipy.optimize import minimize, minimize_scalar
 from scipy.stats    import norm
-from dfe            import DFE
-from cdr            import CDR
+from .dfe            import DFE
+from .cdr            import CDR
 from pylab          import plot, show, legend
+from functools import reduce
 
 debug          = False
 gDebugOptimize = False
@@ -83,7 +84,7 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
     try:
         max_mag_x = max(abs(x))
     except:
-        print "len(x):", len(x)
+        print("len(x):", len(x))
         raise
     min_mag_x = min_init_dev * max_mag_x
     i = 0
@@ -109,21 +110,21 @@ def find_crossing_times(t, x, min_delay=0., rising_first=True, min_init_dev=0.1,
             i += 1
 
     if(debug):
-        print "min_delay: {}".format(min_delay)
-        print "rising_first: {}".format(rising_first)
-        print "i: {}".format(i)
-        print "max_mag_x: {}".format(max_mag_x)
-        print "min_mag_x: {}".format(min_mag_x)
-        print "xings[0]: {}".format(xings[0])
-        print "xings[i]: {}".format(xings[i])
+        print("min_delay: {}".format(min_delay))
+        print("rising_first: {}".format(rising_first))
+        print("i: {}".format(i))
+        print("max_mag_x: {}".format(max_mag_x))
+        print("min_mag_x: {}".format(min_mag_x))
+        print("xings[0]: {}".format(xings[0]))
+        print("xings[i]: {}".format(xings[i]))
 
     try:
         if(rising_first and diff_sign_x[xing_ix[i]] < 0.):
             i += 1
     except:
-        print "len(diff_sign_x):", len(diff_sign_x)
-        print "len(xing_ix):", len(xing_ix)
-        print "i:", i
+        print("len(diff_sign_x):", len(diff_sign_x))
+        print("len(xing_ix):", len(xing_ix))
+        print("i:", i)
         raise
 
     return array(xings[i:])
@@ -258,7 +259,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         bin_centers     = [-ui / 2.] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) \
                             for i in range(len(bin_edges) - 3)] + [ui / 2.]
 
-        return (array(map(float, hist)) / sum(hist), bin_centers)
+        return (array(list(map(float, hist))) / sum(hist), bin_centers)
 
 
     # Check inputs.
@@ -270,10 +271,10 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     actual_xings = array(actual_xings) - (actual_xings[0] - ui / 2.)
     xings_per_pattern = where(ideal_xings > (pattern_len * ui))[0][0]
     if(xings_per_pattern % 2 or not xings_per_pattern):
-        print "xings_per_pattern:", xings_per_pattern
-        print "len(ideal_xings):", len(ideal_xings)
-        print "min(ideal_xings):", min(ideal_xings)
-        print "max(ideal_xings):", max(ideal_xings)
+        print("xings_per_pattern:", xings_per_pattern)
+        print("len(ideal_xings):", len(ideal_xings))
+        print("min(ideal_xings):", min(ideal_xings))
+        print("max(ideal_xings):", max(ideal_xings))
         raise AssertionError("pybert_util.calc_jitter(): Odd number of (or, no) crossings per pattern detected!")
     num_patterns = nui // pattern_len
 
@@ -312,16 +313,16 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     jitter  = array(jitter)
 
     if(debug):
-        print "mean(jitter):", mean(jitter)
-        print "len(jitter):", len(jitter)
+        print("mean(jitter):", mean(jitter))
+        print("len(jitter):", len(jitter))
 
     if(zero_mean):
         jitter -= mean(jitter)
 
     # Do the jitter decomposition.
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    tie_risings  = jitter.take(range(0, len(jitter), 2))
-    tie_fallings = jitter.take(range(1, len(jitter), 2))
+    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))
+    tie_fallings = jitter.take(list(range(1, len(jitter), 2)))
     tie_risings.resize (num_patterns * xings_per_pattern // 2)
     tie_fallings.resize(num_patterns * xings_per_pattern // 2)
     tie_risings  = reshape(tie_risings,  (num_patterns, xings_per_pattern // 2))
@@ -333,14 +334,14 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         tie_fallings_ave = tie_fallings.mean(axis=0)
         isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
     except:
-        print "xings_per_pattern:", xings_per_pattern
-        print "len(ideal_xings):", len(ideal_xings)
+        print("xings_per_pattern:", xings_per_pattern)
+        print("len(ideal_xings):", len(ideal_xings))
         raise
     isi = min(isi, ui) # Cap the ISI at the unit interval.
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
 
     # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
-    tie_ave  = sum(zip(tie_risings_ave, tie_fallings_ave), ())
+    tie_ave  = sum(list(zip(tie_risings_ave, tie_fallings_ave)), ())
     tie_ave  = resize(tie_ave, len(jitter))
     tie_ind  = jitter - tie_ave
 
@@ -434,9 +435,9 @@ def make_uniform(t, jitter, ui, nbits):
     if(len(t) < len(jitter)):
         jitter = jitter[:len(t)]
 
-    run_lengths    = map(int, diff(t) / ui + 0.5)
+    run_lengths    = list(map(int, diff(t) / ui + 0.5))
     valid_ix       = [0] + list(cumsum(run_lengths))
-    valid_ix       = filter(lambda x: x < nbits, valid_ix)
+    valid_ix       = [x for x in valid_ix if x < nbits]
     missing        = where(array(run_lengths) > 1)[0]
     num_insertions = 0
     jitter         = list(jitter) # Because we use 'insert'.
@@ -777,7 +778,7 @@ def import_time(filename, sample_per):
     with open(filename, mode='rU') as file:
         for line in file:
             try:
-                tmp = map(float, filter(None, re.split("[, ;:]+", line))[0:2])
+                tmp = list(map(float, [_f for _f in re.split("[, ;:]+", line) if _f][0:2]))
             except:
                 continue
             ts.append(tmp[0])

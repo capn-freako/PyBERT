@@ -22,9 +22,9 @@ from enable.component_editor import ComponentEditor
 
 from chaco.api import ArrayPlotData
 
-from pybert_cntrl import my_run_sweeps
-from pybert_data  import PyBertData
-from pybert_cfg   import PyBertCfg
+from .pybert_cntrl import my_run_sweeps
+from .pybert_data  import PyBertData
+from .pybert_cfg   import PyBertCfg
 
 
 class RunSimThread(Thread):
@@ -75,7 +75,7 @@ class MyHandler(Handler):
                     the_PyBertCfg = pickle.load(the_file)
                 if(type(the_PyBertCfg) is not PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
-                for prop, value in vars(the_PyBertCfg).iteritems():
+                for prop, value in vars(the_PyBertCfg).items():
                     if(prop == 'tx_taps'):
                         i = 0
                         for (enabled, val) in value:
@@ -111,7 +111,7 @@ class MyHandler(Handler):
                     the_plotdata = pickle.load(the_file)
                 if(type(the_plotdata) is not PyBertData):
                     raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
-                for prop, value in the_plotdata.the_data.arrays.iteritems():
+                for prop, value in the_plotdata.the_data.arrays.items():
                     the_pybert.plotdata.set_data(prop + '_ref', value)
                 the_pybert.data_file = dlg.path
 
@@ -169,7 +169,7 @@ class MyHandler(Handler):
                                         type="line", color="darkcyan",  name="Inc_ref", index_scale='log')
 
             except Exception as err:
-                print item_name
+                print(item_name)
                 err.message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(err.message)
                 the_pybert.handle_error(err)
 

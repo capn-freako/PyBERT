@@ -24,11 +24,11 @@ from numpy.fft    import fft, ifft
 from scipy        import signal
 from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
 
-from dfe          import DFE
-from cdr          import CDR
+from .dfe          import DFE
+from .cdr          import CDR
 
 from pyibisami.amimodel import AMIModel, AMIModelInitializer
-from pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye, import_channel
+from .pybert_util  import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye, import_channel
 
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.e-18
@@ -529,7 +529,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
         # - DFE output
         ignore_until  = (nui - eye_uis) * ui + 0.75 * ui  # 0.5 was causing an occasional misalignment.
-        ideal_xings   = array(filter(lambda x: x > ignore_until, list(ideal_xings)))
+        ideal_xings   = array([x for x in list(ideal_xings) if x > ignore_until])
         min_delay     = ignore_until + conv_dly
         actual_xings  = find_crossings(t, dfe_out, decision_scaler, min_delay=min_delay,
                                                                     mod_type=mod_type,
@@ -614,7 +614,7 @@ def update_results(self):
     for tap_weight in tap_weights:
         self.plotdata.set_data("tap%d_weights" % i, tap_weight)
         i += 1
-    self.plotdata.set_data("tap_weight_index", range(len(tap_weight)))
+    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))
     if(self._old_n_taps != n_taps):
         new_plot = Plot(self.plotdata, auto_colors=['red', 'orange', 'yellow', 'green', 'blue', 'purple'], padding_left=75)
         for i in range(self.n_taps):
