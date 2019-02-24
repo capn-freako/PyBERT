@@ -14,6 +14,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 
 from numpy import sign, array, arange, mean, where
 
+
 class CDR(object):
     """
     A class providing behavioral modeling of a 'bang- bang' clock
@@ -39,17 +40,17 @@ class CDR(object):
             'delta_t' and 'ui'; only that they are the same.
         """
 
-        self.delta_t             = delta_t
-        self.alpha               = alpha
-        self.nom_ui              = ui
-        self._ui                 = ui
-        self.n_lock_ave          = n_lock_ave
-        self.rel_lock_tol        = rel_lock_tol
-        self._locked             = False
-        self.lock_sustain        = lock_sustain
-        self.integral_corrections     = [0.0]
+        self.delta_t = delta_t
+        self.alpha = alpha
+        self.nom_ui = ui
+        self._ui = ui
+        self.n_lock_ave = n_lock_ave
+        self.rel_lock_tol = rel_lock_tol
+        self._locked = False
+        self.lock_sustain = lock_sustain
+        self.integral_corrections = [0.0]
         self.proportional_corrections = []
-        self.lockeds                  = []
+        self.lockeds = []
 
     @property
     def ui(self):
@@ -89,52 +90,51 @@ class CDR(object):
 
         """
 
-        integral_corrections     = self.integral_corrections
+        integral_corrections = self.integral_corrections
         proportional_corrections = self.proportional_corrections
-        delta_t                  = self.delta_t
-        locked                   = self._locked
-        lockeds                  = self.lockeds
-        lock_sustain             = self.lock_sustain
-        n_lock_ave               = self.n_lock_ave
-        rel_lock_tol             = self.rel_lock_tol
+        delta_t = self.delta_t
+        locked = self._locked
+        lockeds = self.lockeds
+        lock_sustain = self.lock_sustain
+        n_lock_ave = self.n_lock_ave
+        rel_lock_tol = self.rel_lock_tol
 
-        integral_correction      = integral_corrections[-1]
+        integral_correction = integral_corrections[-1]
 
         samples = list(map(sign, samples))
-        if(samples[0] == samples[2]):   # No transition; no correction.
+        if samples[0] == samples[2]:  # No transition; no correction.
             proportional_correction = 0.0
-        elif(samples[0] == samples[1]): # Early clock; increase period.
+        elif samples[0] == samples[1]:  # Early clock; increase period.
             proportional_correction = delta_t
-        else:                           # Late clock; decrease period.
+        else:  # Late clock; decrease period.
             proportional_correction = -delta_t
         integral_correction += self.alpha * proportional_correction
         ui = self.nom_ui + integral_correction + proportional_correction
 
         integral_corrections.append(integral_correction)
-        if(len(integral_corrections) > n_lock_ave):
+        if len(integral_corrections) > n_lock_ave:
             integral_corrections.pop(0)
         proportional_corrections.append(proportional_correction)
-        if(len(proportional_corrections) > n_lock_ave):
+        if len(proportional_corrections) > n_lock_ave:
             proportional_corrections.pop(0)
-        if(len(proportional_corrections) == n_lock_ave):
-            x      = array(integral_corrections) #- mean(integral_corrections)
-            var    = sum(x ** 2) / n_lock_ave
-            lock   = abs(mean(proportional_corrections) / delta_t) < rel_lock_tol and (var / delta_t) < rel_lock_tol
+        if len(proportional_corrections) == n_lock_ave:
+            x = array(integral_corrections)  # - mean(integral_corrections)
+            var = sum(x ** 2) / n_lock_ave
+            lock = abs(mean(proportional_corrections) / delta_t) < rel_lock_tol and (var / delta_t) < rel_lock_tol
             lockeds.append(lock)
-            if(len(lockeds) > lock_sustain):
+            if len(lockeds) > lock_sustain:
                 lockeds.pop(0)
-            if(locked):
-                if(len(where(array(lockeds) == True)[0]) < 0.2 * lock_sustain):
+            if locked:
+                if len(where(array(lockeds) == True)[0]) < 0.2 * lock_sustain:
                     locked = False
             else:
-                if(len(where(array(lockeds) == True)[0]) > 0.8 * lock_sustain):
+                if len(where(array(lockeds) == True)[0]) > 0.8 * lock_sustain:
                     locked = True
             self._locked = locked
 
-        self.integral_corrections     = integral_corrections
+        self.integral_corrections = integral_corrections
         self.proportional_corrections = proportional_corrections
-        self.lockeds                  = lockeds
-        self._ui                      = ui
+        self.lockeds = lockeds
+        self._ui = ui
 
         return (ui, locked)
-

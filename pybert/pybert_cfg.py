@@ -13,6 +13,7 @@ configuration could be saved and later restored.
 Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
 
+
 class PyBertCfg(object):
     """
     PyBERT simulation configuration data encapsulation class.
@@ -102,4 +103,3 @@ class PyBertCfg(object):
 
         # Analysis
         self.thresh = the_PyBERT.thresh
-

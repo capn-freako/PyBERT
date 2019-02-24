@@ -53,7 +53,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 # import pybert_util
 # import dfe
 # import cdr
-# 
+#
 # __all__ = ['pybert', 'pybert_view', 'pybert_cntrl', 'pybert_util', 'dfe', 'cdr']
 
-__version__ = '3.0.0'
+__version__ = "3.0.0"
