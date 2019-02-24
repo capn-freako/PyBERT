@@ -1,0 +1,11 @@
+numpy
+scipy
+Cython
+traits
+traitsui
+enable
+kiwisolver
+chaco
+Sphinx
+scikit-rf
+PyIBIS-AMI>=3.0.0
