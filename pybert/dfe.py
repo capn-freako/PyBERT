@@ -12,8 +12,8 @@ into the larger *PyBERT* framework.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from numpy import zeros, sign, array, prod
-from scipy.signal import lfilter, iirfilter
+from numpy import array, sign, zeros
+from scipy.signal import iirfilter
 from .cdr import CDR
 
 gNch_taps = 3  # Number of taps used in summing node filter.

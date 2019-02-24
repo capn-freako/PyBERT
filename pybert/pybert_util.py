@@ -11,7 +11,6 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 import os.path
 import numpy as np
 import re
-import scipy.signal as sig
 import skrf as rf
 
 from numpy import (
@@ -46,14 +45,9 @@ from numpy import (
     concatenate,
     sort,
 )
-from numpy.random import normal
 from numpy.fft import fft, ifft
-from scipy.signal import lfilter, iirfilter, invres, freqs, medfilt, get_window
-from scipy.optimize import minimize, minimize_scalar
+from scipy.signal import freqs, get_window, invres
 from scipy.stats import norm
-from .dfe import DFE
-from .cdr import CDR
-from pylab import plot, show, legend
 from functools import reduce
 
 debug = False

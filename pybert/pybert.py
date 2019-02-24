@@ -21,7 +21,6 @@ from traits.trait_base import ETSConfig
 ETSConfig.toolkit = "qt4"
 # ETSConfig.toolkit = 'wx'
 
-import pickle
 
 from datetime import datetime
 from threading import Thread, Event
@@ -51,10 +50,8 @@ from numpy import (
 )
 from numpy.fft import fft, ifft
 from numpy.random import randint
-from scipy.signal import lfilter, iirfilter
 from scipy.optimize import minimize, minimize_scalar
 
-from pyface.api import FileDialog, OK
 from traits.api import (
     HasTraits,
     Array,
@@ -72,8 +69,7 @@ from traits.api import (
     Button,
     Enum,
 )
-from traitsui.api import View, Item, Group
-from traitsui.message import auto_close_message, error, message
+from traitsui.message import message
 
 from chaco.api import (
     Plot,
@@ -85,14 +81,12 @@ from chaco.api import (
     OverlayPlotContainer,
     PlotAxis,
 )
-from chaco.tools.api import PanTool, ZoomTool, LegendTool, TraitsTool, DragZoom
-from enable.component_editor import ComponentEditor
 
-from pyibisami.amimodel import AMIModel, AMIModelInitializer
+from pyibisami.amimodel import AMIModel
 from pyibisami.ami_parse import AMIParamConfigurator
 
 from pybert.pybert_view import traits_view
-from pybert.pybert_cntrl import my_run_simulation, update_results, update_eyes
+from pybert.pybert_cntrl import my_run_simulation
 from pybert.pybert_util import (
     calc_gamma,
     calc_G,

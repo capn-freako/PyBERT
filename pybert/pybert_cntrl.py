@@ -8,27 +8,25 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
-import sys, traceback
 
-from time import clock, sleep
+from time import clock
 
 from chaco.api import Plot
 from chaco.tools.api import PanTool, ZoomTool
 
-from numpy import sign, sin, pi, array, linspace, zeros, ones, repeat
-from numpy import where, sqrt, histogram, arange, append, square, shape
+from numpy import array, linspace, ones, repeat, zeros
+from numpy import arange, histogram, where
 from numpy import diff, log10, correlate, convolve, mean, resize, real
 from numpy import transpose, cumsum, diff, std, pad, concatenate
 from numpy.random import normal
 from numpy.fft import fft, ifft
 from scipy import signal
-from scipy.signal import lfilter, iirfilter, freqz, fftconvolve
+from scipy.signal import iirfilter, lfilter
 
 from .dfe import DFE
-from .cdr import CDR
 
 from pyibisami.amimodel import AMIModel, AMIModelInitializer
-from .pybert_util import find_crossings, make_ctle, calc_jitter, moving_average, calc_eye, import_channel
+from .pybert_util import calc_eye, calc_jitter, find_crossings, import_channel, make_ctle
 
 DEBUG = False
 MIN_BATHTUB_VAL = 1.0e-18

@@ -12,7 +12,7 @@ integration into the larger *PyBERT* framework.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from numpy import sign, array, arange, mean, where
+from numpy import array, mean, sign, where
 
 
 class CDR(object):

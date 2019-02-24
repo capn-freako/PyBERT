@@ -31,10 +31,8 @@ from traitsui.api import (
     spring,
     TabularEditor,
 )
-from traitsui.tabular_adapter import TabularAdapter
 from enable.component_editor import ComponentEditor
 
-from chaco.api import ArrayPlotData
 
 from .pybert_cntrl import my_run_sweeps
 from .pybert_data import PyBertData
