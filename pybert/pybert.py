@@ -14,93 +14,29 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-
-
-from traits.trait_base import ETSConfig
-
-ETSConfig.toolkit = "qt4"
-# ETSConfig.toolkit = 'wx'
-
-
 from datetime import datetime
-from threading import Thread, Event
+from threading import Event, Thread
 from time import sleep
 
-from numpy import (
-    array,
-    linspace,
-    zeros,
-    histogram,
-    mean,
-    diff,
-    transpose,
-    shape,
-    exp,
-    real,
-    pad,
-    pi,
-    resize,
-    cos,
-    where,
-    sqrt,
-    convolve,
-    sinc,
-    log10,
-    ones,
-)
+from chaco.api import ArrayPlotData, GridPlotContainer
+from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, sinc, where, zeros
 from numpy.fft import fft, ifft
 from numpy.random import randint
 from scipy.optimize import minimize, minimize_scalar
-
-from traits.api import (
-    HasTraits,
-    Array,
-    Range,
-    Float,
-    Int,
-    Property,
-    String,
-    cached_property,
-    Instance,
-    HTML,
-    List,
-    Bool,
-    File,
-    Button,
-    Enum,
-)
+from traits.api import (HTML, Array, Bool, Button, Enum, File, Float, HasTraits, Instance, Int,
+                        List, Property, Range, String, cached_property)
 from traitsui.message import message
 
-from chaco.api import (
-    Plot,
-    ArrayPlotData,
-    VPlotContainer,
-    GridPlotContainer,
-    ColorMapper,
-    Legend,
-    OverlayPlotContainer,
-    PlotAxis,
-)
-
-from pyibisami.amimodel import AMIModel
 from pyibisami.ami_parse import AMIParamConfigurator
+from pyibisami.amimodel import AMIModel
 
-from pybert.pybert_view import traits_view
-from pybert.pybert_cntrl import my_run_simulation
-from pybert.pybert_util import (
-    calc_gamma,
-    calc_G,
-    trim_impulse,
-    import_channel,
-    make_ctle,
-    lfsr_bits,
-    safe_log10,
-    pulse_center,
-)
-from pybert.pybert_plot import make_plots
-from pybert.pybert_help import help_str
-
-import pybert
+from . import __version__ as VERSION
+from .pybert_cntrl import my_run_simulation
+from .pybert_help import help_str
+from .pybert_plot import make_plots
+from .pybert_util import (calc_G, calc_gamma, import_channel, lfsr_bits, make_ctle,
+                          pulse_center, safe_log10, trim_impulse)
+from .pybert_view import traits_view
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -125,9 +61,7 @@ gTheta0 = 0.02  # loss tangent
 gZ0 = 100.0  # characteristic impedance in LC region (Ohms)
 gv0 = 0.67  # relative propagation velocity (c)
 gl_ch = 1.0  # cable length (m)
-gRn = (
-    0.001
-)  # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+gRn = 0.001  # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
 # - Tx
 gVod = 1.0  # output drive strength (Vp)
 gRs = 100  # differential source impedance (Ohms)
@@ -174,19 +108,23 @@ class StoppableThread(Thread):
         self._stop_event = Event()
 
     def stop(self):
-        "Called by thread invoker, when thread should be stopped prematurely."
+        """Called by thread invoker, when thread should be stopped prematurely."""
         self._stop_event.set()
 
     def stopped(self):
-        "Should be called by thread (i.e. - subclass) periodically and, if this function returns True, thread should clean itself up and quit ASAP."
+        """Should be called by thread (i.e. - subclass) periodically and, if this function
+        returns True, thread should clean itself up and quit ASAP.
+        """
         return self._stop_event.is_set()
 
 
 class TxOptThread(StoppableThread):
-    "Used to run Tx tap weight optimization in its own thread, in order to preserve GUI responsiveness."
+    """Used to run Tx tap weight optimization in its own thread,
+    in order to preserve GUI responsiveness.
+    """
 
     def run(self):
-        "Run the Tx equalization optimization thread."
+        """Run the Tx equalization optimization thread."""
 
         pybert = self.pybert
 
@@ -251,10 +189,12 @@ class TxOptThread(StoppableThread):
 
 
 class RxOptThread(StoppableThread):
-    "Used to run Rx tap weight optimization in its own thread, in order to preserve GUI responsiveness."
+    """Used to run Rx tap weight optimization in its own thread,
+    in order to preserve GUI responsiveness.
+    """
 
     def run(self):
-        "Run the Rx equalization optimization thread."
+        """Run the Rx equalization optimization thread."""
 
         pybert = self.pybert
 
@@ -297,10 +237,10 @@ class RxOptThread(StoppableThread):
 
 
 class CoOptThread(StoppableThread):
-    "Used to run co-optimization in its own thread, in order to preserve GUI responsiveness."
+    """Used to run co-optimization in its own thread, in order to preserve GUI responsiveness."""
 
     def run(self):
-        "Run the Tx/Rx equalization co-optimization thread."
+        """Run the Tx/Rx equalization co-optimization thread."""
 
         pybert = self.pybert
 
@@ -349,7 +289,7 @@ class CoOptThread(StoppableThread):
 
 
 class TxTapTuner(HasTraits):
-    "Object used to populate the rows of the Tx FFE tap tuning table."
+    """Object used to populate the rows of the Tx FFE tap tuning table."""
 
     name = String("(noname)")
     enabled = Bool(False)
@@ -359,7 +299,7 @@ class TxTapTuner(HasTraits):
     steps = Int(0)  # Non-zero means we want to sweep it.
 
     def __init__(self, name="(noname)", enabled=False, min_val=0.0, max_val=0.0, value=0.0, steps=0):
-        "Allows user to define properties, at instantiation."
+        """Allows user to define properties, at instantiation."""
 
         # Super-class initialization is ABSOLUTELY NECESSARY, in order
         # to get all the Traits/UI machinery setup correctly.
@@ -376,7 +316,7 @@ class TxTapTuner(HasTraits):
 class PyBERT(HasTraits):
     """
     A serial communication link bit error rate tester (BERT) simulator with a GUI interface.
-    
+
     Useful for exploring the concepts of serial communication link design.
     """
 
@@ -531,7 +471,7 @@ class PyBERT(HasTraits):
     September 14, 2018\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.".format(
-            pybert.__version__
+            VERSION
         )
     )
 
@@ -1317,7 +1257,7 @@ class PyBERT(HasTraits):
         if self.use_dfe_tune:
             for i in range(self.n_taps_tune):
                 if clock_pos + nspui * (1 + i) < len(p):
-                    p[clock_pos + nspui * (0.5 + i) :] -= p[clock_pos + nspui * (1 + i)]
+                    p[int(clock_pos + nspui * (0.5 + i)) :] -= p[clock_pos + nspui * (1 + i)]
 
         self.plotdata.set_data("ctle_out_h_tune", p)
         self.plotdata.set_data("clocks_tune", clocks)
@@ -1350,7 +1290,7 @@ class PyBERT(HasTraits):
             print(self.status_str)
 
     def _use_dfe_changed(self, new_value):
-        if new_value == False:
+        if not new_value:
             for i in range(1, 4):
                 self.tx_taps[i].enabled = True
         else:
@@ -1358,7 +1298,7 @@ class PyBERT(HasTraits):
                 self.tx_taps[i].enabled = False
 
     def _use_dfe_tune_changed(self, new_value):
-        if new_value == False:
+        if not new_value:
             for i in range(1, 4):
                 self.tx_tap_tuners[i].enabled = True
         else:

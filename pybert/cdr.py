@@ -15,7 +15,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 from numpy import array, mean, sign, where
 
 
-class CDR(object):
+class CDR():
     """
     A class providing behavioral modeling of a 'bang- bang' clock
     data recovery (CDR) unit.
@@ -125,10 +125,10 @@ class CDR(object):
             if len(lockeds) > lock_sustain:
                 lockeds.pop(0)
             if locked:
-                if len(where(array(lockeds) == True)[0]) < 0.2 * lock_sustain:
+                if len(where(array(lockeds))[0]) < 0.2 * lock_sustain:
                     locked = False
             else:
-                if len(where(array(lockeds) == True)[0]) > 0.8 * lock_sustain:
+                if len(where(array(lockeds))[0]) > 0.8 * lock_sustain:
                     locked = True
             self._locked = locked
 

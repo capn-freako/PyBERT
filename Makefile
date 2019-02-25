@@ -6,10 +6,14 @@ tox:
 	$(DOCKER) tox
 
 lint:
-	$(DOCKER) tox -e pylint,flake8
+	$(DOCKER) tox -e pylint
 
 test:
 	$(DOCKER) tox -e py37
+
+docs:
+	# Docs doesn't rely on docker but does require tox to be installed via pip.
+	tox -e docs
 
 clean:
 	rm -rf .tox docs/_build/ .pytest_cache .venv

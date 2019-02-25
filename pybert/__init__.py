@@ -16,7 +16,7 @@ The application source is divided among several files, as follows:
                       - default initialization
                       - the definitions of those dependent variables, which are handled
                         automatically by the Traits/UI machinery.
-                
+
     pybert_view.py  - The V in MVC, it contains the main window layout definition, as
                       well as the definitions of user invoked actions
                       (i.e.- buttons).
@@ -46,14 +46,4 @@ The application source is divided among several files, as follows:
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-
-# import pybert
-# import pybert_view
-# import pybert_cntrl
-# import pybert_util
-# import dfe
-# import cdr
-#
-# __all__ = ['pybert', 'pybert_view', 'pybert_cntrl', 'pybert_util', 'dfe', 'cdr']
-
 __version__ = "3.0.0"

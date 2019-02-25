@@ -9,34 +9,17 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 import pickle
-
 from threading import Thread
 
-from pyface.api import FileDialog, OK
-from traits.api import Instance
-from traitsui.api import (
-    View,
-    Item,
-    Group,
-    VGroup,
-    HGroup,
-    Action,
-    Handler,
-    DefaultOverride,
-    CheckListEditor,
-    StatusItem,
-    TextEditor,
-    TableEditor,
-    ObjectColumn,
-    spring,
-    TabularEditor,
-)
 from enable.component_editor import ComponentEditor
+from pyface.api import OK, FileDialog
+from traits.api import Instance
+from traitsui.api import (Action, CheckListEditor, Group, Handler, HGroup, Item,
+                          ObjectColumn, TableEditor, TextEditor, VGroup, View)
 
-
+from .pybert_cfg import PyBertCfg
 from .pybert_cntrl import my_run_sweeps
 from .pybert_data import PyBertData
-from .pybert_cfg import PyBertCfg
 
 
 class RunSimThread(Thread):
@@ -87,7 +70,7 @@ class MyHandler(Handler):
             try:
                 with open(dlg.path, "rt") as the_file:
                     the_PyBertCfg = pickle.load(the_file)
-                if type(the_PyBertCfg) is not PyBertCfg:
+                if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
                     if prop == "tx_taps":
@@ -136,9 +119,9 @@ class MyHandler(Handler):
                 # Add reference plots, if necessary.
                 # - time domain
                 for (container, suffix, has_both) in [
-                    (the_pybert.plots_h.component_grid.flat, "h", False),
-                    (the_pybert.plots_s.component_grid.flat, "s", True),
-                    (the_pybert.plots_p.component_grid.flat, "p", False),
+                        (the_pybert.plots_h.component_grid.flat, "h", False),
+                        (the_pybert.plots_s.component_grid.flat, "s", True),
+                        (the_pybert.plots_p.component_grid.flat, "p", False),
                 ]:
                     if not "Reference" in container[0].plots:
                         (ix, prefix) = (0, "chnl")

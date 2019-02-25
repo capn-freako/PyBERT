@@ -14,12 +14,13 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 
 from numpy import array, sign, zeros
 from scipy.signal import iirfilter
+
 from .cdr import CDR
 
 gNch_taps = 3  # Number of taps used in summing node filter.
 
 
-class LfilterSS(object):
+class LfilterSS():
     """A single steppable version of scipy.signal.lfilter()."""
 
     def __init__(self, b, a):
@@ -41,10 +42,10 @@ class LfilterSS(object):
     def step(self, x):
         """
         Step the filter.
-        
+
         Args:
             x(float): Next input value.
-            
+
         Returns:
             (float): Next output value.
         """
@@ -64,25 +65,25 @@ class LfilterSS(object):
         return y
 
 
-class DFE(object):
+class DFE():
     """Behavioral model of a decision feedback equalizer (DFE)."""
 
     def __init__(
-        self,
-        n_taps,
-        gain,
-        delta_t,
-        alpha,
-        ui,
-        n_spb,
-        decision_scaler,
-        mod_type=0,
-        bandwidth=100.0e9,
-        n_ave=10,
-        n_lock_ave=500,
-        rel_lock_tol=0.01,
-        lock_sustain=500,
-        ideal=True,
+            self,
+            n_taps,
+            gain,
+            delta_t,
+            alpha,
+            ui,
+            n_spb,
+            decision_scaler,
+            mod_type=0,
+            bandwidth=100.0e9,
+            n_ave=10,
+            n_lock_ave=500,
+            rel_lock_tol=0.01,
+            lock_sustain=500,
+            ideal=True,
     ):
         """
         Inputs:

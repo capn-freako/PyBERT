@@ -1,7 +1,7 @@
 """
 Default controller definition for PyBERT class.
 
-Original author: David Banas <capn.freako@gmail.com>  
+Original author: David Banas <capn.freako@gmail.com>
 
 Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code cleanup.)
 
@@ -13,19 +13,16 @@ from time import clock
 
 from chaco.api import Plot
 from chaco.tools.api import PanTool, ZoomTool
-
-from numpy import array, linspace, ones, repeat, zeros
-from numpy import arange, histogram, where
-from numpy import diff, log10, correlate, convolve, mean, resize, real
-from numpy import transpose, cumsum, diff, std, pad, concatenate
-from numpy.random import normal
+from numpy import (arange, array, concatenate, convolve, correlate, cumsum, diff, histogram,
+                   linspace, log10, mean, ones, pad, real, repeat, resize, std, transpose, where,
+                   zeros)
 from numpy.fft import fft, ifft
-from scipy import signal
+from numpy.random import normal
+from pyibisami.amimodel import AMIModel, AMIModelInitializer
 from scipy.signal import iirfilter, lfilter
+from scipy.signal.windows import hann
 
 from .dfe import DFE
-
-from pyibisami.amimodel import AMIModel, AMIModelInitializer
 from .pybert_util import calc_eye, calc_jitter, find_crossings, import_channel, make_ctle
 
 DEBUG = False
@@ -350,7 +347,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                     ctle_out, clock_times = rx_model.getWave(rx_in, len(rx_in))
                 self.log(rx_model.ami_params_out)
 
-                ctle_H = fft(ctle_out * signal.hann(len(ctle_out))) / fft(rx_in * signal.hann(len(rx_in)))
+                ctle_H = fft(ctle_out * hann(len(ctle_out))) / fft(rx_in * hann(len(rx_in)))
                 ctle_h = real(ifft(ctle_H)[: len(chnl_h)])
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
             else:  # Init() only.
@@ -739,7 +736,7 @@ def update_results(self):
     (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     clock_spec = fft(clock_pers[start_ix:])
-    clock_spec = abs(clock_spec[: len(clock_spec) / 2])
+    clock_spec = abs(clock_spec[: len(clock_spec) // 2])
     spec_freqs = arange(len(clock_spec)) / (2.0 * len(clock_spec))  # In this case, fNyquist = half the bit rate.
     clock_spec /= clock_spec[1:].mean()  # Normalize the mean non-d.c. value to 0 dB.
     self.plotdata.set_data("clk_per_hist_bins", bin_centers * 1.0e12)  # (ps)

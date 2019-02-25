@@ -9,46 +9,17 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 import os.path
-import numpy as np
 import re
-import skrf as rf
+from functools import reduce
 
-from numpy import (
-    sign,
-    sin,
-    pi,
-    array,
-    linspace,
-    float,
-    zeros,
-    ones,
-    repeat,
-    where,
-    diff,
-    append,
-    pad,
-    real,
-    histogram,
-    log10,
-    sqrt,
-    power,
-    exp,
-    cumsum,
-    mean,
-    power,
-    convolve,
-    correlate,
-    reshape,
-    resize,
-    insert,
-    shape,
-    concatenate,
-    sort,
-)
+import numpy as np
+from numpy import (array, concatenate, convolve, cumsum, diff, float,
+                   histogram, insert, log10, mean, ones, pi, power, real,
+                   resize, sign, sort, sqrt, where, zeros)
 from numpy.fft import fft, ifft
 from scipy.signal import freqs, get_window, invres
 from scipy.stats import norm
-from functools import reduce
+import skrf as rf
 
 debug = False
 gDebugOptimize = False
@@ -58,7 +29,7 @@ gMaxCTLEPeak = 20  # max. allowed CTLE peaking (dB) (when optimizing, only)
 def moving_average(a, n=3):
     """
     Calculates a sliding average over the input vector.
-    
+
     Args:
         a([float]): Input vector to be averaged.
         n(int): Width of averaging window, in vector samples. (Optional;
@@ -636,9 +607,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
             interp_fac = (start_time - start_ix * tsamp) / tsamp
             last_y = ys[start_ix]
             i = 0
-            for (samp1, samp2) in zip(
-                ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]
-            ):
+            for (samp1, samp2) in zip(ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
                 last_y = y
@@ -724,10 +693,10 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
 
     if mode == "Passive":
         H /= max(abs(H))
-    elif mode == "Manual" or mode == "AGC":
+    elif mode in ("Manual", "AGC"):
         H *= pow(10.0, dc_offset / 20.0) / abs(H[0])  # Enforce d.c. offset.
     else:
-        raise RunTimeException("pybert_util.make_ctle(): Unrecognized value for 'mode' parameter: {}.".format(mode))
+        raise RuntimeError("pybert_util.make_ctle(): Unrecognized value for 'mode' parameter: {}.".format(mode))
 
     return (w, H)
 
@@ -740,7 +709,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
       - setting the "front porch" length equal to 20% of the total length.
 
     Inputs:
-    
+
       - g         impulse response
 
       - Ts        (optional) sample interval (same units as 'chnl_dly')
@@ -752,7 +721,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
       - max_len   (optional) maximum length of returned vector
 
     Outputs:
-    
+
       - g_trim    trimmed impulse response
 
       - start_ix  index of first returned sample
@@ -792,10 +761,9 @@ def import_channel(filename, sample_per, padded=False, windowed=False, f_step=10
     """
 
     extension = os.path.splitext(filename)[1][1:]
-    if extension == "s4p" or extension == "S4P":
+    if extension in ("s4p", "S4P"):
         return import_freq(filename, sample_per, padded=padded, windowed=windowed)
-    else:
-        return import_time(filename, sample_per)
+    return import_time(filename, sample_per)
 
 
 def interp_time(ts, xs, sample_per):
@@ -941,7 +909,7 @@ def lfsr_bits(taps, seed):
         val = (val << 1) & mask  # Just to keep 'val' from growing without bound.
         if xor_res:
             val += 1
-        yield (val & 1)
+        yield val & 1
 
 
 def safe_log10(x):
