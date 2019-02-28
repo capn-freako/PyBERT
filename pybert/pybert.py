@@ -323,7 +323,7 @@ class PyBERT(HasTraits):
     # Independent variables
 
     # - Simulation Control
-    bit_rate = Range(low=0.1, high=100.0, value=gBitRate)  #: (Gbps)
+    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)  #: (Gbps)
     nbits = Range(low=1000, high=10000000, value=gNbits)  #: Number of bits to simulate.
     pattern_len = Range(low=7, high=10000000, value=gPatLen)  #: PRBS pattern length.
     nspb = Range(low=2, high=256, value=gNspb)  #: Signal vector samples per bit.
@@ -468,7 +468,7 @@ class PyBERT(HasTraits):
     ident = String(
         "PyBERT v{} - a serial communication link design tool, written in Python.\n\n \
     David Banas\n \
-    September 14, 2018\n\n \
+    January 8, 2019\n\n \
     Copyright (c) 2014 David Banas;\n \
     All rights reserved World wide.".format(
             VERSION
