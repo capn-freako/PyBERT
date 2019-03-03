@@ -58,10 +58,10 @@ class MyHandler(Handler):
                     pickle.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
-                err.message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(
-                    err.message
+                error_message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(
+                    err
                 )
-                the_pybert.handle_error(err)
+                the_pybert.handle_error(error_message)
 
     def do_load_cfg(self, info):
         the_pybert = info.object
@@ -83,10 +83,10 @@ class MyHandler(Handler):
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
-                err.message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(
-                    err.message
+                error_message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(
+                    err
                 )
-                the_pybert.handle_error(err)
+                the_pybert.handle_error(error_message)
 
     def do_save_data(self, info):
         the_pybert = info.object
@@ -98,10 +98,10 @@ class MyHandler(Handler):
                     pickle.dump(plotdata, the_file)
                 the_pybert.data_file = dlg.path
             except Exception as err:
-                err.message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(
-                    err.message
+                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(
+                    err
                 )
-                the_pybert.handle_error(err)
+                the_pybert.handle_error(error_message)
 
     def do_load_data(self, info):
         the_pybert = info.object
@@ -110,7 +110,7 @@ class MyHandler(Handler):
             try:
                 with open(dlg.path, "rt") as the_file:
                     the_plotdata = pickle.load(the_file)
-                if type(the_plotdata) is not PyBertData:
+                if not isinstance(the_plotdata, PyBertData):
                     raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
                 for prop, value in the_plotdata.the_data.arrays.items():
                     the_pybert.plotdata.set_data(prop + "_ref", value)
@@ -169,10 +169,10 @@ class MyHandler(Handler):
 
             except Exception as err:
                 print(item_name)
-                err.message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(
-                    err.message
+                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(
+                    err
                 )
-                the_pybert.handle_error(err)
+                the_pybert.handle_error(error_message)
 
 
 run_sim = Action(name="Run", action="do_run_simulation")

@@ -171,7 +171,7 @@ class TxOptThread(StoppableThread):
                     pybert.status = "Optimization failed: {}".format(res["message"])
 
         except Exception as err:
-            pybert.status = err.message
+            pybert.status = err
 
     def do_opt_tx(self, taps):
         sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
@@ -223,7 +223,7 @@ class RxOptThread(StoppableThread):
                 pybert.status = "Optimization failed: {}".format(res["message"])
 
         except Exception as err:
-            pybert.status = err.message
+            pybert.status = err
 
     def do_opt_rx(self, peak_mag):
         sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
@@ -269,7 +269,7 @@ class CoOptThread(StoppableThread):
                 pybert.status = "Optimization failed: {}".format(res["message"])
 
         except Exception as err:
-            pybert.status = err.message
+            pybert.status = err
 
     def do_coopt(self, peak_mag):
         sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
@@ -535,20 +535,23 @@ class PyBERT(HasTraits):
 
     # Logger
     def log(self, msg):
+        """Log a message to the console."""
         self.console_log += "\n[{}]: {}\n".format(datetime.now(), msg.strip())
 
     def dbg(self, msg):
+        """Only if debug is true, log this message to the console."""
         if self.debug:
             print("\n[{}]: {}\n".format(datetime.now(), msg.strip()))
             self.log(msg)
 
-    def handle_error(self, err):
-        self.log(err.message)
+    def handle_error(self, error):
+        """If debug, raise else just prompt the user."""
+        self.log(error)
         if self.debug:
-            message(err.message + "\nPlease, check terminal for more information.", "PyBERT Alert")
-            raise
+            message("{}\nPlease, check terminal for more information.".format(error), "PyBERT Alert")
+            raise error
         else:
-            message(err.message, "PyBERT Alert")
+            message(error, "PyBERT Alert")
 
     # Default initialization
     def __init__(self, run_simulation=True):
@@ -1315,8 +1318,8 @@ class PyBERT(HasTraits):
             self._tx_cfg = pcfg
             self.tx_ami_valid = True
         except Exception as err:
-            err.message = "Failed to open and/or parse AMI file!\n{}".format(err.message)
-            self.handle_error(err)
+            error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
+            self.handle_error(error_message)
 
     def _tx_dll_file_changed(self, new_value):
         try:
@@ -1325,8 +1328,8 @@ class PyBERT(HasTraits):
             self._tx_model = model
             self.tx_dll_valid = True
         except Exception as err:
-            err.message = "Failed to open DLL/SO file!\n{}".format(err.message)
-            self.handle_error(err)
+            error_message = "Failed to open DLL/SO file!\n{}".format(err)
+            self.handle_error(error_message)
 
     def _rx_ami_file_changed(self, new_value):
         try:
@@ -1338,8 +1341,8 @@ class PyBERT(HasTraits):
             self._rx_cfg = pcfg
             self.rx_ami_valid = True
         except Exception as err:
-            err.message = "Failed to open and/or parse AMI file!\n{}".format(err.message)
-            self.handle_error(err)
+            error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
+            self.handle_error(error_message)
 
     def _rx_dll_file_changed(self, new_value):
         try:
@@ -1348,8 +1351,8 @@ class PyBERT(HasTraits):
             self._rx_model = model
             self.rx_dll_valid = True
         except Exception as err:
-            err.message = "Failed to open DLL/SO file!\n{}".format(err.message)
-            self.handle_error(err)
+            error_message = "Failed to open DLL/SO file!\n{}".format(err)
+            self.handle_error(error_message)
 
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
