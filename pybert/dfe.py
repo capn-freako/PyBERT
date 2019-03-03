@@ -181,7 +181,6 @@ class DFE():
         tap_values = self.tap_values
         gain = self.gain
         n_ave = self.n_ave
-        summing_filter = self.summing_filter
 
         # Calculate this step's corrections and add to running total.
         corrections = [old + new for (old, new) in zip(self.corrections, [val * error * gain for val in tap_values])]
@@ -230,7 +229,6 @@ class DFE():
         """
 
         mod_type = self.mod_type
-        thresholds = self.thresholds
 
         if mod_type == 0:  # NRZ
             decision = sign(x)

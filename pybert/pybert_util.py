@@ -271,8 +271,8 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         return (array(list(map(float, hist))) / sum(hist), bin_centers)
 
     # Check inputs.
-    assert len(ideal_xings), "ERROR: pybert_util.calc_jitter(): zero length ideal crossings vector received!"
-    assert len(actual_xings), "ERROR: pybert_util.calc_jitter(): zero length actual crossings vector received!"
+    assert ideal_xings, "ERROR: pybert_util.calc_jitter(): zero length ideal crossings vector received!"
+    assert actual_xings, "ERROR: pybert_util.calc_jitter(): zero length actual crossings vector received!"
 
     # Line up first ideal/actual crossings, and count/validate crossings per pattern.
     ideal_xings = array(ideal_xings) - (ideal_xings[0] - ui / 2.0)
@@ -468,7 +468,7 @@ def make_uniform(t, jitter, ui, nbits):
     jitter = list(jitter)  # Because we use 'insert'.
 
     for i in missing:
-        for j in range(run_lengths[i] - 1):
+        for _ in range(run_lengths[i] - 1):
             jitter.insert(i + 1 + num_insertions, 0.0)
             num_insertions += 1
 
@@ -600,17 +600,14 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
     if clock_times:
         for clock_time in clock_times:
             start_time = clock_time - ui
-            stop_time = clock_time + ui
             start_ix = int(start_time / tsamp)
             if start_ix + 2 * samps_per_ui > len(ys):
                 break
             interp_fac = (start_time - start_ix * tsamp) / tsamp
-            last_y = ys[start_ix]
             i = 0
             for (samp1, samp2) in zip(ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-                last_y = y
                 i += 1
     else:
         start_ix = where(diff(sign(ys)))[0][0] + samps_per_ui // 2
@@ -701,7 +698,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
     return (w, H)
 
 
-def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
+def trim_impulse(g, min_len=0, max_len=1000000):
     """
     Trim impulse response, for more useful display, by:
       - clipping off the tail, after 99.8% of the total power has been
@@ -711,10 +708,6 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     Inputs:
 
       - g         impulse response
-
-      - Ts        (optional) sample interval (same units as 'chnl_dly')
-
-      - chnl_dly  (optional) channel delay
 
       - min_len   (optional) minimum length of returned vector
 
@@ -747,7 +740,7 @@ def trim_impulse(g, Ts=0, chnl_dly=0, min_len=0, max_len=1000000):
     return (g[start_ix:stop_ix], start_ix)
 
 
-def import_channel(filename, sample_per, padded=False, windowed=False, f_step=10e6):
+def import_channel(filename, sample_per, padded=False, windowed=False):
     """
     Read in a channel file.
 
@@ -913,7 +906,7 @@ def lfsr_bits(taps, seed):
 
 
 def safe_log10(x):
-    "Guards against pesky 'Divide by 0' error messages."
+    """Guards against pesky 'Divide by 0' error messages."""
 
     if hasattr(x, "__len__"):
         x = where(x == 0, 1.0e-20 * ones(len(x)), x)
@@ -944,7 +937,7 @@ def pulse_center(p, nspui):
     p_max = p.max()
     thresh = p_max / div
     main_lobe_ixs = where(p > thresh)[0]
-    if not len(main_lobe_ixs):  # Sometimes, the optimizer really whacks out.
+    if not main_lobe_ixs:  # Sometimes, the optimizer really whacks out.
         return (-1, 0)  # Flag this, by returning an impossible index.
 
     err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui

@@ -23,7 +23,7 @@ from .pybert_data import PyBertData
 
 
 class RunSimThread(Thread):
-    "Used to run the simulation in its own thread, in order to preserve GUI responsiveness."
+    """Used to run the simulation in its own thread, in order to preserve GUI responsiveness."""
 
     def run(self):
         my_run_sweeps(self.the_pybert)
@@ -43,8 +43,7 @@ class MyHandler(Handler):
             self.run_sim_thread.the_pybert = the_pybert
             self.run_sim_thread.start()
 
-    def do_stop_simulation(self, info):
-        the_pybert = info.object
+    def do_stop_simulation(self):
         if self.run_sim_thread and self.run_sim_thread.isAlive():
             self.run_sim_thread.stop()
 

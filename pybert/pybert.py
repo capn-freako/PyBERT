@@ -470,9 +470,7 @@ class PyBERT(HasTraits):
     David Banas\n \
     January 8, 2019\n\n \
     Copyright (c) 2014 David Banas;\n \
-    All rights reserved World wide.".format(
-            VERSION
-        )
+    All rights reserved World wide.".format(VERSION)
     )
 
     # Help
@@ -550,8 +548,7 @@ class PyBERT(HasTraits):
         if self.debug:
             message("{}\nPlease, check terminal for more information.".format(error), "PyBERT Alert")
             raise error
-        else:
-            message(error, "PyBERT Alert")
+        message(error, "PyBERT Alert")
 
     # Default initialization
     def __init__(self, run_simulation=True):
@@ -663,9 +660,8 @@ class PyBERT(HasTraits):
     # (Primarily, for debugging.)
     def _set_ctle_peak_mag_tune(self, val):
         if val > gMaxCTLEPeak or val < 0.0:
-            raise RunTimeException("CTLE peak magnitude out of range!")
-        else:
-            self.peak_mag_tune = val
+            raise RuntimeError("CTLE peak magnitude out of range!")
+        self.peak_mag_tune = val
 
     # Dependent variable definitions
     @cached_property
@@ -730,7 +726,7 @@ class PyBERT(HasTraits):
         while not seed:  # We don't want to seed our LFSR with zero.
             seed = randint(128)
         bit_gen = lfsr_bits([7, 6], seed)
-        for i in range(pattern_len - 4):
+        for _ in range(pattern_len - 4):
             bits.append(next(bit_gen))
 
         # The 4-bit prequels, below, are to ensure that the first zero crossing
@@ -743,8 +739,7 @@ class PyBERT(HasTraits):
         # probably more robust.
         if mod_type == 1:  # Duo-binary precodes, using XOR.
             return resize(array([0, 0, 1, 0] + bits), nbits)
-        else:
-            return resize(array([0, 0, 1, 1] + bits), nbits)
+        return resize(array([0, 0, 1, 1] + bits), nbits)
 
     @cached_property
     def _get_ui(self):
@@ -910,8 +905,6 @@ class PyBERT(HasTraits):
 
             isi_rej_tx = 1.0e20
             dcd_rej_tx = 1.0e20
-            pj_rej_tx = 1.0e20
-            rj_rej_tx = 1.0e20
             isi_rej_ctle = 1.0e20
             dcd_rej_ctle = 1.0e20
             pj_rej_ctle = 1.0e20
@@ -929,10 +922,6 @@ class PyBERT(HasTraits):
                 isi_rej_tx = isi_chnl / isi_tx
             if dcd_tx:
                 dcd_rej_tx = dcd_chnl / dcd_tx
-            if pj_tx:
-                pj_rej_tx = pj_chnl / pj_tx
-            if rj_tx:
-                rj_rej_tx = rj_chnl / rj_tx
             if isi_ctle:
                 isi_rej_ctle = isi_tx / isi_ctle
             if dcd_ctle:
@@ -1092,9 +1081,9 @@ class PyBERT(HasTraits):
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
         except:
-            raise
             info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
-            info_str += "Sorry, an error occured.\n"
+            info_str += "Sorry, an error occurred.\n"
+            raise
 
         return info_str
 
@@ -1205,7 +1194,7 @@ class PyBERT(HasTraits):
         offset = self.ctle_offset_tune
         mode = self.ctle_mode_tune
 
-        w_dummy, H = make_ctle(rx_bw, peak_freq, peak_mag, w, mode, offset)
+        _, H = make_ctle(rx_bw, peak_freq, peak_mag, w, mode, offset)
         h = real(ifft(H))[:len_h]
         h *= abs(H[0]) / sum(h)
 
@@ -1267,8 +1256,7 @@ class PyBERT(HasTraits):
 
         if mod_type == 1:  # Handle duo-binary.
             return isi - p[clock_pos] - p[clock_pos + nspui] + 2.0 * abs(p[clock_pos + nspui] - p[clock_pos])
-        else:
-            return isi - p[clock_pos]
+        return isi - p[clock_pos]
 
     @cached_property
     def _get_rel_opt(self):
@@ -1280,7 +1268,7 @@ class PyBERT(HasTraits):
         nspui = self.nspui
         n_taps = self.n_taps
 
-        (clock_pos, thresh) = pulse_center(p, nspui)
+        (clock_pos, _) = pulse_center(p, nspui)
         err = 0
         for i in range(n_taps):
             err += p[clock_pos + (i + 1) * nspui] ** 2
@@ -1383,7 +1371,7 @@ class PyBERT(HasTraits):
         impulse_length = self.impulse_length * 1.0e-9
 
         if self.use_ch_file:
-            chnl_h = import_channel(self.ch_file, ts, self.padded, self.windowed, self.f_step)
+            chnl_h = import_channel(self.ch_file, ts, self.padded, self.windowed)
             if chnl_h[-1] > (max(chnl_h) / 2.0):  # step response?
                 chnl_h = diff(chnl_h)  # impulse response is derivative of step response.
             chnl_h /= sum(chnl_h)  # Normalize d.c. to one.
@@ -1430,7 +1418,7 @@ class PyBERT(HasTraits):
         self.chnl_H = chnl_H
         self.chnl_trimmed_H = chnl_trimmed_H
         self.start_ix = start_ix
-        self.t_ns_chnl = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
+        self.t_ns_chnl = array(t[start_ix: start_ix + len(chnl_h)]) * 1.0e9
         self.chnl_s = chnl_s
         self.chnl_p = chnl_p
 

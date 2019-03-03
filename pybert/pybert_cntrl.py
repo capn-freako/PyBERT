@@ -18,9 +18,9 @@ from numpy import (arange, array, concatenate, convolve, correlate, cumsum, diff
                    zeros)
 from numpy.fft import fft, ifft
 from numpy.random import normal
-from pyibisami.amimodel import AMIModel, AMIModelInitializer
 from scipy.signal import iirfilter, lfilter
 from scipy.signal.windows import hann
+from pyibisami.amimodel import AMIModel, AMIModelInitializer
 
 from .dfe import DFE
 from .pybert_util import calc_eye, calc_jitter, find_crossings, import_channel, make_ctle
@@ -103,8 +103,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
-    t_ns = self.t_ns
-    f = self.f
     w = self.w
     bits = self.bits
     symbols = self.symbols
@@ -119,19 +117,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     rn = self.rn
     pn_mag = self.pn_mag
     pn_freq = self.pn_freq * 1.0e6
-    Vod = self.vod
-    Rs = self.rs
-    Cs = self.cout * 1.0e-12
-    RL = self.rin
-    CL = self.cac * 1.0e-6
-    Cp = self.cin * 1.0e-12
-    R0 = self.R0
-    w0 = self.w0
-    Rdc = self.Rdc
-    Z0 = self.Z0
-    v0 = self.v0 * 3.0e8
-    Theta0 = self.Theta0
-    l_ch = self.l_ch
     pattern_len = self.pattern_len
     rx_bw = self.rx_bw * 1.0e9
     peak_freq = self.peak_freq * 1.0e9
@@ -218,14 +203,14 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             if tx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
                 tx_h = array(tx_model.initOut) * ts
             elif not tx_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]):
-                error(
+                self.handle_error(
                     "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
                         I cannot continue.\nThis condition is supposed to be caught sooner in the flow."
                 )
                 self.status = "Simulation Error."
                 return
             elif not self.tx_use_getwave:
-                error(
+                self.handle_error(
                     "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
                         I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     "PyBERT Alert",
@@ -271,7 +256,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         pn_period = 1.0 / pn_freq
         pn_samps = int(pn_period / Ts + 0.5)
         pn = zeros(pn_samps)
-        pn[pn_samps // 2 :] = pn_mag
+        pn[pn_samps // 2:] = pn_mag
         pn = resize(pn, len(tx_out))
         #   - High pass filter it. (Simulating capacitive coupling.)
         (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
@@ -326,14 +311,14 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             if rx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
                 ctle_out_h = array(rx_model.initOut) * ts
             elif not rx_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]):
-                error(
+                self.handle_error(
                     "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
                         I cannot continue.\nThis condition is supposed to be caught sooner in the flow."
                 )
                 self.status = "Simulation Error."
                 return
             elif not self.rx_use_getwave:
-                error(
+                self.handle_error(
                     "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
                         I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     "PyBERT Alert",
@@ -372,7 +357,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 ctle_H = fft(ctle_h)
                 ctle_H *= sum(ctle_h) / ctle_H[0]
             else:
-                w_dummy, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
+                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
                 ctle_h = real(ifft(ctle_H))[: len(chnl_h)]
                 ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
             ctle_out = convolve(rx_in, ctle_h)[: len(tx_out)]
@@ -383,7 +368,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             ctle_out_h = convolve(tx_out_h, ctle_h)[: len(tx_out_h)]
         self.ctle_s = ctle_s
         ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
-        if len(ctle_out_h_main_lobe):
+        if ctle_out_h_main_lobe:
             conv_dly_ix = ctle_out_h_main_lobe[0]
         else:
             conv_dly_ix = self.chnl_dly / Ts
@@ -526,13 +511,13 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         # - channel output
         actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
         (
-            jitter,
+            _,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            jitter_ext,
+            _,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -557,13 +542,13 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         # - Tx output
         actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
         (
-            jitter,
+            _,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            jitter_ext,
+            _,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -643,8 +628,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.jitter_spectrum_dfe = jitter_spectrum
         self.jitter_ind_spectrum_dfe = jitter_ind_spectrum
         self.f_MHz_dfe = array(spectrum_freqs) * 1.0e-6
-        skip_factor = nbits / eye_bits
-        ctle_spec = self.jitter_spectrum_ctle
         dfe_spec = self.jitter_spectrum_dfe
         self.jitter_rejection_ratio = zeros(len(dfe_spec))
 
@@ -690,7 +673,6 @@ def update_results(self):
     t = self.t
     t_ns = self.t_ns
     t_ns_chnl = self.t_ns_chnl
-    conv_dly_ix = self.conv_dly_ix
     n_taps = self.n_taps
 
     Ts = t[1]
