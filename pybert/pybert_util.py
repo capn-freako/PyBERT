@@ -15,7 +15,7 @@ from functools import reduce
 import numpy as np
 from numpy import (array, concatenate, convolve, cumsum, diff, float,
                    histogram, insert, log10, mean, ones, pi, power, real,
-                   resize, sign, sort, sqrt, where, zeros)
+                   reshape, resize, sign, sort, sqrt, where, zeros)
 from numpy.fft import fft, ifft
 from scipy.signal import freqs, get_window, invres
 from scipy.stats import norm
@@ -937,7 +937,7 @@ def pulse_center(p, nspui):
     p_max = p.max()
     thresh = p_max / div
     main_lobe_ixs = where(p > thresh)[0]
-    if not main_lobe_ixs:  # Sometimes, the optimizer really whacks out.
+    if not main_lobe_ixs.size:  # Sometimes, the optimizer really whacks out.
         return (-1, 0)  # Flag this, by returning an impossible index.
 
     err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui

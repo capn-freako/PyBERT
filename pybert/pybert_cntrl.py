@@ -368,7 +368,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             ctle_out_h = convolve(tx_out_h, ctle_h)[: len(tx_out_h)]
         self.ctle_s = ctle_s
         ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
-        if ctle_out_h_main_lobe:
+        if ctle_out_h_main_lobe.size:
             conv_dly_ix = ctle_out_h_main_lobe[0]
         else:
             conv_dly_ix = self.chnl_dly / Ts
