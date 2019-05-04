@@ -14,6 +14,10 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
+from traits.trait_base import ETSConfig
+ETSConfig.toolkit = "qt4"
+# ETSConfig.toolkit = "wx"
+
 from datetime import datetime
 from threading import Event, Thread
 from time import sleep
@@ -23,20 +27,43 @@ from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, 
 from numpy.fft import fft, ifft
 from numpy.random import randint
 from scipy.optimize import minimize, minimize_scalar
-from traits.api import (HTML, Array, Bool, Button, Enum, File, Float, HasTraits, Instance, Int,
-                        List, Property, Range, String, cached_property)
+from traits.api import (
+    HTML,
+    Array,
+    Bool,
+    Button,
+    Enum,
+    File,
+    Float,
+    HasTraits,
+    Instance,
+    Int,
+    List,
+    Property,
+    Range,
+    String,
+    cached_property,
+)
 from traitsui.message import message
 
 from pyibisami.ami_parse import AMIParamConfigurator
-from pyibisami.amimodel import AMIModel
+from pyibisami.ami_model import AMIModel
 
-from . import __version__ as VERSION
-from .pybert_cntrl import my_run_simulation
-from .pybert_help import help_str
-from .pybert_plot import make_plots
-from .pybert_util import (calc_G, calc_gamma, import_channel, lfsr_bits, make_ctle,
-                          pulse_center, safe_log10, trim_impulse)
-from .pybert_view import traits_view
+from pybert import __version__ as VERSION
+from pybert.pybert_cntrl import my_run_simulation
+from pybert.pybert_help import help_str
+from pybert.pybert_plot import make_plots
+from pybert.pybert_util import (
+    calc_G,
+    calc_gamma,
+    import_channel,
+    lfsr_bits,
+    make_ctle,
+    pulse_center,
+    safe_log10,
+    trim_impulse,
+)
+from pybert.pybert_view import traits_view
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -61,7 +88,9 @@ gTheta0 = 0.02  # loss tangent
 gZ0 = 100.0  # characteristic impedance in LC region (Ohms)
 gv0 = 0.67  # relative propagation velocity (c)
 gl_ch = 1.0  # cable length (m)
-gRn = 0.001  # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+gRn = (
+    0.001
+)  # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
 # - Tx
 gVod = 1.0  # output drive strength (Vp)
 gRs = 100  # differential source impedance (Ohms)
@@ -174,6 +203,7 @@ class TxOptThread(StoppableThread):
             pybert.status = err
 
     def do_opt_tx(self, taps):
+        """Run the Tx Optimization."""
         sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
 
         if self.stopped():
@@ -226,6 +256,7 @@ class RxOptThread(StoppableThread):
             pybert.status = err
 
     def do_opt_rx(self, peak_mag):
+        """Run the Rx Optimization."""
         sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
 
         if self.stopped():
@@ -272,6 +303,7 @@ class CoOptThread(StoppableThread):
             pybert.status = err
 
     def do_coopt(self, peak_mag):
+        """Run the Tx and Rx Co-Optimization."""
         sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
 
         if self.stopped():
@@ -470,7 +502,9 @@ class PyBERT(HasTraits):
     David Banas\n \
     January 8, 2019\n\n \
     Copyright (c) 2014 David Banas;\n \
-    All rights reserved World wide.".format(VERSION)
+    All rights reserved World wide.".format(
+            VERSION
+        )
     )
 
     # Help
@@ -584,6 +618,7 @@ class PyBERT(HasTraits):
 
     # Button handlers
     def _btn_rst_eq_fired(self):
+        """Reset the equalization."""
         for i in range(4):
             self.tx_tap_tuners[i].value = self.tx_taps[i].value
             self.tx_tap_tuners[i].enabled = self.tx_taps[i].enabled
@@ -596,6 +631,7 @@ class PyBERT(HasTraits):
         self.n_taps_tune = self.n_taps
 
     def _btn_save_eq_fired(self):
+        """Save the equalization."""
         for i in range(4):
             self.tx_taps[i].value = self.tx_tap_tuners[i].value
             self.tx_taps[i].enabled = self.tx_tap_tuners[i].enabled
@@ -1303,7 +1339,7 @@ class PyBERT(HasTraits):
                 pcfg = AMIParamConfigurator(pfile.read())
             self.log("Parsing Tx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
             self.tx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
-            self._tx_cfg = pcfg
+            self._tx_cfg = pcfg.open_gui
             self.tx_ami_valid = True
         except Exception as err:
             error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
@@ -1326,7 +1362,7 @@ class PyBERT(HasTraits):
                 pcfg = AMIParamConfigurator(pfile.read())
             self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
             self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
-            self._rx_cfg = pcfg
+            self._rx_cfg = pcfg.open_gui
             self.rx_ami_valid = True
         except Exception as err:
             error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
@@ -1418,7 +1454,7 @@ class PyBERT(HasTraits):
         self.chnl_H = chnl_H
         self.chnl_trimmed_H = chnl_trimmed_H
         self.start_ix = start_ix
-        self.t_ns_chnl = array(t[start_ix: start_ix + len(chnl_h)]) * 1.0e9
+        self.t_ns_chnl = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
         self.chnl_s = chnl_s
         self.chnl_p = chnl_p
 

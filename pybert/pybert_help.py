@@ -7,8 +7,7 @@ Original date:   April 15, 2015 (Copied from pybert.py.)
 
 Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
-
-help_str = ("""<H2>PyBERT User's Guide</H2>\n"
+help_str = """<H2>PyBERT User's Guide</H2>\n"
   <H3>Note to developers</H3>\n"
     This is NOT for you. Instead, open 'pybert/doc/_build/html/index.html' in a browser.\n"
   <H3>PyBERT User Help Options</H3>\n"
@@ -34,7 +33,7 @@ help_str = ("""<H2>PyBERT User's Guide</H2>\n"
     <H4>Config.</H4>\n"
       This tab allows you to configure the simulation.\n"
       Hover over any user configurable element for a help message.\n"
-""")
+"""
 # +           "    <H4>DFE</H4>\n" \
 # +           "    <H4>EQ Tune</H4>\n" \
 # +           "    <H4>Impulses</H4>\n" \

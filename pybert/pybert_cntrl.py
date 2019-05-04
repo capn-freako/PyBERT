@@ -7,23 +7,40 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-
-
 from time import clock
 
 from chaco.api import Plot
 from chaco.tools.api import PanTool, ZoomTool
-from numpy import (arange, array, concatenate, convolve, correlate, cumsum, diff, histogram,
-                   linspace, log10, mean, ones, pad, real, repeat, resize, std, transpose, where,
-                   zeros)
+from numpy import (
+    arange,
+    array,
+    concatenate,
+    convolve,
+    correlate,
+    cumsum,
+    diff,
+    histogram,
+    linspace,
+    log10,
+    mean,
+    ones,
+    pad,
+    real,
+    repeat,
+    resize,
+    std,
+    transpose,
+    where,
+    zeros,
+)
 from numpy.fft import fft, ifft
 from numpy.random import normal
 from scipy.signal import iirfilter, lfilter
 from scipy.signal.windows import hann
-from pyibisami.amimodel import AMIModel, AMIModelInitializer
+from pyibisami.ami_model import AMIModel, AMIModelInitializer
 
-from .dfe import DFE
-from .pybert_util import calc_eye, calc_jitter, find_crossings, import_channel, make_ctle
+from pybert.dfe import DFE
+from pybert.pybert_util import calc_eye, calc_jitter, find_crossings, import_channel, make_ctle
 
 DEBUG = False
 MIN_BATHTUB_VAL = 1.0e-18
@@ -256,7 +273,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         pn_period = 1.0 / pn_freq
         pn_samps = int(pn_period / Ts + 0.5)
         pn = zeros(pn_samps)
-        pn[pn_samps // 2:] = pn_mag
+        pn[pn_samps // 2 :] = pn_mag
         pn = resize(pn, len(tx_out))
         #   - High pass filter it. (Simulating capacitive coupling.)
         (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
@@ -806,7 +823,7 @@ def update_results(self):
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
     # Bathtubs
-    half_len = len(jitter_ext_chnl) / 2
+    half_len = len(jitter_ext_chnl) // 2
     #  - Channel
     bathtub_chnl = list(cumsum(jitter_ext_chnl[-1 : -(half_len + 1) : -1]))
     bathtub_chnl.reverse()

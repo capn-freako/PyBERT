@@ -26,3 +26,4 @@ pybert/tags
 
 docs/_build
 tests/htmlcov
+venv

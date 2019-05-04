@@ -1,11 +1,11 @@
-numpy
-scipy
-Cython
+enable
+chaco
 traits
 traitsui
-enable
 kiwisolver
-chaco
 Sphinx
 scikit-rf
+scipy
+pyside2
+PyQt5
 PyIBIS-AMI>=3.0.0

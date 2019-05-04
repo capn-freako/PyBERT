@@ -9,19 +9,28 @@ This Python script provides a behavioral model of a "bang-bang" clock
 data recovery (CDR) unit. The class defined, here, is intended for
 integration into the larger *PyBERT* framework.
 
-Copyright (c) 2014 by David Banas; All rights reserved World wide.
+Copyright (c) 2019 by David Banas; All rights reserved World wide.
 """
+from typing import Sequence, Tuple, List
 
 from numpy import array, mean, sign, where
 
 
-class CDR():
+class CDR:
     """
     A class providing behavioral modeling of a 'bang- bang' clock
     data recovery (CDR) unit.
     """
 
-    def __init__(self, delta_t, alpha, ui, n_lock_ave=500, rel_lock_tol=0.01, lock_sustain=500):
+    def __init__(
+        self,
+        delta_t: float,
+        alpha: float,
+        ui: float,
+        n_lock_ave: int = 500,
+        rel_lock_tol: float = 0.01,
+        lock_sustain: int = 500,
+    ):
         """
         Args:
             delta_t (float): The proportional branch correction, in seconds.
@@ -49,22 +58,22 @@ class CDR():
         self._locked = False
         self.lock_sustain = lock_sustain
         self.integral_corrections = [0.0]
-        self.proportional_corrections = []
-        self.lockeds = []
+        self.proportional_corrections: List = []
+        self.lockeds: List = []
 
     @property
-    def ui(self):
+    def ui(self) -> float:
         """The current unit interval estimate."""
 
         return self._ui
 
     @property
-    def locked(self):
+    def locked(self) -> bool:
         """The current locked state."""
 
         return self._locked
 
-    def adapt(self, samples):
+    def adapt(self, samples: Sequence[float]) -> Tuple[float, bool]:
         """
         Adapt period/phase, according to 3 samples.
 
@@ -74,19 +83,17 @@ class CDR():
           (ui, locked) = adapt(samples)
 
         Args:
-            samples ([float]): A list of 3 samples of the input waveform, as follows:
+            samples: A list of 3 samples of the input waveform, as follows:
 
                 - at the last clock time
                 - at the last unit interval boundary time
                 - at the current clock time
 
         Returns:
-            tuple (float, bool):
-
-                ui:
-                    The new unit interval estimate, in seconds.
-                locked:
-                    Boolean flag indicating 'locked' status.
+            ui:
+                The new unit interval estimate, in seconds.
+            locked:
+                Boolean flag indicating 'locked' status.
 
         """
 

@@ -14,7 +14,7 @@ Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
 
 
-class PyBertCfg():
+class PyBertCfg:
     """
     PyBERT simulation configuration data encapsulation class.
 

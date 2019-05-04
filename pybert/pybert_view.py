@@ -7,25 +7,37 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-
 import pickle
 from threading import Thread
 
 from enable.component_editor import ComponentEditor
 from pyface.api import OK, FileDialog
+from pyface.image_resource import ImageResource
 from traits.api import Instance
-from traitsui.api import (Action, CheckListEditor, Group, Handler, HGroup, Item,
-                          ObjectColumn, TableEditor, TextEditor, VGroup, View)
+from traitsui.api import (
+    Action,
+    CheckListEditor,
+    Group,
+    Handler,
+    HGroup,
+    Item,
+    ObjectColumn,
+    TableEditor,
+    TextEditor,
+    VGroup,
+    View,
+)
 
-from .pybert_cfg import PyBertCfg
-from .pybert_cntrl import my_run_sweeps
-from .pybert_data import PyBertData
+from pybert.pybert_cfg import PyBertCfg
+from pybert.pybert_cntrl import my_run_sweeps
+from pybert.pybert_data import PyBertData
 
 
 class RunSimThread(Thread):
     """Used to run the simulation in its own thread, in order to preserve GUI responsiveness."""
 
     def run(self):
+        """Run the simulation(s)."""
         my_run_sweeps(self.the_pybert)
 
 
@@ -35,6 +47,7 @@ class MyHandler(Handler):
     run_sim_thread = Instance(RunSimThread)
 
     def do_run_simulation(self, info):
+        """Spawn a simulation thread and run with the current settings."""
         the_pybert = info.object
         if self.run_sim_thread and self.run_sim_thread.isAlive():
             pass
@@ -44,10 +57,12 @@ class MyHandler(Handler):
             self.run_sim_thread.start()
 
     def do_stop_simulation(self):
+        """Kill the simulation thread."""
         if self.run_sim_thread and self.run_sim_thread.isAlive():
             self.run_sim_thread.stop()
 
     def do_save_cfg(self, info):
+        """Pickle out the current configuration."""
         the_pybert = info.object
         dlg = FileDialog(action="save as", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
@@ -57,12 +72,11 @@ class MyHandler(Handler):
                     pickle.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(
-                    err
-                )
+                error_message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_load_cfg(self, info):
+        """Read in the pickled configuration."""
         the_pybert = info.object
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
@@ -82,12 +96,11 @@ class MyHandler(Handler):
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(
-                    err
-                )
+                error_message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_save_data(self, info):
+        """Pickle out all the generated data."""
         the_pybert = info.object
         dlg = FileDialog(action="save as", wildcard="*.pybert_data", default_path=the_pybert.data_file)
         if dlg.open() == OK:
@@ -97,12 +110,11 @@ class MyHandler(Handler):
                     pickle.dump(plotdata, the_file)
                 the_pybert.data_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(
-                    err
-                )
+                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_load_data(self, info):
+        """Read in the pickled data.'"""
         the_pybert = info.object
         dlg = FileDialog(action="open", wildcard="*.pybert_data", default_path=the_pybert.data_file)
         if dlg.open() == OK:
@@ -118,11 +130,11 @@ class MyHandler(Handler):
                 # Add reference plots, if necessary.
                 # - time domain
                 for (container, suffix, has_both) in [
-                        (the_pybert.plots_h.component_grid.flat, "h", False),
-                        (the_pybert.plots_s.component_grid.flat, "s", True),
-                        (the_pybert.plots_p.component_grid.flat, "p", False),
+                    (the_pybert.plots_h.component_grid.flat, "h", False),
+                    (the_pybert.plots_s.component_grid.flat, "s", True),
+                    (the_pybert.plots_p.component_grid.flat, "p", False),
                 ]:
-                    if not "Reference" in container[0].plots:
+                    if "Reference" not in container[0].plots:
                         (ix, prefix) = (0, "chnl")
                         item_name = prefix + "_" + suffix + "_ref"
                         container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkcyan", name="Inc_ref")
@@ -140,7 +152,7 @@ class MyHandler(Handler):
 
                 # - frequency domain
                 for (container, suffix, has_both) in [(the_pybert.plots_H.component_grid.flat, "H", True)]:
-                    if not "Reference" in container[0].plots:
+                    if "Reference" not in container[0].plots:
                         (ix, prefix) = (0, "chnl")
                         item_name = prefix + "_" + suffix + "_ref"
                         container[ix].plot(
@@ -168,9 +180,7 @@ class MyHandler(Handler):
 
             except Exception as err:
                 print(item_name)
-                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(
-                    err
-                )
+                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(err)
                 the_pybert.handle_error(error_message)
 
 
@@ -404,13 +414,8 @@ traits_view = View(
                                 reorderable=False,
                                 sortable=False,
                                 selection_mode="cell",
-                                auto_size=True,
+                                # auto_size=True,
                                 rows=4,
-                                # v_size_policy='ignored',
-                                # h_size_policy='minimum',
-                                # orientation='vertical',
-                                # is_grid_cell=True,
-                                # show_toolbar=False,
                             ),
                             show_label=False,
                         ),
@@ -708,5 +713,6 @@ traits_view = View(
     statusbar="status_str",
     title="PyBERT",
     width=0.95,
-    height=600,
+    height=1,
+    icon=ImageResource("icon.png")
 )

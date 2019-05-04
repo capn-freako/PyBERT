@@ -7,15 +7,34 @@ Original date:   September 27, 2014 (Copied from pybert_cntrl.py.)
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-
 import os.path
 import re
 from functools import reduce
 
 import numpy as np
-from numpy import (array, concatenate, convolve, cumsum, diff, float,
-                   histogram, insert, log10, mean, ones, pi, power, real,
-                   reshape, resize, sign, sort, sqrt, where, zeros)
+from numpy import (
+    array,
+    concatenate,
+    convolve,
+    cumsum,
+    diff,
+    float,
+    histogram,
+    insert,
+    log10,
+    mean,
+    ones,
+    pi,
+    power,
+    real,
+    reshape,
+    resize,
+    sign,
+    sort,
+    sqrt,
+    where,
+    zeros,
+)
 from numpy.fft import fft, ifft
 from scipy.signal import freqs, get_window, invres
 from scipy.stats import norm
@@ -44,7 +63,9 @@ def moving_average(a, n=3):
     return insert(ret[n - 1 :], 0, ret[n - 1] * ones(n - 1)) / n
 
 
-def find_crossing_times(t, x, min_delay=0.0, rising_first=True, min_init_dev=0.1, thresh=0.0):
+def find_crossing_times(
+    t, x, min_delay: float = 0.0, rising_first: bool = True, min_init_dev: float = 0.1, thresh: float = 0.0
+):
     """
     Finds the threshold crossing times of the input signal.
 
@@ -70,7 +91,8 @@ def find_crossing_times(t, x, min_delay=0.0, rising_first=True, min_init_dev=0.1
     Returns: an array of signal threshold crossing times.
     """
 
-    assert len(t) == len(x), "len(t) (%d) and len(x) (%d) need to be the same." % (len(t), len(x))
+    if len(t) != len(x):
+        raise ValueError("len(t) (%d) and len(x) (%d) need to be the same." % (len(t), len(x)))
 
     t = array(t)
     x = array(x)
@@ -126,7 +148,7 @@ def find_crossing_times(t, x, min_delay=0.0, rising_first=True, min_init_dev=0.1
     return array(xings[i:])
 
 
-def find_crossings(t, x, amplitude, min_delay=0.0, rising_first=True, min_init_dev=0.1, mod_type=0):
+def find_crossings(t, x, amplitude, min_delay: float = 0.0, rising_first: bool = True, min_init_dev=0.1, mod_type=0):
     """
     Finds the crossing times in a signal, according to the modulation type.
 
@@ -186,7 +208,7 @@ def find_crossings(t, x, amplitude, min_delay=0.0, rising_first=True, min_init_d
                 thresh=(0.5 * amplitude),
             )
         )
-    else:  # PAM-4 (Enabling the +/-0.67 cases yields multiple ideal crossings at the same edge.)
+    elif mod_type == 2:  # PAM-4 (Enabling the +/-0.67 cases yields multiple ideal crossings at the same edge.)
         xings.append(
             find_crossing_times(
                 t,
@@ -197,6 +219,8 @@ def find_crossings(t, x, amplitude, min_delay=0.0, rising_first=True, min_init_d
                 thresh=(0.0 * amplitude),
             )
         )
+    else:
+        raise ValueError(f"Unknown modulation type: {mod_type}")
 
     return sort(concatenate(xings))
 
@@ -208,49 +232,29 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     Inputs:
 
       - ui               : The nominal unit interval.
-
       - nui              : The number of unit intervals spanned by the input signal.
-
       - pattern_len      : The number of unit intervals, before input symbol stream repeats.
-
       - ideal_xings      : The ideal zero crossing locations of the edges.
-
       - actual_xings     : The actual zero crossing locations of the edges.
-
       - rel_thresh       : (optional) The threshold for determining periodic jitter spectral components (sigma).
-
       - num_bins         : (optional) The number of bins to use, when forming histograms.
-
       - zero_mean        : (optional) Force the mean jitter to zero, when True.
 
     Outputs:
 
       - jitter   : The total jitter.
-
       - t_jitter : The times (taken from 'ideal_xings') corresponding to the returned jitter values.
-
       - isi      : The peak to peak jitter due to intersymbol interference.
-
       - dcd      : The peak to peak jitter due to duty cycle distortion.
-
       - pj       : The peak to peak jitter due to uncorrelated periodic sources.
-
       - rj       : The standard deviation of the jitter due to uncorrelated unbounded random sources.
-
       - tie_ind  : The data independent jitter.
-
       - thresh   : Threshold for determining periodic components.
-
       - jitter_spectrum  : The spectral magnitude of the total jitter.
-
       - tie_ind_spectrum : The spectral magnitude of the data independent jitter.
-
       - spectrum_freqs   : The frequencies corresponding to the spectrum components.
-
       - hist        : The histogram of the actual jitter.
-
       - hist_synth  : The histogram of the extrapolated jitter.
-
       - bin_centers : The bin center values for both histograms.
 
     """
@@ -271,8 +275,10 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         return (array(list(map(float, hist))) / sum(hist), bin_centers)
 
     # Check inputs.
-    assert ideal_xings, "ERROR: pybert_util.calc_jitter(): zero length ideal crossings vector received!"
-    assert actual_xings, "ERROR: pybert_util.calc_jitter(): zero length actual crossings vector received!"
+    if not ideal_xings.all():
+        raise ValueError("calc_jitter(): zero length ideal crossings vector received!")
+    if not actual_xings.all():
+        raise ValueError("calc_jitter(): zero length actual crossings vector received!")
 
     # Line up first ideal/actual crossings, and count/validate crossings per pattern.
     ideal_xings = array(ideal_xings) - (ideal_xings[0] - ui / 2.0)
@@ -359,9 +365,9 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     # --- (It's necessary to keep track of those elements in the resultant vector, which aren't paddings; hence, 'valid_ix'.)
     x, valid_ix = make_uniform(t_jitter, jitter, ui, nui)
     y = fft(x)
-    jitter_spectrum = abs(y[: len(y) / 2]) / sqrt(len(jitter))  # Normalized, in order to make power correct.
+    jitter_spectrum = abs(y[: len(y) // 2]) / sqrt(len(jitter))  # Normalized, in order to make power correct.
     f0 = 1.0 / (ui * nui)
-    spectrum_freqs = [i * f0 for i in range(len(y) / 2)]
+    spectrum_freqs = [i * f0 for i in range(len(y) // 2)]
 
     # -- Use the data independent jitter spectrum for our calculations.
     tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nui)
@@ -371,8 +377,8 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     # --- (This has the effect of making our final Rj estimate more conservative.)
     y = fft(tie_ind_uniform) / sqrt(len(tie_ind))
     y_mag = abs(y)
-    y_mean = moving_average(y_mag, n=len(y_mag) / 10)
-    y_var = moving_average((y_mag - y_mean) ** 2, n=len(y_mag) / 10)
+    y_mean = moving_average(y_mag, n=len(y_mag) // 10)
+    y_var = moving_average((y_mag - y_mean) ** 2, n=len(y_mag) // 10)
     y_sigma = sqrt(y_var)
     thresh = y_mean + rel_thresh * y_sigma
     y_per = where(y_mag > thresh, y, zeros(len(y)))  # Periodic components are those lying above the threshold.
@@ -383,7 +389,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     pj = tie_per.ptp()  # non-uniformly sampled state.
 
     # --- Save the spectrum, for display purposes.
-    tie_ind_spectrum = y_mag[: len(y_mag) / 2]
+    tie_ind_spectrum = y_mag[: len(y_mag) // 2]
 
     # - Reassemble the jitter, excluding the Rj.
     # -- Here, we see why it was necessary to keep track of the non-padded elements with 'valid_ix':
@@ -406,7 +412,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     rj_pdf = rv.pdf(bin_centers)
     rj_pmf = rj_pdf / sum(rj_pdf)
     hist_synth = convolve(hist_synth, rj_pmf)
-    tail_len = (len(bin_centers) - 1) / 2
+    tail_len = (len(bin_centers) - 1) // 2
     hist_synth = (
         [sum(hist_synth[: tail_len + 1])]
         + list(hist_synth[tail_len + 1 : len(hist_synth) - tail_len - 1])
@@ -421,7 +427,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         pj,
         rj,
         tie_ind,
-        thresh[: len(thresh) / 2],
+        thresh[: len(thresh) // 2],
         jitter_spectrum,
         tie_ind_spectrum,
         spectrum_freqs,
@@ -592,8 +598,8 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     # Adjust the scaling.
     width = 2 * samps_per_ui
-    y_scale = height / (2 * y_max)  # (pixels/V)
-    y_offset = height / 2  # (pixels)
+    y_scale = height // (2 * y_max)  # (pixels/V)
+    y_offset = height // 2  # (pixels)
 
     # Generate the "heat" picture array.
     img_array = zeros([height, width])
@@ -603,9 +609,11 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
             start_ix = int(start_time / tsamp)
             if start_ix + 2 * samps_per_ui > len(ys):
                 break
-            interp_fac = (start_time - start_ix * tsamp) / tsamp
+            interp_fac = (start_time - start_ix * tsamp) // tsamp
             i = 0
-            for (samp1, samp2) in zip(ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]):
+            for (samp1, samp2) in zip(
+                ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]
+            ):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
                 i += 1
