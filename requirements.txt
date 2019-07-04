@@ -1,5 +1,5 @@
-enable
-chaco
+git+https://github.com/enthought/enable.git
+git+https://github.com/enthought/chaco.git
 traits
 traitsui
 kiwisolver
