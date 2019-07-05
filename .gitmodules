@@ -1,3 +1,6 @@
 [submodule "PyAMI"]
 	path = PyAMI
 	url = https://github.com/capn-freako/PyAMI.git
+[submodule "chaco"]
+	path = chaco
+	url = https://github.com/enthought/chaco.git
