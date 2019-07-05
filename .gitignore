@@ -24,4 +24,4 @@ pybert/status_bar_demo.py
 pybert/tags
 *.pybert*
 pybert/doc/build/*
-
+*~
