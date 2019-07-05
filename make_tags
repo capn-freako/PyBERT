@@ -1,3 +1,0 @@
-#!/usr/bin/env sh
-
-etags -o TAGS pybert/*.py

@@ -12,10 +12,10 @@ result could be saved and later restored, as a reference waveform.
 
 Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
-
 from chaco.api import ArrayPlotData
 
-class PyBertData(object):
+
+class PyBertData:
     """
     PyBERT simulation results data encapsulation class.
 
@@ -63,4 +63,3 @@ class PyBertData(object):
             the_data.set_data(item_name, plotdata.get_data(item_name))
 
         self.the_data = the_data
-

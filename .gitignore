@@ -25,3 +25,6 @@ pybert/tags
 *.pybert*
 pybert/doc/build/*
 *~
+docs/_build
+tests/htmlcov
+venv

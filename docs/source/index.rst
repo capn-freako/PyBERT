@@ -29,7 +29,7 @@ Instead, try:
 Note to PyBERT *importers*
 --------------------------
 
-If you are importing PyBERT funcionality into a larger body of work, this *is* the right place for you, since it provides:
+If you are importing PyBERT functionality into a larger body of work, this *is* the right place for you, since it provides:
 
 - module, class, and attribute definitions and specifications of intent, and
 - calling signatures for module/class member functions.

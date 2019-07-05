@@ -1,0 +1,11 @@
+git+https://github.com/enthought/enable.git
+git+https://github.com/enthought/chaco.git
+traits
+traitsui
+kiwisolver
+Sphinx
+scikit-rf
+scipy
+pyside2
+PyQt5
+PyIBIS-AMI>=3.0.0
