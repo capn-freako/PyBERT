@@ -4,3 +4,6 @@
 [submodule "chaco"]
 	path = chaco
 	url = https://github.com/enthought/chaco.git
+[submodule "enable"]
+	path = enable
+	url = https://github.com/enthought/enable.git
