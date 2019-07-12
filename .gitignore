@@ -28,3 +28,5 @@ pybert/doc/build/*
 docs/_build
 tests/htmlcov
 venv
+env
+
