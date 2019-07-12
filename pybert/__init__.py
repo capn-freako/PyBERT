@@ -46,4 +46,4 @@ The application source is divided among several files, as follows:
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-__version__ = "3.0.1"
+__version__ = "3.1.0"
