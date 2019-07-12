@@ -14,8 +14,8 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-from traits.trait_base import ETSConfig
-ETSConfig.toolkit = "qt4"
+# from traits.trait_base import ETSConfig
+# ETSConfig.toolkit = "qt4"
 # ETSConfig.toolkit = "wx"
 
 from datetime import datetime
@@ -50,6 +50,7 @@ from pyibisami.ami_parse import AMIParamConfigurator
 from pyibisami.ami_model import AMIModel
 
 from pybert import __version__ as VERSION
+
 from pybert.pybert_cntrl import my_run_simulation
 from pybert.pybert_help import help_str
 from pybert.pybert_plot import make_plots

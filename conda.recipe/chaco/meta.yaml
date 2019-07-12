@@ -1,17 +1,18 @@
 package:
   name: chaco
-  version: "4.6.1"
+  version: "4.8.0"
 
 source:
-  fn: chaco-4.6.1.tar.gz
-  url: https://pypi.python.org/packages/d8/5f/82539366bb321f6f07fada6278e320bb52916a36b43fbe0e30e5ef9f9166/chaco-4.6.1.tar.gz
-  md5: d28117730f942f7cecb281b07abac3f4
+  path: ../../chaco/
+  # fn: chaco-4.6.1.tar.gz
+  # url: https://pypi.python.org/packages/d8/5f/82539366bb321f6f07fada6278e320bb52916a36b43fbe0e30e5ef9f9166/chaco-4.6.1.tar.gz
+  # md5: d28117730f942f7cecb281b07abac3f4
 #  patches:
    # List any patch files here
    # - fix.patch
 
 # build:
-  # noarch_python: True
+  noarch_python: True
   # preserve_egg_dir: True
   # entry_points:
     # Put any entry points (scripts to be generated automatically) here. The
@@ -24,7 +25,7 @@ source:
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  # number: 1
+  number: 1
 
 requirements:
   build:
@@ -32,13 +33,13 @@ requirements:
     - setuptools
     - enable
     - cython
-    - PIL
+    - pillow
 
   run:
     - python
     - enable
     - cython
-    - PIL
+    - pillow
 
 test:
   # Python imports

@@ -10,7 +10,8 @@ import pybert
 setup(
     name="PyBERT",
     version=pybert.__version__,
-    packages=find_packages(exclude=['docs', 'tests']),
+    packages=find_packages(),
+    include_package_data=True,
     license="BSD",
     description="Serial communication link bit error rate tester simulator, written in Python.",
     long_description=open("README.md").read(),
@@ -19,7 +20,7 @@ setup(
     author_email="capn.freako@gmail.com",
     install_requires=[
         "chaco",
-        "enable",
+        # "enable",  # Is a requirement of `chaco`.
         "kiwisolver",
         "numpy",
         "scikit-rf",
@@ -27,7 +28,6 @@ setup(
         "traits",
         "traitsui",
         "pyside2",
-        "PyQt5",
         "PyIBIS-AMI>=3.0.0",
     ],
     entry_points={
@@ -55,6 +55,6 @@ setup(
         "Topic :: Scientific/Engineering :: Visualization",
         "Topic :: System :: Emulators",
         "Topic :: System :: Networking",
-        "Topic :: Utilities",
+        "Topic :: Utilities"
     ],
 )

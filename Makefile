@@ -1,4 +1,4 @@
-.PHONY: tox clean test lint etags conda-build conda-skeleton
+.PHONY: tox clean test lint etags conda-build conda-skeleton chaco enable pyibis-ami pybert
 
 tox:
 	tox
@@ -25,3 +25,15 @@ conda-skeleton:
 
 etags:
 	etags -o TAGS pybert/*.py
+
+chaco:
+	conda build -c conda-forge conda.recipe/chaco
+
+enable:
+	conda build -c conda-forge conda.recipe/enable
+
+pyibis-ami:
+	conda build -c conda-forge conda.recipe/pyibis-ami
+
+pybert:
+	conda build -c conda-forge conda.recipe/pybert

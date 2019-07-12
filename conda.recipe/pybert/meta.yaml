@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "2.4.4" %}
+{% set version = "3.0.0" %}
 
 package:
   version: '{{ version }}'
@@ -18,34 +18,34 @@ build:
 requirements:
   run:
     - python
-    - numpy 1.10.*
+    - numpy
     - scipy
     - traits
     - traitsui
-    - enable 4.5.1.*
+    - enable
     - kiwisolver
     - chaco
     - sphinx
     - jinja2
     - docutils
     - pygments
-    - pyibis-ami >=2.2.0
+    - pyibis-ami >=3.0.0
     - scikit-rf
   build:
     - python
     - setuptools
-    - numpy 1.10
+    - numpy
     - scipy
     - traits
     - traitsui
-    - enable 4.5.1
+    - enable
     - kiwisolver
     - chaco
     - sphinx
     - jinja2
     - docutils
     - pygments
-    - pyibis-ami >=2.2.0
+    - pyibis-ami >=3.0.0
     - scikit-rf
 
 test:

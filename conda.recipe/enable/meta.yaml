@@ -1,0 +1,102 @@
+{% set name = "enable" %}
+{% set version = "4.8.0" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  path: ../../enable/
+
+build:
+  number: 0
+  noarch: "python"
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
+
+requirements:
+  host:
+    - fonttools
+    - numpy
+    - pillow
+    - pip
+    - pyface
+    - python
+    - six
+    - traits
+    - traitsui
+    - Cython
+  run:
+    - fonttools
+    - numpy
+    - pillow
+    - pyface
+    - pyparsing
+    - python
+    - six
+    - traits
+    - traitsui
+
+test:
+  imports:
+    - enable
+    - enable.drawing
+    - enable.gadgets
+    - enable.layout
+    - enable.null
+    - enable.primitives
+    - enable.pyglet_backend
+    - enable.qt4
+    - enable.savage
+    - enable.savage.compliance
+    - enable.savage.svg
+    - enable.savage.svg.backends
+    - enable.savage.svg.backends.kiva
+    - enable.savage.svg.backends.null
+    - enable.savage.svg.backends.wx
+    - enable.savage.svg.css
+    - enable.savage.svg.tests
+    - enable.savage.svg.tests.css
+    - enable.savage.trait_defs
+    - enable.savage.trait_defs.ui
+    - enable.savage.trait_defs.ui.qt4
+    - enable.savage.trait_defs.ui.wx
+    - enable.tests
+    - enable.tests.primitives
+    - enable.tests.qt4
+    - enable.tests.tools
+    - enable.tests.tools.apptools
+    - enable.tests.wx
+    - enable.tools
+    - enable.tools.apptools
+    - enable.tools.pyface
+    - enable.tools.toolbars
+    - enable.trait_defs
+    - enable.trait_defs.ui
+    - enable.trait_defs.ui.qt4
+    - enable.trait_defs.ui.wx
+    - enable.vtk_backend
+    - enable.wx
+    - kiva
+    - kiva.agg
+    - kiva.agg.tests
+    - kiva.fonttools
+    - kiva.fonttools.tests
+    - kiva.quartz
+    - kiva.tests
+    - kiva.tests.agg
+    - kiva.trait_defs
+    - kiva.trait_defs.ui
+    - kiva.trait_defs.ui.wx
+
+about:
+  home: "https://github.com/enthought/enable/"
+  license: "BSD"
+  license_family: "BSD"
+  license_file: ""
+  summary: "low-level drawing and interaction"
+  doc_url: ""
+  dev_url: ""
+
+extra:
+  recipe-maintainers:
+    - capn-freako
