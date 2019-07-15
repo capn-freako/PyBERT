@@ -27,13 +27,26 @@ etags:
 	etags -o TAGS pybert/*.py
 
 chaco:
-	conda build -c conda-forge conda.recipe/chaco
+	conda build --numpy=1.16 conda.recipe/chaco
+	conda install --use-local chaco
 
 enable:
-	conda build -c conda-forge conda.recipe/enable
+	conda build --numpy=1.16 conda.recipe/enable
+	conda install --use-local enable
 
 pyibis-ami:
 	conda build -c conda-forge conda.recipe/pyibis-ami
 
-pybert:
-	conda build -c conda-forge conda.recipe/pybert
+pyibis-ami_dev:
+	conda install -n pybert64 --use-local --only-deps PyAMI/
+	conda develop -n pybert64 PyAMI/
+
+pybert: pybert_bld pybert_inst
+pybert_bld:
+	conda build --numpy=1.16 conda.recipe/pybert
+pybert_inst:
+	conda install --use-local pybert
+
+pybert_dev: pybert_bld
+	conda install -n pybert64 --use-local --only-deps pybert
+	conda develop -n pybert64 .

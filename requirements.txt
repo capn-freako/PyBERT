@@ -1,8 +1,6 @@
 -i https://pypi.org/simple
 -e ./PyAMI
 .
-git+https://github.com/enthought/chaco.git@ebd7ae81ef761046c9df6d7f5ced19a1004a1413#egg=chaco
-git+https://github.com/enthought/enable.git@4.8.0#egg=enable
 certifi==2019.6.16
 chardet==3.0.4
 click==7.0
@@ -27,3 +25,5 @@ six==1.12.0
 traits==5.1.2
 traitsui==6.1.1
 urllib3==1.25.3
+git+https://github.com/enthought/chaco.git@ebd7ae81ef761046c9df6d7f5ced19a1004a1413#egg=chaco
+git+https://github.com/enthought/enable.git@4.8.0#egg=enable
