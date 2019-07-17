@@ -27,7 +27,6 @@ setup(
         "scipy",
         "traits",
         "traitsui",
-        "pyside2",
         "PyIBIS-AMI>=3.0.0",
     ],
     entry_points={

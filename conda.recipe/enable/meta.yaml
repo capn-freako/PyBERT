@@ -9,8 +9,8 @@ source:
   path: ../../enable/
 
 build:
-  number: 2
-  noarch: "python"
+  number: 3
+  # noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:

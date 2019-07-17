@@ -11,8 +11,8 @@ source:
    # List any patch files here
    # - fix.patch
 
-# build:
-  noarch_python: True
+build:
+  # noarch_python: True
   # preserve_egg_dir: True
   # entry_points:
     # Put any entry points (scripts to be generated automatically) here. The
@@ -25,19 +25,19 @@ source:
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 1
+  number: 2
 
 requirements:
   build:
     - python
     - setuptools
-    - enable
+    - enable >=4.8.0,<4.9
     - cython
     - pillow
 
   run:
     - python
-    - enable
+    - enable >=4.8.0,<4.9
     - cython
     - pillow
 
