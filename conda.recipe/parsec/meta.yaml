@@ -1,11 +1,9 @@
 package:
   name: parsec
-  version: "3.3"
+  version: "3.4"
 
 source:
-  fn: parsec-3.3.tar.gz
-  url: https://pypi.python.org/packages/4c/50/3ca88db4eadd6e4d175b80f6bf47768d4f8bf4c6e9ff5e1ff61eadc64b0c/parsec-3.3.tar.gz
-  md5: b120b9effe24c1f7d3d35addf2fda095
+  path: ../../parsec.py
 #  patches:
    # List any patch files here
    # - fix.patch

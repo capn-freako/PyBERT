@@ -20,7 +20,7 @@ setup(
     author_email="capn.freako@gmail.com",
     install_requires=[
         "chaco",
-        # "enable",  # Is a requirement of `chaco`.
+        "enable",
         "kiwisolver",
         "numpy",
         "scikit-rf",
@@ -45,7 +45,6 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: Adaptive Technologies",

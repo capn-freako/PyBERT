@@ -50,6 +50,9 @@ from pyibisami.ami_parse import AMIParamConfigurator
 from pyibisami.ami_model import AMIModel
 
 from pybert import __version__ as VERSION
+from pybert import __date__ as DATE
+from pybert import __authors__ as AUTHORS
+from pybert import __copy__ as COPY
 
 from pybert.pybert_cntrl import my_run_simulation
 from pybert.pybert_help import help_str
@@ -500,11 +503,11 @@ class PyBERT(HasTraits):
     # About
     ident = String(
         "PyBERT v{} - a serial communication link design tool, written in Python.\n\n \
-    David Banas\n \
-    January 8, 2019\n\n \
-    Copyright (c) 2014 David Banas;\n \
+    {}\n \
+    {}\n\n \
+    {};\n \
     All rights reserved World wide.".format(
-            VERSION
+            VERSION, AUTHORS, DATE, COPY
         )
     )
 

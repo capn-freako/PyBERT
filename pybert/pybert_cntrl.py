@@ -182,7 +182,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         #       so that we'll have an ideal reference for comparison.
         chnl_h = self.calc_chnl_h()
         self.dbg("Channel impulse response is {} samples long.".format(len(chnl_h)))
-        chnl_out = convolve(self.x, chnl_h)[: len(x)]
+        chnl_out = convolve(self.x, chnl_h)[: len(t)]
 
         self.channel_perf = nbits * nspb / (clock() - start_time)
         split_time = clock()
@@ -247,7 +247,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 tx_out = tx_model.getWave(self.x)
             else:  # Init()-only.
                 tx_s = tx_h.cumsum()
-                tx_out = convolve(tx_h, self.x)[: len(self.x)]
+                tx_out = convolve(tx_h, self.x)
         else:
             # - Generate the ideal, post-preemphasis signal.
             # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
@@ -262,7 +262,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
             tx_h.resize(len(chnl_h))
             tx_s = tx_h.cumsum()
-
+        tx_out.resize(len(t))
         temp = tx_h.copy()
         temp.resize(len(w))
         tx_H = fft(temp)
@@ -361,7 +361,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 )
                 ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)
                 ctle_h = real(ifft(ctle_H)[: len(chnl_h)])
-                ctle_out = convolve(rx_in, ctle_h)[: len(tx_out)]
+                ctle_out = convolve(rx_in, ctle_h)
             ctle_s = ctle_h.cumsum()
         else:
             if self.use_ctle_file:
@@ -377,12 +377,13 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
                 ctle_h = real(ifft(ctle_H))[: len(chnl_h)]
                 ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
-            ctle_out = convolve(rx_in, ctle_h)[: len(tx_out)]
+            ctle_out = convolve(rx_in, ctle_h)
             ctle_out -= mean(ctle_out)  # Force zero mean.
             if self.ctle_mode == "AGC":  # Automatic gain control engaged?
                 ctle_out *= 2.0 * decision_scaler / ctle_out.ptp()
             ctle_s = ctle_h.cumsum()
             ctle_out_h = convolve(tx_out_h, ctle_h)[: len(tx_out_h)]
+        ctle_out.resize(len(t))
         self.ctle_s = ctle_s
         ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
         if ctle_out_h_main_lobe.size:
@@ -450,6 +451,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 ideal=True,
             )
         (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
+        dfe_out = array(dfe_out)
+        dfe_out.resize(len(t))
         bits_out = array(bits_out)
         auto_corr = (
             1.0

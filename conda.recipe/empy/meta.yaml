@@ -1,6 +1,6 @@
 package:
   name: empy
-  version: "3.3.3"
+  version: "3.3.4"
 
 source:
   fn: empy-latest.tar.gz
