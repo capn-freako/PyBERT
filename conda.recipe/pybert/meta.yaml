@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "3.1.0" %}
+{% set version = "3.1.1" %}
 
 package:
   version: '{{ version }}'
@@ -9,7 +9,7 @@ source:
   path: ../../
 
 build:
-  number: 13
+  number: 1
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
@@ -24,7 +24,7 @@ requirements:
     - chaco
     - pyibis-ami >=3.0.0
     - scikit-rf
-    - pyface=6.1.1
+    - pyface=6.1.2
   build:
     - python >=3.7,<3.8.0a0
     - setuptools
@@ -34,7 +34,7 @@ requirements:
     - chaco
     - pyibis-ami >=3.0.0
     - scikit-rf
-    - pyface=6.1.1
+    - pyface=6.1.2
 
 test:
   imports:
