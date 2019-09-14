@@ -10,6 +10,8 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 from chaco.api import ColorMapper, GridPlotContainer, Plot
 from chaco.tools.api import PanTool, ZoomTool
 
+from numpy import (linspace)
+
 from pybert.pybert_cntrl import update_eyes
 
 
@@ -17,6 +19,7 @@ def make_plots(self, n_dfe_taps):
     """ Create the plots used by the PyBERT GUI."""
 
     plotdata = self.plotdata
+    drawdata = self.drawdata
 
     # - DFE tab
     plot2 = Plot(plotdata, padding_left=75)
@@ -64,7 +67,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_tune.plot(("t_ns_chnl", "clocks_tune"), type="line", color="gray")
     plot_h_tune.title = "Channel + Tx Preemphasis + CTLE + Ideal DFE"
     plot_h_tune.index_axis.title = "Time (ns)"
-    plot_h_tune.y_axis.title = "Post-CTLE Pulse Response (V)"
+    plot_h_tune.y_axis.title = "Pulse Response (V)"
     zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis="index", always_on=False)
     plot_h_tune.overlays.append(zoom_tune)
     self.plot_h_tune = plot_h_tune
@@ -401,6 +404,27 @@ def make_plots(self, n_dfe_taps):
     container_eye.add(plot_eye_dfe)
     self.plots_eye = container_eye
 
+    # - Channel Designer channel cross-section
+    plot_channel = Plot(drawdata, padding_left=75)
+    plot_channel.img_plot("channel", colormap=clr_map)
+    plot_channel.y_direction = "normal"
+    plot_channel.components[0].y_direction = "normal"
+    plot_channel.title = "Channel Cross-section"
+    plot_channel.x_axis.title = "X (mm)"
+    plot_channel.x_axis.orientation = "bottom"
+    plot_channel.y_axis.title = "Y (mm)"
+    plot_channel.x_grid.visible = False
+    plot_channel.y_grid.visible = False
+    xs = linspace(0, 2.0, 100)
+    ys = linspace(0, 0.5, 100)
+    plot_channel.components[0].index.set_data(xs, ys)
+    plot_channel.x_axis.mapper.range.low = xs[0]
+    plot_channel.x_axis.mapper.range.high = xs[-1]
+    plot_channel.y_axis.mapper.range.low = ys[0]
+    plot_channel.y_axis.mapper.range.high = ys[-1]
+    plot_channel.invalidate_draw()
+    self.plot_channel = plot_channel
+    
     # - Jitter Distributions tab
     plot_jitter_dist_chnl = Plot(plotdata, padding_left=75)
     plot_jitter_dist_chnl.plot(("jitter_bins", "jitter_chnl"), type="line", color="blue", name="Measured")

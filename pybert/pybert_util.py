@@ -629,6 +629,40 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     return img_array
 
+def draw_channel(height, width, thickness, separation, arraySize=[100, 100]):
+    """
+    Draws the channel cross section.
+
+    Args:
+        height(float): dielectric thickness
+        width(float): trace width
+        thickness(float): trace thickness
+
+    Keyword Args:
+        arraySize([int,int]): Size of image array. (100,100)
+
+    Returns: A black & white drawing of the channel cross-section.
+    """
+    # Generate the cross-section drawing.
+    img_array = 10 * ones(arraySize)
+    [yMax, xMax] = arraySize
+    # hScale = xMax / (2. * width)
+    # vScale = yMax / (2. * height)
+    hScale = xMax / 2.0
+    vScale = yMax / 0.5
+    xMid = int(xMax // 2)
+    yMid = int(yMax // 2)
+    xOff1 = xMid - int(hScale * (separation/2 + width))
+    xOff2 = xMid + int(hScale * separation/2)
+    yOff = int(yMax // 10 + vScale * height)
+    for y in range(yMax // 10):    # Draw the reference plane.
+        for x in range(xMax):
+            img_array[y,x] = 0
+    for y in range(int(vScale * thickness)):
+        for x in range(int(hScale * width)):
+            img_array[yOff + y, xOff1 + x] = 0
+            img_array[yOff + y, xOff2 + x] = 0
+    return img_array
 
 def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
     """

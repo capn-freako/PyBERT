@@ -26,6 +26,7 @@ from traitsui.api import (
     TextEditor,
     VGroup,
     View,
+    Label,
 )
 
 from pybert.pybert_cfg import PyBertCfg
@@ -254,109 +255,22 @@ traits_view = View(
                             Item(name="pn_freq", label="f(Pn) (MHz)", tooltip="frequency of periodic noise"),
                         ),
                     ),
-                    HGroup(
-                        Item(
-                            name="thresh",
-                            label="Pj Threshold (sigma)",
-                            tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
-                        ),
-                        Item(
-                            name="impulse_length",
-                            label="Impulse Response Length (ns)",
-                            tooltip="Manual impulse response length override",
-                        ),
-                        Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
-                        label="Analysis Parameters",
-                        show_border=True,
-                    ),
                     label="Simulation Control",
                     show_border=True,
                 ),
-                VGroup(  # Channel Parameters
-                    HGroup(  # From File
-                        Item(
-                            name="use_ch_file",
-                            show_label=False,
-                            tooltip="Select channel frequency/impulse/step response from file.",
-                        ),
-                        Item(name="ch_file", label="File", enabled_when="use_ch_file == True", springy=True),
-                        Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
-                        Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
-                        Item(
-                            name="f_step",
-                            label="f_step",
-                            enabled_when="use_ch_file == True",
-                            tooltip="Frequency step to use in generating H(f).",
-                        ),
-                        Item(label="MHz"),
-                        label="From File",
-                        show_border=True,
+                VGroup(
+                    Item(
+                        name="thresh",
+                        label="Pj Threshold (sigma)",
+                        tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
                     ),
-                    HGroup(  # Native
-                        VGroup(
-                            Item(
-                                name="rs",
-                                label="Tx_Rs (Ohms)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="Tx differential source impedance",
-                            ),
-                            Item(
-                                name="cout",
-                                label="Tx_Cout (pF)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="Tx parasitic output capacitance (each pin)",
-                            ),
-                            Item(
-                                name="l_ch",
-                                label="Length (m)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="interconnect length",
-                            ),
-                        ),
-                        VGroup(
-                            Item(
-                                name="Theta0",
-                                label="Loss Tan.",
-                                enabled_when="use_ch_file == False",
-                                tooltip="dielectric loss tangent",
-                            ),
-                            Item(
-                                name="Z0",
-                                label="Z0 (Ohms)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="characteristic differential impedance",
-                            ),
-                            Item(
-                                name="v0",
-                                label="v_rel (c)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="normalized propagation velocity",
-                            ),
-                        ),
-                        VGroup(
-                            Item(
-                                name="rin",
-                                label="Rx_Rin (Ohms)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="Rx differential input impedance",
-                            ),
-                            Item(
-                                name="cin",
-                                label="Rx_Cin (pF)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="Rx parasitic input capacitance (each pin)",
-                            ),
-                            Item(
-                                name="cac",
-                                label="Rx_Cac (uF)",
-                                enabled_when="use_ch_file == False",
-                                tooltip="Rx a.c. coupling capacitance (each pin)",
-                            ),
-                        ),
-                        label="Native",
-                        show_border=True,
+                    Item(
+                        name="impulse_length",
+                        label="Impulse Response Length (ns)",
+                        tooltip="Manual impulse response length override",
                     ),
-                    label="Channel Parameters",
+                    Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
+                    label="Analysis Parameters",
                     show_border=True,
                 ),
             ),
@@ -577,9 +491,123 @@ traits_view = View(
             label="Config.",
             id="config",
         ),
-        Group(Item("console_log", show_label=False, style="custom"), label="Console", id="console"),
-        Group(Item("plots_dfe", editor=ComponentEditor(), show_label=False), label="DFE", id="plots_dfe"),
-        # "EQ Tune" tab.
+        # "Channel" tab.
+        VGroup(  # Channel Parameters
+            HGroup(  # Native
+                VGroup(
+                    Item(
+                        name="rs",
+                        label="Tx_Rs (Ohms)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="Tx differential source impedance",
+                    ),
+                    Item(
+                        name="cout",
+                        label="Tx_Cout (pF)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="Tx parasitic output capacitance (each pin)",
+                    ),
+                    Item(
+                        name="l_ch",
+                        label="Length (m)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="interconnect length",
+                    ),
+                ),
+                VGroup(
+                    Item(
+                        name="Theta0",
+                        label="Loss Tan.",
+                        enabled_when="use_ch_file == False",
+                        tooltip="dielectric loss tangent",
+                    ),
+                    Item(
+                        name="Z0",
+                        label="Z0 (Ohms)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="characteristic differential impedance",
+                    ),
+                    Item(
+                        name="v0",
+                        label="v_rel (c)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="normalized propagation velocity",
+                    ),
+                ),
+                VGroup(
+                    Item(
+                        name="rin",
+                        label="Rx_Rin (Ohms)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="Rx differential input impedance",
+                    ),
+                    Item(
+                        name="cin",
+                        label="Rx_Cin (pF)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="Rx parasitic input capacitance (each pin)",
+                    ),
+                    Item(
+                        name="cac",
+                        label="Rx_Cac (uF)",
+                        enabled_when="use_ch_file == False",
+                        tooltip="Rx a.c. coupling capacitance (each pin)",
+                    ),
+                ),
+                label="Native",
+                show_border=True,
+            ),
+            HGroup(  # From File
+                Item(
+                    name="use_ch_file",
+                    show_label=False,
+                    tooltip="Select channel frequency/impulse/step response from file.",
+                ),
+                Item(name="ch_file", label="File", enabled_when="use_ch_file == True", springy=True),
+                Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
+                Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
+                Item(
+                    name="f_step",
+                    label="f_step",
+                    enabled_when="use_ch_file == True",
+                    tooltip="Frequency step to use in generating H(f).",
+                ),
+                Item(label="MHz"),
+                label="From File",
+                show_border=True,
+            ),
+            HGroup(
+                VGroup(
+                    Label("Note: All dimmensions in mm."),
+                    Item(name="height",     label="Dielectric Thickness",),
+                    Item(name="width",      label="Trace Width",),
+                    Item(name="thickness",  label="Trace Thickness",),
+                    Item(name="separation", label="Trace Separation",),
+                    Item(name="roughness",  label="Surface Roughness",),
+                    Item(
+                        name="solver",
+                        label="Solver",
+                        tooltip="Field solver to use, to characterize channel cross-section.",
+                        editor=CheckListEditor(values=[(0, "Simbeor")]),
+                    ),
+                    Item("btn_solve", show_label=False,
+                         tooltip="Solve for channel characterization."),
+                    label="Trace Parameters",
+                    show_border=True,
+                ),
+                VGroup(
+                    Item("plot_channel", editor=ComponentEditor(), show_label=False,),
+                    label="Trace Drawing",
+                    show_border=True,
+                    springy=True,
+                ),
+                label="Channel Designer",
+                show_border=True,
+            ),
+            label="Channel",
+            id="channel",
+        ),
+        # "Optimizer" tab.
         VGroup(
             HGroup(
                 Group(
@@ -597,7 +625,7 @@ traits_view = View(
                             reorderable=False,
                             sortable=False,
                             selection_mode="cell",
-                            auto_size=True,
+                            auto_size=False,
                             rows=4,
                             orientation="horizontal",
                             is_grid_cell=True,
@@ -606,23 +634,29 @@ traits_view = View(
                     ),
                     label="Tx Equalization",
                     show_border=True,
+                    springy=True,
                 ),
-                HGroup(
+                # HGroup(
                     VGroup(
-                        Item(name="peak_freq_tune", label="CTLE fp (GHz)", tooltip="CTLE peaking frequency (GHz)"),
-                        Item(
-                            name="rx_bw_tune",
-                            label="Bandwidth (GHz)",
-                            tooltip="unequalized signal path bandwidth (GHz).",
-                        ),
                         Item(
                             name="peak_mag_tune",
-                            label="CTLE boost (dB)",
+                            label="CTLE: boost (dB)",
                             tooltip="CTLE peaking magnitude (dB)",
                             format_str="%4.1f",
                         ),
                         HGroup(
-                            Item(name="ctle_mode_tune", label="CTLE mode", tooltip="CTLE Operating Mode"),
+                            Item(name="peak_freq_tune",
+                                 label="fp (GHz)",
+                                 tooltip="CTLE peaking frequency (GHz)"
+                            ),
+                            Item(
+                                name="rx_bw_tune",
+                                label="BW (GHz)",
+                                tooltip="unequalized signal path bandwidth (GHz).",
+                            ),
+                        ),
+                        HGroup(
+                            Item(name="ctle_mode_tune", label="mode", tooltip="CTLE Operating Mode"),
                             Item(
                                 name="ctle_offset_tune",
                                 tooltip="CTLE d.c. offset (dB)",
@@ -631,16 +665,13 @@ traits_view = View(
                             ),
                         ),
                         HGroup(
-                            Item(name="use_dfe_tune", label="Use DFE.", tooltip="Include ideal DFE in optimization."),
+                            Item(name="use_dfe_tune", label="DFE: Enable", tooltip="Include ideal DFE in optimization."),
                             Item(name="n_taps_tune", label="Taps", tooltip="Number of DFE taps."),
                         ),
-                    ),
-                    Item(
-                        label="Note: Only peaking magnitude\nwill be optimized; please, set\npeak frequency, bandwidth, and\nmode appropriately."
-                    ),
                     label="Rx Equalization",
                     show_border=True,
-                ),
+                    ),
+                # ),
                 VGroup(
                     Item(
                         name="max_iter",
@@ -666,6 +697,9 @@ traits_view = View(
                 ),
                 springy=False,
             ),
+            Item(
+                label="Note: Only CTLE boost will be optimized; please, set peak frequency, bandwidth, and mode appropriately.",
+            ),
             Item("plot_h_tune", editor=ComponentEditor(), show_label=False, springy=True),
             HGroup(
                 Item("btn_rst_eq", show_label=False, tooltip="Reset all values to those on the 'Config.' tab."),
@@ -675,34 +709,56 @@ traits_view = View(
                 Item("btn_coopt", show_label=False, tooltip="Run co-optimization."),
                 Item("btn_abort", show_label=False, tooltip="Abort all optimizations."),
             ),
-            label="EQ Tune",
+            label="Optimizer",
             id="eq_tune",
         ),
-        Group(Item("plots_h", editor=ComponentEditor(), show_label=False), label="Impulses", id="plots_h"),
-        Group(Item("plots_s", editor=ComponentEditor(), show_label=False), label="Steps", id="plots_s"),
-        Group(Item("plots_p", editor=ComponentEditor(), show_label=False), label="Pulses", id="plots_p"),
-        Group(Item("plots_H", editor=ComponentEditor(), show_label=False), label="Freq. Resp.", id="plots_H"),
-        Group(Item("plots_out", editor=ComponentEditor(), show_label=False), label="Outputs", id="plots_out"),
-        Group(Item("plots_eye", editor=ComponentEditor(), show_label=False), label="Eyes", id="plots_eye"),
-        Group(
-            Item("plots_jitter_dist", editor=ComponentEditor(), show_label=False),
-            label="Jitter Dist.",
-            id="plots_jitter_dist",
+        Group(  # Responses
+            Group(Item("plots_h", editor=ComponentEditor(), show_label=False), label="Impulses", id="plots_h"),
+            Group(Item("plots_s", editor=ComponentEditor(), show_label=False), label="Steps", id="plots_s"),
+            Group(Item("plots_p", editor=ComponentEditor(), show_label=False), label="Pulses", id="plots_p"),
+            Group(Item("plots_H", editor=ComponentEditor(), show_label=False), label="Freq. Resp.", id="plots_H"),
+            layout='tabbed',
+            label='Responses',
+            id='responses'
         ),
-        Group(
-            Item("plots_jitter_spec", editor=ComponentEditor(), show_label=False),
-            label="Jitter Spec.",
-            id="plots_jitter_spec",
+        Group(  # Results
+            Group(Item("plots_dfe", editor=ComponentEditor(), show_label=False), label="DFE", id="plots_dfe"),
+            Group(Item("plots_out", editor=ComponentEditor(), show_label=False), label="Outputs", id="plots_out"),
+            Group(Item("plots_eye", editor=ComponentEditor(), show_label=False), label="Eyes", id="plots_eye"),
+            Group(Item("plots_bathtub", editor=ComponentEditor(), show_label=False), label="Bathtubs", id="plots_bathtub"),
+            Group(Item("sweep_info", style="readonly", show_label=False), label="Sweep Info"),
+            layout='tabbed',
+            label='Results',
+            id='results'
         ),
-        Group(Item("plots_bathtub", editor=ComponentEditor(), show_label=False), label="Bathtubs", id="plots_bathtub"),
-        Group(Item("jitter_info", style="readonly", show_label=False), label="Jitter Info"),
-        Group(Item("sweep_info", style="readonly", show_label=False), label="Sweep Info"),
-        Group(
-            Item("ident", style="readonly", show_label=False),
-            Item("perf_info", style="readonly", show_label=False),
-            label="About",
+        Group(  # Jitter
+            Group(
+                Item("plots_jitter_dist", editor=ComponentEditor(), show_label=False),
+                label="Jitter Dist.",
+                id="plots_jitter_dist",
+            ),
+            Group(
+                Item("plots_jitter_spec", editor=ComponentEditor(), show_label=False),
+                label="Jitter Spec.",
+                id="plots_jitter_spec",
+            ),
+            Group(Item("jitter_info", style="readonly", show_label=False), label="Jitter Info"),
+            layout='tabbed',
+            label='Jitter',
+            id='jitter'
         ),
-        Group(Item("instructions", style="readonly", show_label=False), label="Help"),
+        Group(  # Help
+            Group(
+                Item("ident", style="readonly", show_label=False),
+                Item("perf_info", style="readonly", show_label=False),
+                label="About",
+            ),
+            Group(Item("instructions", style="readonly", show_label=False), label="Guide"),
+            Group(Item("console_log", show_label=False, style="custom"), label="Console", id="console"),
+            layout='tabbed',
+            label='Help',
+            id='help'
+        ),
         layout="tabbed",
         springy=True,
         id="tabs",
@@ -712,7 +768,7 @@ traits_view = View(
     buttons=[run_sim, save_cfg, load_cfg, save_data, load_data],
     statusbar="status_str",
     title="PyBERT",
-    width=0.95,
-    height=1,
+    width=1024,
+    height=768,
     icon=ImageResource("icon.png")
 )

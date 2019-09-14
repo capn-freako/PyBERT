@@ -13,7 +13,7 @@ help_str = """<H2>PyBERT User's Guide</H2>\n
   <H3>PyBERT User Help Options</H3>\n
     <UL>\n
       <LI>Hover over any user-settable value in the <em>Config.</em> tab, for help message.</LI>\n
-      <LI>Peruse the <em>General Tips</em> & <em>Help by Tab</em> section, below.</LI>\n
+      <LI>Peruse the <em>General Tips</em> & <em>Help by Tab</em> sections, below.</LI>\n
       <LI>Visit the PyBERT FAQ at: https://github.com/capn-freako/PyBERT/wiki/pybert_faq.</LI>\n
       <LI>Send e-mail to David Banas at capn.freako@gmail.com.</LI>\n
     </UL>\n

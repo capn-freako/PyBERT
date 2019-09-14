@@ -66,6 +66,7 @@ from pybert.pybert_util import (
     pulse_center,
     safe_log10,
     trim_impulse,
+    draw_channel,
 )
 from pybert.pybert_view import traits_view
 
@@ -387,7 +388,13 @@ class PyBERT(HasTraits):
     Z0 = Float(gZ0)  #: Channel characteristic impedance, in LC region (Ohms).
     v0 = Float(gv0)  #: Channel relative propagation velocity (c).
     l_ch = Float(gl_ch)  #: Channel length (m).
-
+    height     = Float(0.127)  #: Dielectric thickness (mm).
+    width      = Float(0.254)  #: Trace width (mm).
+    thickness  = Float(0.036)  #: Trace thickness (mm).
+    separation = Float(0.508)  #: Trace separation (mm).
+    roughness  = Float(0.005)  #: Average surface roughness (mm).
+    solver     = List([0])     #: 0 = Simbeor
+    
     # - EQ Tune
     tx_tap_tuners = List(
         [
@@ -480,6 +487,7 @@ class PyBERT(HasTraits):
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
+    drawdata = ArrayPlotData()
     plots_h = Instance(GridPlotContainer)
     plots_s = Instance(GridPlotContainer)
     plots_p = Instance(GridPlotContainer)
@@ -568,6 +576,7 @@ class PyBERT(HasTraits):
     btn_abort = Button(label="Abort")
     btn_cfg_tx = Button(label="Configure")
     btn_cfg_rx = Button(label="Configure")
+    btn_solve = Button(label="Solve")
 
     # Logger
     def log(self, msg):
@@ -610,6 +619,9 @@ class PyBERT(HasTraits):
         super(PyBERT, self).__init__()
 
         self.log("Started.")
+
+        channel = draw_channel(self.height, self.width, self.thickness, self.separation)
+        self.drawdata.set_data("channel", channel)
 
         if run_simulation:
             # Running the simulation will fill in the required data structure.
@@ -1382,6 +1394,22 @@ class PyBERT(HasTraits):
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
             self.handle_error(error_message)
 
+    def _height_changed(self, new_value):
+        channel = draw_channel(new_value, self.width, self.thickness, self.separation)
+        self.drawdata.set_data("channel", channel)
+        
+    def _width_changed(self, new_value):
+        channel = draw_channel(self.height, new_value, self.thickness, self.separation)
+        self.drawdata.set_data("channel", channel)
+        
+    def _thickness_changed(self, new_value):
+        channel = draw_channel(self.height, self.width, new_value, self.separation)
+        self.drawdata.set_data("channel", channel)
+        
+    def _separation_changed(self, new_value):
+        channel = draw_channel(self.height, self.width, self.thickness, new_value)
+        self.drawdata.set_data("channel", channel)
+        
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
