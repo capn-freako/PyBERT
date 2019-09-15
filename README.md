@@ -8,19 +8,11 @@ as well as the NumPy and SciPy packages.
 Notice: Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
 
 ## Installation
-Using Conda:
-
-* `conda install -c dbanas pybert`
-* `pybert`
-
-Using Pip:
-* `pip install numpy Cython`  Required by enable/chaco which use numpy's distutils.
-* `pip install PyBERT`
-* `pybert`
+- <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
 
 ## Testing
 Tox is used for the test runner and documentation builder.  By default, it runs the following
-environments: py36, py37, pylint, flake8 and docs.  It will skip any missing python versions.
+environments: _py36_, _py37_, _pylint_, _flake8_ and _docs_.  It will skip any missing python versions.
 * `pip install tox`
 * `tox`
 
@@ -45,5 +37,5 @@ I would like to thank the following individuals, for their contributions to PyBE
 
 - Mark Marlett  
 - Low Kian Seong  
-- Amanda Bukur <amandabukur11@gmail.com>  
-
+- Amanda Bukur
+- David Patterson

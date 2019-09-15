@@ -4,7 +4,8 @@ package:
 
 source:
   path: ../../chaco/
-  # fn: chaco-4.6.1.tar.gz
+  # url: ../../chaco/dist/chaco-4.8.0.dev160.win-amd64.zip
+  # url: ../../chaco/dist/chaco-4.8.0.dev160.tar.gz
   # url: https://pypi.python.org/packages/d8/5f/82539366bb321f6f07fada6278e320bb52916a36b43fbe0e30e5ef9f9166/chaco-4.6.1.tar.gz
   # md5: d28117730f942f7cecb281b07abac3f4
 #  patches:
@@ -25,21 +26,26 @@ build:
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 2
+  number: 3
+  script: python setup.py install  --single-version-externally-managed --record=record.txt
 
 requirements:
   build:
     - python
     - setuptools
     - enable >=4.8.0,<4.9
+    - numpy
     - cython
     - pillow
+    - fonttools =4.0.1
 
   run:
     - python
     - enable >=4.8.0,<4.9
+    - numpy
     - cython
     - pillow
+    - fonttools =4.0.1
 
 test:
   # Python imports
