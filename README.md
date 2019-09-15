@@ -8,15 +8,7 @@ as well as the NumPy and SciPy packages.
 Notice: Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
 
 ## Installation
-Using Conda:
-
-* `conda install -c dbanas pybert`
-* `pybert`
-
-Using Pip:
-* `pip install numpy Cython`  Required by enable/chaco which use numpy's distutils.
-* `pip install PyBERT`
-* `pybert`
+- <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
 
 ## Testing
 Tox is used for the test runner and documentation builder.  By default, it runs the following
