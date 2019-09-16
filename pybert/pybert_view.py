@@ -68,7 +68,7 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
@@ -81,7 +81,7 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_PyBertCfg = pickle.load(the_file)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
