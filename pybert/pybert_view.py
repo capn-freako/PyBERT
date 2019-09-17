@@ -631,7 +631,7 @@ traits_view = View(
                             ),
                         ),
                         HGroup(
-                            Item(name="use_dfe_tune", label="Use DFE.", tooltip="Include ideal DFE in optimization."),
+                            Item(name="use_dfe_tune", label="Use DFE:", tooltip="Include ideal DFE in optimization."),
                             Item(name="n_taps_tune", label="Taps", tooltip="Number of DFE taps."),
                         ),
                     ),

@@ -45,6 +45,7 @@ class PyBertCfg:
         self.use_ch_file = the_PyBERT.use_ch_file
         self.ch_file = the_PyBERT.ch_file
         self.impulse_length = the_PyBERT.impulse_length
+        self.f_step = the_PyBERT.f_step
         self.Rdc = the_PyBERT.Rdc
         self.w0 = the_PyBERT.w0
         self.R0 = the_PyBERT.R0

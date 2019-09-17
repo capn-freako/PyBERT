@@ -610,6 +610,8 @@ class PyBERT(HasTraits):
         super(PyBERT, self).__init__()
 
         self.log("Started.")
+        if self.debug:
+            self.log("Debug Mode Enabled.")
 
         if run_simulation:
             # Running the simulation will fill in the required data structure.
