@@ -68,7 +68,7 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
@@ -81,17 +81,19 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_PyBertCfg = pickle.load(the_file)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
                     if prop == "tx_taps":
-                        i = 0
-                        for (enabled, val) in value:
-                            setattr(the_pybert.tx_taps[i], "enabled", enabled)
-                            setattr(the_pybert.tx_taps[i], "value", val)
-                            i += 1
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_taps[count], "enabled", enabled)
+                            setattr(the_pybert.tx_taps[count], "value", val)
+                    elif prop == "tx_tap_tuners":
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_tap_tuners[count], "enabled", enabled)
+                            setattr(the_pybert.tx_tap_tuners[count], "value", val)
                     else:
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
@@ -631,7 +633,7 @@ traits_view = View(
                             ),
                         ),
                         HGroup(
-                            Item(name="use_dfe_tune", label="Use DFE.", tooltip="Include ideal DFE in optimization."),
+                            Item(name="use_dfe_tune", label="Use DFE:", tooltip="Include ideal DFE in optimization."),
                             Item(name="n_taps_tune", label="Taps", tooltip="Number of DFE taps."),
                         ),
                     ),
