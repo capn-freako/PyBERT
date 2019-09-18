@@ -87,11 +87,13 @@ class MyHandler(Handler):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
                     if prop == "tx_taps":
-                        i = 0
-                        for (enabled, val) in value:
-                            setattr(the_pybert.tx_taps[i], "enabled", enabled)
-                            setattr(the_pybert.tx_taps[i], "value", val)
-                            i += 1
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_taps[count], "enabled", enabled)
+                            setattr(the_pybert.tx_taps[count], "value", val)
+                    elif prop == "tx_tap_tuners":
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_tap_tuners[count], "enabled", enabled)
+                            setattr(the_pybert.tx_tap_tuners[count], "value", val)
                     else:
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
