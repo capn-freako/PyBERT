@@ -108,7 +108,7 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             try:
                 plotdata = PyBertData(the_pybert)
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(plotdata, the_file)
                 the_pybert.data_file = dlg.path
             except Exception as err:
@@ -121,7 +121,7 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_data", default_path=the_pybert.data_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_plotdata = pickle.load(the_file)
                 if not isinstance(the_plotdata, PyBertData):
                     raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
