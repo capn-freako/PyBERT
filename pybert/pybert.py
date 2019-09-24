@@ -809,7 +809,7 @@ class PyBERT(HasTraits):
 
         nui = nbits
         if mod_type == 2:  # PAM-4
-            nui /= 2
+            nui //= 2
 
         return nui
 
@@ -839,7 +839,7 @@ class PyBERT(HasTraits):
 
         eye_uis = eye_bits
         if mod_type == 2:  # PAM-4
-            eye_uis /= 2
+            eye_uis //= 2
 
         return eye_uis
 
