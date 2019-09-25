@@ -10,6 +10,8 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 import os.path
 import re
 from functools import reduce
+import pkgutil
+import importlib
 
 import numpy as np
 from numpy import (
@@ -994,3 +996,24 @@ def pulse_center(p, nspui):
 
     clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
     return (clock_pos, thresh)
+
+def submodules(package):
+
+    # mod_path = package.__file__
+
+    # fn = os.path.basename(mod_path)
+    # pathname = os.path.dirname(mod_path)
+
+    # if fn not in ("__init__.py", "__init__.pyc"):
+    #     return None
+
+    rst = {}
+
+    for imp, name, _ in pkgutil.iter_modules(package.__path__):
+        fullModuleName = "{0}.{1}".format(package.__name__, name)
+        mod = importlib.import_module(fullModuleName, package=package.__path__)
+        # loader = imp.find_module(name)
+        # mod = loader.load_module(package.__name__ + "." + name)
+        rst[name] = mod
+
+    return rst 

@@ -27,6 +27,7 @@ from traitsui.api import (
     VGroup,
     View,
     Label,
+    EnumEditor,
 )
 
 from pybert.pybert_cfg import PyBertCfg
@@ -584,11 +585,9 @@ traits_view = View(
                     Item(name="thickness",  label="Trace Thickness",),
                     Item(name="separation", label="Trace Separation",),
                     Item(name="roughness",  label="Surface Roughness",),
-                    Item(
-                        name="solver",
-                        label="Solver",
+                    Item(name="solver",     label="Solver",
                         tooltip="Field solver to use, to characterize channel cross-section.",
-                        editor=CheckListEditor(values=[(0, "Simbeor")]),
+                        editor=EnumEditor(values=solver),
                     ),
                     Item("btn_solve", show_label=False,
                          tooltip="Solve for channel characterization."),
@@ -769,6 +768,6 @@ traits_view = View(
     statusbar="status_str",
     title="PyBERT",
     width=1024,
-    height=768,
+    height=680,
     icon=ImageResource("icon.png")
 )

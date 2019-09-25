@@ -14,8 +14,8 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-from traits.trait_base import ETSConfig
-ETSConfig.toolkit = "qt4"
+# from traits.trait_base import ETSConfig
+# ETSConfig.toolkit = "qt4"
 # ETSConfig.toolkit = "wx"
 
 from datetime import datetime
@@ -43,6 +43,7 @@ from traits.api import (
     Range,
     String,
     cached_property,
+    Trait,
 )
 from traitsui.message import message
 
@@ -67,8 +68,11 @@ from pybert.pybert_util import (
     safe_log10,
     trim_impulse,
     draw_channel,
+    submodules,
 )
 from pybert.pybert_view import traits_view
+
+import pybert.solvers
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -325,6 +329,42 @@ class CoOptThread(StoppableThread):
         return pybert.cost
 
 
+class ChnlSolveThread(StoppableThread):
+    """Used to run custom channel cross-section solving in its own thread,
+    in order to preserve GUI responsiveness."""
+
+    def run(self):
+        """Run the custom channel solver thread."""
+
+        pybert = self.pybert
+        pybert.status = "Solving custom channel..."
+
+        try:
+            res = self.do_solve()
+
+            if res["success"]:
+                pybert.status = "Channel solve succeeded."
+            else:
+                pybert.status = "Channel solve failed: {}".format(res["message"])
+
+        except Exception as err:
+            pybert.status = err
+
+    def do_solve(self):
+        """Run the selected solver."""
+        sleep(0.001)  # Give the GUI a chance to update status, etc.
+
+        res = {
+            "success" : False,
+            "message" : "Not yet run.",
+        }
+        pybert = self.pybert
+        solver = pybert.solver_
+        print(solver)
+        print(type(solver))
+        return res
+
+
 class TxTapTuner(HasTraits):
     """Object used to populate the rows of the Tx FFE tap tuning table."""
 
@@ -393,7 +433,7 @@ class PyBERT(HasTraits):
     thickness  = Float(0.036)  #: Trace thickness (mm).
     separation = Float(0.508)  #: Trace separation (mm).
     roughness  = Float(0.005)  #: Average surface roughness (mm).
-    solver     = List([0])     #: 0 = Simbeor
+    solver     = Trait("None", {"None": None,})
     
     # - EQ Tune
     tx_tap_tuners = List(
@@ -417,6 +457,7 @@ class PyBERT(HasTraits):
     tx_opt_thread = Instance(TxOptThread)  #: Tx EQ optimization thread.
     rx_opt_thread = Instance(RxOptThread)  #: Rx EQ optimization thread.
     coopt_thread = Instance(CoOptThread)  #: EQ co-optimization thread.
+    chnl_solve_thread = Instance(ChnlSolveThread)  #: Custom channel solving thread.
 
     # - Tx
     vod = Float(gVod)  #: Tx differential output voltage (V)
@@ -623,6 +664,31 @@ class PyBERT(HasTraits):
         channel = draw_channel(self.height, self.width, self.thickness, self.separation)
         self.drawdata.set_data("channel", channel)
 
+        slvr_dict = submodules(pybert.solvers)
+        print("slvr_dict:", slvr_dict)
+        tmp_dict = {"None": None}
+        tmp_dict.update(slvr_dict)
+        print("tmp_dict:", tmp_dict)
+        # tmp_dict   = {"One": 1, "Two": 2}
+        #tmp_dict   = {"One": 1}.update({"Two": 2})
+        #print(tmp_dict)
+        # solver     = Trait("None", tmp_dict)
+        # self.solver = Trait("None", tmp_dict)
+        # solver     = Trait("One", {"One": 1, "Two": 2})
+        # solver     = Trait("None", {"None": None,})
+        # self.solver = Trait("None", {"None": None,}.update(submodules(pybert.solvers)))
+        # self.solver = Trait("One", {"One": 1, "Two": 2})
+        self.remove_trait("solver")
+        self.add_trait("solver", Trait("None", tmp_dict))
+        print(self.solver)
+        print(self.solver_)
+        # solver_dict = {"None": None,}
+        # solvers = pybert.solvers.__all__
+        # names = map(lambda x : x.__name__, solvers)
+        # mods = map(lambda x : x.__spec__, solvers)
+        # solver_dict.update(dict(zip(names, mods)))
+        # self.solver = Trait(solver_dict)
+
         if run_simulation:
             # Running the simulation will fill in the required data structure.
             my_run_simulation(self, initial_run=True)
@@ -707,6 +773,14 @@ class PyBERT(HasTraits):
 
     def _btn_cfg_rx_fired(self):
         self._rx_cfg()
+
+    def _btn_solve_fired(self):
+        if self.chnl_solve_thread and self.chnl_solve_thread.isAlive():
+            pass
+        else:
+            self.chnl_solve_thread = ChnlSolveThread()
+            self.chnl_solve_thread.pybert = self
+            self.chnl_solve_thread.start()
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
