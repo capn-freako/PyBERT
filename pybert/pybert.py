@@ -14,8 +14,8 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-from traits.trait_base import ETSConfig
-ETSConfig.toolkit = "qt4"
+# from traits.trait_base import ETSConfig
+# ETSConfig.toolkit = "qt4"
 # ETSConfig.toolkit = "wx"
 
 from datetime import datetime
@@ -619,6 +619,8 @@ class PyBERT(HasTraits):
         super(PyBERT, self).__init__()
 
         self.log("Started.")
+        if self.debug:
+            self.log("Debug Mode Enabled.")
 
         channel = draw_channel(self.height, self.width, self.thickness, self.separation)
         self.drawdata.set_data("channel", channel)
@@ -819,7 +821,7 @@ class PyBERT(HasTraits):
 
         nui = nbits
         if mod_type == 2:  # PAM-4
-            nui /= 2
+            nui //= 2
 
         return nui
 
@@ -849,7 +851,7 @@ class PyBERT(HasTraits):
 
         eye_uis = eye_bits
         if mod_type == 2:  # PAM-4
-            eye_uis /= 2
+            eye_uis //= 2
 
         return eye_uis
 

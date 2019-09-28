@@ -17,6 +17,7 @@ from traits.api import Instance
 from traitsui.api import (
     Action,
     CheckListEditor,
+    FileEditor,
     Group,
     Handler,
     HGroup,
@@ -69,7 +70,7 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
@@ -82,22 +83,24 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_PyBertCfg = pickle.load(the_file)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
                     if prop == "tx_taps":
-                        i = 0
-                        for (enabled, val) in value:
-                            setattr(the_pybert.tx_taps[i], "enabled", enabled)
-                            setattr(the_pybert.tx_taps[i], "value", val)
-                            i += 1
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_taps[count], "enabled", enabled)
+                            setattr(the_pybert.tx_taps[count], "value", val)
+                    elif prop == "tx_tap_tuners":
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_tap_tuners[count], "enabled", enabled)
+                            setattr(the_pybert.tx_tap_tuners[count], "value", val)
                     else:
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err)
+                error_message = "The following error occurred:\n\t{}\nThe configuration was NOT loaded.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_save_data(self, info):
@@ -107,11 +110,11 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             try:
                 plotdata = PyBertData(the_pybert)
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(plotdata, the_file)
                 the_pybert.data_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(err)
+                error_message = "The following error occurred:\n\t{}\nThe waveform data was NOT saved.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_load_data(self, info):
@@ -120,7 +123,7 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_data", default_path=the_pybert.data_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_plotdata = pickle.load(the_file)
                 if not isinstance(the_plotdata, PyBertData):
                     raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
@@ -258,11 +261,39 @@ traits_view = View(
                     label="Simulation Control",
                     show_border=True,
                 ),
+<<<<<<< HEAD
                 VGroup(
                     Item(
                         name="thresh",
                         label="Pj Threshold (sigma)",
                         tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
+=======
+                VGroup(  # Channel Parameters
+                    HGroup(  # From File
+                        Item(
+                            name="use_ch_file",
+                            show_label=False,
+                            tooltip="Select channel frequency/impulse/step response from file.",
+                        ),
+                        Item(
+                            name="ch_file",
+                            label="File",
+                            editor=FileEditor(dialog_style="open"),
+                            enabled_when="use_ch_file == True",
+                            springy=True,
+                        ),
+                        Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
+                        Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
+                        Item(
+                            name="f_step",
+                            label="f_step",
+                            enabled_when="use_ch_file == True",
+                            tooltip="Frequency step to use in generating H(f).",
+                        ),
+                        Item(label="MHz"),
+                        label="From File",
+                        show_border=True,
+>>>>>>> master
                     ),
                     Item(
                         name="impulse_length",
@@ -281,11 +312,21 @@ traits_view = View(
                             VGroup(
                                 HGroup(
                                     Item(name="tx_ami_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="tx_ami_file", label="AMI File:", tooltip="Choose AMI file."),
+                                    Item(
+                                        name="tx_ami_file",
+                                        label="AMI File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose AMI file.",
+                                    ),
                                 ),
                                 HGroup(
                                     Item(name="tx_dll_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="tx_dll_file", label="DLL File:", tooltip="Choose DLL file."),
+                                    Item(
+                                        name="tx_dll_file",
+                                        label="DLL File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose DLL file.",
+                                    ),
                                 ),
                             ),
                             VGroup(
@@ -346,11 +387,21 @@ traits_view = View(
                             VGroup(
                                 HGroup(
                                     Item(name="rx_ami_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="rx_ami_file", label="AMI File:", tooltip="Choose AMI file."),
+                                    Item(
+                                        name="rx_ami_file",
+                                        label="AMI File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose AMI file.",
+                                    ),
                                 ),
                                 HGroup(
                                     Item(name="rx_dll_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="rx_dll_file", label="DLL File:", tooltip="Choose DLL file."),
+                                    Item(
+                                        name="rx_dll_file",
+                                        label="DLL File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose DLL file.",
+                                    ),
                                 ),
                             ),
                             VGroup(
@@ -665,7 +716,11 @@ traits_view = View(
                             ),
                         ),
                         HGroup(
+<<<<<<< HEAD
                             Item(name="use_dfe_tune", label="DFE: Enable", tooltip="Include ideal DFE in optimization."),
+=======
+                            Item(name="use_dfe_tune", label="Use DFE:", tooltip="Include ideal DFE in optimization."),
+>>>>>>> master
                             Item(name="n_taps_tune", label="Taps", tooltip="Number of DFE taps."),
                         ),
                     label="Rx Equalization",
@@ -768,7 +823,7 @@ traits_view = View(
     buttons=[run_sim, save_cfg, load_cfg, save_data, load_data],
     statusbar="status_str",
     title="PyBERT",
-    width=1024,
-    height=768,
+    width=0.95,
+    height=0.9,
     icon=ImageResource("icon.png")
 )
