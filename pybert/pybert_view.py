@@ -17,6 +17,7 @@ from traits.api import Instance
 from traitsui.api import (
     Action,
     CheckListEditor,
+    FileEditor,
     Group,
     Handler,
     HGroup,
@@ -98,7 +99,7 @@ class MyHandler(Handler):
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err)
+                error_message = "The following error occurred:\n\t{}\nThe configuration was NOT loaded.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_save_data(self, info):
@@ -108,11 +109,11 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             try:
                 plotdata = PyBertData(the_pybert)
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(plotdata, the_file)
                 the_pybert.data_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(err)
+                error_message = "The following error occurred:\n\t{}\nThe waveform data was NOT saved.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_load_data(self, info):
@@ -121,7 +122,7 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_data", default_path=the_pybert.data_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_plotdata = pickle.load(the_file)
                 if not isinstance(the_plotdata, PyBertData):
                     raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
@@ -281,7 +282,13 @@ traits_view = View(
                             show_label=False,
                             tooltip="Select channel frequency/impulse/step response from file.",
                         ),
-                        Item(name="ch_file", label="File", enabled_when="use_ch_file == True", springy=True),
+                        Item(
+                            name="ch_file",
+                            label="File",
+                            editor=FileEditor(dialog_style="open"),
+                            enabled_when="use_ch_file == True",
+                            springy=True,
+                        ),
                         Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
                         Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
                         Item(
@@ -369,11 +376,21 @@ traits_view = View(
                             VGroup(
                                 HGroup(
                                     Item(name="tx_ami_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="tx_ami_file", label="AMI File:", tooltip="Choose AMI file."),
+                                    Item(
+                                        name="tx_ami_file",
+                                        label="AMI File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose AMI file.",
+                                    ),
                                 ),
                                 HGroup(
                                     Item(name="tx_dll_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="tx_dll_file", label="DLL File:", tooltip="Choose DLL file."),
+                                    Item(
+                                        name="tx_dll_file",
+                                        label="DLL File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose DLL file.",
+                                    ),
                                 ),
                             ),
                             VGroup(
@@ -434,11 +451,21 @@ traits_view = View(
                             VGroup(
                                 HGroup(
                                     Item(name="rx_ami_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="rx_ami_file", label="AMI File:", tooltip="Choose AMI file."),
+                                    Item(
+                                        name="rx_ami_file",
+                                        label="AMI File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose AMI file.",
+                                    ),
                                 ),
                                 HGroup(
                                     Item(name="rx_dll_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="rx_dll_file", label="DLL File:", tooltip="Choose DLL file."),
+                                    Item(
+                                        name="rx_dll_file",
+                                        label="DLL File:",
+                                        editor=FileEditor(dialog_style="open"),
+                                        tooltip="Choose DLL file.",
+                                    ),
                                 ),
                             ),
                             VGroup(
