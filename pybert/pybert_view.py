@@ -715,6 +715,6 @@ traits_view = View(
     statusbar="status_str",
     title="PyBERT",
     width=0.95,
-    height=1,
+    height=0.9,
     icon=ImageResource("icon.png")
 )
