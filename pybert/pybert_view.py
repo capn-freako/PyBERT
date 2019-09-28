@@ -261,39 +261,11 @@ traits_view = View(
                     label="Simulation Control",
                     show_border=True,
                 ),
-<<<<<<< HEAD
                 VGroup(
                     Item(
                         name="thresh",
                         label="Pj Threshold (sigma)",
                         tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
-=======
-                VGroup(  # Channel Parameters
-                    HGroup(  # From File
-                        Item(
-                            name="use_ch_file",
-                            show_label=False,
-                            tooltip="Select channel frequency/impulse/step response from file.",
-                        ),
-                        Item(
-                            name="ch_file",
-                            label="File",
-                            editor=FileEditor(dialog_style="open"),
-                            enabled_when="use_ch_file == True",
-                            springy=True,
-                        ),
-                        Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
-                        Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
-                        Item(
-                            name="f_step",
-                            label="f_step",
-                            enabled_when="use_ch_file == True",
-                            tooltip="Frequency step to use in generating H(f).",
-                        ),
-                        Item(label="MHz"),
-                        label="From File",
-                        show_border=True,
->>>>>>> master
                     ),
                     Item(
                         name="impulse_length",
@@ -436,7 +408,12 @@ traits_view = View(
                                     label="fromFile",
                                     tooltip="Select CTLE impulse/step response from file.",
                                 ),
-                                Item(name="ctle_file", label="Filename", enabled_when="use_ctle_file == True"),
+                                Item(
+                                    name="ctle_file",
+                                    label="Filename",
+                                    editor=FileEditor(dialog_style="open"),
+                                    enabled_when="use_ctle_file == True"
+                                ),
                             ),
                             HGroup(
                                 Item(
@@ -614,7 +591,13 @@ traits_view = View(
                     show_label=False,
                     tooltip="Select channel frequency/impulse/step response from file.",
                 ),
-                Item(name="ch_file", label="File", enabled_when="use_ch_file == True", springy=True),
+                Item(
+                    name="ch_file",
+                    label="File",
+                    editor=FileEditor(dialog_style="open"),
+                    enabled_when="use_ch_file == True",
+                    springy=True
+                ),
                 Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
                 Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
                 Item(
@@ -716,11 +699,7 @@ traits_view = View(
                             ),
                         ),
                         HGroup(
-<<<<<<< HEAD
                             Item(name="use_dfe_tune", label="DFE: Enable", tooltip="Include ideal DFE in optimization."),
-=======
-                            Item(name="use_dfe_tune", label="Use DFE:", tooltip="Include ideal DFE in optimization."),
->>>>>>> master
                             Item(name="n_taps_tune", label="Taps", tooltip="Number of DFE taps."),
                         ),
                     label="Rx Equalization",
