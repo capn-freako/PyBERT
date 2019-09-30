@@ -17,6 +17,7 @@ from traits.api import (Instance, HasTraits)
 from traitsui.api import (
     Action,
     CheckListEditor,
+    FileEditor,
     Group,
     Handler,
     HGroup,
@@ -69,7 +70,7 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
@@ -82,22 +83,24 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_PyBertCfg = pickle.load(the_file)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
                     if prop == "tx_taps":
-                        i = 0
-                        for (enabled, val) in value:
-                            setattr(the_pybert.tx_taps[i], "enabled", enabled)
-                            setattr(the_pybert.tx_taps[i], "value", val)
-                            i += 1
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_taps[count], "enabled", enabled)
+                            setattr(the_pybert.tx_taps[count], "value", val)
+                    elif prop == "tx_tap_tuners":
+                        for count, (enabled, val) in enumerate(value):
+                            setattr(the_pybert.tx_tap_tuners[count], "enabled", enabled)
+                            setattr(the_pybert.tx_tap_tuners[count], "value", val)
                     else:
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe configuration was NOT loaded.".format(err)
+                error_message = "The following error occurred:\n\t{}\nThe configuration was NOT loaded.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_save_data(self, info):
@@ -107,11 +110,11 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             try:
                 plotdata = PyBertData(the_pybert)
-                with open(dlg.path, "wt") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     pickle.dump(plotdata, the_file)
                 the_pybert.data_file = dlg.path
             except Exception as err:
-                error_message = "The following error occured:\n\t{}\nThe waveform data was NOT saved.".format(err)
+                error_message = "The following error occurred:\n\t{}\nThe waveform data was NOT saved.".format(err)
                 the_pybert.handle_error(error_message)
 
     def do_load_data(self, info):
@@ -120,7 +123,7 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_data", default_path=the_pybert.data_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rt") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     the_plotdata = pickle.load(the_file)
                 if not isinstance(the_plotdata, PyBertData):
                     raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
@@ -394,7 +397,8 @@ class MyView(HasTraits):
                                             label="fromFile",
                                             tooltip="Select CTLE impulse/step response from file.",
                                         ),
-                                        Item(name="ctle_file", label="Filename", enabled_when="use_ctle_file == True"),
+                                        Item(name="ctle_file", label="Filename", enabled_when="use_ctle_file == True",
+                                            editor=FileEditor(dialog_style="open"),),
                                     ),
                                     HGroup(
                                         Item(
@@ -572,7 +576,8 @@ class MyView(HasTraits):
                             show_label=False,
                             tooltip="Select channel frequency/impulse/step response from file.",
                         ),
-                        Item(name="ch_file", label="File", enabled_when="use_ch_file == True", springy=True),
+                        Item(name="ch_file", label="File", enabled_when="use_ch_file == True", springy=True,
+                            editor=FileEditor(dialog_style="open"),),
                         Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
                         Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
                         Item(
@@ -586,29 +591,35 @@ class MyView(HasTraits):
                         show_border=True,
                     ),
                     HGroup(
-                        HGroup(
-                            VGroup(
-                                Label("Note: All dimmensions in mm."),
-                                Item(name="height",     label="Dielectric Thickness",),
-                                Item(name="width",      label="Trace Width",),
-                                Item(name="thickness",  label="Trace Thickness",),
-                                Item(name="separation", label="Trace Separation",),
-                                Item(name="roughness",  label="Surface Roughness",),
-                            ),
-                            VGroup(
-                                Item(name="solver",     label="Solver",
-                                    tooltip="Field solver to use, to characterize channel cross-section.",
-                                    editor=EnumEditor(values=solver),
+                        VGroup(
+                            Label("Note: All dimmensions in mm."),
+                            HGroup(
+                                VGroup(
+                                    Item(name="width",      label="Trace Width",),
+                                    Item(name="thickness",  label="Trace Thickness",),
+                                    Item(name="separation", label="Trace Separation",),
+                                    Item(name="roughness",  label="Surface Roughness",),
+                                    Item(name="ch_type",    label="Channel Type"),
+                                    Item(name="solver",     label="Solver",
+                                        tooltip="Field solver to use, to characterize channel cross-section.",
+                                        editor=EnumEditor(values=solver),),
                                 ),
-                                Item(name="lic_path", label="License File",
-                                    tooltip="Path to solver license file.",
-                                    editor=FileEditor(values=solver),
+                                VGroup(
+                                    Item(name="height",     label="Dielectric Thickness",),
+                                    Item(name="diel_const", label="Dielectric Constant (rel.)",),
+                                    Item(name="loss_tan",   label="Dielectric Loss Tangent",),
+                                    Item(name="des_freq",   label="Dielectric Design Freq. (Hz)",),
+                                    Item("lic_name"),
+                                    Item("prj_name"),
                                 ),
-                                Item("btn_solve", show_label=False,
-                                     tooltip="Solve for channel characterization."),
-                                label="Trace Parameters",
-                                show_border=True,
                             ),
+                            Item(name="lic_path", label="License File",
+                                tooltip="Path to solver license file.",
+                                editor=FileEditor(dialog_style="open"),),
+                            Item("btn_solve", show_label=False,
+                                 tooltip="Solve for channel characterization."),
+                            label="Channel Solver Parameters",
+                            show_border=True,
                         ),
                         VGroup(
                             Item("plot_channel", editor=ComponentEditor(), show_label=False,),

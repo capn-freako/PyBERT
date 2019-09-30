@@ -45,6 +45,7 @@ class PyBertCfg:
         self.use_ch_file = the_PyBERT.use_ch_file
         self.ch_file = the_PyBERT.ch_file
         self.impulse_length = the_PyBERT.impulse_length
+        self.f_step = the_PyBERT.f_step
         self.Rdc = the_PyBERT.Rdc
         self.w0 = the_PyBERT.w0
         self.R0 = the_PyBERT.R0
@@ -64,6 +65,9 @@ class PyBertCfg:
         for tap in the_PyBERT.tx_taps:
             tx_taps.append((tap.enabled, tap.value))
         self.tx_taps = tx_taps
+        self.tx_tap_tuners = []
+        for tap in the_PyBERT.tx_tap_tuners:
+            self.tx_tap_tuners.append((tap.enabled, tap.value))        
         self.tx_use_ami = the_PyBERT.tx_use_ami
         self.tx_use_getwave = the_PyBERT.tx_use_getwave
         self.tx_ami_file = the_PyBERT.tx_ami_file
@@ -80,6 +84,8 @@ class PyBertCfg:
         self.peak_mag = the_PyBERT.peak_mag
         self.ctle_offset = the_PyBERT.ctle_offset
         self.ctle_mode = the_PyBERT.ctle_mode
+        self.ctle_mode_tune = the_PyBERT.ctle_mode_tune
+        self.ctle_offset_tune = the_PyBERT.ctle_offset_tune
         self.rx_use_ami = the_PyBERT.rx_use_ami
         self.rx_use_getwave = the_PyBERT.rx_use_getwave
         self.rx_ami_file = the_PyBERT.rx_ami_file
@@ -87,6 +93,7 @@ class PyBertCfg:
 
         # DFE
         self.use_dfe = the_PyBERT.use_dfe
+        self.use_dfe_tune = the_PyBERT.use_dfe_tune
         self.sum_ideal = the_PyBERT.sum_ideal
         self.decision_scaler = the_PyBERT.decision_scaler
         self.gain = the_PyBERT.gain
