@@ -1,5 +1,7 @@
 """Main entry into the PyBERT GUI."""
 from pybert.pybert import PyBERT
-from pybert.pybert_view import traits_view
+from pybert.pybert_view import MyView
 
-PyBERT().configure_traits(view=traits_view)
+thePyBERT = PyBERT()
+theView = MyView(thePyBERT.trait("solver")).traits_view
+thePyBERT.configure_traits(view=theView)

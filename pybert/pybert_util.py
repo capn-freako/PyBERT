@@ -526,6 +526,34 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
     return (gamma, Zc)
 
 
+def calc_gamma_RLGC(R, L, G, C, ws):
+    """
+    Calculates propagation constant from R, L, G, and C.
+
+    Inputs:
+      - R           resistance per unit length (Ohms/m)
+      - L           inductance per unit length (Henrys/m)
+      - G           conductance per unit length (Siemens/m)
+      - C           capacitance per unit length (Farads/m)
+      - ws          frequency sample points vector
+
+    Outputs:
+      - gamma       frequency dependent propagation constant
+      - Zc          frequency dependent characteristic impedance
+    """
+
+    w = array(ws).copy()
+
+    # Guard against /0.
+    if w[0] == 0:
+        w[0] = 1.0e-12
+
+    gamma = sqrt((1j * w * L0 + R) * (1j * w * C + G))  # propagation constant (nepers/m)
+    Zc    = sqrt((1j * w * L0 + R) / (1j * w * C + G))  # characteristic impedance (Ohms)
+
+    return (gamma, Zc)
+
+
 def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
     """
     Calculates fully loaded transfer function of complete channel.

@@ -70,7 +70,7 @@ from pybert.pybert_util import (
     draw_channel,
     submodules,
 )
-from pybert.pybert_view import traits_view
+from pybert.pybert_view import MyView
 
 import pybert.solvers
 
@@ -358,10 +358,10 @@ class ChnlSolveThread(StoppableThread):
             "success" : False,
             "message" : "Not yet run.",
         }
-        pybert = self.pybert
-        solver = pybert.solver_
-        print(solver)
-        print(type(solver))
+        self.pybert.solver_.solve(ch_type, diel_const, thickness, width, height,
+            separation, roughness, ws, lic_path, lic_name, prj_name)
+        res['success'] = True
+        res['message'] = "Solve complete."
         return res
 
 
@@ -428,13 +428,22 @@ class PyBERT(HasTraits):
     Z0 = Float(gZ0)  #: Channel characteristic impedance, in LC region (Ohms).
     v0 = Float(gv0)  #: Channel relative propagation velocity (c).
     l_ch = Float(gl_ch)  #: Channel length (m).
+    ch_type    = Enum('microstrip_se', 'microstrip_diff', 'stripline_se', 'stripline_diff')
+    diel_const = Float(4.3)    #: Dielectric constant at ``des_freq`` (rel.).
+    loss_tan   = Float(0.02)   #: Loss tangent at ``des_freq``.
+    des_freq   = Float(1.0e9)  #: Frequency at which ``diel_const`` and ``loss_tan`` are specified (Hz).
     height     = Float(0.127)  #: Dielectric thickness (mm).
     width      = Float(0.254)  #: Trace width (mm).
     thickness  = Float(0.036)  #: Trace thickness (mm).
     separation = Float(0.508)  #: Trace separation (mm).
     roughness  = Float(0.005)  #: Average surface roughness (mm).
-    solver     = Trait("None", {"None": None,})
-    
+    solver     = Trait("No solver", {"No solver": None,})
+    lic_path = File(
+        "", entries=5, filter=["*.lic", "*.LIC", "*.txt", "*.TXT", "*.*"]
+    )  #: Solver license file name.
+    lic_name = String("simbeor_complete")  #: Solver license name (if needed).
+    prj_name = String("SimbeorPyBERT")     #: Solver project name (if needed).
+
     # - EQ Tune
     tx_tap_tuners = List(
         [
@@ -665,29 +674,10 @@ class PyBERT(HasTraits):
         self.drawdata.set_data("channel", channel)
 
         slvr_dict = submodules(pybert.solvers)
-        print("slvr_dict:", slvr_dict)
         tmp_dict = {"None": None}
         tmp_dict.update(slvr_dict)
-        print("tmp_dict:", tmp_dict)
-        # tmp_dict   = {"One": 1, "Two": 2}
-        #tmp_dict   = {"One": 1}.update({"Two": 2})
-        #print(tmp_dict)
-        # solver     = Trait("None", tmp_dict)
-        # self.solver = Trait("None", tmp_dict)
-        # solver     = Trait("One", {"One": 1, "Two": 2})
-        # solver     = Trait("None", {"None": None,})
-        # self.solver = Trait("None", {"None": None,}.update(submodules(pybert.solvers)))
-        # self.solver = Trait("One", {"One": 1, "Two": 2})
         self.remove_trait("solver")
         self.add_trait("solver", Trait("None", tmp_dict))
-        print(self.solver)
-        print(self.solver_)
-        # solver_dict = {"None": None,}
-        # solvers = pybert.solvers.__all__
-        # names = map(lambda x : x.__name__, solvers)
-        # mods = map(lambda x : x.__spec__, solvers)
-        # solver_dict.update(dict(zip(names, mods)))
-        # self.solver = Trait(solver_dict)
 
         if run_simulation:
             # Running the simulation will fill in the required data structure.
@@ -1568,9 +1558,9 @@ class PyBERT(HasTraits):
 
 
 # So that we can be used in stand-alone, or imported, fashion.
-def main():
-    PyBERT().configure_traits(view=traits_view)
+# def main():
+#     PyBERT().configure_traits(view=MyView(solver).traits_view)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

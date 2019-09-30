@@ -33,14 +33,17 @@ class Solver(slvr.Solver):
     def solve(self,
           ch_type    : slvr.ChType = "microstrip_se",  #: Channel cross-sectional configuration.
           diel_const : float  = 4.0,    #: Dielectric constant of substrate (rel.).
+          loss_tan   : float  = 0.02,   #: Loss tangent at ``des_freq``.
+          des_freq   : float  = 1.0e9   #: Frequency at which ``diel_const`` and ``loss_tan`` are quoted (Hz).
           thickness  : float  = 0.036,  #: Trace thickness (mm).
           width      : float  = 0.254,  #: Trace width (mm).
           height     : float  = 0.127,  #: Trace height above/below ground plane (mm).
           separation : float  = 0.508,  #: Trace separation (mm).
           roughness  : float  = 0.004,  #: Trace surface roughness (mm-rms).
+          ws         : [float] = None,  #: Angular frequency sample points (rads/s).
           lic_path   : str    = "C:\\Users\\dbanas\\Downloads\\simbeor_DavidBanas_09152019.lic",
           lic_name   : str    = "simbeor_complete",
-          prj_name   : str    = "SimbeorPyBERT"
+          prj_name   : str    = "SimbeorPyBERT",
          ):
         """Use the simbeor.pyd Python library to solve the channel."""
         
@@ -60,7 +63,7 @@ class Solver(slvr.Solver):
             return simbeor.CheckResult("Create Project")
         # - Setup materials.
         #Wideband Debye aka Djordjevic-Sarkar, best for PCBs and packages
-        fr4 = simbeor.MaterialAddDielectric(osp.join(prj_name, "FR4"), 4.3, 0.02, 1.0e9, {}, 1e5, 1e12)
+        fr4 = simbeor.MaterialAddDielectric(osp.join(prj_name, "FR4"), diel_const, loss_tan, des_freq, {}, 1e5, 1e12)
         if fr4 == 0:
             return simbeor.CheckResult("Add material")
         air = simbeor.MaterialAddDielectric(osp.join(prj_name, "Air"), 1.0, 0.0, 1e9, {}, 1e5, 1e12)
@@ -102,7 +105,7 @@ class Solver(slvr.Solver):
         # Calculate Z0.
         zresult, result = simbeor.CalcSingleTLine_Z(prj_name, tline)
         simbeor.CheckResult(result, "calculating Zo")
-        print(tline, zresult, "Forward")
+        # print(tline, zresult, "Forward")
 
         # Calculate frequency-dependent loss.
         # - Examples from Simbeor `test_zcalc.py` file.
@@ -110,6 +113,9 @@ class Solver(slvr.Solver):
         # TestModelSingle(Project1M, "Project(1M)\\SingleMSL", "TOP", True, False, '' ) #model for single microstrip        
         # - Optionally, define frequency sweep. Otherwise, sweep is defined by the signal configurator
         frqSweep = simbeor.GetDefaultFrequencySweep() #access to default sweep
+        frqSweep['Start'] = ws[0]
+        frqSweep['Stop']  = ws[-1]
+        frqSweep['Count'] = len(ws)
         opt = simbeor.GetDefault_SFS_Options()
         # - Build model and simulate
         ModelName = osp.join(prj_name, "SingleMSL")
@@ -121,18 +127,22 @@ class Solver(slvr.Solver):
             frqCount = simbeor.GetFrequencyPointsCount(ModelName) #get number of computed frequency points
             pfrqs = simbeor.GetFrequencyPoints(ModelName) #get all frequency points
             if len( pfrqs ) == frqCount:
-                pAtt = simbeor.GetPropagationConstants(ModelName, 'DBAttenuation', 1) #get attenuation in dB/m into pAtt array
-                if len( pAtt ) != frqCount:
+                # pAtt = simbeor.GetPropagationConstants(ModelName, 'DBAttenuation', 1) #get attenuation in dB/m into pAtt array
+                alpha = simbeor.GetPropagationConstants(ModelName, 'Attenuation',   1)
+                beta  = simbeor.GetPropagationConstants(ModelName, 'PhaseConstant', 1)
+                if len( alpha ) != frqCount or len( beta ) != frqCount:
                     simbeor.CheckResult("propagation constant")
-                pZo = simbeor.GetCharacteristicImpedances(ModelName, 'Magnitude', 1) #get characteristic impedance in Ohm into pAtt array
-                if len( pZo ) != frqCount:
+                # pZo = simbeor.GetCharacteristicImpedances(ModelName, 'Magnitude', 1) #get characteristic impedance in Ohm into pAtt array
+                ZcR = simbeor.GetCharacteristicImpedances(ModelName, 'Real',      1)
+                ZcI = simbeor.GetCharacteristicImpedances(ModelName, 'Imaginary', 1)
+                if len( ZcR ) != frqCount or len( ZcI ) != frqCount:
                     simbeor.CheckResult("characteristic impedance")
 
                 #ACCESS TO PER UNIT LENGTH RLGC PARAMETERS
-                for i in range(frqCount):
-                    R, L, G, C, result = simbeor.GetRLGC(ModelName, pfrqs[i], 1)
-                    if result != 0:
-                        simbeor.CheckResult(result, "RLGC of 1-conductor t-line")
+                # for i in range(frqCount):
+                #     R, L, G, C, result = simbeor.GetRLGC(ModelName, pfrqs[i], 1)
+                #     if result != 0:
+                #         simbeor.CheckResult(result, "RLGC of 1-conductor t-line")
                     #fill arrays of R,L,G,C if necessary
                 
                 # if SolutionDirectory != '':
@@ -146,5 +156,5 @@ class Solver(slvr.Solver):
 
         simbeor.Cleanup()
         simbeor.Uninitialize()
-        return (pfrqs, pAtt)
-        
+        # return (pfrqs, pAtt)
+        return ((alpha + 1j*beta), (ZcR + 1j*ZcI), pfrqs)
