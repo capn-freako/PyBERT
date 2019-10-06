@@ -389,8 +389,17 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         if ctle_out_h_main_lobe.size:
             conv_dly_ix = ctle_out_h_main_lobe[0]
         else:
-            conv_dly_ix = self.chnl_dly / Ts
-        conv_dly = t[conv_dly_ix]
+            conv_dly_ix = self.chnl_dly // Ts
+        # TEMPORARY DEBUGGING
+        try:
+            conv_dly = t[conv_dly_ix]  # Keep this line only.
+        except:
+            print("chnl_dly:", self.chnl_dly)
+            print("conv_dly_ix:", conv_dly_ix)
+            print("tx_h:", tx_h)
+            print("chnl_h:", chnl_h)
+            raise
+        #####
         ctle_out_s = ctle_out_h.cumsum()
         temp = ctle_out_h.copy()
         temp.resize(len(w))

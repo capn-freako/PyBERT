@@ -17,6 +17,7 @@ Copyright (c) 2019 by David Banas; all rights reserved World wide.
 """
 import os
 import os.path       as osp
+import numpy         as np
 import pybert.solver as slvr
 
 sdkdir   = os.environ.get('SIMBEOR_SDK')
@@ -34,14 +35,14 @@ class Solver(slvr.Solver):
           ch_type    : slvr.ChType = "microstrip_se",  #: Channel cross-sectional configuration.
           diel_const : float  = 4.0,    #: Dielectric constant of substrate (rel.).
           loss_tan   : float  = 0.02,   #: Loss tangent at ``des_freq``.
-          des_freq   : float  = 1.0e9   #: Frequency at which ``diel_const`` and ``loss_tan`` are quoted (Hz).
+          des_freq   : float  = 1.0e9,   #: Frequency at which ``diel_const`` and ``loss_tan`` are quoted (Hz).
           thickness  : float  = 0.036,  #: Trace thickness (mm).
           width      : float  = 0.254,  #: Trace width (mm).
           height     : float  = 0.127,  #: Trace height above/below ground plane (mm).
           separation : float  = 0.508,  #: Trace separation (mm).
           roughness  : float  = 0.004,  #: Trace surface roughness (mm-rms).
-          ws         : [float] = None,  #: Angular frequency sample points (rads/s).
-          lic_path   : str    = "C:\\Users\\dbanas\\Downloads\\simbeor_DavidBanas_09152019.lic",
+          fs         : [float] = None,  #: Angular frequency sample points (Hz).
+          lic_path   : str    = "",
           lic_name   : str    = "simbeor_complete",
           prj_name   : str    = "SimbeorPyBERT",
          ):
@@ -113,10 +114,16 @@ class Solver(slvr.Solver):
         # TestModelSingle(Project1M, "Project(1M)\\SingleMSL", "TOP", True, False, '' ) #model for single microstrip        
         # - Optionally, define frequency sweep. Otherwise, sweep is defined by the signal configurator
         frqSweep = simbeor.GetDefaultFrequencySweep() #access to default sweep
-        frqSweep['Start'] = ws[0]
-        frqSweep['Stop']  = ws[-1]
-        frqSweep['Count'] = len(ws)
+        frqSweep['Start'] = fs[0]
+        print(frqSweep['Stop'])
+        frqSweep['Stop']  = fs[-1]
+        print(frqSweep['Stop'])
+        frqSweep['Count'] = len(fs)
+        frqSweep['SweepType'] = 'Equidistant'
+        print(frqSweep)
+        simbeor.SetDefaultFrequencySweep(frqSweep) #access to default sweep
         opt = simbeor.GetDefault_SFS_Options()
+        
         # - Build model and simulate
         ModelName = osp.join(prj_name, "SingleMSL")
         result = simbeor.ModelSingleTLine_SFS(ModelName, tline, frqSweep, opt) #frqSweep is not needed if common default sweep is used, opt are not needed most of the time
@@ -128,13 +135,13 @@ class Solver(slvr.Solver):
             pfrqs = simbeor.GetFrequencyPoints(ModelName) #get all frequency points
             if len( pfrqs ) == frqCount:
                 # pAtt = simbeor.GetPropagationConstants(ModelName, 'DBAttenuation', 1) #get attenuation in dB/m into pAtt array
-                alpha = simbeor.GetPropagationConstants(ModelName, 'Attenuation',   1)
-                beta  = simbeor.GetPropagationConstants(ModelName, 'PhaseConstant', 1)
+                alpha = np.array(simbeor.GetPropagationConstants(ModelName, 'Attenuation',   1))
+                beta  = np.array(simbeor.GetPropagationConstants(ModelName, 'PhaseConstant', 1))
                 if len( alpha ) != frqCount or len( beta ) != frqCount:
                     simbeor.CheckResult("propagation constant")
                 # pZo = simbeor.GetCharacteristicImpedances(ModelName, 'Magnitude', 1) #get characteristic impedance in Ohm into pAtt array
-                ZcR = simbeor.GetCharacteristicImpedances(ModelName, 'Real',      1)
-                ZcI = simbeor.GetCharacteristicImpedances(ModelName, 'Imaginary', 1)
+                ZcR = np.array(simbeor.GetCharacteristicImpedances(ModelName, 'Real',      1))
+                ZcI = np.array(simbeor.GetCharacteristicImpedances(ModelName, 'Imaginary', 1))
                 if len( ZcR ) != frqCount or len( ZcI ) != frqCount:
                     simbeor.CheckResult("characteristic impedance")
 
@@ -158,3 +165,5 @@ class Solver(slvr.Solver):
         simbeor.Uninitialize()
         # return (pfrqs, pAtt)
         return ((alpha + 1j*beta), (ZcR + 1j*ZcI), pfrqs)
+
+solver = Solver()

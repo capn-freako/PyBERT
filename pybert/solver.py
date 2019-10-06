@@ -29,13 +29,13 @@ class Solver(ABC):
           ch_type    : ChType = "microstrip_se",  #: Channel cross-sectional configuration.
           diel_const : float  = 4.3,    #: Dielectric constant of substrate at ``des_freq`` (rel.).
           loss_tan   : float  = 0.02,   #: Loss tangent at ``des_freq``.
-          des_freq   : float  = 1.0e9   #: Frequency at which ``diel_const`` and ``loss_tan`` are quoted (Hz).
+          des_freq   : float  = 1.0e9,   #: Frequency at which ``diel_const`` and ``loss_tan`` are quoted (Hz).
           thickness  : float  = 0.036,  #: Trace thickness (mm).
           width      : float  = 0.254,  #: Trace width (mm).
           height     : float  = 0.127,  #: Trace height above/below ground plane (mm).
           separation : float  = 0.508,  #: Trace separation (mm).
           roughness  : float  = 0.004,  #: Trace surface roughness (mm-rms).
-          ws         : [float] = None,  #: Angular frequency sample points (rads/s).
+          fs         : [float] = None,  #: Angular frequency sample points (Hz).
           lic_path   : str    = "",     #: Path to license file.
           lic_name   : str    = "",     #: Name of license type (if needed by solver).
           prj_name   : str    = "",     #: Name of project (if needed by solver).

@@ -22,7 +22,10 @@ from datetime import datetime
 from threading import Event, Thread
 from time import sleep
 
+from math import isnan
+
 from chaco.api import ArrayPlotData, GridPlotContainer
+import numpy as np
 from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, sinc, where, zeros
 from numpy.fft import fft, ifft
 from numpy.random import randint
@@ -348,7 +351,8 @@ class ChnlSolveThread(StoppableThread):
                 pybert.status = "Channel solve failed: {}".format(res["message"])
 
         except Exception as err:
-            pybert.status = err
+            pybert.status = "Exception occurred."
+            raise
 
     def do_solve(self):
         """Run the selected solver."""
@@ -358,8 +362,20 @@ class ChnlSolveThread(StoppableThread):
             "success" : False,
             "message" : "Not yet run.",
         }
-        self.pybert.solver_.solve(ch_type, diel_const, thickness, width, height,
-            separation, roughness, ws, lic_path, lic_name, prj_name)
+        pybert = self.pybert
+        f = pybert.f
+        f = f[1:len(f)//2+1]
+        gamma, Zc, freqs = pybert.solver_.solver.solve(
+            pybert.ch_type,   pybert.diel_const, pybert.loss_tan,  pybert.des_freq,
+            pybert.thickness, pybert.width,      pybert.height,    pybert.separation,
+            pybert.roughness, f,                 pybert.lic_path,  pybert.lic_name,
+            pybert.prj_name)
+        gammaI = np.flip(np.conjugate(gamma[:-1]))
+        gamma  = np.concatenate((np.array([complex(0)]), gamma, gammaI))
+        ZcI = np.flip(np.conjugate(Zc[:-1]))
+        Zc  = np.concatenate((np.array([complex(Zc[0].real, 0)]), Zc, ZcI))
+        pybert.gamma = gamma
+        pybert.Zc    = Zc
         res['success'] = True
         res['message'] = "Solve complete."
         return res
@@ -414,6 +430,7 @@ class PyBERT(HasTraits):
 
     # - Channel Control
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
+    Zref = Float(100)  #: Reference (or, nominal) channel impedance.
     padded = Bool(False)  #: Zero pad imported Touchstone data? (Default = False)
     windowed = Bool(False)  #: Apply windowing to the Touchstone data? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
@@ -428,6 +445,7 @@ class PyBERT(HasTraits):
     Z0 = Float(gZ0)  #: Channel characteristic impedance, in LC region (Ohms).
     v0 = Float(gv0)  #: Channel relative propagation velocity (c).
     l_ch = Float(gl_ch)  #: Channel length (m).
+    use_native = Bool(True)  #: Use native channel parameters? (Default = True)
     ch_type    = Enum('microstrip_se', 'microstrip_diff', 'stripline_se', 'stripline_diff')
     diel_const = Float(4.3)    #: Dielectric constant at ``des_freq`` (rel.).
     loss_tan   = Float(0.02)   #: Loss tangent at ``des_freq``.
@@ -443,6 +461,8 @@ class PyBERT(HasTraits):
     )  #: Solver license file name.
     lic_name = String("simbeor_complete")  #: Solver license name (if needed).
     prj_name = String("SimbeorPyBERT")     #: Solver project name (if needed).
+    gamma = None
+    Zc = None
 
     # - EQ Tune
     tx_tap_tuners = List(
@@ -1503,35 +1523,55 @@ class PyBERT(HasTraits):
         ts = t[1]
         nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
+        Rs = self.rs
+        Cs = self.cout * 1.0e-12
+        RL = self.rin
+        Cp = self.cin * 1.0e-12
+        CL = self.cac * 1.0e-6
+        w = self.w
 
         if self.use_ch_file:
-            chnl_h = import_channel(self.ch_file, ts, self.padded, self.windowed)
-            if chnl_h[-1] > (max(chnl_h) / 2.0):  # step response?
-                chnl_h = diff(chnl_h)  # impulse response is derivative of step response.
-            chnl_h /= sum(chnl_h)  # Normalize d.c. to one.
-            chnl_dly = t[where(chnl_h == max(chnl_h))[0][0]]
-            chnl_h.resize(len(t))
-            chnl_H = fft(chnl_h)
+            Zref = self.Zref
+            h = import_channel(self.ch_file, ts, self.padded, self.windowed)
+            if h[-1] > (max(h) / 2.0):  # step response?
+                h = diff(h)  # impulse response is derivative of step response.
+            h /= sum(h)  # Normalize d.c. to one.
+            chnl_dly = t[where(h == max(h))[0][0]]
+            h.resize(len(t))
+            H = fft(h)
+            chnl_H = 2.0 * calc_G(H, Rs, Cs, Zref, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
+            chnl_h = real(ifft(chnl_H))
         else:
             l_ch = self.l_ch
-            v0 = self.v0 * 3.0e8
-            R0 = self.R0
-            w0 = self.w0
-            Rdc = self.Rdc
-            Z0 = self.Z0
-            Theta0 = self.Theta0
-            w = self.w
-            Rs = self.rs
-            Cs = self.cout * 1.0e-12
-            RL = self.rin
-            Cp = self.cin * 1.0e-12
-            CL = self.cac * 1.0e-6
+            if self.use_native:
+                v0 = self.v0 * 3.0e8
+                R0 = self.R0
+                w0 = self.w0
+                Rdc = self.Rdc
+                Z0 = self.Z0
+                Theta0 = self.Theta0
 
-            chnl_dly = l_ch / v0
-            gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+                gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+            else:  # 3rd party channel solver
+                gamma = self.gamma
+                Zc = self.Zc
+                if gamma is None or Zc is None:
+                    self.handle_error("You haven't run the channel solver yet.")
+                    return np.zeros(w)
+                ix = len(gamma) // 4  # middle of positive frequencies
+                v0 = w[1] / diff(gamma.imag[ix : ix + 2])  # * 2*pi  # Why?!
+                print("v0:", v0)  # TEMPORARY DEBUGGING
             H = exp(-l_ch * gamma)
             chnl_H = 2.0 * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
             chnl_h = real(ifft(chnl_H))
+            # TEMPORARY DEBUGGING
+            if any(map(isnan, chnl_h)):
+                print("chnl_h:", chnl_h)
+                print("chnl_H:", chnl_H)
+                print("H:", H)
+                print("Zc:", Zc)
+                raise RuntimeError("Debugging Stop.")
+            chnl_dly = l_ch / v0
 
         min_len = 10 * nspui
         max_len = 100 * nspui
