@@ -659,7 +659,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     return img_array
 
-def draw_channel(height, width, thickness, separation, ch_type, arraySize=[100, 100]):
+def draw_channel(height, width, thickness, separation, ch_type, arraySize=[25, 100]):
     """
     Draws the channel cross section.
 
@@ -681,7 +681,7 @@ def draw_channel(height, width, thickness, separation, ch_type, arraySize=[100, 
     vScale = yMax / 0.5
     xMid = int(xMax // 2)
     yMid = int(yMax // 2)
-    yOff = int(yMax // 10 + vScale * height)
+    yOff = int(yMax // 10 + hScale * height)
     if ch_type == 'microstrip_se' or ch_type == 'stripline_se':  # single-ended configuration
         xOff1 = xMid - int(hScale * (width/2))
         xOff2 = None
@@ -701,11 +701,11 @@ def draw_channel(height, width, thickness, separation, ch_type, arraySize=[100, 
             for x in range(xMax):
                 img_array[y, x] = 255  # air (white)
     else :                                                          # stripline configuration
-        for y in range(yOff + int(vScale*(thickness + height)), yMax):
+        for y in range(yOff + int(hScale*(thickness + height)), yMax):
             for x in range(xMax):
                 img_array[y, x] = 0  # metal (black)
     # - Draw trace(s).
-    for y in range(int(vScale * thickness)):
+    for y in range(int(hScale * thickness)):
         for x in range(int(hScale * width)):
             img_array[yOff + y, xOff1 + x] = 0
             if xOff2:

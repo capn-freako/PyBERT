@@ -461,8 +461,6 @@ class PyBERT(HasTraits):
     )  #: Solver license file name.
     lic_name = String("simbeor_complete")  #: Solver license name (if needed).
     prj_name = String("SimbeorPyBERT")     #: Solver project name (if needed).
-    gamma = None
-    Zc = None
 
     # - EQ Tune
     tx_tap_tuners = List(
@@ -704,6 +702,15 @@ class PyBERT(HasTraits):
         if run_simulation:
             # Running the simulation will fill in the required data structure.
             my_run_simulation(self, initial_run=True)
+
+            # Channel solver results need a little extra help, since it hasn't been run.
+            f = self.f
+            gamma = zeros(len(f))
+            Zc = zeros(len(f))
+            self.plotdata.set_data("gamma", gamma)
+            self.plotdata.set_data("Zc", Zc)
+            self.gamma = gamma
+            self.Zc = Zc
 
             # Once the required data structure is filled in, we can create the plots.
             make_plots(self, n_dfe_taps=gNtaps)

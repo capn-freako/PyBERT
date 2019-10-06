@@ -649,6 +649,7 @@ class MyView(HasTraits):
                                 ),
                                 VGroup(
                                     Item("plot_channel", editor=ComponentEditor(), show_label=False,),
+                                    # Item("plot_solve", editor=ComponentEditor(), show_label=False,),
                                     label="Trace Drawing",
                                     show_border=True,
                                     springy=True,
