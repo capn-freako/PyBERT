@@ -659,7 +659,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     return img_array
 
-def draw_channel(height, width, thickness, separation, arraySize=[100, 100]):
+def draw_channel(height, width, thickness, separation, ch_type, arraySize=[100, 100]):
     """
     Draws the channel cross section.
 
@@ -667,31 +667,49 @@ def draw_channel(height, width, thickness, separation, arraySize=[100, 100]):
         height(float): dielectric thickness
         width(float): trace width
         thickness(float): trace thickness
+        ch_type(Enum): channel cross-section type
 
     Keyword Args:
         arraySize([int,int]): Size of image array. (100,100)
 
-    Returns: A black & white drawing of the channel cross-section.
+    Returns: A drawing of the channel cross-section.
     """
-    # Generate the cross-section drawing.
-    img_array = 10 * ones(arraySize)
+
+    # Calculate drawing dimmensions.
     [yMax, xMax] = arraySize
-    # hScale = xMax / (2. * width)
-    # vScale = yMax / (2. * height)
-    hScale = xMax / 2.0
+    hScale = xMax / 2.0  # Fixed physical bounds, for now.
     vScale = yMax / 0.5
     xMid = int(xMax // 2)
     yMid = int(yMax // 2)
-    xOff1 = xMid - int(hScale * (separation/2 + width))
-    xOff2 = xMid + int(hScale * separation/2)
     yOff = int(yMax // 10 + vScale * height)
-    for y in range(yMax // 10):    # Draw the reference plane.
+    if ch_type == 'microstrip_se' or ch_type == 'stripline_se':  # single-ended configuration
+        xOff1 = xMid - int(hScale * (width/2))
+        xOff2 = None
+    else :                                                       # differential configuration
+        xOff1 = xMid - int(hScale * (separation/2 + width))
+        xOff2 = xMid + int(hScale * separation/2)
+    # Generate the cross-section drawing.
+    # - Fill w/ dielectric color.
+    img_array = 10 * ones(arraySize)
+    # - Draw the reference plane.
+    for y in range(yMax // 10):
         for x in range(xMax):
             img_array[y,x] = 0
+    # - Draw air, or second plane, depending on configuration.
+    if ch_type == 'microstrip_se' or ch_type == 'microstrip_diff':  # microstrip configuration
+        for y in range(yOff, yMax):
+            for x in range(xMax):
+                img_array[y, x] = 255  # air (white)
+    else :                                                          # stripline configuration
+        for y in range(yOff + int(vScale*(thickness + height)), yMax):
+            for x in range(xMax):
+                img_array[y, x] = 0  # metal (black)
+    # - Draw trace(s).
     for y in range(int(vScale * thickness)):
         for x in range(int(hScale * width)):
             img_array[yOff + y, xOff1 + x] = 0
-            img_array[yOff + y, xOff2 + x] = 0
+            if xOff2:
+                img_array[yOff + y, xOff2 + x] = 0
     return img_array
 
 def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):

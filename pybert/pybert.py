@@ -692,7 +692,7 @@ class PyBERT(HasTraits):
         if self.debug:
             self.log("Debug Mode Enabled.")
 
-        channel = draw_channel(self.height, self.width, self.thickness, self.separation)
+        channel = draw_channel(self.height, self.width, self.thickness, self.separation, self.ch_type)
         self.drawdata.set_data("channel", channel)
 
         slvr_dict = submodules(pybert.solvers)
@@ -1480,20 +1480,24 @@ class PyBERT(HasTraits):
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
             self.handle_error(error_message)
 
+    def _ch_type_changed(self, new_value):
+        channel = draw_channel(self.height, self.width, self.thickness, self.separation, new_value)
+        self.drawdata.set_data("channel", channel)
+        
     def _height_changed(self, new_value):
-        channel = draw_channel(new_value, self.width, self.thickness, self.separation)
+        channel = draw_channel(new_value, self.width, self.thickness, self.separation, self.ch_type)
         self.drawdata.set_data("channel", channel)
         
     def _width_changed(self, new_value):
-        channel = draw_channel(self.height, new_value, self.thickness, self.separation)
+        channel = draw_channel(self.height, new_value, self.thickness, self.separation, self.ch_type)
         self.drawdata.set_data("channel", channel)
         
     def _thickness_changed(self, new_value):
-        channel = draw_channel(self.height, self.width, new_value, self.separation)
+        channel = draw_channel(self.height, self.width, new_value, self.separation, self.ch_type)
         self.drawdata.set_data("channel", channel)
         
     def _separation_changed(self, new_value):
-        channel = draw_channel(self.height, self.width, self.thickness, new_value)
+        channel = draw_channel(self.height, self.width, self.thickness, new_value, self.ch_type)
         self.drawdata.set_data("channel", channel)
         
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
@@ -1559,18 +1563,10 @@ class PyBERT(HasTraits):
                     self.handle_error("You haven't run the channel solver yet.")
                     return np.zeros(w)
                 ix = len(gamma) // 4  # middle of positive frequencies
-                v0 = w[1] / diff(gamma.imag[ix : ix + 2])  # * 2*pi  # Why?!
-                print("v0:", v0)  # TEMPORARY DEBUGGING
+                v0 = w[1] / diff(gamma.imag[ix : ix + 2])
             H = exp(-l_ch * gamma)
             chnl_H = 2.0 * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
             chnl_h = real(ifft(chnl_H))
-            # TEMPORARY DEBUGGING
-            if any(map(isnan, chnl_h)):
-                print("chnl_h:", chnl_h)
-                print("chnl_H:", chnl_H)
-                print("H:", H)
-                print("Zc:", Zc)
-                raise RuntimeError("Debugging Stop.")
             chnl_dly = l_ch / v0
 
         min_len = 10 * nspui
