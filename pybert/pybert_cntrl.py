@@ -742,7 +742,11 @@ def update_results(self):
         self._old_n_taps = n_taps
 
     clock_pers = diff(clock_times)
-    start_t = t[where(self.lockeds)[0][0]]
+    lockedsTrue = where(self.lockeds)[0]
+    if lockedsTrue.any():
+        start_t = t[lockedsTrue[0]]
+    else:
+        start_t = 0
     start_ix = where(clock_times > start_t)[0][0]
     (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
