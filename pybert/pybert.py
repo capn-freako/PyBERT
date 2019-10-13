@@ -365,6 +365,7 @@ class ChnlSolveThread(StoppableThread):
         pybert = self.pybert
         f = pybert.f
         f = f[1:len(f)//2+1]
+        print("Channel width:", pybert.width)
         gamma, Zc, freqs = pybert.solver_.solver.solve(
             pybert.ch_type,   pybert.diel_const, pybert.loss_tan,  pybert.des_freq,
             pybert.thickness, pybert.width,      pybert.height,    pybert.separation,
