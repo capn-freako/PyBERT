@@ -389,8 +389,17 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         if ctle_out_h_main_lobe.size:
             conv_dly_ix = ctle_out_h_main_lobe[0]
         else:
-            conv_dly_ix = self.chnl_dly / Ts
-        conv_dly = t[conv_dly_ix]
+            conv_dly_ix = self.chnl_dly // Ts
+        # TEMPORARY DEBUGGING
+        try:
+            conv_dly = t[conv_dly_ix]  # Keep this line only.
+        except:
+            print("chnl_dly:", self.chnl_dly)
+            print("conv_dly_ix:", conv_dly_ix)
+            print("tx_h:", tx_h)
+            print("chnl_h:", chnl_h)
+            raise
+        #####
         ctle_out_s = ctle_out_h.cumsum()
         temp = ctle_out_h.copy()
         temp.resize(len(w))
@@ -733,7 +742,11 @@ def update_results(self):
         self._old_n_taps = n_taps
 
     clock_pers = diff(clock_times)
-    start_t = t[where(self.lockeds)[0][0]]
+    lockedsTrue = where(self.lockeds)[0]
+    if lockedsTrue.any():
+        start_t = t[lockedsTrue[0]]
+    else:
+        start_t = 0
     start_ix = where(clock_times > start_t)[0][0]
     (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
