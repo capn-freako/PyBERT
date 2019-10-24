@@ -73,9 +73,7 @@ from pybert.pybert_util import (
     draw_channel,
     submodules,
 )
-from pybert.pybert_view import MyView
-
-import pybert.solvers
+from pybert.pybert_view import traits_view
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -332,56 +330,6 @@ class CoOptThread(StoppableThread):
         return pybert.cost
 
 
-class ChnlSolveThread(StoppableThread):
-    """Used to run custom channel cross-section solving in its own thread,
-    in order to preserve GUI responsiveness."""
-
-    def run(self):
-        """Run the custom channel solver thread."""
-
-        pybert = self.pybert
-        pybert.status = "Solving custom channel..."
-
-        try:
-            res = self.do_solve()
-
-            if res["success"]:
-                pybert.status = "Channel solve succeeded."
-            else:
-                pybert.status = "Channel solve failed: {}".format(res["message"])
-
-        except Exception as err:
-            pybert.status = "Exception occurred."
-            raise
-
-    def do_solve(self):
-        """Run the selected solver."""
-        sleep(0.001)  # Give the GUI a chance to update status, etc.
-
-        res = {
-            "success" : False,
-            "message" : "Not yet run.",
-        }
-        pybert = self.pybert
-        f = pybert.f
-        f = f[1:len(f)//2+1]
-        print("Channel width:", pybert.width)
-        gamma, Zc, freqs = pybert.solver_.solver.solve(
-            pybert.ch_type,   pybert.diel_const, pybert.loss_tan,  pybert.des_freq,
-            pybert.thickness, pybert.width,      pybert.height,    pybert.separation,
-            pybert.roughness, f,                 pybert.lic_path,  pybert.lic_name,
-            pybert.prj_name)
-        gammaI = np.flip(np.conjugate(gamma[:-1]))
-        gamma  = np.concatenate((np.array([complex(0)]), gamma, gammaI))
-        ZcI = np.flip(np.conjugate(Zc[:-1]))
-        Zc  = np.concatenate((np.array([complex(Zc[0].real, 0)]), Zc, ZcI))
-        pybert.gamma = gamma
-        pybert.Zc    = Zc
-        res['success'] = True
-        res['message'] = "Solve complete."
-        return res
-
-
 class TxTapTuner(HasTraits):
     """Object used to populate the rows of the Tx FFE tap tuning table."""
 
@@ -417,51 +365,35 @@ class PyBERT(HasTraits):
     # Independent variables
 
     # - Simulation Control
-    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)  #: (Gbps)
-    nbits = Range(low=1000, high=10000000, value=gNbits)  #: Number of bits to simulate.
+    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)     #: (Gbps)
+    nbits = Range(low=1000, high=10000000, value=gNbits)      #: Number of bits to simulate.
     pattern_len = Range(low=7, high=10000000, value=gPatLen)  #: PRBS pattern length.
-    nspb = Range(low=2, high=256, value=gNspb)  #: Signal vector samples per bit.
+    nspb = Range(low=2, high=256, value=gNspb)                #: Signal vector samples per bit.
     eye_bits = Int(gNbits // 5)  #: # of bits used to form eye. (Default = last 20%)
-    mod_type = List([0])  #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
-    num_sweeps = Int(1)  #: Number of sweeps to run.
+    mod_type = List([0])         #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    num_sweeps = Int(1)          #: Number of sweeps to run.
     sweep_num = Int(1)
     sweep_aves = Int(gNumAve)
     do_sweep = Bool(False)  #: Run sweeps? (Default = False)
-    debug = Bool(True)  #: Log extra info to console when true. (Default = False)
+    debug = Bool(True)      #: Log extra info to console when true. (Default = False)
 
     # - Channel Control
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
-    Zref = Float(100)  #: Reference (or, nominal) channel impedance.
-    padded = Bool(False)  #: Zero pad imported Touchstone data? (Default = False)
-    windowed = Bool(False)  #: Apply windowing to the Touchstone data? (Default = False)
-    f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
+    Zref = Float(100)          #: Reference (or, nominal) channel impedance.
+    padded = Bool(False)       #: Zero pad imported Touchstone data? (Default = False)
+    windowed = Bool(False)     #: Apply windowing to the Touchstone data? (Default = False)
+    f_step = Float(10)         #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     ch_file = File(
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
-    )  #: Channel file name.
+    )                            #: Channel file name.
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
-    Rdc = Float(gRdc)  #: Channel d.c. resistance (Ohms/m).
-    w0 = Float(gw0)  #: Channel transition frequency (rads./s).
-    R0 = Float(gR0)  #: Channel skin effect resistance (Ohms/m).
-    Theta0 = Float(gTheta0)  #: Channel loss tangent (unitless).
-    Z0 = Float(gZ0)  #: Channel characteristic impedance, in LC region (Ohms).
-    v0 = Float(gv0)  #: Channel relative propagation velocity (c).
-    l_ch = Float(gl_ch)  #: Channel length (m).
-    use_native = Bool(True)  #: Use native channel parameters? (Default = True)
-    ch_type    = Enum('microstrip_se', 'microstrip_diff', 'stripline_se', 'stripline_diff')
-    diel_const = Float(4.3)    #: Dielectric constant at ``des_freq`` (rel.).
-    loss_tan   = Float(0.02)   #: Loss tangent at ``des_freq``.
-    des_freq   = Float(1.0e9)  #: Frequency at which ``diel_const`` and ``loss_tan`` are specified (Hz).
-    height     = Float(0.127)  #: Dielectric thickness (mm).
-    width      = Float(0.254)  #: Trace width (mm).
-    thickness  = Float(0.036)  #: Trace thickness (mm).
-    separation = Float(0.508)  #: Trace separation (mm).
-    roughness  = Float(0.005)  #: Average surface roughness (mm).
-    solver     = Trait("No solver", {"No solver": None,})
-    lic_path = File(
-        "", entries=5, filter=["*.lic", "*.LIC", "*.txt", "*.TXT", "*.*"]
-    )  #: Solver license file name.
-    lic_name = String("simbeor_complete")  #: Solver license name (if needed).
-    prj_name = String("SimbeorPyBERT")     #: Solver project name (if needed).
+    Rdc = Float(gRdc)            #: Channel d.c. resistance (Ohms/m).
+    w0 = Float(gw0)              #: Channel transition frequency (rads./s).
+    R0 = Float(gR0)              #: Channel skin effect resistance (Ohms/m).
+    Theta0 = Float(gTheta0)      #: Channel loss tangent (unitless).
+    Z0 = Float(gZ0)              #: Channel characteristic impedance, in LC region (Ohms).
+    v0 = Float(gv0)              #: Channel relative propagation velocity (c).
+    l_ch = Float(gl_ch)          #: Channel length (m).
 
     # - EQ Tune
     tx_tap_tuners = List(
@@ -485,7 +417,6 @@ class PyBERT(HasTraits):
     tx_opt_thread = Instance(TxOptThread)  #: Tx EQ optimization thread.
     rx_opt_thread = Instance(RxOptThread)  #: Rx EQ optimization thread.
     coopt_thread = Instance(CoOptThread)  #: EQ co-optimization thread.
-    chnl_solve_thread = Instance(ChnlSolveThread)  #: Custom channel solving thread.
 
     # - Tx
     vod = Float(gVod)  #: Tx differential output voltage (V)
@@ -556,7 +487,7 @@ class PyBERT(HasTraits):
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
-    drawdata = ArrayPlotData()
+    # drawdata = ArrayPlotData()
     plots_h = Instance(GridPlotContainer)
     plots_s = Instance(GridPlotContainer)
     plots_p = Instance(GridPlotContainer)
@@ -645,7 +576,6 @@ class PyBERT(HasTraits):
     btn_abort = Button(label="Abort")
     btn_cfg_tx = Button(label="Configure")
     btn_cfg_rx = Button(label="Configure")
-    btn_solve = Button(label="Solve")
 
     # Logger
     def log(self, msg):
@@ -655,6 +585,7 @@ class PyBERT(HasTraits):
     def dbg(self, msg):
         """Only if debug is true, log this message to the console."""
         if self.debug:
+            ## In case PyBERT crashes, before we can read this in its console tab:
             print("\n[{}]: {}\n".format(datetime.now(), msg.strip()))
             self.log(msg)
 
@@ -691,28 +622,9 @@ class PyBERT(HasTraits):
         if self.debug:
             self.log("Debug Mode Enabled.")
 
-        channel = draw_channel(self.height, self.width, self.thickness, self.separation, self.ch_type)
-        self.drawdata.set_data("channel", channel)
-
-        slvr_dict = submodules(pybert.solvers)
-        tmp_dict = {"None": None}
-        tmp_dict.update(slvr_dict)
-        self.remove_trait("solver")
-        self.add_trait("solver", Trait("None", tmp_dict))
-
         if run_simulation:
             # Running the simulation will fill in the required data structure.
             my_run_simulation(self, initial_run=True)
-
-            # Channel solver results need a little extra help, since it hasn't been run.
-            f = self.f
-            gamma = zeros(len(f))
-            Zc = zeros(len(f))
-            self.plotdata.set_data("gamma", gamma)
-            self.plotdata.set_data("Zc", Zc)
-            self.gamma = gamma
-            self.Zc = Zc
-
             # Once the required data structure is filled in, we can create the plots.
             make_plots(self, n_dfe_taps=gNtaps)
         else:
@@ -793,14 +705,6 @@ class PyBERT(HasTraits):
 
     def _btn_cfg_rx_fired(self):
         self._rx_cfg()
-
-    def _btn_solve_fired(self):
-        if self.chnl_solve_thread and self.chnl_solve_thread.isAlive():
-            pass
-        else:
-            self.chnl_solve_thread = ChnlSolveThread()
-            self.chnl_solve_thread.pybert = self
-            self.chnl_solve_thread.start()
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
@@ -1293,7 +1197,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        status_str = "%-20s | Perf. (Ms/m):    %4.1f" % (self.status, self.total_perf * 60.0e-6)
+        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (self.status, self.total_perf * 60.0e-6)
         dly_str = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.0e9)
         err_str = "         | BitErrs: %d" % self.bit_errs
         pwr_str = "         | TxPwr (W): %4.2f" % self.rel_power
@@ -1555,23 +1459,13 @@ class PyBERT(HasTraits):
             chnl_h = real(ifft(chnl_H))
         else:
             l_ch = self.l_ch
-            if self.use_native:
-                v0 = self.v0 * 3.0e8
-                R0 = self.R0
-                w0 = self.w0
-                Rdc = self.Rdc
-                Z0 = self.Z0
-                Theta0 = self.Theta0
-
-                gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-            else:  # 3rd party channel solver
-                gamma = self.gamma
-                Zc = self.Zc
-                if gamma is None or Zc is None:
-                    self.handle_error("You haven't run the channel solver yet.")
-                    return np.zeros(w)
-                ix = len(gamma) // 4  # middle of positive frequencies
-                v0 = w[1] / diff(gamma.imag[ix : ix + 2])
+            v0 = self.v0 * 3.0e8
+            R0 = self.R0
+            w0 = self.w0
+            Rdc = self.Rdc
+            Z0 = self.Z0
+            Theta0 = self.Theta0
+            gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H = exp(-l_ch * gamma)
             chnl_H = 2.0 * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
             chnl_h = real(ifft(chnl_H))
@@ -1603,10 +1497,9 @@ class PyBERT(HasTraits):
         return chnl_h
 
 
-# So that we can be used in stand-alone, or imported, fashion.
+# So that we can be used in stand-alone or imported fashion.
 # def main():
-#     PyBERT().configure_traits(view=MyView(solver).traits_view)
-
+#     PyBERT().configure_traits(view=traits_view)
 
 # if __name__ == "__main__":
 #     main()

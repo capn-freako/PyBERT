@@ -19,7 +19,6 @@ def make_plots(self, n_dfe_taps):
     """ Create the plots used by the PyBERT GUI."""
 
     plotdata = self.plotdata
-    drawdata = self.drawdata
 
     # - DFE tab
     plot2 = Plot(plotdata, padding_left=75)
@@ -403,40 +402,6 @@ def make_plots(self, n_dfe_taps):
     container_eye.add(plot_eye_ctle)
     container_eye.add(plot_eye_dfe)
     self.plots_eye = container_eye
-
-    # - Channel Designer channel cross-section
-    plot_channel = Plot(drawdata, padding_left=75)
-    plot_channel.img_plot("channel", colormap=clr_map)
-    plot_channel.y_direction = "normal"
-    plot_channel.components[0].y_direction = "normal"
-    plot_channel.title = "Channel Cross-section"
-    plot_channel.x_axis.title = "X (mm)"
-    plot_channel.x_axis.orientation = "bottom"
-    plot_channel.y_axis.title = "Y (mm)"
-    plot_channel.x_grid.visible = False
-    plot_channel.y_grid.visible = False
-    xs = linspace(0, 2.0, 100)
-    ys = linspace(0, 0.5, 25)
-    plot_channel.components[0].index.set_data(xs, ys)
-    plot_channel.x_axis.mapper.range.low = xs[0]
-    plot_channel.x_axis.mapper.range.high = xs[-1]
-    plot_channel.y_axis.mapper.range.low = ys[0]
-    plot_channel.y_axis.mapper.range.high = ys[-1]
-    plot_channel.invalidate_draw()
-    self.plot_channel = plot_channel
-    
-    # plot_solve = Plot(plotdata, padding_left=75)
-    # plot_solve.plot(("f_GHz", "Zc"), type="line", color="blue", name="Zc", index_scale="log")
-    # plot_solve.plot(("f_GHz", "gamma"), type="line", color="red", name="Gamma", index_scale="log")
-    # plot_solve.title = "Channel Solver Results"
-    # plot_solve.index_axis.title = "Frequency (GHz)"
-    # plot_solve.y_axis.title = "Impedance (Ohms)"
-    # plot_solve.index_range.low_setting = 0.01
-    # plot_solve.index_range.high_setting = 40.0
-    # #plot_solve.value_range = plot_H_ctle.value_range
-    # plot_solve.legend.visible = True
-    # plot_solve.legend.align = "ll"
-    # self.plot_solve = plot_solve
 
     # - Jitter Distributions tab
     plot_jitter_dist_chnl = Plot(plotdata, padding_left=75)
