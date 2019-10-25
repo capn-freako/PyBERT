@@ -9,7 +9,7 @@ source:
   path: ../../
 
 build:
-  number: 3
+  number: 4
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
@@ -25,6 +25,7 @@ requirements:
     - pyibis-ami >=3.0.0
     - scikit-rf
     - pyface=6.1.2
+    - pyside2
   build:
     - python >=3.7,<3.8.0a0
     - setuptools
@@ -35,6 +36,7 @@ requirements:
     - pyibis-ami >=3.0.0
     - scikit-rf
     - pyface=6.1.2
+    - pyside2
 
 test:
   imports:
