@@ -10,6 +10,8 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 from chaco.api import ColorMapper, GridPlotContainer, Plot
 from chaco.tools.api import PanTool, ZoomTool
 
+from numpy import (linspace)
+
 from pybert.pybert_cntrl import update_eyes
 
 
@@ -64,7 +66,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_tune.plot(("t_ns_chnl", "clocks_tune"), type="line", color="gray")
     plot_h_tune.title = "Channel + Tx Preemphasis + CTLE + Ideal DFE"
     plot_h_tune.index_axis.title = "Time (ns)"
-    plot_h_tune.y_axis.title = "Post-CTLE Pulse Response (V)"
+    plot_h_tune.y_axis.title = "Pulse Response (V)"
     zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis="index", always_on=False)
     plot_h_tune.overlays.append(zoom_tune)
     self.plot_h_tune = plot_h_tune
