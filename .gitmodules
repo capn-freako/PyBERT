@@ -10,6 +10,4 @@
 [submodule "parsec.py"]
 	path = parsec.py
 	url = https://github.com/sighingnow/parsec.py.git
-[submodule "fonttools"]
-	path = fonttools
-	url = https://github.com/fonttools/fonttools.git
+

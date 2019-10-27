@@ -10,6 +10,8 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 import os.path
 import re
 from functools import reduce
+import pkgutil
+import importlib
 
 import numpy as np
 from numpy import (
@@ -524,6 +526,34 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
     return (gamma, Zc)
 
 
+def calc_gamma_RLGC(R, L, G, C, ws):
+    """
+    Calculates propagation constant from R, L, G, and C.
+
+    Inputs:
+      - R           resistance per unit length (Ohms/m)
+      - L           inductance per unit length (Henrys/m)
+      - G           conductance per unit length (Siemens/m)
+      - C           capacitance per unit length (Farads/m)
+      - ws          frequency sample points vector
+
+    Outputs:
+      - gamma       frequency dependent propagation constant
+      - Zc          frequency dependent characteristic impedance
+    """
+
+    w = array(ws).copy()
+
+    # Guard against /0.
+    if w[0] == 0:
+        w[0] = 1.0e-12
+
+    gamma = sqrt((1j * w * L0 + R) * (1j * w * C + G))  # propagation constant (nepers/m)
+    Zc    = sqrt((1j * w * L0 + R) / (1j * w * C + G))  # characteristic impedance (Ohms)
+
+    return (gamma, Zc)
+
+
 def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
     """
     Calculates fully loaded transfer function of complete channel.
@@ -629,6 +659,58 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     return img_array
 
+def draw_channel(height, width, thickness, separation, ch_type, arraySize=[25, 100]):
+    """
+    Draws the channel cross section.
+
+    Args:
+        height(float): dielectric thickness
+        width(float): trace width
+        thickness(float): trace thickness
+        ch_type(Enum): channel cross-section type
+
+    Keyword Args:
+        arraySize([int,int]): Size of image array. (100,100)
+
+    Returns: A drawing of the channel cross-section.
+    """
+
+    # Calculate drawing dimmensions.
+    [yMax, xMax] = arraySize
+    hScale = xMax / 2.0  # Fixed physical bounds, for now.
+    vScale = yMax / 0.5
+    xMid = int(xMax // 2)
+    yMid = int(yMax // 2)
+    yOff = int(yMax // 10 + hScale * height)
+    if ch_type == 'microstrip_se' or ch_type == 'stripline_se':  # single-ended configuration
+        xOff1 = xMid - int(hScale * (width/2))
+        xOff2 = None
+    else :                                                       # differential configuration
+        xOff1 = xMid - int(hScale * (separation/2 + width))
+        xOff2 = xMid + int(hScale * separation/2)
+    # Generate the cross-section drawing.
+    # - Fill w/ dielectric color.
+    img_array = 10 * ones(arraySize)
+    # - Draw the reference plane.
+    for y in range(yMax // 10):
+        for x in range(xMax):
+            img_array[y,x] = 0
+    # - Draw air, or second plane, depending on configuration.
+    if ch_type == 'microstrip_se' or ch_type == 'microstrip_diff':  # microstrip configuration
+        for y in range(yOff, yMax):
+            for x in range(xMax):
+                img_array[y, x] = 255  # air (white)
+    else :                                                          # stripline configuration
+        for y in range(yOff + int(hScale*(thickness + height)), yMax):
+            for x in range(xMax):
+                img_array[y, x] = 0  # metal (black)
+    # - Draw trace(s).
+    for y in range(int(hScale * thickness)):
+        for x in range(int(hScale * width)):
+            img_array[yOff + y, xOff1 + x] = 0
+            if xOff2:
+                img_array[yOff + y, xOff2 + x] = 0
+    return img_array
 
 def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
     """
@@ -960,3 +1042,24 @@ def pulse_center(p, nspui):
 
     clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
     return (clock_pos, thresh)
+
+def submodules(package):
+
+    # mod_path = package.__file__
+
+    # fn = os.path.basename(mod_path)
+    # pathname = os.path.dirname(mod_path)
+
+    # if fn not in ("__init__.py", "__init__.pyc"):
+    #     return None
+
+    rst = {}
+
+    for imp, name, _ in pkgutil.iter_modules(package.__path__):
+        fullModuleName = "{0}.{1}".format(package.__name__, name)
+        mod = importlib.import_module(fullModuleName, package=package.__path__)
+        # loader = imp.find_module(name)
+        # mod = loader.load_module(package.__name__ + "." + name)
+        rst[name] = mod
+
+    return rst 

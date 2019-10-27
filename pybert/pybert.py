@@ -22,7 +22,10 @@ from datetime import datetime
 from threading import Event, Thread
 from time import sleep
 
+from math import isnan
+
 from chaco.api import ArrayPlotData, GridPlotContainer
+import numpy as np
 from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, sinc, where, zeros
 from numpy.fft import fft, ifft
 from numpy.random import randint
@@ -43,6 +46,7 @@ from traits.api import (
     Range,
     String,
     cached_property,
+    Trait,
 )
 from traitsui.message import message
 
@@ -66,6 +70,8 @@ from pybert.pybert_util import (
     pulse_center,
     safe_log10,
     trim_impulse,
+    draw_channel,
+    submodules,
 )
 from pybert.pybert_view import traits_view
 
@@ -359,34 +365,35 @@ class PyBERT(HasTraits):
     # Independent variables
 
     # - Simulation Control
-    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)  #: (Gbps)
-    nbits = Range(low=1000, high=10000000, value=gNbits)  #: Number of bits to simulate.
+    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)     #: (Gbps)
+    nbits = Range(low=1000, high=10000000, value=gNbits)      #: Number of bits to simulate.
     pattern_len = Range(low=7, high=10000000, value=gPatLen)  #: PRBS pattern length.
-    nspb = Range(low=2, high=256, value=gNspb)  #: Signal vector samples per bit.
+    nspb = Range(low=2, high=256, value=gNspb)                #: Signal vector samples per bit.
     eye_bits = Int(gNbits // 5)  #: # of bits used to form eye. (Default = last 20%)
-    mod_type = List([0])  #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
-    num_sweeps = Int(1)  #: Number of sweeps to run.
+    mod_type = List([0])         #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    num_sweeps = Int(1)          #: Number of sweeps to run.
     sweep_num = Int(1)
     sweep_aves = Int(gNumAve)
     do_sweep = Bool(False)  #: Run sweeps? (Default = False)
-    debug = Bool(True)  #: Log extra info to console when true. (Default = False)
+    debug = Bool(True)      #: Log extra info to console when true. (Default = False)
 
     # - Channel Control
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
-    padded = Bool(False)  #: Zero pad imported Touchstone data? (Default = False)
-    windowed = Bool(False)  #: Apply windowing to the Touchstone data? (Default = False)
-    f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
+    Zref = Float(100)          #: Reference (or, nominal) channel impedance.
+    padded = Bool(False)       #: Zero pad imported Touchstone data? (Default = False)
+    windowed = Bool(False)     #: Apply windowing to the Touchstone data? (Default = False)
+    f_step = Float(10)         #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     ch_file = File(
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
-    )  #: Channel file name.
+    )                            #: Channel file name.
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
-    Rdc = Float(gRdc)  #: Channel d.c. resistance (Ohms/m).
-    w0 = Float(gw0)  #: Channel transition frequency (rads./s).
-    R0 = Float(gR0)  #: Channel skin effect resistance (Ohms/m).
-    Theta0 = Float(gTheta0)  #: Channel loss tangent (unitless).
-    Z0 = Float(gZ0)  #: Channel characteristic impedance, in LC region (Ohms).
-    v0 = Float(gv0)  #: Channel relative propagation velocity (c).
-    l_ch = Float(gl_ch)  #: Channel length (m).
+    Rdc = Float(gRdc)            #: Channel d.c. resistance (Ohms/m).
+    w0 = Float(gw0)              #: Channel transition frequency (rads./s).
+    R0 = Float(gR0)              #: Channel skin effect resistance (Ohms/m).
+    Theta0 = Float(gTheta0)      #: Channel loss tangent (unitless).
+    Z0 = Float(gZ0)              #: Channel characteristic impedance, in LC region (Ohms).
+    v0 = Float(gv0)              #: Channel relative propagation velocity (c).
+    l_ch = Float(gl_ch)          #: Channel length (m).
 
     # - EQ Tune
     tx_tap_tuners = List(
@@ -480,6 +487,7 @@ class PyBERT(HasTraits):
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
+    # drawdata = ArrayPlotData()
     plots_h = Instance(GridPlotContainer)
     plots_s = Instance(GridPlotContainer)
     plots_p = Instance(GridPlotContainer)
@@ -577,6 +585,7 @@ class PyBERT(HasTraits):
     def dbg(self, msg):
         """Only if debug is true, log this message to the console."""
         if self.debug:
+            ## In case PyBERT crashes, before we can read this in its console tab:
             print("\n[{}]: {}\n".format(datetime.now(), msg.strip()))
             self.log(msg)
 
@@ -616,7 +625,6 @@ class PyBERT(HasTraits):
         if run_simulation:
             # Running the simulation will fill in the required data structure.
             my_run_simulation(self, initial_run=True)
-
             # Once the required data structure is filled in, we can create the plots.
             make_plots(self, n_dfe_taps=gNtaps)
         else:
@@ -1189,7 +1197,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        status_str = "%-20s | Perf. (Ms/m):    %4.1f" % (self.status, self.total_perf * 60.0e-6)
+        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (self.status, self.total_perf * 60.0e-6)
         dly_str = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.0e9)
         err_str = "         | BitErrs: %d" % self.bit_errs
         pwr_str = "         | TxPwr (W): %4.2f" % self.rel_power
@@ -1384,6 +1392,26 @@ class PyBERT(HasTraits):
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
             self.handle_error(error_message)
 
+    def _ch_type_changed(self, new_value):
+        channel = draw_channel(self.height, self.width, self.thickness, self.separation, new_value)
+        self.drawdata.set_data("channel", channel)
+        
+    def _height_changed(self, new_value):
+        channel = draw_channel(new_value, self.width, self.thickness, self.separation, self.ch_type)
+        self.drawdata.set_data("channel", channel)
+        
+    def _width_changed(self, new_value):
+        channel = draw_channel(self.height, new_value, self.thickness, self.separation, self.ch_type)
+        self.drawdata.set_data("channel", channel)
+        
+    def _thickness_changed(self, new_value):
+        channel = draw_channel(self.height, self.width, new_value, self.separation, self.ch_type)
+        self.drawdata.set_data("channel", channel)
+        
+    def _separation_changed(self, new_value):
+        channel = draw_channel(self.height, self.width, self.thickness, new_value, self.ch_type)
+        self.drawdata.set_data("channel", channel)
+        
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
@@ -1411,15 +1439,24 @@ class PyBERT(HasTraits):
         ts = t[1]
         nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
+        Rs = self.rs
+        Cs = self.cout * 1.0e-12
+        RL = self.rin
+        Cp = self.cin * 1.0e-12
+        CL = self.cac * 1.0e-6
+        w = self.w
 
         if self.use_ch_file:
-            chnl_h = import_channel(self.ch_file, ts, self.padded, self.windowed)
-            if chnl_h[-1] > (max(chnl_h) / 2.0):  # step response?
-                chnl_h = diff(chnl_h)  # impulse response is derivative of step response.
-            chnl_h /= sum(chnl_h)  # Normalize d.c. to one.
-            chnl_dly = t[where(chnl_h == max(chnl_h))[0][0]]
-            chnl_h.resize(len(t))
-            chnl_H = fft(chnl_h)
+            Zref = self.Zref
+            h = import_channel(self.ch_file, ts, self.padded, self.windowed)
+            if h[-1] > (max(h) / 2.0):  # step response?
+                h = diff(h)  # impulse response is derivative of step response.
+            h /= sum(h)  # Normalize d.c. to one.
+            chnl_dly = t[where(h == max(h))[0][0]]
+            h.resize(len(t))
+            H = fft(h)
+            chnl_H = 2.0 * calc_G(H, Rs, Cs, Zref, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
+            chnl_h = real(ifft(chnl_H))
         else:
             l_ch = self.l_ch
             v0 = self.v0 * 3.0e8
@@ -1428,18 +1465,11 @@ class PyBERT(HasTraits):
             Rdc = self.Rdc
             Z0 = self.Z0
             Theta0 = self.Theta0
-            w = self.w
-            Rs = self.rs
-            Cs = self.cout * 1.0e-12
-            RL = self.rin
-            Cp = self.cin * 1.0e-12
-            CL = self.cac * 1.0e-6
-
-            chnl_dly = l_ch / v0
             gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H = exp(-l_ch * gamma)
             chnl_H = 2.0 * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
             chnl_h = real(ifft(chnl_H))
+            chnl_dly = l_ch / v0
 
         min_len = 10 * nspui
         max_len = 100 * nspui
@@ -1467,10 +1497,9 @@ class PyBERT(HasTraits):
         return chnl_h
 
 
-# So that we can be used in stand-alone, or imported, fashion.
-def main():
-    PyBERT().configure_traits(view=traits_view)
+# So that we can be used in stand-alone or imported fashion.
+# def main():
+#     PyBERT().configure_traits(view=traits_view)
 
-
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
