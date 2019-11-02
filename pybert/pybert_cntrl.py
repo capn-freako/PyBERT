@@ -354,10 +354,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
             else:  # Init() only.
                 ctle_out_h_padded = pad(
-                    ctle_out_h, (nspb, len(rx_in) - nspb - len(ctle_out_h)), "linear_ramp", end_values=(0.0, 0.0)
+                    ctle_out_h, (nspb, len(rx_in) - nspb - len(ctle_out_h)), "linear_ramp", end_values=(0.0, 0.0),
                 )
                 tx_out_h_padded = pad(
-                    tx_out_h, (nspb, len(rx_in) - nspb - len(tx_out_h)), "linear_ramp", end_values=(0.0, 0.0)
+                    tx_out_h, (nspb, len(rx_in) - nspb - len(tx_out_h)), "linear_ramp", end_values=(0.0, 0.0),
                 )
                 ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)
                 ctle_h = real(ifft(ctle_H)[: len(chnl_h)])
@@ -724,11 +724,11 @@ def update_results(self):
     self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))
     if self._old_n_taps != n_taps:
         new_plot = Plot(
-            self.plotdata, auto_colors=["red", "orange", "yellow", "green", "blue", "purple"], padding_left=75
+            self.plotdata, auto_colors=["red", "orange", "yellow", "green", "blue", "purple"], padding_left=75,
         )
         for i in range(self.n_taps):
             new_plot.plot(
-                ("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d" % (i + 1)
+                ("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d" % (i + 1),
             )
         new_plot.title = "DFE Adaptation"
         new_plot.tools.append(PanTool(new_plot, constrain=True, constrain_key=None, constrain_direction="x"))
@@ -845,7 +845,7 @@ def update_results(self):
     bathtub_chnl.reverse()
     bathtub_chnl = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[: half_len + 1])))
     bathtub_chnl = where(
-        bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl
+        bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl,
     )  # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_chnl", log10(bathtub_chnl))
     #  - Tx
@@ -861,7 +861,7 @@ def update_results(self):
     bathtub_ctle.reverse()
     bathtub_ctle = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[: half_len + 1])))
     bathtub_ctle = where(
-        bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle
+        bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle,
     )  # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_ctle", log10(bathtub_ctle))
     #  - DFE

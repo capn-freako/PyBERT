@@ -14,7 +14,7 @@ from threading import Thread
 from enable.component_editor import ComponentEditor
 from pyface.api import OK, FileDialog
 from pyface.image_resource import ImageResource
-from traits.api import (Instance, HasTraits)
+from traits.api import Instance, HasTraits
 from traitsui.api import (
     Action,
     CheckListEditor,

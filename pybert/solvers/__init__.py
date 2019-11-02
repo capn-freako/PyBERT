@@ -14,5 +14,7 @@ so as to support solvers, which may need extra data/support files.
 
 Copyright (c) 2019 by David Banas; all rights reserved World wide.
 """
-__all__ = ["simbeor",]  # Should contain the name of each submodule.
-from . import *       # Makes each solver package available as: solvers.simbeor, etc.
+__all__ = [
+    "simbeor",
+]  # Should contain the name of each submodule.
+from . import *  # Makes each solver package available as: solvers.simbeor, etc.
