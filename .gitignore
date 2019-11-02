@@ -29,3 +29,5 @@ tests/htmlcov
 venv
 env
 
+htmlcov
+pybert.log

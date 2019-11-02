@@ -7,6 +7,7 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
+import json
 import pickle
 from threading import Thread
 
@@ -30,7 +31,7 @@ from traitsui.api import (
     Label,
     EnumEditor,
 )
-from pybert.pybert_cfg import PyBertCfg
+from pybert.pybert_cfg import PyBertCfg, config_from_dict
 from pybert.pybert_cntrl import my_run_sweeps
 from pybert.pybert_data import PyBertData
 
@@ -70,9 +71,11 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "wb") as the_file:
-                    pickle.dump(the_PyBertCfg, the_file)
+                with open(dlg.path, "w") as the_file:
+                    # Grab all the instance variables from the_PyBertCfg
+                    json.dump(the_PyBertCfg, the_file, indent=4, default=lambda x: x.__dict__)
                 the_pybert.cfg_file = dlg.path
+                the_pybert.log(f"Configuration saved to {the_pybert.cfg_file}")
             except Exception as err:
                 error_message = "The following error occured:\n\t{}\nThe configuration was NOT saved.".format(err)
                 the_pybert.handle_error(error_message)
@@ -83,8 +86,8 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rb") as the_file:
-                    the_PyBertCfg = pickle.load(the_file)
+                with open(dlg.path, "r") as the_file:
+                    the_PyBertCfg = config_from_dict(json.load(the_file))
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
@@ -99,6 +102,7 @@ class MyHandler(Handler):
                     else:
                         setattr(the_pybert, prop, value)
                 the_pybert.cfg_file = dlg.path
+                the_pybert.log(f"Configuration loaded from {the_pybert.cfg_file}")
             except Exception as err:
                 error_message = "The following error occurred:\n\t{}\nThe configuration was NOT loaded.".format(err)
                 the_pybert.handle_error(error_message)
