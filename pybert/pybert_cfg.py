@@ -110,10 +110,3 @@ class PyBertCfg:
 
         # Analysis
         self.thresh = the_PyBERT.thresh
-
-
-def config_from_dict(dict_obj):
-    """Create a new empty PyBERT config and update its __dict__ from the argument."""
-    instance = PyBertCfg.__new__(PyBertCfg)
-    instance.__dict__.update(dict_obj)
-    return instance
