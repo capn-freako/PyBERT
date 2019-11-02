@@ -19,6 +19,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 # ETSConfig.toolkit = "wx"
 
 from datetime import datetime
+import platform
 from threading import Event, Thread
 from time import sleep
 
@@ -580,7 +581,7 @@ class PyBERT(HasTraits):
     # Logger
     def log(self, msg):
         """Log a message to the console."""
-        self.console_log += "\n[{}]: {}\n".format(datetime.now(), msg.strip())
+        self.console_log += "[{}]: {}\n".format(datetime.now(), msg.strip())
 
     def dbg(self, msg):
         """Only if debug is true, log this message to the console."""
@@ -619,6 +620,7 @@ class PyBERT(HasTraits):
         super(PyBERT, self).__init__()
 
         self.log("Started.")
+        self.log_information()
         if self.debug:
             self.log("Debug Mode Enabled.")
 
@@ -1495,6 +1497,14 @@ class PyBERT(HasTraits):
         self.chnl_p = chnl_p
 
         return chnl_h
+
+    def log_information(self):
+        """Log the system information."""
+        self.log(
+            f"System: {platform.system()} {platform.release()} Version: {platform.version()}"
+        )
+        self.log(f"Python Version: {platform.python_version()}")
+        self.log(f"PyBERT Version: {VERSION}")
 
 
 # So that we can be used in stand-alone or imported fashion.
