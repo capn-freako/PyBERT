@@ -1500,7 +1500,7 @@ class PyBERT(HasTraits):
 
     def log_information(self):
         """Log the system information."""
-        self.log(f"System: {platform.system()} {platform.release()} Version: {platform.version()}")
+        self.log(f"System: {platform.system()} {platform.release()}")
         self.log(f"Python Version: {platform.python_version()}")
         self.log(f"PyBERT Version: {VERSION}")
 
