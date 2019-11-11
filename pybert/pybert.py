@@ -445,7 +445,7 @@ class PyBERT(HasTraits):
     tx_ami_valid = Bool(False)  #: (Bool)
     tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     tx_dll_valid = Bool(False)  #: (Bool)
-    tx_ibis_file = File("", entries=5, filter=["*.ibs"])  #: (File)
+    tx_ibis_file = File("", entries=5, filter=["IBIS Models (*.ibs)|*.ibs",])  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
     tx_use_ibis = Bool(False)  #: (Bool)
 

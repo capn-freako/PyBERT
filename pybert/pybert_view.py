@@ -285,7 +285,7 @@ traits_view = View(
                             Item(
                                 name="tx_ibis_file", label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open"),
+                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
                             ),
                             Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
@@ -412,7 +412,7 @@ traits_view = View(
                             Item(
                                 name="rx_ibis_file", label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open"),
+                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
                             ),
                             Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),

@@ -109,7 +109,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_dfe.plot(("t_ns_chnl", "dfe_out_h"), type="line", color="red", name="Cumulative")
     plot_h_dfe.title = post_dfe_str
     plot_h_dfe.index_axis.title = "Time (ns)"
-    plot_h_dfe.y_axis.title = post_dfe_str
+    plot_h_dfe.y_axis.title = "Impulse Response (V/ns)"
     plot_h_dfe.legend.visible = True
     plot_h_dfe.legend.align = "ur"
     plot_h_dfe.index_range = plot_h_chnl.index_range  # Zoom x-axes in tandem.
@@ -157,7 +157,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_dfe.plot(("t_ns_chnl", "dfe_out_s"), type="line", color="red", name="Cumulative")
     plot_s_dfe.title = post_dfe_str
     plot_s_dfe.index_axis.title = "Time (ns)"
-    plot_s_dfe.y_axis.title = post_dfe_str
+    plot_s_dfe.y_axis.title = "Step Response (V)"
     plot_s_dfe.legend.visible = True
     plot_s_dfe.legend.align = "lr"
     plot_s_dfe.index_range = plot_s_chnl.index_range  # Zoom x-axes in tandem.
