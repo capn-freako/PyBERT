@@ -1079,7 +1079,7 @@ class PyBERT(HasTraits):
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
 
-            info_str += "<H2>CTLE</H2>\n"
+            info_str += "<H2>CTLE (+ AMI DFE)</H2>\n"
             info_str += '<TABLE border="1">\n'
             info_str += '<TR align="center">\n'
             info_str += "<TH>Jitter Component</TH><TH>Input (ps)</TH><TH>Output (ps)</TH><TH>Rejection (dB)</TH>\n"
