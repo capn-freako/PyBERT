@@ -187,7 +187,8 @@ class MyHandler(Handler):
                 error_message = "The following error occured:\n\t{}\nThe waveform data was NOT loaded.".format(err)
                 the_pybert.handle_error(error_message)
 
-
+# These are the "globally applicable" buttons referred to in pybert.py,
+# just above the button definitions (approx. line 580).
 run_sim = Action(name="Run", action="do_run_simulation")
 stop_sim = Action(name="Stop", action="do_stop_simulation")
 save_data = Action(name="Save Results", action="do_save_data")
@@ -281,14 +282,193 @@ traits_view = View(
                 VGroup(
                     VGroup(
                         HGroup(
+                            Item(
+                                name="tx_ibis_file", label="File",
+                                springy=True,
+                                editor=FileEditor(dialog_style="open"),
+                            ),
+                            Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        ),
+                        HGroup(
+                            Item(name="tx_use_ibis", label="Use IBIS"),
+                            Item(name="btn_sel_tx", show_label=False),
+                            Item(name="btn_view_tx", show_label=False),
+                            enabled_when="tx_ibis_valid == True",
+                        ),
+                        label="IBIS",
+                        show_border=True,
+                    ),
+                    VGroup(
+                        Item(
+                            name="rs",
+                            label="Tx_Rs (Ohms)",
+                            tooltip="Tx differential source impedance",
+                        ),
+                        Item(
+                            name="cout",
+                            label="Tx_Cout (pF)",
+                            tooltip="Tx parasitic output capacitance (each pin)",
+                        ),
+                        label="Native",
+                        show_border=True,
+                        enabled_when="tx_use_ibis == False",
+                    ),
+                    label="Tx",
+                    show_border=True,
+                ),
+                VGroup(  # Interconnect
+                    VGroup(  # From File
+                        VGroup(
+                            HGroup(
+                                Item(
+                                    name="ch_file", label="File",
+                                    springy=True,
+                                    editor=FileEditor(dialog_style="open"),
+                                ),
+                                Item(name="chnl_valid", label="Valid", style="simple", enabled_when="False"),
+                            ),
+                            Item(
+                                name="use_ch_file",
+                                label="Use file",
+                                enabled_when="chnl_valid == True",
+                            ),
+                        ),
+                        HGroup(
+                            VGroup(
+                                Item(
+                                    name="Zref",
+                                    label="Zref",
+                                    tooltip="Reference Impedance.",
+                                ),
+                                Item(
+                                    name="f_step",
+                                    label="f_step",
+                                    tooltip="Frequency step to use in generating H(f).",
+                                ),
+                            ),
+                            VGroup(
+                                Item(label="Ohms"),
+                                Item(label="MHz"),
+                            ),
+                            VGroup(
+                                Item(name="padded",   label="Zero-padded"),
+                                Item(name="windowed", label="Windowed"),
+                            ),
+                            enabled_when="use_ch_file == True",
+                        ),
+                        label="From File",
+                        show_border=True,
+                    ),
+                    HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
+                        VGroup(
+                            Item(
+                                name="l_ch",
+                                label="Length (m)",
+                                tooltip="interconnect length",
+                            ),
+                            Item(
+                                name="Theta0",
+                                label="Loss Tan.",
+                                tooltip="dielectric loss tangent",
+                            ),
+                            Item(
+                                name="Z0",
+                                label="Z0 (Ohms)",
+                                tooltip="characteristic differential impedance",
+                            ),
+                            Item(
+                                name="v0",
+                                label="v_rel (c)",
+                                tooltip="normalized propagation velocity",
+                            ),
+                        ),
+                        VGroup(
+                            Item(
+                                name="Rdc",
+                                label="Rdc (Ohms)",
+                                tooltip="d.c. resistance",
+                            ),
+                            Item(
+                                name="w0",
+                                label="w0 (rads./s)",
+                                tooltip="transition frequency",
+                            ),
+                            Item(
+                                name="R0",
+                                label="R0 (Ohms)",
+                                tooltip="skin effect resistance",
+                            ),
+                        ),
+                        label="Native",
+                        show_border=True,
+                        enabled_when="use_ch_file == False",
+                    ),
+                    label="Interconnect",
+                    show_border=True,
+                ),
+                VGroup(
+                    VGroup(
+                        HGroup(
+                            Item(
+                                name="rx_ibis_file", label="File",
+                                springy=True,
+                                editor=FileEditor(dialog_style="open"),
+                            ),
+                            Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        ),
+                        HGroup(
+                            Item(name="rx_use_ibis", label="Use IBIS"),
+                            Item(name="btn_sel_rx", show_label=False),
+                            Item(name="btn_view_rx", show_label=False),
+                            enabled_when="rx_ibis_valid == True",
+                        ),
+                        label="IBIS",
+                        show_border=True,
+                    ),
+                    VGroup(
+                        Item(
+                            name="rin",
+                            label="Rx_Rin (Ohms)",
+                            tooltip="Rx differential input impedance",
+                        ),
+                        Item(
+                            name="cin",
+                            label="Rx_Cin (pF)",
+                            tooltip="Rx parasitic input capacitance (each pin)",
+                        ),
+                        Item(
+                            name="cac",
+                            label="Rx_Cac (uF)",
+                            tooltip="Rx a.c. coupling capacitance (each pin)",
+                        ),
+                        label="Native",
+                        show_border=True,
+                        enabled_when="rx_use_ibis == False",
+                    ),
+                    label="Rx",
+                    show_border=True,
+                ),
+                label="Channel",
+                show_border=True,
+            ),
+            # spring,
+            label="Config.",
+            id="config",
+        ),
+        # "Equalization" tab.
+        VGroup(  # Channel Parameters
+            HGroup(
+                VGroup(
+                    VGroup(
+                        HGroup(
                             VGroup(
                                 HGroup(
-                                    Item(name="tx_ami_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="tx_ami_file", label="AMI File:", tooltip="Choose AMI file."),
+                                    Item(name="tx_ami_file", label="AMI File:", style="readonly", springy=True),
+                                    Item(name="tx_ami_valid", label="Valid", style="simple", enabled_when="False"),
                                 ),
                                 HGroup(
-                                    Item(name="tx_dll_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="tx_dll_file", label="DLL File:", tooltip="Choose DLL file."),
+                                    Item(name="tx_dll_file", label="DLL File:", style="readonly", springy=True),
+                                    Item(name="tx_dll_valid", label="Valid", style="simple", enabled_when="False"),
                                 ),
                             ),
                             VGroup(
@@ -348,12 +528,12 @@ traits_view = View(
                         HGroup(
                             VGroup(
                                 HGroup(
-                                    Item(name="rx_ami_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="rx_ami_file", label="AMI File:", tooltip="Choose AMI file."),
+                                    Item(name="rx_ami_file", label="AMI File:", style="readonly", springy=True),
+                                    Item(name="rx_ami_valid", label="Valid", style="simple", enabled_when="False"),
                                 ),
                                 HGroup(
-                                    Item(name="rx_dll_valid", show_label=False, style="simple", enabled_when="False"),
-                                    Item(name="rx_dll_file", label="DLL File:", tooltip="Choose DLL file."),
+                                    Item(name="rx_dll_file", label="DLL File:", style="readonly", springy=True),
+                                    Item(name="rx_dll_valid", label="Valid", style="simple", enabled_when="False"),
                                 ),
                             ),
                             VGroup(
@@ -491,122 +671,7 @@ traits_view = View(
                     # enabled_when='rx_use_ami == False  or  rx_use_ami == True and rx_use_getwave == False',
                 ),
             ),
-            # spring,
-            label="Config.",
-            id="config",
-        ),
-        # "Channel" tab.
-        VGroup(  # Channel Parameters
-            HGroup(
-                VGroup(
-                    Item(
-                        name="rs",
-                        label="Tx_Rs (Ohms)",
-                        tooltip="Tx differential source impedance",
-                    ),
-                    Item(
-                        name="cout",
-                        label="Tx_Cout (pF)",
-                        tooltip="Tx parasitic output capacitance (each pin)",
-                    ),
-                    label="Tx",
-                    show_border=True,
-                ),
-                VGroup(
-                    Item(
-                        name="rin",
-                        label="Rx_Rin (Ohms)",
-                        tooltip="Rx differential input impedance",
-                    ),
-                    Item(
-                        name="cin",
-                        label="Rx_Cin (pF)",
-                        tooltip="Rx parasitic input capacitance (each pin)",
-                    ),
-                    Item(
-                        name="cac",
-                        label="Rx_Cac (uF)",
-                        tooltip="Rx a.c. coupling capacitance (each pin)",
-                    ),
-                    label="Rx",
-                    show_border=True,
-                ),
-            ),
-            VGroup(  # Interconnect
-                HGroup(  # From File
-                    Item(
-                        name="use_ch_file",
-                        show_label=False,
-                        tooltip="Select channel frequency/impulse/step response from file.",
-                    ),
-                    Item(name="ch_file", label="File", enabled_when="use_ch_file == True", springy=True,
-                        editor=FileEditor(dialog_style="open"),),
-                    Item(name="Zref", label="Zref", enabled_when="use_ch_file == True",
-                        tooltip="Reference (or, nominal) interconnect impedance."),
-                    Item(name="padded", label="Zero-padded", enabled_when="use_ch_file == True"),
-                    Item(name="windowed", label="Windowed", enabled_when="use_ch_file == True"),
-                    Item(
-                        name="f_step",
-                        label="f_step",
-                        enabled_when="use_ch_file == True",
-                        tooltip="Frequency step to use in generating H(f).",
-                    ),
-                    Item(label="MHz"),
-                    label="From File",
-                    show_border=True,
-                ),
-                VGroup(  # Channel Designer
-                    HGroup(
-                        Item(
-                            name="l_ch",
-                            label="Length (m)",
-                            enabled_when="use_ch_file == False",
-                            tooltip="interconnect length",
-                        ),
-                        HGroup(
-                            Item(
-                                name="Theta0",
-                                label="Loss Tan.",
-                                tooltip="dielectric loss tangent",
-                            ),
-                            Item(
-                                name="Z0",
-                                label="Z0 (Ohms)",
-                                tooltip="characteristic differential impedance",
-                            ),
-                            Item(
-                                name="v0",
-                                label="v_rel (c)",
-                                # enabled_when="use_ch_file == False",
-                                tooltip="normalized propagation velocity",
-                            ),
-                            Item(
-                                name="Rdc",
-                                label="Rdc (Ohms)",
-                                tooltip="d.c. resistance",
-                            ),
-                            Item(
-                                name="w0",
-                                label="w0 (rads./s)",
-                                tooltip="transition frequency",
-                            ),
-                            Item(
-                                name="R0",
-                                label="R0 (Ohms)",
-                                tooltip="skin effect resistance",
-                            ),
-                            label="Native Channel Parameters",
-                            show_border=True,
-                            enabled_when="use_native == True and use_ch_file == False",
-                        ),
-                    ),
-                    label="Channel Designer",
-                    show_border=True,
-                ),
-                label="Interconnect",
-                show_border=True,
-            ),
-            label="Channel",
+            label="Equalization",
             id="channel",
         ),
         # "Optimizer" tab.

@@ -29,6 +29,8 @@ import numpy as np
 from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, sinc, where, zeros
 from numpy.fft import fft, ifft
 from numpy.random import randint
+from os.path import dirname, join
+import platform
 from scipy.optimize import minimize, minimize_scalar
 from traits.api import (
     HTML,
@@ -52,6 +54,7 @@ from traitsui.message import message
 
 from pyibisami.ami_parse import AMIParamConfigurator
 from pyibisami.ami_model import AMIModel
+from pyibisami.ibis_parser import IBISModel
 
 from pybert import __version__ as VERSION
 from pybert import __date__ as DATE
@@ -93,7 +96,7 @@ gNumAve = 1  # Number of bit error samples to average, when sweeping.
 #     - ToDo: These are the values for 24 guage twisted copper pair; need to add other options.
 gRdc = 0.1876  # Ohms/m
 gw0 = 10.0e6  # 10 MHz is recommended in Ch. 8 of his second book, in which UTP is described in detail.
-gR0 = 1.452  # skin-effect resistance (Ohms/m)
+gR0 = 1.452  # skin-effect resistance (Ohms/m)log
 gTheta0 = 0.02  # loss tangent
 gZ0 = 100.0  # characteristic impedance in LC region (Ohms)
 gv0 = 0.67  # relative propagation velocity (c)
@@ -375,17 +378,18 @@ class PyBERT(HasTraits):
     sweep_num = Int(1)
     sweep_aves = Int(gNumAve)
     do_sweep = Bool(False)  #: Run sweeps? (Default = False)
-    debug = Bool(True)      #: Log extra info to console when true. (Default = False)
+    debug = Bool(True)      #: Send log messages to terminal, as well as console, when True. (Default = False)
 
     # - Channel Control
+    ch_file = File(
+        "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
+    )                          #: Channel file name.
+    chnl_valid = Bool(False)   #: Channel file is valid.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     Zref = Float(100)          #: Reference (or, nominal) channel impedance.
     padded = Bool(False)       #: Zero pad imported Touchstone data? (Default = False)
     windowed = Bool(False)     #: Apply windowing to the Touchstone data? (Default = False)
     f_step = Float(10)         #: Frequency step to use when constructing H(f). (Default = 10 MHz)
-    ch_file = File(
-        "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
-    )                            #: Channel file name.
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(gRdc)            #: Channel d.c. resistance (Ohms/m).
     w0 = Float(gw0)              #: Channel transition frequency (rads./s).
@@ -398,7 +402,7 @@ class PyBERT(HasTraits):
     # - EQ Tune
     tx_tap_tuners = List(
         [
-            TxTapTuner(name="Pre-tap", enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
+            TxTapTuner(name="Pre-tap",   enabled=True,  min_val=-0.2, max_val=0.2, value=0.0),
             TxTapTuner(name="Post-tap1", enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
             TxTapTuner(name="Post-tap2", enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
             TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
@@ -427,7 +431,7 @@ class PyBERT(HasTraits):
     rn = Float(gRn)  #: Standard deviation of Gaussian random noise (V).
     tx_taps = List(
         [
-            TxTapTuner(name="Pre-tap", enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
+            TxTapTuner(name="Pre-tap",   enabled=True,  min_val=-0.2, max_val=0.2, value=0.0),
             TxTapTuner(name="Post-tap1", enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
             TxTapTuner(name="Post-tap2", enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
             TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
@@ -441,6 +445,9 @@ class PyBERT(HasTraits):
     tx_ami_valid = Bool(False)  #: (Bool)
     tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     tx_dll_valid = Bool(False)  #: (Bool)
+    tx_ibis_file = File("", entries=5, filter=["*.ibs"])  #: (File)
+    tx_ibis_valid = Bool(False)  #: (Bool)
+    tx_use_ibis = Bool(False)  #: (Bool)
 
     # - Rx
     rin = Float(gRin)  #: Rx input impedance (Ohm)
@@ -460,6 +467,9 @@ class PyBERT(HasTraits):
     rx_ami_valid = Bool(False)  #: (Bool)
     rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     rx_dll_valid = Bool(False)  #: (Bool)
+    rx_ibis_file = File("", entries=5, filter=["*.ibs"])  #: (File)
+    rx_ibis_valid = Bool(False)  #: (Bool)
+    rx_use_ibis = Bool(False)  #: (Bool)
 
     # - DFE
     use_dfe = Bool(gUseDfe)  #: True = use a DFE (Bool).
@@ -574,28 +584,24 @@ class PyBERT(HasTraits):
     btn_opt_rx = Button(label="OptRx")
     btn_coopt = Button(label="CoOpt")
     btn_abort = Button(label="Abort")
-    btn_cfg_tx = Button(label="Configure")
+    btn_cfg_tx = Button(label="Configure")  # Configure AMI parameters.
     btn_cfg_rx = Button(label="Configure")
+    btn_sel_tx = Button(label="Select")     # Select IBIS model.
+    btn_sel_rx = Button(label="Select")
+    btn_view_tx = Button(label="View")      # View IBIS model.
+    btn_view_rx = Button(label="View")
 
-    # Logger
-    def log(self, msg):
-        """Log a message to the console."""
-        self.console_log += "\n[{}]: {}\n".format(datetime.now(), msg.strip())
-
-    def dbg(self, msg):
-        """Only if debug is true, log this message to the console."""
+    # Logger & Pop-up
+    def log(self, msg, alert=False):
+        """Log a message to the console and, optionally, to terminal and/or pop-up dialog."""
+        _msg = msg.strip()
+        txt = "\n[{}]: {}\n".format(datetime.now(), _msg)
+        self.console_log += txt
         if self.debug:
-            ## In case PyBERT crashes, before we can read this in its console tab:
-            print("\n[{}]: {}\n".format(datetime.now(), msg.strip()))
-            self.log(msg)
-
-    def handle_error(self, error):
-        """If debug, raise else just prompt the user."""
-        self.log(error)
-        if self.debug:
-            message("{}\nPlease, check terminal for more information.".format(error), "PyBERT Alert")
-            raise error
-        message(error, "PyBERT Alert")
+            ## In case PyBERT crashes, before we can read this in its `Console` tab:
+            print(txt)
+        if alert:
+            message(_msg, "PyBERT Alert")
 
     # Default initialization
     def __init__(self, run_simulation=True):
@@ -630,7 +636,7 @@ class PyBERT(HasTraits):
         else:
             self.calc_chnl_h()  # Prevents missing attribute error in _get_ctle_out_h_tune().
 
-    # Button handlers
+    # Custom button handlers
     def _btn_rst_eq_fired(self):
         """Reset the equalization."""
         for i in range(4):
@@ -705,6 +711,53 @@ class PyBERT(HasTraits):
 
     def _btn_cfg_rx_fired(self):
         self._rx_cfg()
+
+    def ibis_model_changed(self, tx_rx):
+        if tx_rx not in ['tx', 'rx']:
+            raise ValueError("`tx_rx` must be one of: ['tx', 'rx']")
+        if tx_rx == 'tx':
+            ibis = self._tx_ibis
+        else:
+            ibis = self._rx_ibis
+        os_type = platform.system()
+        os_bits = platform.architecture()[0]
+        if os_type == 'Windows':
+            if os_bits == '64bit':
+                fnames = ibis.model._exec64Wins
+            else:
+                fnames = ibis.model._exec32Wins
+        else:
+            if os_bits == '64bit':
+                fnames = ibis.model._exec64Lins
+            else:
+                fnames = ibis.model._exec32Lins
+        if fnames:
+            if tx_rx == 'tx':
+                self.tx_dll_file = join(dirname(self.tx_ibis_file), fnames[0])
+                self.tx_ami_file = join(dirname(self.tx_ibis_file), fnames[1])
+            else:
+                self.rx_dll_file = join(dirname(self.rx_ibis_file), fnames[0])
+                self.rx_ami_file = join(dirname(self.rx_ibis_file), fnames[1])
+        elif ibis.model._subDict['algorithmic_model']:
+            self.log(f'There was an [Algorithmic Model] keyword for this model, but no executable for your platform: {os_type}-{os_bits}; PyBERT native equalization modeling being used instead.',
+                alert=True)
+        else:
+            self.log('There was no [Algorithmic Model] keyword for this model; PyBERT native equalization modeling being used instead.',
+                alert=True)
+
+    def _btn_sel_tx_fired(self):
+        self._tx_ibis()
+        self.ibis_model_changed('tx')
+
+    def _btn_sel_rx_fired(self):
+        self._rx_ibis()
+        self.ibis_model_changed('rx')
+
+    def _btn_view_tx_fired(self):
+        self._tx_ibis.model()
+
+    def _btn_view_rx_fired(self):
+        self._rx_ibis.model()
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
@@ -1346,6 +1399,19 @@ class PyBERT(HasTraits):
             for i in range(1, 4):
                 self.tx_tap_tuners[i].enabled = False
 
+    def _tx_ibis_file_changed(self, new_value):
+        try:
+            self.tx_ibis_valid = False
+            with open(new_value) as file:
+                ibis = IBISModel(file.read())
+            self.log("Parsing Tx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
+            self._tx_ibis = ibis
+            self.tx_ibis_valid = True
+            self.ibis_model_changed('tx')
+        except Exception as err:
+            error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
+            self.log(error_message, alert=True)
+
     def _tx_ami_file_changed(self, new_value):
         try:
             self.tx_ami_valid = False
@@ -1353,11 +1419,11 @@ class PyBERT(HasTraits):
                 pcfg = AMIParamConfigurator(pfile.read())
             self.log("Parsing Tx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
             self.tx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
-            self._tx_cfg = pcfg.open_gui
+            self._tx_cfg = pcfg
             self.tx_ami_valid = True
         except Exception as err:
             error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
-            self.handle_error(error_message)
+            self.log(error_message, alert=True)
 
     def _tx_dll_file_changed(self, new_value):
         try:
@@ -1367,7 +1433,20 @@ class PyBERT(HasTraits):
             self.tx_dll_valid = True
         except Exception as err:
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
-            self.handle_error(error_message)
+            self.log(error_message, alert=True)
+
+    def _rx_ibis_file_changed(self, new_value):
+        try:
+            self.rx_ibis_valid = False
+            with open(new_value) as file:
+                ibis = IBISModel(file.read())
+            self.log("Parsing Rx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
+            self._rx_ibis = ibis
+            self.rx_ibis_valid = True
+            self.ibis_model_changed('rx')
+        except Exception as err:
+            error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
+            self.log(error_message, alert=True)
 
     def _rx_ami_file_changed(self, new_value):
         try:
@@ -1376,11 +1455,11 @@ class PyBERT(HasTraits):
                 pcfg = AMIParamConfigurator(pfile.read())
             self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
             self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
-            self._rx_cfg = pcfg.open_gui
+            self._rx_cfg = pcfg
             self.rx_ami_valid = True
         except Exception as err:
             error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
-            self.handle_error(error_message)
+            self.log(error_message, alert=True)
 
     def _rx_dll_file_changed(self, new_value):
         try:
@@ -1390,7 +1469,7 @@ class PyBERT(HasTraits):
             self.rx_dll_valid = True
         except Exception as err:
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
-            self.handle_error(error_message)
+            self.log(error_message, alert=True)
 
     def _ch_type_changed(self, new_value):
         channel = draw_channel(self.height, self.width, self.thickness, self.separation, new_value)
@@ -1446,6 +1525,10 @@ class PyBERT(HasTraits):
         CL = self.cac * 1.0e-6
         w = self.w
 
+        if self.tx_use_ibis:
+            model = self._tx_ibis.model
+            Rs = model.zout * 2
+            Cs = model.ccomp[0] * 2
         if self.use_ch_file:
             Zref = self.Zref
             h = import_channel(self.ch_file, ts, self.padded, self.windowed)
@@ -1495,11 +1578,3 @@ class PyBERT(HasTraits):
         self.chnl_p = chnl_p
 
         return chnl_h
-
-
-# So that we can be used in stand-alone or imported fashion.
-# def main():
-#     PyBERT().configure_traits(view=traits_view)
-
-# if __name__ == "__main__":
-#     main()
