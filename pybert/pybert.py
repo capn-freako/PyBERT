@@ -54,7 +54,7 @@ from traitsui.message import message
 
 from pyibisami.ami_parse import AMIParamConfigurator
 from pyibisami.ami_model import AMIModel
-from pyibisami.ibis_parser import IBISModel
+from pyibisami.ibis_file import IBISModel
 
 from pybert import __version__ as VERSION
 from pybert import __date__ as DATE
@@ -73,7 +73,6 @@ from pybert.pybert_util import (
     pulse_center,
     safe_log10,
     trim_impulse,
-    draw_channel,
     submodules,
 )
 from pybert.pybert_view import traits_view
@@ -1471,26 +1470,6 @@ class PyBERT(HasTraits):
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
             self.log(error_message, alert=True)
 
-    def _ch_type_changed(self, new_value):
-        channel = draw_channel(self.height, self.width, self.thickness, self.separation, new_value)
-        self.drawdata.set_data("channel", channel)
-        
-    def _height_changed(self, new_value):
-        channel = draw_channel(new_value, self.width, self.thickness, self.separation, self.ch_type)
-        self.drawdata.set_data("channel", channel)
-        
-    def _width_changed(self, new_value):
-        channel = draw_channel(self.height, new_value, self.thickness, self.separation, self.ch_type)
-        self.drawdata.set_data("channel", channel)
-        
-    def _thickness_changed(self, new_value):
-        channel = draw_channel(self.height, self.width, new_value, self.separation, self.ch_type)
-        self.drawdata.set_data("channel", channel)
-        
-    def _separation_changed(self, new_value):
-        channel = draw_channel(self.height, self.width, self.thickness, new_value, self.ch_type)
-        self.drawdata.set_data("channel", channel)
-        
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
