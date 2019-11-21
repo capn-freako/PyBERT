@@ -737,11 +737,11 @@ class PyBERT(HasTraits):
             else:
                 self.rx_dll_file = join(dirname(self.rx_ibis_file), fnames[0])
                 self.rx_ami_file = join(dirname(self.rx_ibis_file), fnames[1])
-        elif ibis.model._subDict['algorithmic_model']:
+        elif 'algorithmic_model' in ibis.model._subDict:
             self.log(f'There was an [Algorithmic Model] keyword for this model, but no executable for your platform: {os_type}-{os_bits}; PyBERT native equalization modeling being used instead.',
                 alert=True)
         else:
-            self.log('There was no [Algorithmic Model] keyword for this model; PyBERT native equalization modeling being used instead.',
+            self.log('There was no [Algorithmic Model] keyword for this model;\nPyBERT native equalization modeling being used instead.',
                 alert=True)
 
     def _btn_sel_tx_fired(self):
