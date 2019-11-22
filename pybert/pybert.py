@@ -30,7 +30,6 @@ from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, 
 from numpy.fft import fft, ifft
 from numpy.random import randint
 from os.path import dirname, join
-import platform
 from scipy.optimize import minimize, minimize_scalar
 from traits.api import (
     HTML,
@@ -711,46 +710,15 @@ class PyBERT(HasTraits):
     def _btn_cfg_rx_fired(self):
         self._rx_cfg()
 
-    def ibis_model_changed(self, tx_rx):
-        if tx_rx not in ['tx', 'rx']:
-            raise ValueError("`tx_rx` must be one of: ['tx', 'rx']")
-        if tx_rx == 'tx':
-            ibis = self._tx_ibis
-        else:
-            ibis = self._rx_ibis
-        os_type = platform.system()
-        os_bits = platform.architecture()[0]
-        if os_type == 'Windows':
-            if os_bits == '64bit':
-                fnames = ibis.model._exec64Wins
-            else:
-                fnames = ibis.model._exec32Wins
-        else:
-            if os_bits == '64bit':
-                fnames = ibis.model._exec64Lins
-            else:
-                fnames = ibis.model._exec32Lins
-        if fnames:
-            if tx_rx == 'tx':
-                self.tx_dll_file = join(dirname(self.tx_ibis_file), fnames[0])
-                self.tx_ami_file = join(dirname(self.tx_ibis_file), fnames[1])
-            else:
-                self.rx_dll_file = join(dirname(self.rx_ibis_file), fnames[0])
-                self.rx_ami_file = join(dirname(self.rx_ibis_file), fnames[1])
-        elif 'algorithmic_model' in ibis.model._subDict:
-            self.log(f'There was an [Algorithmic Model] keyword for this model, but no executable for your platform: {os_type}-{os_bits}; PyBERT native equalization modeling being used instead.',
-                alert=True)
-        else:
-            self.log('There was no [Algorithmic Model] keyword for this model;\nPyBERT native equalization modeling being used instead.',
-                alert=True)
-
     def _btn_sel_tx_fired(self):
         self._tx_ibis()
-        self.ibis_model_changed('tx')
+        self.tx_dll_file = self._tx_ibis.dll_file
+        self.tx_ami_file = self._tx_ibis.ami_file
 
     def _btn_sel_rx_fired(self):
         self._rx_ibis()
-        self.ibis_model_changed('rx')
+        self.rx_dll_file = self._rx_ibis.dll_file
+        self.rx_ami_file = self._rx_ibis.ami_file
 
     def _btn_view_tx_fired(self):
         self._tx_ibis.model()
@@ -1406,7 +1374,8 @@ class PyBERT(HasTraits):
             self.log("Parsing Tx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
-            self.ibis_model_changed('tx')
+            self.tx_dll_file = self._tx_ibis.dll_file
+            self.tx_ami_file = self._tx_ibis.ami_file
         except Exception as err:
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
             self.log(error_message, alert=True)
@@ -1442,7 +1411,8 @@ class PyBERT(HasTraits):
             self.log("Parsing Rx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
-            self.ibis_model_changed('rx')
+            self.rx_dll_file = self._rx_ibis.dll_file
+            self.rx_ami_file = self._rx_ibis.ami_file
         except Exception as err:
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
             self.log(error_message, alert=True)
