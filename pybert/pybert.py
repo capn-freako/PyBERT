@@ -363,6 +363,8 @@ class PyBERT(HasTraits):
     Useful for exploring the concepts of serial communication link design.
     """
 
+    reraise = True  # Set to `True` only for serious development debugging mode.
+
     # Independent variables
 
     # - Simulation Control
@@ -590,11 +592,13 @@ class PyBERT(HasTraits):
     btn_view_rx = Button(label="View")
 
     # Logger & Pop-up
-    def log(self, msg, alert=False):
+    def log(self, msg, alert=False, exception=None):
         """Log a message to the console and, optionally, to terminal and/or pop-up dialog."""
         _msg = msg.strip()
         txt = "\n[{}]: {}\n".format(datetime.now(), _msg)
         self.console_log += txt
+        if exception and self.reraise:  # If we're in serious development debugging mode:
+            raise exception
         if self.debug:
             ## In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt)
@@ -1378,7 +1382,7 @@ class PyBERT(HasTraits):
             self.tx_ami_file = self._tx_ibis.ami_file
         except Exception as err:
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
-            self.log(error_message, alert=True)
+            self.log(error_message, alert=True, exception=err)
 
     def _tx_ami_file_changed(self, new_value):
         try:
