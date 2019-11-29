@@ -1374,7 +1374,7 @@ class PyBERT(HasTraits):
         try:
             self.tx_ibis_valid = False
             with open(new_value) as file:
-                ibis = IBISModel(file.read())
+                ibis = IBISModel(file.read(), True)
             self.log("Parsing Tx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
@@ -1411,7 +1411,7 @@ class PyBERT(HasTraits):
         try:
             self.rx_ibis_valid = False
             with open(new_value) as file:
-                ibis = IBISModel(file.read())
+                ibis = IBISModel(file.read(), False)
             self.log("Parsing Rx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
