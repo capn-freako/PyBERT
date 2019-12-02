@@ -1,0 +1,667 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>pybert.pybert_plot &#8212; PyBERT 3.3.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for pybert.pybert_plot</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Plot definitions for PyBERT class.</span>
+
+<span class="sd">Original author: David Banas &lt;capn.freako@gmail.com&gt;</span>
+
+<span class="sd">Original date:   February 21, 2015 (Copied from pybert.py, as part of a major code cleanup.)</span>
+
+<span class="sd">Copyright (c) 2015 David Banas; all rights reserved World wide.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">chaco.api</span> <span class="k">import</span> <span class="n">ColorMapper</span><span class="p">,</span> <span class="n">GridPlotContainer</span><span class="p">,</span> <span class="n">Plot</span>
+<span class="kn">from</span> <span class="nn">chaco.tools.api</span> <span class="k">import</span> <span class="n">PanTool</span><span class="p">,</span> <span class="n">ZoomTool</span>
+
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="p">(</span><span class="n">linspace</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">pybert.pybert_cntrl</span> <span class="k">import</span> <span class="n">update_eyes</span>
+
+
+<div class="viewcode-block" id="make_plots"><a class="viewcode-back" href="../../pybert.html#pybert.pybert_plot.make_plots">[docs]</a><span class="k">def</span> <span class="nf">make_plots</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_dfe_taps</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Create the plots used by the PyBERT GUI.&quot;&quot;&quot;</span>
+
+    <span class="n">post_chnl_str</span> <span class="o">=</span> <span class="s2">&quot;Channel&quot;</span>
+    <span class="n">post_tx_str</span>   <span class="o">=</span> <span class="s2">&quot;Channel + Tx Preemphasis&quot;</span>
+    <span class="n">post_ctle_str</span> <span class="o">=</span> <span class="s2">&quot;Channel + Tx Preemphasis + CTLE (+ AMI DFE)&quot;</span>
+    <span class="n">post_dfe_str</span>  <span class="o">=</span> <span class="s2">&quot;Channel + Tx Preemphasis + CTLE (+ AMI DFE) + PyBERT DFE&quot;</span>
+
+    <span class="n">plotdata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">plotdata</span>
+
+    <span class="c1"># - DFE tab</span>
+    <span class="n">plot2</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot2</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns&quot;</span><span class="p">,</span> <span class="s2">&quot;ui_ests&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot2</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;CDR Adaptation&quot;</span>
+    <span class="n">plot2</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot2</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;UI (ps)&quot;</span>
+
+    <span class="n">plot9</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">auto_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="s2">&quot;orange&quot;</span><span class="p">,</span> <span class="s2">&quot;yellow&quot;</span><span class="p">,</span> <span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="s2">&quot;purple&quot;</span><span class="p">],</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_dfe_taps</span><span class="p">):</span>
+        <span class="n">plot9</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;tap_weight_index&quot;</span><span class="p">,</span> <span class="s2">&quot;tap</span><span class="si">%d</span><span class="s2">_weights&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;tap</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">plot9</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;DFE Adaptation&quot;</span>
+    <span class="n">plot9</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">PanTool</span><span class="p">(</span><span class="n">plot9</span><span class="p">,</span> <span class="n">constrain</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">constrain_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">constrain_direction</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">))</span>
+    <span class="n">zoom9</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot9</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot9</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom9</span><span class="p">)</span>
+    <span class="n">plot9</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot9</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ul&quot;</span>
+
+    <span class="n">plot_clk_per_hist</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_clk_per_hist</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;clk_per_hist_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;clk_per_hist_vals&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_clk_per_hist</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;CDR Clock Period Histogram&quot;</span>
+    <span class="n">plot_clk_per_hist</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Clock Period (ps)&quot;</span>
+    <span class="n">plot_clk_per_hist</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Bin Count&quot;</span>
+
+    <span class="n">plot_clk_per_spec</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_clk_per_spec</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;clk_freqs&quot;</span><span class="p">,</span> <span class="s2">&quot;clk_spec&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_clk_per_spec</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;CDR Clock Period Spectrum&quot;</span>
+    <span class="n">plot_clk_per_spec</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (bit rate)&quot;</span>
+    <span class="n">plot_clk_per_spec</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;|H(f)| (dB mean)&quot;</span>
+    <span class="n">plot_clk_per_spec</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="o">-</span><span class="mi">10</span>
+    <span class="n">zoom_clk_per_spec</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot_clk_per_spec</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot_clk_per_spec</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom_clk_per_spec</span><span class="p">)</span>
+
+    <span class="n">container_dfe</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_dfe</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot2</span><span class="p">)</span>
+    <span class="n">container_dfe</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot9</span><span class="p">)</span>
+    <span class="n">container_dfe</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_clk_per_hist</span><span class="p">)</span>
+    <span class="n">container_dfe</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_clk_per_spec</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_dfe</span> <span class="o">=</span> <span class="n">container_dfe</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_dfe_plot</span> <span class="o">=</span> <span class="n">plot9</span>
+
+    <span class="c1"># - EQ Tune tab</span>
+    <span class="n">plot_h_tune</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_h_tune</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_out_h_tune&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_h_tune</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;clocks_tune&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">)</span>
+    <span class="n">plot_h_tune</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Channel + Tx Preemphasis + CTLE (+ AMI DFE) + Ideal DFE&quot;</span>
+    <span class="n">plot_h_tune</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_h_tune</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Pulse Response (V)&quot;</span>
+    <span class="n">zoom_tune</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot_h_tune</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot_h_tune</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom_tune</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plot_h_tune</span> <span class="o">=</span> <span class="n">plot_h_tune</span>
+
+    <span class="c1"># - Impulse Responses tab</span>
+    <span class="n">plot_h_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;chnl_h&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">)</span>
+    <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Impulse Response (V/ns)&quot;</span>
+    <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">zoom_h</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot_h_chnl</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom_h</span><span class="p">)</span>
+
+    <span class="n">plot_h_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_h_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;tx_out_h&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_h_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_h_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_h_tx</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Impulse Response (V/ns)&quot;</span>
+    <span class="n">plot_h_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_h_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">plot_h_tx</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_h_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_h_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_out_h&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_h_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_h_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_h_ctle</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Impulse Response (V/ns)&quot;</span>
+    <span class="n">plot_h_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_h_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">plot_h_ctle</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_h_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_h_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;dfe_out_h&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_h_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_h_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_h_dfe</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Impulse Response (V/ns)&quot;</span>
+    <span class="n">plot_h_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_h_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">plot_h_dfe</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_h_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">container_h</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_h</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_h_chnl</span><span class="p">)</span>
+    <span class="n">container_h</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_h_tx</span><span class="p">)</span>
+    <span class="n">container_h</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_h_ctle</span><span class="p">)</span>
+    <span class="n">container_h</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_h_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_h</span> <span class="o">=</span> <span class="n">container_h</span>
+
+    <span class="c1"># - Step Responses tab</span>
+    <span class="n">plot_s_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;chnl_s&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">)</span>
+    <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Step Response (V)&quot;</span>
+    <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+    <span class="n">zoom_s</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot_s_chnl</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom_s</span><span class="p">)</span>
+
+    <span class="n">plot_s_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;tx_s&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">)</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;tx_out_s&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Step Response (V)&quot;</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+    <span class="n">plot_s_tx</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_s_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_s&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">)</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_out_s&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Step Response (V)&quot;</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+    <span class="n">plot_s_ctle</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_s_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;dfe_s&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">)</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;dfe_out_s&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Step Response (V)&quot;</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+    <span class="n">plot_s_dfe</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_s_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">container_s</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_s</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_s_chnl</span><span class="p">)</span>
+    <span class="n">container_s</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_s_tx</span><span class="p">)</span>
+    <span class="n">container_s</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_s_ctle</span><span class="p">)</span>
+    <span class="n">container_s</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_s_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_s</span> <span class="o">=</span> <span class="n">container_s</span>
+
+    <span class="c1"># - Pulse Responses tab</span>
+    <span class="n">plot_p_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;chnl_p&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">)</span>
+    <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Pulse Response (V)&quot;</span>
+    <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">zoom_p</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot_p_chnl</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom_p</span><span class="p">)</span>
+
+    <span class="n">plot_p_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_p_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;tx_out_p&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_p_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_p_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_p_tx</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Pulse Response (V)&quot;</span>
+    <span class="n">plot_p_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_p_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">plot_p_tx</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_p_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_p_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_out_p&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_p_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_p_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_p_ctle</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Pulse Response (V)&quot;</span>
+    <span class="n">plot_p_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_p_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">plot_p_ctle</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_p_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_p_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="s2">&quot;dfe_out_p&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">)</span>
+    <span class="n">plot_p_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_p_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_p_dfe</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Pulse Response (V)&quot;</span>
+    <span class="n">plot_p_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_p_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">plot_p_dfe</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_p_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">container_p</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_p</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_p_chnl</span><span class="p">)</span>
+    <span class="n">container_p</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_p_tx</span><span class="p">)</span>
+    <span class="n">container_p</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_p_ctle</span><span class="p">)</span>
+    <span class="n">container_p</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_p_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_p</span> <span class="o">=</span> <span class="n">container_p</span>
+
+    <span class="c1"># - Frequency Responses tab</span>
+    <span class="n">plot_H_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;chnl_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Original Impulse&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;chnl_trimmed_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Trimmed Impulse&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (GHz)&quot;</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency Response (dB)&quot;</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="mf">0.01</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mf">40.0</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ll&quot;</span>
+
+    <span class="n">plot_H_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;tx_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;tx_out_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (GHz)&quot;</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency Response (dB)&quot;</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="mf">0.01</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mf">40.0</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ll&quot;</span>
+
+    <span class="n">plot_H_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_out_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (GHz)&quot;</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency Response (dB)&quot;</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="mf">0.01</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mf">40.0</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="o">-</span><span class="mf">40.0</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ll&quot;</span>
+
+    <span class="n">plot_H_chnl</span><span class="o">.</span><span class="n">value_range</span> <span class="o">=</span> <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">value_range</span>
+    <span class="n">plot_H_tx</span><span class="o">.</span><span class="n">value_range</span> <span class="o">=</span> <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">value_range</span>
+
+    <span class="n">plot_H_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;dfe_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Incremental&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;dfe_out_H&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cumulative&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (GHz)&quot;</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency Response (dB)&quot;</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="mf">0.01</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">index_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mf">40.0</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">value_range</span> <span class="o">=</span> <span class="n">plot_H_ctle</span><span class="o">.</span><span class="n">value_range</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_H_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ll&quot;</span>
+
+    <span class="n">container_H</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_H</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_H_chnl</span><span class="p">)</span>
+    <span class="n">container_H</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_H_tx</span><span class="p">)</span>
+    <span class="n">container_H</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_H_ctle</span><span class="p">)</span>
+    <span class="n">container_H</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_H_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_H</span> <span class="o">=</span> <span class="n">container_H</span>
+
+    <span class="c1"># - Outputs tab</span>
+    <span class="n">plot_out_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns&quot;</span><span class="p">,</span> <span class="s2">&quot;ideal_signal&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;lightgrey&quot;</span><span class="p">)</span>
+    <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns&quot;</span><span class="p">,</span> <span class="s2">&quot;chnl_out&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Output (V)&quot;</span>
+    <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">PanTool</span><span class="p">(</span><span class="n">plot_out_chnl</span><span class="p">,</span> <span class="n">constrain</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">constrain_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">constrain_direction</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">))</span>
+    <span class="n">zoom_out_chnl</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot_out_chnl</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom_out_chnl</span><span class="p">)</span>
+
+    <span class="n">plot_out_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_out_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns&quot;</span><span class="p">,</span> <span class="s2">&quot;tx_out&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_out_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_out_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_out_tx</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Output (V)&quot;</span>
+    <span class="n">plot_out_tx</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_out_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_out_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns&quot;</span><span class="p">,</span> <span class="s2">&quot;ctle_out&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_out_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_out_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_out_ctle</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Output (V)&quot;</span>
+    <span class="n">plot_out_ctle</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">plot_out_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_out_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns&quot;</span><span class="p">,</span> <span class="s2">&quot;dfe_out&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_out_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_out_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ns)&quot;</span>
+    <span class="n">plot_out_dfe</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Output (V)&quot;</span>
+    <span class="n">plot_out_dfe</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_out_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+
+    <span class="n">container_out</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_out</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_out_chnl</span><span class="p">)</span>
+    <span class="n">container_out</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_out_tx</span><span class="p">)</span>
+    <span class="n">container_out</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_out_ctle</span><span class="p">)</span>
+    <span class="n">container_out</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_out_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_out</span> <span class="o">=</span> <span class="n">container_out</span>
+
+    <span class="c1"># - Eye Diagrams tab</span>
+    <span class="n">seg_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">red</span><span class="o">=</span><span class="p">[</span>
+            <span class="p">(</span><span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># black</span>
+            <span class="p">(</span><span class="mf">0.00001</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># blue</span>
+            <span class="p">(</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># cyan</span>
+            <span class="p">(</span><span class="mf">0.30</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># green</span>
+            <span class="p">(</span><span class="mf">0.45</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># yellow</span>
+            <span class="p">(</span><span class="mf">0.60</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># orange</span>
+            <span class="p">(</span><span class="mf">0.75</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># red</span>
+            <span class="p">(</span><span class="mf">0.90</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># pink</span>
+            <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># white</span>
+        <span class="p">],</span>
+        <span class="n">green</span><span class="o">=</span><span class="p">[</span>
+            <span class="p">(</span><span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># black</span>
+            <span class="p">(</span><span class="mf">0.00001</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># blue</span>
+            <span class="p">(</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>  <span class="c1"># cyan</span>
+            <span class="p">(</span><span class="mf">0.30</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>  <span class="c1"># green</span>
+            <span class="p">(</span><span class="mf">0.45</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># yellow</span>
+            <span class="p">(</span><span class="mf">0.60</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>  <span class="c1"># orange</span>
+            <span class="p">(</span><span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># red</span>
+            <span class="p">(</span><span class="mf">0.90</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>  <span class="c1"># pink</span>
+            <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># white</span>
+        <span class="p">],</span>
+        <span class="n">blue</span><span class="o">=</span><span class="p">[</span>
+            <span class="p">(</span><span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># black</span>
+            <span class="p">(</span><span class="mf">1e-18</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>  <span class="c1"># blue</span>
+            <span class="p">(</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>  <span class="c1"># cyan</span>
+            <span class="p">(</span><span class="mf">0.30</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># green</span>
+            <span class="p">(</span><span class="mf">0.45</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># yellow</span>
+            <span class="p">(</span><span class="mf">0.60</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># orange</span>
+            <span class="p">(</span><span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.00</span><span class="p">),</span>  <span class="c1"># red</span>
+            <span class="p">(</span><span class="mf">0.90</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>  <span class="c1"># pink</span>
+            <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>  <span class="c1"># white</span>
+        <span class="p">],</span>
+    <span class="p">)</span>
+    <span class="n">clr_map</span> <span class="o">=</span> <span class="n">ColorMapper</span><span class="o">.</span><span class="n">from_segment_map</span><span class="p">(</span><span class="n">seg_map</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">clr_map</span> <span class="o">=</span> <span class="n">clr_map</span>
+
+    <span class="n">plot_eye_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">img_plot</span><span class="p">(</span><span class="s2">&quot;eye_chnl&quot;</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="n">clr_map</span><span class="p">)</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="s2">&quot;bottom&quot;</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Signal Level (V)&quot;</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+    <span class="n">plot_eye_chnl</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+
+    <span class="n">plot_eye_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">img_plot</span><span class="p">(</span><span class="s2">&quot;eye_tx&quot;</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="n">clr_map</span><span class="p">)</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="s2">&quot;bottom&quot;</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Signal Level (V)&quot;</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+    <span class="n">plot_eye_tx</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+
+    <span class="n">plot_eye_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">img_plot</span><span class="p">(</span><span class="s2">&quot;eye_ctle&quot;</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="n">clr_map</span><span class="p">)</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="s2">&quot;bottom&quot;</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Signal Level (V)&quot;</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+    <span class="n">plot_eye_ctle</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+
+    <span class="n">plot_eye_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">img_plot</span><span class="p">(</span><span class="s2">&quot;eye_dfe&quot;</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="n">clr_map</span><span class="p">)</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">y_direction</span> <span class="o">=</span> <span class="s2">&quot;normal&quot;</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">x_axis</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="s2">&quot;bottom&quot;</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">y_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Signal Level (V)&quot;</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">x_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+    <span class="n">plot_eye_dfe</span><span class="o">.</span><span class="n">y_grid</span><span class="o">.</span><span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span>
+
+    <span class="n">container_eye</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_eye</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_eye_chnl</span><span class="p">)</span>
+    <span class="n">container_eye</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_eye_tx</span><span class="p">)</span>
+    <span class="n">container_eye</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_eye_ctle</span><span class="p">)</span>
+    <span class="n">container_eye</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_eye_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_eye</span> <span class="o">=</span> <span class="n">container_eye</span>
+
+    <span class="c1"># - Jitter Distributions tab</span>
+    <span class="n">plot_jitter_dist_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_chnl&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Measured&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ext_chnl&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Extrapolated&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_jitter_dist_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_jitter_dist_chnl</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Count&quot;</span>
+    <span class="n">plot_jitter_dist_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_dist_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+
+    <span class="n">plot_jitter_dist_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_tx&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Measured&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ext_tx&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Extrapolated&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_jitter_dist_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_jitter_dist_tx</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Count&quot;</span>
+    <span class="n">plot_jitter_dist_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_dist_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+
+    <span class="n">plot_jitter_dist_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ctle&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Measured&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ext_ctle&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Extrapolated&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_jitter_dist_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_jitter_dist_ctle</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Count&quot;</span>
+    <span class="n">plot_jitter_dist_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_dist_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+
+    <span class="n">plot_jitter_dist_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">padding_left</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_dfe&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Measured&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ext_dfe&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Extrapolated&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_dist_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_jitter_dist_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_jitter_dist_dfe</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Count&quot;</span>
+    <span class="n">plot_jitter_dist_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_dist_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+
+    <span class="n">container_jitter_dist</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_jitter_dist</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_dist_chnl</span><span class="p">)</span>
+    <span class="n">container_jitter_dist</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_dist_tx</span><span class="p">)</span>
+    <span class="n">container_jitter_dist</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_dist_ctle</span><span class="p">)</span>
+    <span class="n">container_jitter_dist</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_dist_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_jitter_dist</span> <span class="o">=</span> <span class="n">container_jitter_dist</span>
+
+    <span class="c1"># - Jitter Spectrums tab</span>
+    <span class="n">plot_jitter_spec_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_spectrum_chnl&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Total&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="p">(</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ind_spectrum_chnl&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Data Independent&quot;</span>
+    <span class="p">)</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;thresh_chnl&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;magenta&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pj Threshold&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (MHz)&quot;</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;|FFT(TIE)| (dBui)&quot;</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="n">PanTool</span><span class="p">(</span><span class="n">plot_jitter_spec_chnl</span><span class="p">,</span> <span class="n">constrain</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">constrain_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">constrain_direction</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">zoom_jitter_spec_chnl</span> <span class="o">=</span> <span class="n">ZoomTool</span><span class="p">(</span><span class="n">plot_jitter_spec_chnl</span><span class="p">,</span> <span class="n">tool_mode</span><span class="o">=</span><span class="s2">&quot;range&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">,</span> <span class="n">always_on</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">overlays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zoom_jitter_spec_chnl</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+
+    <span class="n">plot_jitter_spec_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_spectrum_tx&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Total&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ind_spectrum_tx&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Data Independent&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;thresh_tx&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;magenta&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pj Threshold&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (MHz)&quot;</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;|FFT(TIE)| (dBui)&quot;</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="o">-</span><span class="mf">40.0</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+
+    <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">value_range</span> <span class="o">=</span> <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">value_range</span>
+
+    <span class="n">plot_jitter_spec_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_spectrum_ctle&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Total&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="p">(</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ind_spectrum_ctle&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Data Independent&quot;</span>
+    <span class="p">)</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;thresh_ctle&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;magenta&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pj Threshold&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (MHz)&quot;</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;|FFT(TIE)| (dBui)&quot;</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+    <span class="n">plot_jitter_spec_ctle</span><span class="o">.</span><span class="n">value_range</span> <span class="o">=</span> <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">value_range</span>
+
+    <span class="n">plot_jitter_spec_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz_dfe&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_spectrum_dfe&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Total&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="p">(</span><span class="s2">&quot;f_MHz_dfe&quot;</span><span class="p">,</span> <span class="s2">&quot;jitter_ind_spectrum_dfe&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Data Independent&quot;</span>
+    <span class="p">)</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;f_MHz_dfe&quot;</span><span class="p">,</span> <span class="s2">&quot;thresh_dfe&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;magenta&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pj Threshold&quot;</span><span class="p">)</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Frequency (MHz)&quot;</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;|FFT(TIE)| (dBui)&quot;</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">index_range</span> <span class="o">=</span> <span class="n">plot_jitter_spec_chnl</span><span class="o">.</span><span class="n">index_range</span>  <span class="c1"># Zoom x-axes in tandem.</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">legend</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;lr&quot;</span>
+    <span class="n">plot_jitter_spec_dfe</span><span class="o">.</span><span class="n">value_range</span> <span class="o">=</span> <span class="n">plot_jitter_spec_tx</span><span class="o">.</span><span class="n">value_range</span>
+
+    <span class="n">container_jitter_spec</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_jitter_spec</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_spec_chnl</span><span class="p">)</span>
+    <span class="n">container_jitter_spec</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_spec_tx</span><span class="p">)</span>
+    <span class="n">container_jitter_spec</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_spec_ctle</span><span class="p">)</span>
+    <span class="n">container_jitter_spec</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_jitter_spec_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_jitter_spec</span> <span class="o">=</span> <span class="n">container_jitter_spec</span>
+
+    <span class="c1"># - Bathtub Curves tab</span>
+    <span class="n">plot_bathtub_chnl</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_bathtub_chnl</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;bathtub_chnl&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_bathtub_chnl</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">plot_bathtub_chnl</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="o">-</span><span class="mi">18</span>
+    <span class="n">plot_bathtub_chnl</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">tick_interval</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">plot_bathtub_chnl</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_chnl_str</span>
+    <span class="n">plot_bathtub_chnl</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_bathtub_chnl</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Log10(P(Transition occurs inside.))&quot;</span>
+
+    <span class="n">plot_bathtub_tx</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_bathtub_tx</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;bathtub_tx&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_bathtub_tx</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">plot_bathtub_tx</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="o">-</span><span class="mi">18</span>
+    <span class="n">plot_bathtub_tx</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">tick_interval</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">plot_bathtub_tx</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_tx_str</span>
+    <span class="n">plot_bathtub_tx</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_bathtub_tx</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Log10(P(Transition occurs inside.))&quot;</span>
+
+    <span class="n">plot_bathtub_ctle</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_bathtub_ctle</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;bathtub_ctle&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_bathtub_ctle</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">plot_bathtub_ctle</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="o">-</span><span class="mi">18</span>
+    <span class="n">plot_bathtub_ctle</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">tick_interval</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">plot_bathtub_ctle</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_ctle_str</span>
+    <span class="n">plot_bathtub_ctle</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_bathtub_ctle</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Log10(P(Transition occurs inside.))&quot;</span>
+
+    <span class="n">plot_bathtub_dfe</span> <span class="o">=</span> <span class="n">Plot</span><span class="p">(</span><span class="n">plotdata</span><span class="p">)</span>
+    <span class="n">plot_bathtub_dfe</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;jitter_bins&quot;</span><span class="p">,</span> <span class="s2">&quot;bathtub_dfe&quot;</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">plot_bathtub_dfe</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">high_setting</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">plot_bathtub_dfe</span><span class="o">.</span><span class="n">value_range</span><span class="o">.</span><span class="n">low_setting</span> <span class="o">=</span> <span class="o">-</span><span class="mi">18</span>
+    <span class="n">plot_bathtub_dfe</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">tick_interval</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">plot_bathtub_dfe</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">post_dfe_str</span>
+    <span class="n">plot_bathtub_dfe</span><span class="o">.</span><span class="n">index_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Time (ps)&quot;</span>
+    <span class="n">plot_bathtub_dfe</span><span class="o">.</span><span class="n">value_axis</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Log10(P(Transition occurs inside.))&quot;</span>
+
+    <span class="n">container_bathtub</span> <span class="o">=</span> <span class="n">GridPlotContainer</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="n">container_bathtub</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_bathtub_chnl</span><span class="p">)</span>
+    <span class="n">container_bathtub</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_bathtub_tx</span><span class="p">)</span>
+    <span class="n">container_bathtub</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_bathtub_ctle</span><span class="p">)</span>
+    <span class="n">container_bathtub</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">plot_bathtub_dfe</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">plots_bathtub</span> <span class="o">=</span> <span class="n">container_bathtub</span>
+
+    <span class="n">update_eyes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">PyBERT</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">General description of <em>pybert</em> package.</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Modules in <em>pybert</em> package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, David Banas.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

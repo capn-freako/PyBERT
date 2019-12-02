@@ -80,7 +80,7 @@ class CDR:
         Should be called, when the clock has just struck.
 
         Synopsis:
-          (ui, locked) = adapt(samples)
+            (ui, locked) = adapt(samples)
 
         Args:
             samples: A list of 3 samples of the input waveform, as follows:
@@ -90,10 +90,8 @@ class CDR:
                 - at the current clock time
 
         Returns:
-            ui:
-                The new unit interval estimate, in seconds.
-            locked:
-                Boolean flag indicating 'locked' status.
+            (float, bool): The new unit interval estimate, in seconds, and
+                a flag indicating 'locked' status.
 
         """
 

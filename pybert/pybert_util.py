@@ -56,8 +56,9 @@ def moving_average(a, n=3):
         n(int): Width of averaging window, in vector samples. (Optional;
             default = 3.)
 
-    Returns: the moving average of the input vector, leaving the input
-        vector unchanged.
+    Returns:
+        [float]: the moving average of the input vector, leaving the input
+            vector unchanged.
     """
 
     ret = cumsum(a, dtype=float)
@@ -90,7 +91,8 @@ def find_crossing_times(
             (Optional; default = 0.1.)
         thresh(float): Vertical crossing threshold.
 
-    Returns: an array of signal threshold crossing times.
+    Returns:
+        [float]: Array of signal threshold crossing times.
     """
 
     if len(t) != len(x):
@@ -177,7 +179,8 @@ def find_crossings(t, x, amplitude, min_delay: float = 0.0, rising_first: bool =
             {0: NRZ, 1: Duo-binary, 2: PAM-4}
             (Optional; default = 0.)
 
-    Returns: The signal threshold crossing times.
+    Returns:
+        [float]: The signal threshold crossing times.
     """
 
     assert mod_type >= 0 and mod_type <= 2, "ERROR: pybert_util.find_crossings(): Unknown modulation type: {}".format(
@@ -615,9 +618,10 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
             (This allows the same function to be used for eye diagram
             creation, for both pre and post-CDR signals.)
 
-    Returns: The "heat map" representing the eye diagram. Each grid
-        location contains a value indicating the number of times the
-        signal passed through that location.
+    Returns:
+        2D *NumPy* array: The "heat map" representing the eye diagram. Each grid
+            location contains a value indicating the number of times the
+            signal passed through that location.
     """
 
     # List/array necessities.
@@ -787,7 +791,8 @@ def import_channel(filename, sample_per, padded=False, windowed=False):
         padded(Bool): (Optional) Zero pad s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
         windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)
 
-    Returns: Imported channel impulse, or step, response.
+    Returns:
+        [float]: Imported channel impulse, or step, response.
     """
 
     extension = os.path.splitext(filename)[1][1:]
@@ -805,7 +810,8 @@ def interp_time(ts, xs, sample_per):
         xs([float]): Original signal values.
         sample_per(float): System sample period.
 
-    Returns: Resampled waveform.
+    Returns:
+        [float]: Resampled waveform.
     """
     tmax = ts[-1]
     res = []
@@ -829,10 +835,9 @@ def import_time(filename, sample_per):
         filename(str): Name of waveform file to read in.
         sample_per(float): New sample interval
 
-    Returns: Resampled waveform.
+    Returns:
+        [float]: Resampled waveform.
     """
-
-    # Read in original data from file.
     ts = []
     xs = []
     with open(filename, mode="rU") as file:
@@ -854,9 +859,9 @@ def sdd_21(ntwk):
     Args:
         ntwk(skrf.Network): 4-port single ended network.
 
-    Returns: Sdd[2,1].
+    Returns:
+        [float]: Sdd[2,1].
     """
-
     if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
         ntwk.renumber((2, 3), (3, 2))
 
@@ -875,16 +880,13 @@ def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6)
         padded(Bool): (Optional) Zero pad s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
         windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)
 
-    Returns: Resampled step response waveform.
+    Returns:
+        [float]: Resampled step response waveform.
     """
-
     ntwk = rf.Network(filename)
 
     # Form frequency vector.
     f = ntwk.f
-    # fmin = f[0]
-    # if(fmin == 0):  # Correct, if d.c. point was included in original data.
-    #     fmin = f[1]
     fmin = f_step
     fmax = f[-1]
     f = np.arange(fmin, fmax + fmin, fmin)
@@ -892,13 +894,10 @@ def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6)
 
     # Form impulse response from frequency response.
     H = sdd_21(ntwk).interpolate_from_f(F).s[:, 0, 0]
-    # ntwk = ntwk.interpolate_from_f(F)
-    # H = np.concatenate((H, np.conj(np.flipud(H[:-1]))))  # Forming the vector that fft() would've outputted.
     H = np.pad(H, (1, 0), "constant", constant_values=1.0)  # Presume d.c. value = 1.
     if windowed:
         window = get_window(6.0, 2 * len(H))[len(H) :]
         H *= window
-    # h = np.real(np.fft.ifft(H))
     if padded:
         h = np.fft.irfft(H, int(1.0 / (fmin * sample_per)) + 1)
         fmax = 1.0 / (2.0 * sample_per)
@@ -926,10 +925,9 @@ def lfsr_bits(taps, seed):
         seed(int): The initial value of the shift register.
 
     Returns:
-        A PRBS generator object with a next() method, for retrieving
-        the next bit in the sequence.
+        generator: A PRBS generator object with a next() method, for retrieving
+            the next bit in the sequence.
     """
-
     val = int(seed)
     num_taps = max(taps)
     mask = (1 << num_taps) - 1
@@ -964,12 +962,10 @@ def pulse_center(p, nspui):
         nspui(Int): The number of vector elements per unit interval.
 
     Returns:
-        clock_pos(Int): The estimated index at which the clock will
-                        sample the main lobe.
-        thresh(Float):  The vertical threshold at which the main lobe is
-                        UI wide.
+        (Int, float): The estimated index at which the clock will
+            sample the main lobe, and the vertical threshold at which
+            the main lobe is UI wide.
     """
-
     div = 2.0
     p_max = p.max()
     thresh = p_max / div
@@ -991,22 +987,12 @@ def pulse_center(p, nspui):
     return (clock_pos, thresh)
 
 def submodules(package):
-
-    # mod_path = package.__file__
-
-    # fn = os.path.basename(mod_path)
-    # pathname = os.path.dirname(mod_path)
-
-    # if fn not in ("__init__.py", "__init__.pyc"):
-    #     return None
-
+    """Find all sub-modules of a package."""
     rst = {}
 
     for imp, name, _ in pkgutil.iter_modules(package.__path__):
         fullModuleName = "{0}.{1}".format(package.__name__, name)
         mod = importlib.import_module(fullModuleName, package=package.__path__)
-        # loader = imp.find_module(name)
-        # mod = loader.load_module(package.__name__ + "." + name)
         rst[name] = mod
 
     return rst 

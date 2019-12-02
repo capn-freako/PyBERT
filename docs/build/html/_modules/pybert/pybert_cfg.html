@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>pybert.pybert_cfg &#8212; PyBERT 3.3.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for pybert.pybert_cfg</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Simulation configuration data encapsulation, for PyBERT.</span>
+
+<span class="sd">Original Author: David Banas &lt;capn.freako@gmail.com&gt;</span>
+
+<span class="sd">Original Date:   5 May 2017</span>
+
+<span class="sd">This Python script provides a data structure for encapsulating the</span>
+<span class="sd">simulation configuration data of a PyBERT instance. It was first</span>
+<span class="sd">created, as a way to facilitate easier pickling, so that a particular</span>
+<span class="sd">configuration could be saved and later restored.</span>
+
+<span class="sd">Copyright (c) 2017 by David Banas; All rights reserved World wide.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="PyBertCfg"><a class="viewcode-back" href="../../modules.html#pybert.pybert_cfg.PyBertCfg">[docs]</a><span class="k">class</span> <span class="nc">PyBertCfg</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    PyBERT simulation configuration data encapsulation class.</span>
+
+<span class="sd">    This class is used to encapsulate that subset of the configuration</span>
+<span class="sd">    data for a PyBERT instance, which is to be saved when the user</span>
+<span class="sd">    clicks the &quot;Save Config.&quot; button.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">the_PyBERT</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Copy just that subset of the supplied PyBERT instance&#39;s</span>
+<span class="sd">        __dict__, which should be saved during pickling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Simulation Control</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bit_rate</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">bit_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nbits</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">nbits</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pattern_len</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">pattern_len</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nspb</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">nspb</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eye_bits</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">eye_bits</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mod_type</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">mod_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_sweeps</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">num_sweeps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sweep_num</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">sweep_num</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sweep_aves</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">sweep_aves</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">do_sweep</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">do_sweep</span>
+
+        <span class="c1"># Channel Control</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_ch_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">use_ch_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ch_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">ch_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">impulse_length</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">impulse_length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_step</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">f_step</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Rdc</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">Rdc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">w0</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">w0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">R0</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">R0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Theta0</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">Theta0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Z0</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">Z0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">v0</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">v0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">l_ch</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">l_ch</span>
+
+        <span class="c1"># Tx</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vod</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">vod</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rs</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cout</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">cout</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pn_mag</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">pn_mag</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pn_freq</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">pn_freq</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rn</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rn</span>
+        <span class="n">tx_taps</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">tap</span> <span class="ow">in</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">:</span>
+            <span class="n">tx_taps</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tap</span><span class="o">.</span><span class="n">enabled</span><span class="p">,</span> <span class="n">tap</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_taps</span> <span class="o">=</span> <span class="n">tx_taps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">tap</span> <span class="ow">in</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tap</span><span class="o">.</span><span class="n">enabled</span><span class="p">,</span> <span class="n">tap</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>        
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_use_ami</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">tx_use_ami</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_use_getwave</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">tx_use_getwave</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_ami_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">tx_ami_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_dll_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">tx_dll_file</span>
+
+        <span class="c1"># Rx</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rin</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cin</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">cin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cac</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">cac</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_ctle_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">use_ctle_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctle_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">ctle_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rx_bw</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rx_bw</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">peak_freq</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">peak_freq</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">peak_mag</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">peak_mag</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctle_offset</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">ctle_offset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctle_mode</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">ctle_mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctle_mode_tune</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">ctle_mode_tune</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctle_offset_tune</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">ctle_offset_tune</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rx_use_ami</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rx_use_ami</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rx_use_getwave</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rx_use_getwave</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rx_ami_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rx_ami_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rx_dll_file</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rx_dll_file</span>
+
+        <span class="c1"># DFE</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_dfe</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">use_dfe</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_dfe_tune</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">use_dfe_tune</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sum_ideal</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">sum_ideal</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">decision_scaler</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">decision_scaler</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gain</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">gain</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_ave</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">n_ave</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_taps</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">n_taps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sum_bw</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">sum_bw</span>
+
+        <span class="c1"># CDR</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta_t</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">delta_t</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_lock_ave</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">n_lock_ave</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rel_lock_tol</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">rel_lock_tol</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock_sustain</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">lock_sustain</span>
+
+        <span class="c1"># Analysis</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">the_PyBERT</span><span class="o">.</span><span class="n">thresh</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">PyBERT</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">General description of <em>pybert</em> package.</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Modules in <em>pybert</em> package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, David Banas.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
