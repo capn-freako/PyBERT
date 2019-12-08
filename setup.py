@@ -28,6 +28,7 @@ setup(
         "traits",
         "traitsui",
         "PyIBIS-AMI>=3.0.0",
+        "pyyaml",
         "pyside2",
     ],
     entry_points={

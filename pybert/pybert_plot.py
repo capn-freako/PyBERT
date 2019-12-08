@@ -10,7 +10,7 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 from chaco.api import ColorMapper, GridPlotContainer, Plot
 from chaco.tools.api import PanTool, ZoomTool
 
-from numpy import (linspace)
+from numpy import linspace
 
 from pybert.pybert_cntrl import update_eyes
 
@@ -27,9 +27,11 @@ def make_plots(self, n_dfe_taps):
     plot2.index_axis.title = "Time (ns)"
     plot2.value_axis.title = "UI (ps)"
 
-    plot9 = Plot(plotdata, auto_colors=["red", "orange", "yellow", "green", "blue", "purple"], padding_left=75)
+    plot9 = Plot(plotdata, auto_colors=["red", "orange", "yellow", "green", "blue", "purple"], padding_left=75,)
     for i in range(n_dfe_taps):
-        plot9.plot(("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d" % (i + 1))
+        plot9.plot(
+            ("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d" % (i + 1),
+        )
     plot9.title = "DFE Adaptation"
     plot9.tools.append(PanTool(plot9, constrain=True, constrain_key=None, constrain_direction="x"))
     zoom9 = ZoomTool(plot9, tool_mode="range", axis="index", always_on=False)
@@ -212,7 +214,9 @@ def make_plots(self, n_dfe_taps):
     # - Frequency Responses tab
     plot_H_chnl = Plot(plotdata, padding_left=75)
     plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue", name="Original Impulse", index_scale="log")
-    plot_H_chnl.plot(("f_GHz", "chnl_trimmed_H"), type="line", color="red", name="Trimmed Impulse", index_scale="log")
+    plot_H_chnl.plot(
+        ("f_GHz", "chnl_trimmed_H"), type="line", color="red", name="Trimmed Impulse", index_scale="log",
+    )
     plot_H_chnl.title = "Channel"
     plot_H_chnl.index_axis.title = "Frequency (GHz)"
     plot_H_chnl.y_axis.title = "Frequency Response (dB)"

@@ -67,7 +67,7 @@ class PyBertCfg:
         self.tx_taps = tx_taps
         self.tx_tap_tuners = []
         for tap in the_PyBERT.tx_tap_tuners:
-            self.tx_tap_tuners.append((tap.enabled, tap.value))        
+            self.tx_tap_tuners.append((tap.enabled, tap.value))
         self.tx_use_ami = the_PyBERT.tx_use_ami
         self.tx_use_getwave = the_PyBERT.tx_use_getwave
         self.tx_ami_file = the_PyBERT.tx_ami_file
