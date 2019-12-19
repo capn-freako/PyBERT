@@ -1371,6 +1371,7 @@ class PyBERT(HasTraits):
                 self.tx_tap_tuners[i].enabled = False
 
     def _tx_ibis_file_changed(self, new_value):
+        self.status = f"Parsing IBIS file: {new_value}"
         try:
             self.tx_ibis_valid = False
             with open(new_value) as file:
@@ -1381,9 +1382,11 @@ class PyBERT(HasTraits):
             self.tx_dll_file = self._tx_ibis.dll_file
             self.tx_ami_file = self._tx_ibis.ami_file
         except Exception as err:
+            self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
             self.log(error_message, alert=True, exception=err)
-
+        self.status = "Done."
+        
     def _tx_ami_file_changed(self, new_value):
         try:
             self.tx_ami_valid = False
@@ -1408,6 +1411,7 @@ class PyBERT(HasTraits):
             self.log(error_message, alert=True)
 
     def _rx_ibis_file_changed(self, new_value):
+        self.status = f"Parsing IBIS file: {new_value}"
         try:
             self.rx_ibis_valid = False
             with open(new_value) as file:
@@ -1418,8 +1422,10 @@ class PyBERT(HasTraits):
             self.rx_dll_file = self._rx_ibis.dll_file
             self.rx_ami_file = self._rx_ibis.ami_file
         except Exception as err:
+            self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
             self.log(error_message, alert=True)
+        self.status = "Done."
 
     def _rx_ami_file_changed(self, new_value):
         try:
