@@ -128,7 +128,7 @@ class DFE:
           - ideal            Boolean flag. When true, use an ideal summing node.
 
         Raises:
-            Exception: If the requested modulation type is unknown.
+            RuntimeError: If the requested modulation type is unknown.
         """
 
         # Design summing node filter.
@@ -159,7 +159,7 @@ class DFE:
             thresholds.append(0.0)
             thresholds.append(decision_scaler * 2.0 / 3.0)
         else:
-            raise Exception("ERROR: DFE.__init__(): Unrecognized modulation type requested!")
+            raise RuntimeError("ERROR: DFE.__init__(): Unrecognized modulation type requested!")
         self.thresholds = thresholds
 
     def step(self, decision, error, update):
@@ -223,7 +223,7 @@ class DFE:
                 bits: The list of bits recovered.
 
         Raises:
-            Exception: If the requested modulation type is unknown.
+            RuntimeError: If the requested modulation type is unknown.
 
         """
 
@@ -256,7 +256,7 @@ class DFE:
                 decision = -1
                 bits = [0, 0]
         else:
-            raise Exception("ERROR: DFE.decide(): Unrecognized modulation type requested!")
+            raise RuntimeError("ERROR: DFE.decide(): Unrecognized modulation type requested!")
 
         return decision, bits
 
@@ -294,7 +294,7 @@ class DFE:
                         List of recovered bits.
 
         Raises:
-            Exception: If the requested modulation type is unknown.
+            RuntimeError: If the requested modulation type is unknown.
         """
 
         ui = self.ui
@@ -348,7 +348,7 @@ class DFE:
                 elif mod_type == 2:  # PAM-4
                     pass
                 else:
-                    raise Exception("ERROR: DFE.run(): Unrecognized modulation type!")
+                    raise RuntimeError("ERROR: DFE.run(): Unrecognized modulation type!")
                 ui, locked = self.cdr.adapt(samples)
                 decision, new_bits = self.decide(sum_out)
                 bits.extend(new_bits)

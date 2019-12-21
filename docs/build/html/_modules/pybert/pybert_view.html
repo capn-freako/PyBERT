@@ -1,0 +1,951 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>pybert.pybert_view &#8212; PyBERT 3.3.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for pybert.pybert_view</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Default view definition for PyBERT class.</span>
+
+<span class="sd">Original author: David Banas &lt;capn.freako@gmail.com&gt;</span>
+
+<span class="sd">Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code cleanup.)</span>
+
+<span class="sd">Copyright (c) 2014 David Banas; all rights reserved World wide.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">from</span> <span class="nn">threading</span> <span class="k">import</span> <span class="n">Thread</span>
+
+<span class="kn">from</span> <span class="nn">enable.component_editor</span> <span class="k">import</span> <span class="n">ComponentEditor</span>
+<span class="kn">from</span> <span class="nn">pyface.api</span> <span class="k">import</span> <span class="n">OK</span><span class="p">,</span> <span class="n">FileDialog</span>
+<span class="kn">from</span> <span class="nn">pyface.image_resource</span> <span class="k">import</span> <span class="n">ImageResource</span>
+<span class="kn">from</span> <span class="nn">traits.api</span> <span class="k">import</span> <span class="p">(</span><span class="n">Instance</span><span class="p">,</span> <span class="n">HasTraits</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">traitsui.api</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">Action</span><span class="p">,</span>
+    <span class="n">CheckListEditor</span><span class="p">,</span>
+    <span class="n">FileEditor</span><span class="p">,</span>
+    <span class="n">Group</span><span class="p">,</span>
+    <span class="n">Handler</span><span class="p">,</span>
+    <span class="n">HGroup</span><span class="p">,</span>
+    <span class="n">Item</span><span class="p">,</span>
+    <span class="n">ObjectColumn</span><span class="p">,</span>
+    <span class="n">TableEditor</span><span class="p">,</span>
+    <span class="n">TextEditor</span><span class="p">,</span>
+    <span class="n">VGroup</span><span class="p">,</span>
+    <span class="n">View</span><span class="p">,</span>
+    <span class="n">Label</span><span class="p">,</span>
+    <span class="n">EnumEditor</span><span class="p">,</span>
+    <span class="n">spring</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">pybert.pybert_cfg</span> <span class="k">import</span> <span class="n">PyBertCfg</span>
+<span class="kn">from</span> <span class="nn">pybert.pybert_cntrl</span> <span class="k">import</span> <span class="n">my_run_sweeps</span>
+<span class="kn">from</span> <span class="nn">pybert.pybert_data</span> <span class="k">import</span> <span class="n">PyBertData</span>
+
+
+<div class="viewcode-block" id="RunSimThread"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.RunSimThread">[docs]</a><span class="k">class</span> <span class="nc">RunSimThread</span><span class="p">(</span><span class="n">Thread</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Used to run the simulation in its own thread, in order to preserve GUI responsiveness.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="RunSimThread.run"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.RunSimThread.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Run the simulation(s).&quot;&quot;&quot;</span>
+        <span class="n">my_run_sweeps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">the_pybert</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="MyHandler"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.MyHandler">[docs]</a><span class="k">class</span> <span class="nc">MyHandler</span><span class="p">(</span><span class="n">Handler</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This handler is instantiated by the View and handles user button clicks.&quot;&quot;&quot;</span>
+
+    <span class="n">run_sim_thread</span> <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="n">RunSimThread</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MyHandler.do_run_simulation"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.MyHandler.do_run_simulation">[docs]</a>    <span class="k">def</span> <span class="nf">do_run_simulation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Spawn a simulation thread and run with the current settings.&quot;&quot;&quot;</span>
+        <span class="n">the_pybert</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">object</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">():</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span> <span class="o">=</span> <span class="n">RunSimThread</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span><span class="o">.</span><span class="n">the_pybert</span> <span class="o">=</span> <span class="n">the_pybert</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="MyHandler.do_stop_simulation"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.MyHandler.do_stop_simulation">[docs]</a>    <span class="k">def</span> <span class="nf">do_stop_simulation</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Kill the simulation thread.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span><span class="o">.</span><span class="n">isAlive</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run_sim_thread</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="MyHandler.do_save_cfg"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.MyHandler.do_save_cfg">[docs]</a>    <span class="k">def</span> <span class="nf">do_save_cfg</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Pickle out the current configuration.&quot;&quot;&quot;</span>
+        <span class="n">the_pybert</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">object</span>
+        <span class="n">dlg</span> <span class="o">=</span> <span class="n">FileDialog</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s2">&quot;save as&quot;</span><span class="p">,</span> <span class="n">wildcard</span><span class="o">=</span><span class="s2">&quot;*.pybert_cfg&quot;</span><span class="p">,</span> <span class="n">default_path</span><span class="o">=</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">cfg_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dlg</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="o">==</span> <span class="n">OK</span><span class="p">:</span>
+            <span class="n">the_PyBertCfg</span> <span class="o">=</span> <span class="n">PyBertCfg</span><span class="p">(</span><span class="n">the_pybert</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dlg</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">the_file</span><span class="p">:</span>
+                    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">the_PyBertCfg</span><span class="p">,</span> <span class="n">the_file</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">cfg_file</span> <span class="o">=</span> <span class="n">dlg</span><span class="o">.</span><span class="n">path</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">error_message</span> <span class="o">=</span> <span class="s2">&quot;The following error occured:</span><span class="se">\n\t</span><span class="si">{}</span><span class="se">\n</span><span class="s2">The configuration was NOT saved.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="MyHandler.do_load_cfg"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.MyHandler.do_load_cfg">[docs]</a>    <span class="k">def</span> <span class="nf">do_load_cfg</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Read in the pickled configuration.&quot;&quot;&quot;</span>
+        <span class="n">the_pybert</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">object</span>
+        <span class="n">dlg</span> <span class="o">=</span> <span class="n">FileDialog</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s2">&quot;open&quot;</span><span class="p">,</span> <span class="n">wildcard</span><span class="o">=</span><span class="s2">&quot;*.pybert_cfg&quot;</span><span class="p">,</span> <span class="n">default_path</span><span class="o">=</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">cfg_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dlg</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="o">==</span> <span class="n">OK</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dlg</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">the_file</span><span class="p">:</span>
+                    <span class="n">the_PyBertCfg</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">the_file</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">the_PyBertCfg</span><span class="p">,</span> <span class="n">PyBertCfg</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;The data structure read in is NOT of type: PyBertCfg!&quot;</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">prop</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="n">the_PyBertCfg</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">prop</span> <span class="o">==</span> <span class="s2">&quot;tx_taps&quot;</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">count</span><span class="p">,</span> <span class="p">(</span><span class="n">enabled</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                            <span class="nb">setattr</span><span class="p">(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">count</span><span class="p">],</span> <span class="s2">&quot;enabled&quot;</span><span class="p">,</span> <span class="n">enabled</span><span class="p">)</span>
+                            <span class="nb">setattr</span><span class="p">(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">tx_taps</span><span class="p">[</span><span class="n">count</span><span class="p">],</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">prop</span> <span class="o">==</span> <span class="s2">&quot;tx_tap_tuners&quot;</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">count</span><span class="p">,</span> <span class="p">(</span><span class="n">enabled</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                            <span class="nb">setattr</span><span class="p">(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">count</span><span class="p">],</span> <span class="s2">&quot;enabled&quot;</span><span class="p">,</span> <span class="n">enabled</span><span class="p">)</span>
+                            <span class="nb">setattr</span><span class="p">(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">tx_tap_tuners</span><span class="p">[</span><span class="n">count</span><span class="p">],</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="nb">setattr</span><span class="p">(</span><span class="n">the_pybert</span><span class="p">,</span> <span class="n">prop</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">cfg_file</span> <span class="o">=</span> <span class="n">dlg</span><span class="o">.</span><span class="n">path</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">error_message</span> <span class="o">=</span> <span class="s2">&quot;The following error occurred:</span><span class="se">\n\t</span><span class="si">{}</span><span class="se">\n</span><span class="s2">The configuration was NOT loaded.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="MyHandler.do_save_data"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.MyHandler.do_save_data">[docs]</a>    <span class="k">def</span> <span class="nf">do_save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Pickle out all the generated data.&quot;&quot;&quot;</span>
+        <span class="n">the_pybert</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">object</span>
+        <span class="n">dlg</span> <span class="o">=</span> <span class="n">FileDialog</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s2">&quot;save as&quot;</span><span class="p">,</span> <span class="n">wildcard</span><span class="o">=</span><span class="s2">&quot;*.pybert_data&quot;</span><span class="p">,</span> <span class="n">default_path</span><span class="o">=</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">data_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dlg</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="o">==</span> <span class="n">OK</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">plotdata</span> <span class="o">=</span> <span class="n">PyBertData</span><span class="p">(</span><span class="n">the_pybert</span><span class="p">)</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dlg</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">the_file</span><span class="p">:</span>
+                    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">plotdata</span><span class="p">,</span> <span class="n">the_file</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">data_file</span> <span class="o">=</span> <span class="n">dlg</span><span class="o">.</span><span class="n">path</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">error_message</span> <span class="o">=</span> <span class="s2">&quot;The following error occurred:</span><span class="se">\n\t</span><span class="si">{}</span><span class="se">\n</span><span class="s2">The waveform data was NOT saved.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="MyHandler.do_load_data"><a class="viewcode-back" href="../../modules.html#pybert.pybert_view.MyHandler.do_load_data">[docs]</a>    <span class="k">def</span> <span class="nf">do_load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">info</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Read in the pickled data.&#39;&quot;&quot;&quot;</span>
+        <span class="n">the_pybert</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">object</span>
+        <span class="n">dlg</span> <span class="o">=</span> <span class="n">FileDialog</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s2">&quot;open&quot;</span><span class="p">,</span> <span class="n">wildcard</span><span class="o">=</span><span class="s2">&quot;*.pybert_data&quot;</span><span class="p">,</span> <span class="n">default_path</span><span class="o">=</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">data_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dlg</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="o">==</span> <span class="n">OK</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dlg</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">the_file</span><span class="p">:</span>
+                    <span class="n">the_plotdata</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">the_file</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">the_plotdata</span><span class="p">,</span> <span class="n">PyBertData</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;The data structure read in is NOT of type: ArrayPlotData!&quot;</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">prop</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">the_plotdata</span><span class="o">.</span><span class="n">the_data</span><span class="o">.</span><span class="n">arrays</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">the_pybert</span><span class="o">.</span><span class="n">plotdata</span><span class="o">.</span><span class="n">set_data</span><span class="p">(</span><span class="n">prop</span> <span class="o">+</span> <span class="s2">&quot;_ref&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">data_file</span> <span class="o">=</span> <span class="n">dlg</span><span class="o">.</span><span class="n">path</span>
+
+                <span class="c1"># Add reference plots, if necessary.</span>
+                <span class="c1"># - time domain</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">suffix</span><span class="p">,</span> <span class="n">has_both</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[</span>
+                    <span class="p">(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">plots_h</span><span class="o">.</span><span class="n">component_grid</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="s2">&quot;h&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">plots_s</span><span class="o">.</span><span class="n">component_grid</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">plots_p</span><span class="o">.</span><span class="n">component_grid</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="s2">&quot;p&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                <span class="p">]:</span>
+                    <span class="k">if</span> <span class="s2">&quot;Reference&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">container</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plots</span><span class="p">:</span>
+                        <span class="p">(</span><span class="n">ix</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;chnl&quot;</span><span class="p">)</span>
+                        <span class="n">item_name</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">suffix</span> <span class="o">+</span> <span class="s2">&quot;_ref&quot;</span>
+                        <span class="n">container</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">((</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="n">item_name</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;darkcyan&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Inc_ref&quot;</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="p">(</span><span class="n">ix</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;tx&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;ctle&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;dfe&quot;</span><span class="p">)]:</span>
+                            <span class="n">item_name</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;_out_&quot;</span> <span class="o">+</span> <span class="n">suffix</span> <span class="o">+</span> <span class="s2">&quot;_ref&quot;</span>
+                            <span class="n">container</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                                <span class="p">(</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="n">item_name</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;darkmagenta&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cum_ref&quot;</span>
+                            <span class="p">)</span>
+                        <span class="k">if</span> <span class="n">has_both</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="p">(</span><span class="n">ix</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;tx&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;ctle&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;dfe&quot;</span><span class="p">)]:</span>
+                                <span class="n">item_name</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">suffix</span> <span class="o">+</span> <span class="s2">&quot;_ref&quot;</span>
+                                <span class="n">container</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                                    <span class="p">(</span><span class="s2">&quot;t_ns_chnl&quot;</span><span class="p">,</span> <span class="n">item_name</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;darkcyan&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Inc_ref&quot;</span>
+                                <span class="p">)</span>
+
+                <span class="c1"># - frequency domain</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">suffix</span><span class="p">,</span> <span class="n">has_both</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[(</span><span class="n">the_pybert</span><span class="o">.</span><span class="n">plots_H</span><span class="o">.</span><span class="n">component_grid</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)]:</span>
+                    <span class="k">if</span> <span class="s2">&quot;Reference&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">container</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plots</span><span class="p">:</span>
+                        <span class="p">(</span><span class="n">ix</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;chnl&quot;</span><span class="p">)</span>
+                        <span class="n">item_name</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">suffix</span> <span class="o">+</span> <span class="s2">&quot;_ref&quot;</span>
+                        <span class="n">container</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                            <span class="p">(</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="n">item_name</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;darkcyan&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Inc_ref&quot;</span><span class="p">,</span> <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span>
+                        <span class="p">)</span>
+                        <span class="k">for</span> <span class="p">(</span><span class="n">ix</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;tx&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;ctle&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;dfe&quot;</span><span class="p">)]:</span>
+                            <span class="n">item_name</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;_out_&quot;</span> <span class="o">+</span> <span class="n">suffix</span> <span class="o">+</span> <span class="s2">&quot;_ref&quot;</span>
+                            <span class="n">container</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                                <span class="p">(</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="n">item_name</span><span class="p">),</span>
+                                <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span>
+                                <span class="n">color</span><span class="o">=</span><span class="s2">&quot;darkmagenta&quot;</span><span class="p">,</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Cum_ref&quot;</span><span class="p">,</span>
+                                <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span>
+                            <span class="p">)</span>
+                        <span class="k">if</span> <span class="n">has_both</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="p">(</span><span class="n">ix</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;tx&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;ctle&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;dfe&quot;</span><span class="p">)]:</span>
+                                <span class="n">item_name</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">suffix</span> <span class="o">+</span> <span class="s2">&quot;_ref&quot;</span>
+                                <span class="n">container</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                                    <span class="p">(</span><span class="s2">&quot;f_GHz&quot;</span><span class="p">,</span> <span class="n">item_name</span><span class="p">),</span>
+                                    <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;line&quot;</span><span class="p">,</span>
+                                    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;darkcyan&quot;</span><span class="p">,</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Inc_ref&quot;</span><span class="p">,</span>
+                                    <span class="n">index_scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span>
+                                <span class="p">)</span>
+
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">item_name</span><span class="p">)</span>
+                <span class="n">error_message</span> <span class="o">=</span> <span class="s2">&quot;The following error occured:</span><span class="se">\n\t</span><span class="si">{}</span><span class="se">\n</span><span class="s2">The waveform data was NOT loaded.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+                <span class="n">the_pybert</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span></div></div>
+
+<span class="c1"># These are the &quot;globally applicable&quot; buttons referred to in pybert.py,</span>
+<span class="c1"># just above the button definitions (approx. line 580).</span>
+<span class="n">run_sim</span> <span class="o">=</span> <span class="n">Action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Run&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;do_run_simulation&quot;</span><span class="p">)</span>
+<span class="n">stop_sim</span> <span class="o">=</span> <span class="n">Action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Stop&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;do_stop_simulation&quot;</span><span class="p">)</span>
+<span class="n">save_data</span> <span class="o">=</span> <span class="n">Action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Save Results&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;do_save_data&quot;</span><span class="p">)</span>
+<span class="n">load_data</span> <span class="o">=</span> <span class="n">Action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Load Results&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;do_load_data&quot;</span><span class="p">)</span>
+<span class="n">save_cfg</span> <span class="o">=</span> <span class="n">Action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Save Config.&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;do_save_cfg&quot;</span><span class="p">)</span>
+<span class="n">load_cfg</span> <span class="o">=</span> <span class="n">Action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Load Config.&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;do_load_cfg&quot;</span><span class="p">)</span>
+
+<span class="c1"># Main window layout definition.</span>
+<span class="n">traits_view</span> <span class="o">=</span> <span class="n">View</span><span class="p">(</span>
+    <span class="n">Group</span><span class="p">(</span>
+        <span class="n">VGroup</span><span class="p">(</span>
+            <span class="n">HGroup</span><span class="p">(</span>
+                <span class="n">VGroup</span><span class="p">(</span>
+                    <span class="n">HGroup</span><span class="p">(</span>  <span class="c1"># Simulation Control</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;bit_rate&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Bit Rate (Gbps)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;bit rate&quot;</span><span class="p">,</span>
+                                <span class="n">show_label</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;True&quot;</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">TextEditor</span><span class="p">(</span><span class="n">auto_set</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">enter_set</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;nbits&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Nbits&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;# of bits to run&quot;</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">TextEditor</span><span class="p">(</span><span class="n">auto_set</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">enter_set</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="nb">int</span><span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;nspb&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Nspb&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;# of samples per bit&quot;</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">TextEditor</span><span class="p">(</span><span class="n">auto_set</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">enter_set</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="nb">int</span><span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;mod_type&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Modulation&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;line signalling/modulation scheme&quot;</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">CheckListEditor</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;NRZ&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Duo-binary&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;PAM-4&quot;</span><span class="p">)]),</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;do_sweep&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Do Sweep&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Run parameter sweeps.&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sweep_aves&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;SweepAves&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;# of trials, per sweep, for averaging.&quot;</span><span class="p">,</span>
+                                <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;do_sweep == True&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;pattern_len&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;PatLen&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;length of random pattern to use to construct bit stream&quot;</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">TextEditor</span><span class="p">(</span><span class="n">auto_set</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">enter_set</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="nb">int</span><span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;eye_bits&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;EyeBits&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;# of bits to use to form eye diagrams&quot;</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">TextEditor</span><span class="p">(</span><span class="n">auto_set</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">enter_set</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="nb">int</span><span class="p">),</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;vod&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Vod (V)&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Tx output voltage into matched load&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;rn&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rn (V)&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;standard deviation of random noise&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;pn_mag&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Pn (V)&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;peak magnitude of periodic noise&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;pn_freq&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;f(Pn) (MHz)&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;frequency of periodic noise&quot;</span><span class="p">),</span>
+                        <span class="p">),</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Simulation Control&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">VGroup</span><span class="p">(</span>
+                    <span class="n">Item</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;thresh&quot;</span><span class="p">,</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Pj Threshold (sigma)&quot;</span><span class="p">,</span>
+                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Threshold for identifying periodic jitter spectral elements. (sigma)&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">Item</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;impulse_length&quot;</span><span class="p">,</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Impulse Response Length (ns)&quot;</span><span class="p">,</span>
+                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Manual impulse response length override&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Debug&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Enable to log extra information to console.&quot;</span><span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Analysis Parameters&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">),</span>
+            <span class="n">HGroup</span><span class="p">(</span>
+                <span class="n">VGroup</span><span class="p">(</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_ibis_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;File&quot;</span><span class="p">,</span>
+                                <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">FileEditor</span><span class="p">(</span><span class="n">dialog_style</span><span class="o">=</span><span class="s2">&quot;open&quot;</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;*.ibs&quot;</span><span class="p">]),</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_ibis_valid&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Valid&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;False&quot;</span><span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_use_ibis&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use IBIS&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;btn_sel_tx&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;btn_view_tx&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                            <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;tx_ibis_valid == True&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;IBIS&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">Item</span><span class="p">(</span>
+                            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rs&quot;</span><span class="p">,</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Tx_Rs (Ohms)&quot;</span><span class="p">,</span>
+                            <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Tx differential source impedance&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">Item</span><span class="p">(</span>
+                            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;cout&quot;</span><span class="p">,</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Tx_Cout (pF)&quot;</span><span class="p">,</span>
+                            <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Tx parasitic output capacitance (each pin)&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Native&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;tx_use_ibis == False&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Tx&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">VGroup</span><span class="p">(</span>  <span class="c1"># Interconnect</span>
+                    <span class="n">VGroup</span><span class="p">(</span>  <span class="c1"># From File</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">HGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;ch_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;File&quot;</span><span class="p">,</span>
+                                    <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                    <span class="n">editor</span><span class="o">=</span><span class="n">FileEditor</span><span class="p">(</span><span class="n">dialog_style</span><span class="o">=</span><span class="s2">&quot;open&quot;</span><span class="p">),</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;chnl_valid&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Valid&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;False&quot;</span><span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">HGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;use_ch_file&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use file&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;chnl_valid == True&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">spring</span><span class="p">,</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;padded&quot;</span><span class="p">,</span>   <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Zero-padded&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ch_file == True&quot;</span><span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;windowed&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Windowed&quot;</span><span class="p">,</span>    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ch_file == True&quot;</span><span class="p">),</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Zref&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Zref&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Reference Impedance.&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">&quot;Ohms&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;f_step&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;f_step&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Frequency step to use in generating H(f).&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">&quot;MHz&quot;</span><span class="p">),</span>
+                            <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ch_file == True&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;From File&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">HGroup</span><span class="p">(</span>  <span class="c1"># Native (i.e. - Howard Johnson&#39;s) interconnect model.</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;l_ch&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length (m)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;interconnect length&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Theta0&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Loss Tan.&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;dielectric loss tangent&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Z0&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Z0 (Ohms)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;characteristic differential impedance&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;v0&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;v_rel (c)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;normalized propagation velocity&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Rdc&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rdc (Ohms)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;d.c. resistance&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;w0&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;w0 (rads./s)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;transition frequency&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;R0&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;R0 (Ohms)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;skin effect resistance&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Native&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ch_file == False&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Interconnect&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">VGroup</span><span class="p">(</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_ibis_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;File&quot;</span><span class="p">,</span>
+                                <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                <span class="n">editor</span><span class="o">=</span><span class="n">FileEditor</span><span class="p">(</span><span class="n">dialog_style</span><span class="o">=</span><span class="s2">&quot;open&quot;</span><span class="p">,</span> <span class="nb">filter</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;*.ibs&quot;</span><span class="p">]),</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_ibis_valid&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Valid&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;False&quot;</span><span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_use_ibis&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use IBIS&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;btn_sel_rx&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;btn_view_rx&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                            <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;rx_ibis_valid == True&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;IBIS&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">Item</span><span class="p">(</span>
+                            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rin&quot;</span><span class="p">,</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rx_Rin (Ohms)&quot;</span><span class="p">,</span>
+                            <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Rx differential input impedance&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">Item</span><span class="p">(</span>
+                            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;cin&quot;</span><span class="p">,</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rx_Cin (pF)&quot;</span><span class="p">,</span>
+                            <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Rx parasitic input capacitance (each pin)&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">Item</span><span class="p">(</span>
+                            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;cac&quot;</span><span class="p">,</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rx_Cac (uF)&quot;</span><span class="p">,</span>
+                            <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Rx a.c. coupling capacitance (each pin)&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Native&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;rx_use_ibis == False&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rx&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Channel&quot;</span><span class="p">,</span>
+                <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="c1"># spring,</span>
+            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Config.&quot;</span><span class="p">,</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;config&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="c1"># &quot;Equalization&quot; tab.</span>
+        <span class="n">VGroup</span><span class="p">(</span>  <span class="c1"># Channel Parameters</span>
+            <span class="n">HGroup</span><span class="p">(</span>
+                <span class="n">VGroup</span><span class="p">(</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">VGroup</span><span class="p">(</span>
+                                <span class="n">HGroup</span><span class="p">(</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_ami_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;AMI File:&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_ami_valid&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Valid&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;False&quot;</span><span class="p">),</span>
+                                <span class="p">),</span>
+                                <span class="n">HGroup</span><span class="p">(</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_dll_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;DLL File:&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_dll_valid&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Valid&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;False&quot;</span><span class="p">),</span>
+                                <span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">VGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_use_ami&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use AMI&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;You must select both files, first.&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;tx_ami_valid == True and tx_dll_valid == True&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_use_getwave&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use GetWave&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Use the model&#39;s GetWave() function.&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;tx_use_ami and tx_has_getwave&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="s2">&quot;btn_cfg_tx&quot;</span><span class="p">,</span>
+                                    <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Configure Tx AMI parameters.&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;tx_ami_valid == True&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;IBIS-AMI&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">Item</span><span class="p">(</span>
+                            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_taps&quot;</span><span class="p">,</span>
+                            <span class="n">editor</span><span class="o">=</span><span class="n">TableEditor</span><span class="p">(</span>
+                                <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+                                    <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="n">editable</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                                    <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;enabled&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">),</span>
+                                    <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;min_val&quot;</span><span class="p">,</span> <span class="n">horizontal_alignment</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">),</span>
+                                    <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;max_val&quot;</span><span class="p">,</span> <span class="n">horizontal_alignment</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">),</span>
+                                    <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%+05.3f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">horizontal_alignment</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">),</span>
+                                    <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;steps&quot;</span><span class="p">,</span> <span class="n">horizontal_alignment</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">),</span>
+                                <span class="p">],</span>
+                                <span class="n">configurable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">reorderable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">sortable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">selection_mode</span><span class="o">=</span><span class="s2">&quot;cell&quot;</span><span class="p">,</span>
+                                <span class="c1"># auto_size=True,</span>
+                                <span class="n">rows</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Native&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;tx_use_ami == False&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Tx Equalization&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">VGroup</span><span class="p">(</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">VGroup</span><span class="p">(</span>
+                                <span class="n">HGroup</span><span class="p">(</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_ami_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;AMI File:&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_ami_valid&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Valid&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;False&quot;</span><span class="p">),</span>
+                                <span class="p">),</span>
+                                <span class="n">HGroup</span><span class="p">(</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_dll_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;DLL File:&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_dll_valid&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Valid&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;False&quot;</span><span class="p">),</span>
+                                <span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">VGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_use_ami&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use AMI&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;You must select both files, first.&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;rx_ami_valid == True and rx_dll_valid == True&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_use_getwave&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use GetWave&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Use the model&#39;s GetWave() function.&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;rx_use_ami and rx_has_getwave&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="s2">&quot;btn_cfg_rx&quot;</span><span class="p">,</span>
+                                    <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Configure Rx AMI parameters.&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;rx_ami_valid == True&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;IBIS-AMI&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">VGroup</span><span class="p">(</span>
+                                <span class="n">HGroup</span><span class="p">(</span>
+                                    <span class="n">Item</span><span class="p">(</span>
+                                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;use_ctle_file&quot;</span><span class="p">,</span>
+                                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;fromFile&quot;</span><span class="p">,</span>
+                                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Select CTLE impulse/step response from file.&quot;</span><span class="p">,</span>
+                                    <span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;ctle_file&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Filename&quot;</span><span class="p">,</span> <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ctle_file == True&quot;</span><span class="p">,</span>
+                                        <span class="n">editor</span><span class="o">=</span><span class="n">FileEditor</span><span class="p">(</span><span class="n">dialog_style</span><span class="o">=</span><span class="s2">&quot;open&quot;</span><span class="p">),),</span>
+                                <span class="p">),</span>
+                                <span class="n">HGroup</span><span class="p">(</span>
+                                    <span class="n">Item</span><span class="p">(</span>
+                                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;peak_freq&quot;</span><span class="p">,</span>
+                                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;CTLE fp (GHz)&quot;</span><span class="p">,</span>
+                                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE peaking frequency (GHz)&quot;</span><span class="p">,</span>
+                                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ctle_file == False&quot;</span><span class="p">,</span>
+                                    <span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span>
+                                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_bw&quot;</span><span class="p">,</span>
+                                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Bandwidth (GHz)&quot;</span><span class="p">,</span>
+                                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;unequalized signal path bandwidth (GHz).&quot;</span><span class="p">,</span>
+                                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ctle_file == False&quot;</span><span class="p">,</span>
+                                    <span class="p">),</span>
+                                <span class="p">),</span>
+                                <span class="n">HGroup</span><span class="p">(</span>
+                                    <span class="n">Item</span><span class="p">(</span>
+                                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;peak_mag&quot;</span><span class="p">,</span>
+                                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;CTLE boost (dB)&quot;</span><span class="p">,</span>
+                                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE peaking magnitude (dB)&quot;</span><span class="p">,</span>
+                                        <span class="n">format_str</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%4.1f</span><span class="s2">&quot;</span><span class="p">,</span>
+                                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ctle_file == False&quot;</span><span class="p">,</span>
+                                    <span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span>
+                                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;ctle_mode&quot;</span><span class="p">,</span>
+                                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;CTLE mode&quot;</span><span class="p">,</span>
+                                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE Operating Mode&quot;</span><span class="p">,</span>
+                                        <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_ctle_file == False&quot;</span><span class="p">,</span>
+                                    <span class="p">),</span>
+                                    <span class="n">Item</span><span class="p">(</span>
+                                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;ctle_offset&quot;</span><span class="p">,</span>
+                                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE d.c. offset (dB)&quot;</span><span class="p">,</span>
+                                        <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                        <span class="n">enabled_when</span><span class="o">=</span><span class="s1">&#39;ctle_mode == &quot;Manual&quot;&#39;</span><span class="p">,</span>
+                                    <span class="p">),</span>
+                                <span class="p">),</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;CTLE&quot;</span><span class="p">,</span>
+                            <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                            <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;rx_use_ami == False&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">HGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;delta_t&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Delta-t (ps)&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;magnitude of CDR proportional branch&quot;</span><span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;alpha&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Alpha&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;relative magnitude of CDR integral branch&quot;</span><span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">HGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;n_lock_ave&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Lock Nave.&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;# of UI estimates to average, when determining lock&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rel_lock_tol&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Lock Tol.&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;relative tolerance for determining lock&quot;</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;lock_sustain&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Lock Sus.&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;length of lock determining hysteresis vector&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;CDR&quot;</span><span class="p">,</span>
+                            <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                            <span class="n">enabled_when</span><span class="o">=</span><span class="s1">&#39;rx_use_ami == False or rx_use_getwave == False&#39;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="p">),</span>
+                        <span class="n">VGroup</span><span class="p">(</span>
+                            <span class="n">HGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;use_dfe&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Use DFE&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Include DFE in simulation.&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;rx_use_ami == False or rx_use_getwave == False&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                            <span class="p">),</span>
+                            <span class="n">HGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;n_taps&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Taps&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;# of taps&quot;</span><span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;gain&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Gain&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;error feedback gain&quot;</span><span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;decision_scaler&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Level&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;target output magnitude&quot;</span><span class="p">),</span>
+                                <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_dfe == True&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">HGroup</span><span class="p">(</span>
+                                <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;n_ave&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Nave.&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;# of CDR adaptations per DFE adaptation&quot;</span><span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sum_bw&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;BW (GHz)&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;summing node bandwidth&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;sum_ideal == False&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">Item</span><span class="p">(</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sum_ideal&quot;</span><span class="p">,</span>
+                                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Ideal&quot;</span><span class="p">,</span>
+                                    <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Use ideal DFE. (performance boost)&quot;</span><span class="p">,</span>
+                                    <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_dfe == True&quot;</span><span class="p">,</span>
+                                <span class="p">),</span>
+                                <span class="n">enabled_when</span><span class="o">=</span><span class="s2">&quot;use_dfe == True&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;DFE&quot;</span><span class="p">,</span>
+                            <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Native&quot;</span><span class="p">,</span>
+                        <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rx Equalization&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">HGroup</span><span class="p">(</span>
+            <span class="p">),</span>
+            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Equalization&quot;</span><span class="p">,</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;channel&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="c1"># &quot;Optimizer&quot; tab.</span>
+        <span class="n">VGroup</span><span class="p">(</span>
+            <span class="n">HGroup</span><span class="p">(</span>
+                <span class="n">Group</span><span class="p">(</span>
+                    <span class="n">Item</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;tx_tap_tuners&quot;</span><span class="p">,</span>
+                        <span class="n">editor</span><span class="o">=</span><span class="n">TableEditor</span><span class="p">(</span>
+                            <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+                                <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="n">editable</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                                <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;enabled&quot;</span><span class="p">),</span>
+                                <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;min_val&quot;</span><span class="p">),</span>
+                                <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;max_val&quot;</span><span class="p">),</span>
+                                <span class="n">ObjectColumn</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%+05.3f</span><span class="s2">&quot;</span><span class="p">),</span>
+                            <span class="p">],</span>
+                            <span class="n">configurable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">reorderable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">sortable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">selection_mode</span><span class="o">=</span><span class="s2">&quot;cell&quot;</span><span class="p">,</span>
+                            <span class="n">auto_size</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">rows</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+                            <span class="n">orientation</span><span class="o">=</span><span class="s2">&quot;horizontal&quot;</span><span class="p">,</span>
+                            <span class="n">is_grid_cell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Tx Equalization&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="c1"># HGroup(</span>
+                    <span class="n">VGroup</span><span class="p">(</span>
+                        <span class="n">Item</span><span class="p">(</span>
+                            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;peak_mag_tune&quot;</span><span class="p">,</span>
+                            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;CTLE: boost (dB)&quot;</span><span class="p">,</span>
+                            <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE peaking magnitude (dB)&quot;</span><span class="p">,</span>
+                            <span class="n">format_str</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%4.1f</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="p">),</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;peak_freq_tune&quot;</span><span class="p">,</span>
+                                 <span class="n">label</span><span class="o">=</span><span class="s2">&quot;fp (GHz)&quot;</span><span class="p">,</span>
+                                 <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE peaking frequency (GHz)&quot;</span>
+                            <span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rx_bw_tune&quot;</span><span class="p">,</span>
+                                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;BW (GHz)&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;unequalized signal path bandwidth (GHz).&quot;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;ctle_mode_tune&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;mode&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE Operating Mode&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span>
+                                <span class="n">name</span><span class="o">=</span><span class="s2">&quot;ctle_offset_tune&quot;</span><span class="p">,</span>
+                                <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;CTLE d.c. offset (dB)&quot;</span><span class="p">,</span>
+                                <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">enabled_when</span><span class="o">=</span><span class="s1">&#39;ctle_mode_tune == &quot;Manual&quot;&#39;</span><span class="p">,</span>
+                            <span class="p">),</span>
+                        <span class="p">),</span>
+                        <span class="n">HGroup</span><span class="p">(</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;use_dfe_tune&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;DFE: Enable&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Include ideal DFE in optimization.&quot;</span><span class="p">),</span>
+                            <span class="n">Item</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;n_taps_tune&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Taps&quot;</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Number of DFE taps.&quot;</span><span class="p">),</span>
+                        <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rx Equalization&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">),</span>
+                <span class="c1"># ),</span>
+                <span class="n">VGroup</span><span class="p">(</span>
+                    <span class="n">Item</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;max_iter&quot;</span><span class="p">,</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Max. Iterations&quot;</span><span class="p">,</span>
+                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Maximum number of iterations to allow, during optimization.&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">Item</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;rel_opt&quot;</span><span class="p">,</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rel. Opt.:&quot;</span><span class="p">,</span>
+                        <span class="n">format_str</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%7.4f</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Relative optimization metric.&quot;</span><span class="p">,</span>
+                        <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">Item</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;przf_err&quot;</span><span class="p">,</span>
+                        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;PRZF Err.:&quot;</span><span class="p">,</span>
+                        <span class="n">format_str</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%5.3f</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Pulse Response Zero Forcing approximation error.&quot;</span><span class="p">,</span>
+                        <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span>
+                    <span class="p">),</span>
+                    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Tuning Options&quot;</span><span class="p">,</span>
+                    <span class="n">show_border</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">springy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">Item</span><span class="p">(</span>
+                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Note: Only CTLE boost will be optimized; please, set peak frequency, bandwidth, and mode appropriately.&quot;</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plot_h_tune&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="n">HGroup</span><span class="p">(</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;btn_rst_eq&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Reset all values to those on the &#39;Config.&#39; tab.&quot;</span><span class="p">),</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;btn_save_eq&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Store all values to &#39;Config.&#39; tab.&quot;</span><span class="p">),</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;btn_opt_tx&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Run Tx tap weight optimization.&quot;</span><span class="p">),</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;btn_opt_rx&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Run Rx CTLE optimization.&quot;</span><span class="p">),</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;btn_coopt&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Run co-optimization.&quot;</span><span class="p">),</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;btn_abort&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tooltip</span><span class="o">=</span><span class="s2">&quot;Abort all optimizations.&quot;</span><span class="p">),</span>
+            <span class="p">),</span>
+            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Optimizer&quot;</span><span class="p">,</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;eq_tune&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">Group</span><span class="p">(</span>  <span class="c1"># Responses</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_h&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Impulses&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_h&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_s&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Steps&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_s&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_p&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Pulses&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_p&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_H&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Freq. Resp.&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_H&quot;</span><span class="p">),</span>
+            <span class="n">layout</span><span class="o">=</span><span class="s1">&#39;tabbed&#39;</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Responses&#39;</span><span class="p">,</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s1">&#39;responses&#39;</span>
+        <span class="p">),</span>
+        <span class="n">Group</span><span class="p">(</span>  <span class="c1"># Results</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_dfe&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;DFE&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_dfe&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_out&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Outputs&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_out&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_eye&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Eyes&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_eye&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_bathtub&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Bathtubs&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_bathtub&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;sweep_info&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Sweep Info&quot;</span><span class="p">),</span>
+            <span class="n">layout</span><span class="o">=</span><span class="s1">&#39;tabbed&#39;</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Results&#39;</span><span class="p">,</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s1">&#39;results&#39;</span>
+        <span class="p">),</span>
+        <span class="n">Group</span><span class="p">(</span>  <span class="c1"># Jitter</span>
+            <span class="n">Group</span><span class="p">(</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_jitter_dist&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Jitter Dist.&quot;</span><span class="p">,</span>
+                <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_jitter_dist&quot;</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;plots_jitter_spec&quot;</span><span class="p">,</span> <span class="n">editor</span><span class="o">=</span><span class="n">ComponentEditor</span><span class="p">(),</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Jitter Spec.&quot;</span><span class="p">,</span>
+                <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;plots_jitter_spec&quot;</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;jitter_info&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Jitter Info&quot;</span><span class="p">),</span>
+            <span class="n">layout</span><span class="o">=</span><span class="s1">&#39;tabbed&#39;</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Jitter&#39;</span><span class="p">,</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s1">&#39;jitter&#39;</span>
+        <span class="p">),</span>
+        <span class="n">Group</span><span class="p">(</span>  <span class="c1"># Help</span>
+            <span class="n">Group</span><span class="p">(</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;ident&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                <span class="n">Item</span><span class="p">(</span><span class="s2">&quot;perf_info&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;About&quot;</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;instructions&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Guide&quot;</span><span class="p">),</span>
+            <span class="n">Group</span><span class="p">(</span><span class="n">Item</span><span class="p">(</span><span class="s2">&quot;console_log&quot;</span><span class="p">,</span> <span class="n">show_label</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;custom&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Console&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;console&quot;</span><span class="p">),</span>
+            <span class="n">layout</span><span class="o">=</span><span class="s1">&#39;tabbed&#39;</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Help&#39;</span><span class="p">,</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s1">&#39;help&#39;</span>
+        <span class="p">),</span>
+        <span class="n">layout</span><span class="o">=</span><span class="s2">&quot;tabbed&quot;</span><span class="p">,</span>
+        <span class="n">springy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;tabs&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">resizable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">handler</span><span class="o">=</span><span class="n">MyHandler</span><span class="p">(),</span>
+    <span class="n">buttons</span><span class="o">=</span><span class="p">[</span><span class="n">run_sim</span><span class="p">,</span> <span class="n">save_cfg</span><span class="p">,</span> <span class="n">load_cfg</span><span class="p">,</span> <span class="n">save_data</span><span class="p">,</span> <span class="n">load_data</span><span class="p">],</span>
+    <span class="n">statusbar</span><span class="o">=</span><span class="s2">&quot;status_str&quot;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;PyBERT&quot;</span><span class="p">,</span>
+    <span class="n">width</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span>
+    <span class="n">height</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+    <span class="n">icon</span><span class="o">=</span><span class="n">ImageResource</span><span class="p">(</span><span class="s2">&quot;icon.png&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">PyBERT</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">General description of <em>pybert</em> package.</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Modules in <em>pybert</em> package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, David Banas.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
