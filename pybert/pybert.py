@@ -19,6 +19,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 # ETSConfig.toolkit = "wx"
 
 from datetime import datetime
+import platform
 from threading import Event, Thread
 from time import sleep
 
@@ -580,7 +581,7 @@ class PyBERT(HasTraits):
     # Logger
     def log(self, msg):
         """Log a message to the console."""
-        self.console_log += "\n[{}]: {}\n".format(datetime.now(), msg.strip())
+        self.console_log += "[{}]: {}\n".format(datetime.now(), msg.strip())
 
     def dbg(self, msg):
         """Only if debug is true, log this message to the console."""
@@ -619,6 +620,7 @@ class PyBERT(HasTraits):
         super(PyBERT, self).__init__()
 
         self.log("Started.")
+        self.log_information()
         if self.debug:
             self.log("Debug Mode Enabled.")
 
@@ -1019,10 +1021,10 @@ class PyBERT(HasTraits):
             )
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
-            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (pj_chnl, pj_tx)
+            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (pj_chnl, pj_tx,)
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
-            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (rj_chnl, rj_tx)
+            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (rj_chnl, rj_tx,)
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
 
@@ -1197,7 +1199,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (self.status, self.total_perf * 60.0e-6)
+        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (self.status, self.total_perf * 60.0e-6,)
         dly_str = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.0e9)
         err_str = "         | BitErrs: %d" % self.bit_errs
         pwr_str = "         | TxPwr (W): %4.2f" % self.rel_power
@@ -1395,23 +1397,23 @@ class PyBERT(HasTraits):
     def _ch_type_changed(self, new_value):
         channel = draw_channel(self.height, self.width, self.thickness, self.separation, new_value)
         self.drawdata.set_data("channel", channel)
-        
+
     def _height_changed(self, new_value):
         channel = draw_channel(new_value, self.width, self.thickness, self.separation, self.ch_type)
         self.drawdata.set_data("channel", channel)
-        
+
     def _width_changed(self, new_value):
         channel = draw_channel(self.height, new_value, self.thickness, self.separation, self.ch_type)
         self.drawdata.set_data("channel", channel)
-        
+
     def _thickness_changed(self, new_value):
         channel = draw_channel(self.height, self.width, new_value, self.separation, self.ch_type)
         self.drawdata.set_data("channel", channel)
-        
+
     def _separation_changed(self, new_value):
         channel = draw_channel(self.height, self.width, self.thickness, new_value, self.ch_type)
         self.drawdata.set_data("channel", channel)
-        
+
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
@@ -1495,6 +1497,12 @@ class PyBERT(HasTraits):
         self.chnl_p = chnl_p
 
         return chnl_h
+
+    def log_information(self):
+        """Log the system information."""
+        self.log(f"System: {platform.system()} {platform.release()}")
+        self.log(f"Python Version: {platform.python_version()}")
+        self.log(f"PyBERT Version: {VERSION}")
 
 
 # So that we can be used in stand-alone or imported fashion.

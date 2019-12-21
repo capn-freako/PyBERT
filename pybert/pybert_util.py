@@ -66,7 +66,7 @@ def moving_average(a, n=3):
 
 
 def find_crossing_times(
-    t, x, min_delay: float = 0.0, rising_first: bool = True, min_init_dev: float = 0.1, thresh: float = 0.0
+    t, x, min_delay: float = 0.0, rising_first: bool = True, min_init_dev: float = 0.1, thresh: float = 0.0,
 ):
     """
     Finds the threshold crossing times of the input signal.
@@ -150,7 +150,9 @@ def find_crossing_times(
     return array(xings[i:])
 
 
-def find_crossings(t, x, amplitude, min_delay: float = 0.0, rising_first: bool = True, min_init_dev=0.1, mod_type=0):
+def find_crossings(
+    t, x, amplitude, min_delay: float = 0.0, rising_first: bool = True, min_init_dev=0.1, mod_type=0,
+):
     """
     Finds the crossing times in a signal, according to the modulation type.
 
@@ -549,7 +551,7 @@ def calc_gamma_RLGC(R, L, G, C, ws):
         w[0] = 1.0e-12
 
     gamma = sqrt((1j * w * L0 + R) * (1j * w * C + G))  # propagation constant (nepers/m)
-    Zc    = sqrt((1j * w * L0 + R) / (1j * w * C + G))  # characteristic impedance (Ohms)
+    Zc = sqrt((1j * w * L0 + R) / (1j * w * C + G))  # characteristic impedance (Ohms)
 
     return (gamma, Zc)
 
@@ -642,7 +644,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
             interp_fac = (start_time - start_ix * tsamp) // tsamp
             i = 0
             for (samp1, samp2) in zip(
-                ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui]
+                ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui],
             ):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
@@ -658,6 +660,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
             start_ix += samps_per_ui
 
     return img_array
+
 
 def draw_channel(height, width, thickness, separation, ch_type, arraySize=[25, 100]):
     """
@@ -682,26 +685,26 @@ def draw_channel(height, width, thickness, separation, ch_type, arraySize=[25, 1
     xMid = int(xMax // 2)
     yMid = int(yMax // 2)
     yOff = int(yMax // 10 + hScale * height)
-    if ch_type == 'microstrip_se' or ch_type == 'stripline_se':  # single-ended configuration
-        xOff1 = xMid - int(hScale * (width/2))
+    if ch_type == "microstrip_se" or ch_type == "stripline_se":  # single-ended configuration
+        xOff1 = xMid - int(hScale * (width / 2))
         xOff2 = None
-    else :                                                       # differential configuration
-        xOff1 = xMid - int(hScale * (separation/2 + width))
-        xOff2 = xMid + int(hScale * separation/2)
+    else:  # differential configuration
+        xOff1 = xMid - int(hScale * (separation / 2 + width))
+        xOff2 = xMid + int(hScale * separation / 2)
     # Generate the cross-section drawing.
     # - Fill w/ dielectric color.
     img_array = 10 * ones(arraySize)
     # - Draw the reference plane.
     for y in range(yMax // 10):
         for x in range(xMax):
-            img_array[y,x] = 0
+            img_array[y, x] = 0
     # - Draw air, or second plane, depending on configuration.
-    if ch_type == 'microstrip_se' or ch_type == 'microstrip_diff':  # microstrip configuration
+    if ch_type == "microstrip_se" or ch_type == "microstrip_diff":  # microstrip configuration
         for y in range(yOff, yMax):
             for x in range(xMax):
                 img_array[y, x] = 255  # air (white)
-    else :                                                          # stripline configuration
-        for y in range(yOff + int(hScale*(thickness + height)), yMax):
+    else:  # stripline configuration
+        for y in range(yOff + int(hScale * (thickness + height)), yMax):
             for x in range(xMax):
                 img_array[y, x] = 0  # metal (black)
     # - Draw trace(s).
@@ -711,6 +714,7 @@ def draw_channel(height, width, thickness, separation, ch_type, arraySize=[25, 1
             if xOff2:
                 img_array[yOff + y, xOff2 + x] = 0
     return img_array
+
 
 def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
     """
@@ -1043,6 +1047,7 @@ def pulse_center(p, nspui):
     clock_pos = int(mean([main_lobe_ixs[0], main_lobe_ixs[-1]]))
     return (clock_pos, thresh)
 
+
 def submodules(package):
 
     # mod_path = package.__file__
@@ -1062,4 +1067,4 @@ def submodules(package):
         # mod = loader.load_module(package.__name__ + "." + name)
         rst[name] = mod
 
-    return rst 
+    return rst

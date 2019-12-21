@@ -14,17 +14,18 @@ Note to PyBERT *users*
 ----------------------
 
 The documentation for the *PyBERT* project has 2 parts:
-  * help for stand-alone GUI application *users*, and
-  * help for PyBERT *developers* and *importers*
+
+* help for stand-alone GUI application *users*, and
+* help for PyBERT *developers* and *importers*
 
 This is the help for developers and importers.
 
 If you're looking for usage instructions, you're in the wrong place.
 Instead, try:
 
-  * Looking at the *Help* tab of the PyBERT GUI.
-  * Looking at the `PyBERT FAQ <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>`_.
-  * Sending me e-mail at: <capn.freako@gmail.com>.
+* Looking at the *Help* tab of the PyBERT GUI.
+* Looking at the `PyBERT FAQ <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>`_.
+* Sending me e-mail at: <capn.freako@gmail.com>.
 
 Note to PyBERT *importers*
 --------------------------
