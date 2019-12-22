@@ -1381,8 +1381,9 @@ class PyBERT(HasTraits):
             self.log("Parsing Tx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
-            self.tx_dll_file = self._tx_ibis.dll_file
-            self.tx_ami_file = self._tx_ibis.ami_file
+            dName = dirname(new_value)
+            self.tx_dll_file = join(dName, self._tx_ibis.dll_file)
+            self.tx_ami_file = join(dName, self._tx_ibis.ami_file)
         except Exception as err:
             self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
@@ -1421,8 +1422,9 @@ class PyBERT(HasTraits):
             self.log("Parsing Rx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
-            self.rx_dll_file = self._rx_ibis.dll_file
-            self.rx_ami_file = self._rx_ibis.ami_file
+            dName = dirname(new_value)
+            self.rx_dll_file = join(dName, self._rx_ibis.dll_file)
+            self.rx_ami_file = join(dName, self._rx_ibis.ami_file)
         except Exception as err:
             self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
