@@ -718,13 +718,21 @@ class PyBERT(HasTraits):
 
     def _btn_sel_tx_fired(self):
         self._tx_ibis()
-        self.tx_dll_file = join(self._tx_ibis_dir, self._tx_ibis.dll_file)
-        self.tx_ami_file = join(self._tx_ibis_dir, self._tx_ibis.ami_file)
+        if self._tx_ibis.dll_file and self._tx_ibis.ami_file:
+            self.tx_dll_file = join(self._tx_ibis_dir, self._tx_ibis.dll_file)
+            self.tx_ami_file = join(self._tx_ibis_dir, self._tx_ibis.ami_file)
+        else:
+            self.tx_dll_file = ""
+            self.tx_ami_file = ""
 
     def _btn_sel_rx_fired(self):
         self._rx_ibis()
-        self.rx_dll_file = join(self._rx_ibis_dir, self._rx_ibis.dll_file)
-        self.rx_ami_file = join(self._rx_ibis_dir, self._rx_ibis.ami_file)
+        if self._rx_ibis.dll_file and self._rx_ibis.ami_file:
+            self.rx_dll_file = join(self._rx_ibis_dir, self._rx_ibis.dll_file)
+            self.rx_ami_file = join(self._rx_ibis_dir, self._rx_ibis.ami_file)
+        else:
+            self.rx_dll_file = ""
+            self.rx_ami_file = ""
 
     def _btn_view_tx_fired(self):
         self._tx_ibis.model()
@@ -1376,14 +1384,19 @@ class PyBERT(HasTraits):
         self.status = f"Parsing IBIS file: {new_value}"
         try:
             self.tx_ibis_valid = False
+            self.tx_use_ami = False
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
             ibis = IBISModel(new_value, True)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
             dName = dirname(new_value)
-            self.tx_dll_file = join(dName, self._tx_ibis.dll_file)
-            self.tx_ami_file = join(dName, self._tx_ibis.ami_file)
+            if self._tx_ibis.dll_file and self._tx_ibis.ami_file:
+                self.tx_dll_file = join(dName, self._tx_ibis.dll_file)
+                self.tx_ami_file = join(dName, self._tx_ibis.ami_file)
+            else:
+                self.tx_dll_file = ""
+                self.tx_ami_file = ""
         except Exception as err:
             self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
@@ -1394,12 +1407,13 @@ class PyBERT(HasTraits):
     def _tx_ami_file_changed(self, new_value):
         try:
             self.tx_ami_valid = False
-            with open(new_value) as pfile:
-                pcfg = AMIParamConfigurator(pfile.read())
-            self.log("Parsing Tx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
-            self.tx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
-            self._tx_cfg = pcfg
-            self.tx_ami_valid = True
+            if new_value:
+                with open(new_value) as pfile:
+                    pcfg = AMIParamConfigurator(pfile.read())
+                self.log("Parsing Tx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
+                self.tx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
+                self._tx_cfg = pcfg
+                self.tx_ami_valid = True
         except Exception as err:
             error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
             self.log(error_message, alert=True)
@@ -1407,9 +1421,10 @@ class PyBERT(HasTraits):
     def _tx_dll_file_changed(self, new_value):
         try:
             self.tx_dll_valid = False
-            model = AMIModel(str(new_value))
-            self._tx_model = model
-            self.tx_dll_valid = True
+            if new_value:
+                model = AMIModel(str(new_value))
+                self._tx_model = model
+                self.tx_dll_valid = True
         except Exception as err:
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
             self.log(error_message, alert=True)
@@ -1418,14 +1433,19 @@ class PyBERT(HasTraits):
         self.status = f"Parsing IBIS file: {new_value}"
         try:
             self.rx_ibis_valid = False
+            self.rx_use_ami = False
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
             ibis = IBISModel(new_value, False)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
             dName = dirname(new_value)
-            self.rx_dll_file = join(dName, self._rx_ibis.dll_file)
-            self.rx_ami_file = join(dName, self._rx_ibis.ami_file)
+            if self._rx_ibis.dll_file and self._rx_ibis.ami_file:
+                self.rx_dll_file = join(dName, self._rx_ibis.dll_file)
+                self.rx_ami_file = join(dName, self._rx_ibis.ami_file)
+            else:
+                self.rx_dll_file = ""
+                self.rx_ami_file = ""
         except Exception as err:
             self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
@@ -1436,12 +1456,13 @@ class PyBERT(HasTraits):
     def _rx_ami_file_changed(self, new_value):
         try:
             self.rx_ami_valid = False
-            with open(new_value) as pfile:
-                pcfg = AMIParamConfigurator(pfile.read())
-            self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
-            self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
-            self._rx_cfg = pcfg
-            self.rx_ami_valid = True
+            if new_value:
+                with open(new_value) as pfile:
+                    pcfg = AMIParamConfigurator(pfile.read())
+                self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
+                self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
+                self._rx_cfg = pcfg
+                self.rx_ami_valid = True
         except Exception as err:
             error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
             self.log(error_message, alert=True)
@@ -1449,9 +1470,10 @@ class PyBERT(HasTraits):
     def _rx_dll_file_changed(self, new_value):
         try:
             self.rx_dll_valid = False
-            model = AMIModel(str(new_value))
-            self._rx_model = model
-            self.rx_dll_valid = True
+            if new_value:
+                model = AMIModel(str(new_value))
+                self._rx_model = model
+                self.rx_dll_valid = True
         except Exception as err:
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
             self.log(error_message, alert=True)
