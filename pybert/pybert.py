@@ -718,13 +718,13 @@ class PyBERT(HasTraits):
 
     def _btn_sel_tx_fired(self):
         self._tx_ibis()
-        self.tx_dll_file = self._tx_ibis.dll_file
-        self.tx_ami_file = self._tx_ibis.ami_file
+        self.tx_dll_file = join(self._tx_ibis_dir, self._tx_ibis.dll_file)
+        self.tx_ami_file = join(self._tx_ibis_dir, self._tx_ibis.ami_file)
 
     def _btn_sel_rx_fired(self):
         self._rx_ibis()
-        self.rx_dll_file = self._rx_ibis.dll_file
-        self.rx_ami_file = self._rx_ibis.ami_file
+        self.rx_dll_file = join(self._rx_ibis_dir, self._rx_ibis.dll_file)
+        self.rx_ami_file = join(self._rx_ibis_dir, self._rx_ibis.ami_file)
 
     def _btn_view_tx_fired(self):
         self._tx_ibis.model()
@@ -1376,9 +1376,9 @@ class PyBERT(HasTraits):
         self.status = f"Parsing IBIS file: {new_value}"
         try:
             self.tx_ibis_valid = False
-            with open(new_value) as file:
-                ibis = IBISModel(file.read(), True)
-            self.log("Parsing Tx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
+            self.log(f"Parsing Tx IBIS file, '{new_value}'...")
+            ibis = IBISModel(new_value, True)
+            self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
             dName = dirname(new_value)
@@ -1388,6 +1388,7 @@ class PyBERT(HasTraits):
             self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
             self.log(error_message, alert=True, exception=err)
+        self._tx_ibis_dir = dName
         self.status = "Done."
         
     def _tx_ami_file_changed(self, new_value):
@@ -1417,9 +1418,9 @@ class PyBERT(HasTraits):
         self.status = f"Parsing IBIS file: {new_value}"
         try:
             self.rx_ibis_valid = False
-            with open(new_value) as file:
-                ibis = IBISModel(file.read(), False)
-            self.log("Parsing Rx IBIS file, '{}'...\n{}".format(new_value, ibis.ibis_parsing_errors))
+            self.log(f"Parsing Rx IBIS file, '{new_value}'...")
+            ibis = IBISModel(new_value, False)
+            self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
             dName = dirname(new_value)
@@ -1429,6 +1430,7 @@ class PyBERT(HasTraits):
             self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
             self.log(error_message, alert=True)
+        self._rx_ibis_dir = dName
         self.status = "Done."
 
     def _rx_ami_file_changed(self, new_value):
