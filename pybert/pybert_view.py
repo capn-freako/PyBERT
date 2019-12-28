@@ -614,12 +614,10 @@ traits_view = View(
                             enabled_when="rx_use_ami == False",
                             ),
                         ),
-                        VGroup(
-                            HGroup(
+                        HGroup(
+                            VGroup(
                                 Item(name="delta_t", label="Delta-t (ps)", tooltip="magnitude of CDR proportional branch"),
                                 Item(name="alpha", label="Alpha", tooltip="relative magnitude of CDR integral branch"),
-                            ),
-                            HGroup(
                                 Item(
                                     name="n_lock_ave",
                                     label="Lock Nave.",
@@ -633,29 +631,28 @@ traits_view = View(
                                     label="Lock Sus.",
                                     tooltip="length of lock determining hysteresis vector",
                                 ),
+                                label="CDR",
+                                show_border=True,
+                                enabled_when='rx_use_ami == False or rx_use_getwave == False',
                             ),
-                            label="CDR",
-                            show_border=True,
-                            enabled_when='rx_use_ami == False or rx_use_getwave == False',
-                        ),
-                        VGroup(
-                        ),
-                        VGroup(
-                            HGroup(
-                                Item(
-                                    name="use_dfe",
-                                    label="Use DFE",
-                                    tooltip="Include DFE in simulation.",
-                                    enabled_when="rx_use_ami == False or rx_use_getwave == False",
+                            VGroup(
+                                HGroup(
+                                    Item(
+                                        name="use_dfe",
+                                        label="Use DFE",
+                                        tooltip="Include DFE in simulation.",
+                                        enabled_when="rx_use_ami == False or rx_use_getwave == False",
+                                    ),
+                                    Item(
+                                        name="sum_ideal",
+                                        label="Ideal",
+                                        tooltip="Use ideal DFE. (performance boost)",
+                                        enabled_when="use_dfe == True",
+                                    ),
                                 ),
-                            ),
-                            HGroup(
                                 Item(name="n_taps", label="Taps", tooltip="# of taps"),
                                 Item(name="gain", label="Gain", tooltip="error feedback gain"),
                                 Item(name="decision_scaler", label="Level", tooltip="target output magnitude"),
-                                enabled_when="use_dfe == True",
-                            ),
-                            HGroup(
                                 Item(name="n_ave", label="Nave.", tooltip="# of CDR adaptations per DFE adaptation"),
                                 Item(
                                     name="sum_bw",
@@ -663,16 +660,10 @@ traits_view = View(
                                     tooltip="summing node bandwidth",
                                     enabled_when="sum_ideal == False",
                                 ),
-                                Item(
-                                    name="sum_ideal",
-                                    label="Ideal",
-                                    tooltip="Use ideal DFE. (performance boost)",
-                                    enabled_when="use_dfe == True",
-                                ),
                                 enabled_when="use_dfe == True",
+                                label="DFE",
+                                show_border=True,
                             ),
-                            label="DFE",
-                            show_border=True,
                         ),
                         label="Native",
                         show_border=True,

@@ -35,7 +35,7 @@ enable:
 	conda install --use-local enable
 
 pyibis-ami:
-	conda build --numpy=1.16 -c conda-forge conda.recipe/pyibis-ami
+	conda build --numpy=1.16 conda.recipe/pyibis-ami
 
 pyibis-ami_dev:
 	conda install -n pybert64 --use-local --only-deps PyAMI/

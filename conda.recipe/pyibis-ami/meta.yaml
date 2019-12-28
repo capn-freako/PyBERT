@@ -1,7 +1,7 @@
 {% set name = "pyibis-ami" %}
 {% set version = "3.3.0" %}
-{% set hash_type = "sha256" %}
-{% set hash_value = "03cd97ba09850d673bc6c3fd6e769fd48aa3c4e2212300dce219873204d53b6c" %}
+# {% set hash_type = "sha256" %}
+# {% set hash_value = "03cd97ba09850d673bc6c3fd6e769fd48aa3c4e2212300dce219873204d53b6c" %}
 
 package:
   version: '{{ version }}'
@@ -14,9 +14,10 @@ source:
   # fn: '{{ name }}-{{ version }}.tar.gz'
 
 build:
-  script: python setup.py install  --single-version-externally-managed --record=record.txt
+  # script: python setup.py install  --single-version-externally-managed --record=record.txt
   number: 1
   # noarch: python
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   run:
