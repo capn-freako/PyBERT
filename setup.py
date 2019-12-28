@@ -27,7 +27,7 @@ setup(
         "scipy",
         "traits",
         "traitsui",
-        "PyIBIS-AMI>=3.0.0",
+        "PyIBIS-AMI>=3.3.0",
         "pyyaml",
         "pyside2",
     ],
