@@ -385,7 +385,6 @@ class PyBERT(HasTraits):
     ch_file = File(
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
     )                          #: Channel file name.
-    chnl_valid = Bool(False)   #: Channel file is valid.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     Zref = Float(100)          #: Reference (or, nominal) channel impedance.
     padded = Bool(False)       #: Zero pad imported Touchstone data? (Default = False)

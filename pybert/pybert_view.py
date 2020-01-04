@@ -330,13 +330,11 @@ traits_view = View(
                                     springy=True,
                                     editor=FileEditor(dialog_style="open"),
                                 ),
-                                Item(name="chnl_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                             HGroup(
                                 Item(
                                     name="use_ch_file",
                                     label="Use file",
-                                    enabled_when="chnl_valid == True",
                                 ),
                                 spring,
                                 Item(name="padded",   label="Zero-padded", enabled_when="use_ch_file == True"),
