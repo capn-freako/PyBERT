@@ -13,7 +13,7 @@ kiwisolver==1.1.0
 matplotlib==3.1.1
 numpy==1.16.4
 parsec==3.4
-pillow==6.1.0
+pillow==6.2.0
 pyface==6.1.1
 pyparsing==2.4.0
 pyside2==5.13.0
