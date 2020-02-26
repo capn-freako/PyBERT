@@ -890,6 +890,8 @@ def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6)
     # Form frequency vector.
     f = ntwk.f
     fmin = f_step
+    if f[0] > 0:
+        fmin = max(fmin, f[0])
     fmax = f[-1]
     f = np.arange(fmin, fmax + fmin, fmin)
     F = rf.Frequency.from_f(f / 1e9)  # skrf.Frequency.from_f() expects its argument to be in units of GHz.

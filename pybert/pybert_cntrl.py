@@ -240,11 +240,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
                 # order to minimize high frequency artifactual energy
                 # introduced by frequency domain processing in some models.
                 half_len = len(chnl_h) // 2
-                tx_s = tx_model.getWave(array([0.0] * half_len + [1.0] * half_len))
+                tx_s, _ = tx_model.getWave(array([0.0] * half_len + [1.0] * half_len))
                 # Shift the result back to the correct location, extending the last sample.
                 tx_s = pad(tx_s[half_len:], (0, half_len), "edge")
                 tx_h = diff(concatenate((array([0.0]), tx_s)))  # Without the leading 0, we miss the pre-tap.
-                tx_out = tx_model.getWave(self.x)
+                tx_out, _ = tx_model.getWave(self.x)
             else:  # Init()-only.
                 tx_s = tx_h.cumsum()
                 tx_out = convolve(tx_h, self.x)
