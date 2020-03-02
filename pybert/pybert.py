@@ -364,7 +364,7 @@ class PyBERT(HasTraits):
     Useful for exploring the concepts of serial communication link design.
     """
 
-    reraise = True  # Set to `True` only for serious development debugging mode.
+    reraise = False  # Set to `True` only for serious development debugging mode.
 
     # Independent variables
 
@@ -379,7 +379,7 @@ class PyBERT(HasTraits):
     sweep_num = Int(1)
     sweep_aves = Int(gNumAve)
     do_sweep = Bool(False)  #: Run sweeps? (Default = False)
-    debug = Bool(True)      #: Send log messages to terminal, as well as console, when True. (Default = False)
+    debug = Bool(False)     #: Send log messages to terminal, as well as console, when True. (Default = False)
 
     # - Channel Control
     ch_file = File(
@@ -497,7 +497,6 @@ class PyBERT(HasTraits):
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
-    # drawdata = ArrayPlotData()
     plots_h = Instance(GridPlotContainer)
     plots_s = Instance(GridPlotContainer)
     plots_p = Instance(GridPlotContainer)
@@ -1290,10 +1289,8 @@ class PyBERT(HasTraits):
         ctle_h = self.ctle_h_tune
 
         tx_out_h = convolve(tx_h, chnl_h)
-        h = convolve(ctle_h, tx_out_h)
-
-        return h
-
+        return(convolve(ctle_h, tx_out_h))
+        
     @cached_property
     def _get_cost(self):
         nspui = self.nspui
@@ -1333,9 +1330,9 @@ class PyBERT(HasTraits):
             for i in range(self.n_taps_tune):
                 if clock_pos + nspui * (1 + i) < len(p):
                     p[int(clock_pos + nspui * (0.5 + i)) :] -= p[clock_pos + nspui * (1 + i)]
-
-        self.plotdata.set_data("ctle_out_h_tune", p)
-        self.plotdata.set_data("clocks_tune", clocks)
+        plot_len = len(self.chnl_h)
+        self.plotdata.set_data("ctle_out_h_tune", p[:plot_len])
+        self.plotdata.set_data("clocks_tune", clocks[:plot_len])
 
         if mod_type == 1:  # Handle duo-binary.
             return isi - p[clock_pos] - p[clock_pos + nspui] + 2.0 * abs(p[clock_pos + nspui] - p[clock_pos])
@@ -1353,10 +1350,13 @@ class PyBERT(HasTraits):
 
         (clock_pos, _) = pulse_center(p, nspui)
         err = 0
+        len_p = len(p)
         for i in range(n_taps):
-            err += p[clock_pos + (i + 1) * nspui] ** 2
+            ix = clock_pos + (i + 1) * nspui
+            if ix < len_p:
+                err += p[ix]**2
 
-        return err / p[clock_pos] ** 2
+        return err / p[clock_pos]**2
 
     # Changed property handlers.
     def _status_str_changed(self):
@@ -1434,7 +1434,7 @@ class PyBERT(HasTraits):
             self.rx_ibis_valid = False
             self.rx_use_ami = False
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, False)
+            ibis = IBISModel(new_value, self.debug)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True

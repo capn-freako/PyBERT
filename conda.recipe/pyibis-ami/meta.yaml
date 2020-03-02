@@ -1,5 +1,5 @@
 {% set name = "pyibis-ami" %}
-{% set version = "3.3.2" %}
+{% set version = "3.3.3rc1" %}
 # {% set hash_type = "sha256" %}
 # {% set hash_value = "03cd97ba09850d673bc6c3fd6e769fd48aa3c4e2212300dce219873204d53b6c" %}
 
@@ -84,4 +84,4 @@ about:
   doc_url: ''
 
 extra:
-  recipe-maintainers: 'capn-freako'
+  recipe-maintainers: 'capn.freako@gmail.com'
