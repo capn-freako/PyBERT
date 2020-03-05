@@ -364,8 +364,6 @@ class PyBERT(HasTraits):
     Useful for exploring the concepts of serial communication link design.
     """
 
-    reraise = False  # Set to `True` only for serious development debugging mode.
-
     # Independent variables
 
     # - Simulation Control
@@ -595,12 +593,12 @@ class PyBERT(HasTraits):
         """Log a message to the console and, optionally, to terminal and/or pop-up dialog."""
         _msg = msg.strip()
         txt = "\n[{}]: {}\n".format(datetime.now(), _msg)
-        self.console_log += txt
-        if exception and self.reraise:  # If we're in serious development debugging mode:
-            raise exception
         if self.debug:
             ## In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt)
+        self.console_log += txt
+        if exception:
+            raise exception
         if alert:
             message(_msg, "PyBERT Alert")
 

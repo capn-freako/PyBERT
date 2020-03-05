@@ -280,30 +280,30 @@ def make_plots(self, n_dfe_taps):
     plot_out_chnl.title = post_chnl_str
     plot_out_chnl.index_axis.title = "Time (ns)"
     plot_out_chnl.y_axis.title = "Output (V)"
-    plot_out_chnl.tools.append(PanTool(plot_out_chnl, constrain=True, constrain_key=None, constrain_direction="x"))
-    zoom_out_chnl = ZoomTool(plot_out_chnl, tool_mode="range", axis="index", always_on=False)
-    plot_out_chnl.overlays.append(zoom_out_chnl)
+    # plot_out_chnl.tools.append(PanTool(plot_out_chnl, constrain=True, constrain_key=None, constrain_direction="x"))
+    # zoom_out_chnl = ZoomTool(plot_out_chnl, tool_mode="range", axis="index", always_on=False)
+    # plot_out_chnl.overlays.append(zoom_out_chnl)
 
     plot_out_tx = Plot(plotdata, padding_left=75)
     plot_out_tx.plot(("t_ns", "tx_out"), type="line", color="blue")
     plot_out_tx.title = post_tx_str
     plot_out_tx.index_axis.title = "Time (ns)"
     plot_out_tx.y_axis.title = "Output (V)"
-    plot_out_tx.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
+    # plot_out_tx.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
 
     plot_out_ctle = Plot(plotdata, padding_left=75)
     plot_out_ctle.plot(("t_ns", "ctle_out"), type="line", color="blue")
     plot_out_ctle.title = post_ctle_str
     plot_out_ctle.index_axis.title = "Time (ns)"
     plot_out_ctle.y_axis.title = "Output (V)"
-    plot_out_ctle.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
+    # plot_out_ctle.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
 
     plot_out_dfe = Plot(plotdata, padding_left=75)
     plot_out_dfe.plot(("t_ns", "dfe_out"), type="line", color="blue")
     plot_out_dfe.title = post_dfe_str
     plot_out_dfe.index_axis.title = "Time (ns)"
     plot_out_dfe.y_axis.title = "Output (V)"
-    plot_out_dfe.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
+    # plot_out_dfe.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
 
     container_out = GridPlotContainer(shape=(2, 2))
     container_out.add(plot_out_chnl)

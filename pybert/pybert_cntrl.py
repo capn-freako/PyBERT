@@ -220,19 +220,18 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             if tx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
                 tx_h = array(tx_model.initOut) * ts
             elif not tx_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]):
-                self.handle_error(
-                    "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
-                        I cannot continue.\nThis condition is supposed to be caught sooner in the flow."
-                )
                 self.status = "Simulation Error."
+                self.log( "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
+I cannot continue.\nYou will have to select a different model.",
+                    alert=True
+                )
                 return
             elif not self.tx_use_getwave:
-                self.handle_error(
-                    "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
-                        I cannot continue.\nPlease, select 'Use GetWave' and try again.",
-                    "PyBERT Alert",
-                )
                 self.status = "Simulation Error."
+                self.log( "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
+I cannot continue.\nPlease, select 'Use GetWave' and try again.",
+                    alert=True
+                )
                 return
             if self.tx_use_getwave:
                 # For GetWave, use a step to extract the model's native properties.
@@ -328,19 +327,20 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             if rx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
                 ctle_out_h = array(rx_model.initOut) * ts
             elif not rx_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]):
-                self.handle_error(
-                    "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
-                        I cannot continue.\nThis condition is supposed to be caught sooner in the flow."
-                )
                 self.status = "Simulation Error."
+                self.log(
+                    "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
+I cannot continue.\nYou will have to select a different model.",
+                    alert=True
+                )
                 return
             elif not self.rx_use_getwave:
-                self.handle_error(
-                    "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
-                        I cannot continue.\nPlease, select 'Use GetWave' and try again.",
-                    "PyBERT Alert",
-                )
                 self.status = "Simulation Error."
+                self.log(
+                    "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
+I cannot continue.\nPlease, select 'Use GetWave' and try again.",
+                    alert=True
+                )
                 return
             if self.rx_use_getwave:
                 if False:
@@ -711,6 +711,7 @@ def update_results(self):
     # Misc.
     f_GHz = f[: len(f) // 2] / 1.0e9
     len_f_GHz = len(f_GHz)
+    len_t = len(t_ns)
     self.plotdata.set_data("f_GHz", f_GHz[1:])
     self.plotdata.set_data("t_ns", t_ns)
     self.plotdata.set_data("t_ns_chnl", t_ns_chnl)
@@ -788,12 +789,17 @@ def update_results(self):
     self.plotdata.set_data("dfe_out_p", self.dfe_out_p)
 
     # Outputs
-    self.plotdata.set_data("ideal_signal", self.ideal_signal)
-    self.plotdata.set_data("chnl_out", self.chnl_out)
-    self.plotdata.set_data("tx_out", self.rx_in)
-    self.plotdata.set_data("ctle_out", self.ctle_out)
-    self.plotdata.set_data("dfe_out", self.dfe_out)
-    self.plotdata.set_data("auto_corr", self.auto_corr)
+    # self.plotdata.set_data("ideal_signal", self.ideal_signal[:len_t])
+    # self.plotdata.set_data("chnl_out", self.chnl_out[:len_t])
+    # self.plotdata.set_data("tx_out", self.rx_in[:len_t])
+    # self.plotdata.set_data("ctle_out", self.ctle_out[:len_t])
+    # self.plotdata.set_data("dfe_out", self.dfe_out[:len_t])
+    self.plotdata.set_data("ideal_signal", self.chnl_p[:len_t])
+    self.plotdata.set_data("chnl_out", self.chnl_p[:len_t])
+    self.plotdata.set_data("tx_out", self.chnl_p[:len_t])
+    self.plotdata.set_data("ctle_out", self.chnl_p[:len_t])
+    self.plotdata.set_data("dfe_out", self.chnl_p[:len_t])
+    # self.plotdata.set_data("auto_corr", self.auto_corr)
 
     # Frequency responses
     self.plotdata.set_data("chnl_H", 20.0 * log10(abs(self.chnl_H[1:len_f_GHz])))
