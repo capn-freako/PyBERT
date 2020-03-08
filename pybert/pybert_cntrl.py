@@ -169,7 +169,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         if mod_type == 1:  # Handle duo-binary case.
             duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
             x = convolve(x, duob_h)[: len(t)]
-        self.ideal_signal = x
+        # self.ideal_signal = x           # Causes crash.
+        # self.ideal_signal = x[:-70000]    # Fixes crash.
+        # self.ideal_signal = x[:-62500]  # Causes crash again.
+        self.ideal_signal = 0.6 * x     # Also fixes crash
+        # self.ideal_signal = 0.7 * x     # Causes crash again.
 
         # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
         ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 2.0), mod_type=mod_type)
@@ -789,17 +793,11 @@ def update_results(self):
     self.plotdata.set_data("dfe_out_p", self.dfe_out_p)
 
     # Outputs
-    # self.plotdata.set_data("ideal_signal", self.ideal_signal[:len_t])
-    # self.plotdata.set_data("chnl_out", self.chnl_out[:len_t])
-    # self.plotdata.set_data("tx_out", self.rx_in[:len_t])
-    # self.plotdata.set_data("ctle_out", self.ctle_out[:len_t])
-    # self.plotdata.set_data("dfe_out", self.dfe_out[:len_t])
-    self.plotdata.set_data("ideal_signal", self.chnl_p[:len_t])
-    self.plotdata.set_data("chnl_out", self.chnl_p[:len_t])
-    self.plotdata.set_data("tx_out", self.chnl_p[:len_t])
-    self.plotdata.set_data("ctle_out", self.chnl_p[:len_t])
-    self.plotdata.set_data("dfe_out", self.chnl_p[:len_t])
-    # self.plotdata.set_data("auto_corr", self.auto_corr)
+    self.plotdata.set_data("ideal_signal", self.ideal_signal[:len_t])
+    self.plotdata.set_data("chnl_out", self.chnl_out[:len_t])
+    self.plotdata.set_data("tx_out", self.rx_in[:len_t])
+    self.plotdata.set_data("ctle_out", self.ctle_out[:len_t])
+    self.plotdata.set_data("dfe_out", self.dfe_out[:len_t])
 
     # Frequency responses
     self.plotdata.set_data("chnl_H", 20.0 * log10(abs(self.chnl_H[1:len_f_GHz])))
