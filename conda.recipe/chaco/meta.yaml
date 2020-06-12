@@ -1,6 +1,6 @@
 package:
   name: chaco
-  version: "4.8.0.64g54727c9c"
+  version: "4.8.0g192675d6"
 
 source:
   path: ../../chaco/

@@ -169,10 +169,10 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         if mod_type == 1:  # Handle duo-binary case.
             duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
             x = convolve(x, duob_h)[: len(t)]
-        # self.ideal_signal = x           # Causes crash.
+        self.ideal_signal = x           # Causes crash.
         # self.ideal_signal = x[:-70000]    # Fixes crash.
         # self.ideal_signal = x[:-62500]  # Causes crash again.
-        self.ideal_signal = 0.6 * x     # Also fixes crash
+        # self.ideal_signal = 0.6 * x     # Also fixes crash
         # self.ideal_signal = 0.7 * x     # Causes crash again.
 
         # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.

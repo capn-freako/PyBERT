@@ -20,7 +20,7 @@ setup(
     author_email="capn.freako@gmail.com",
     install_requires=[
         "chaco",
-        "enable",
+        "enable>=4.8.1",
         "kiwisolver",
         "numpy",
         "scikit-rf",
