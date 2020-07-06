@@ -1,5 +1,5 @@
 {% set name = "enable" %}
-{% set version = "4.8.0" %}
+{% set version = "4.8.1" %}
 
 package:
   name: "{{ name|lower }}"
@@ -9,7 +9,7 @@ source:
   path: ../../enable/
 
 build:
-  number: 3
+  number: 1
   # noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
