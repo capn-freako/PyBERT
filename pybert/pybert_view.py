@@ -840,7 +840,7 @@ traits_view = View(
         springy=True,
         id="tabs",
     ),
-    resizable=False,
+    resizable=True,
     handler=MyHandler(),
     buttons=[run_sim, save_cfg, load_cfg, save_data, load_data],
     statusbar="status_str",
