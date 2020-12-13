@@ -1,51 +1,38 @@
+{% set name = "chaco" %}
+{% set version = "4.8.0" %}
+
 package:
-  name: chaco
-  version: "4.8.0g192675d6"
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
 
 source:
   path: ../../chaco/
-  # url: ../../chaco/dist/chaco-4.8.0.dev160.win-amd64.zip
-  # url: ../../chaco/dist/chaco-4.8.0.dev160.tar.gz
-  # url: https://pypi.python.org/packages/d8/5f/82539366bb321f6f07fada6278e320bb52916a36b43fbe0e30e5ef9f9166/chaco-4.6.1.tar.gz
-  # md5: d28117730f942f7cecb281b07abac3f4
-#  patches:
-   # List any patch files here
-   # - fix.patch
 
 build:
-  # noarch_python: True
-  # preserve_egg_dir: True
-  # entry_points:
-    # Put any entry points (scripts to be generated automatically) here. The
-    # syntax is module:function.  For example
-    #
-    # - chaco = chaco:main
-    #
-    # Would create an entry point called chaco that calls chaco.main()
-
-
-  # If this is a new build for the same version, increment the build
-  # number. If you do not include this key, it defaults to 0.
-  number: 1
-  script: python setup.py install  --single-version-externally-managed --record=record.txt
+  string: 4a6683_2
+  number: 2
+  # script: python setup.py install  --single-version-externally-managed --record=record.txt
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
     - python
     - setuptools
     - enable >=4.8.0,<4.9
-    - numpy
+    # - numpy
     - cython
-    - pillow
-    - fonttools =4.0.1
+    # - pillow
+    # - fonttools
+    # - fonttools =4.0.1
 
   run:
     - python
     - enable >=4.8.0,<4.9
-    - numpy
+    # - numpy
     - cython
-    - pillow
-    - fonttools =4.0.1
+    # - pillow
+    # - fonttools
+    # - fonttools =4.0.1
 
 test:
   # Python imports
@@ -87,3 +74,7 @@ about:
 # See
 # http://docs.continuum.io/conda/build.html for
 # more information about meta.yaml
+
+extra:
+  recipe-maintainers:
+    - capn-freako

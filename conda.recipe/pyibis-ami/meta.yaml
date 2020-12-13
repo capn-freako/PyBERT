@@ -1,5 +1,5 @@
 {% set name = "pyibis-ami" %}
-{% set version = "3.3.3rc1" %}
+{% set version = "3.3.3" %}
 # {% set hash_type = "sha256" %}
 # {% set hash_value = "03cd97ba09850d673bc6c3fd6e769fd48aa3c4e2212300dce219873204d53b6c" %}
 
@@ -15,7 +15,8 @@ source:
 
 build:
   # script: python setup.py install  --single-version-externally-managed --record=record.txt
-  number: 1
+  string: 4961a3_2
+  number: 2
   # noarch: python
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
@@ -23,7 +24,7 @@ requirements:
   run:
     - python
     - empy
-    - numpy
+    # - numpy
     - scipy
     - matplotlib
     - parsec
@@ -31,7 +32,7 @@ requirements:
     - python
     - setuptools
     - empy
-    - numpy
+    # - numpy
     - scipy
     - matplotlib
     - parsec
