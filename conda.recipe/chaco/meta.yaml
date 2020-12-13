@@ -9,8 +9,8 @@ source:
   path: ../../chaco/
 
 build:
-  string: 4a6683
-  number: 1
+  string: 4a6683_2
+  number: 2
   # script: python setup.py install  --single-version-externally-managed --record=record.txt
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
@@ -19,19 +19,19 @@ requirements:
     - python
     - setuptools
     - enable >=4.8.0,<4.9
-    - numpy
+    # - numpy
     - cython
-    - pillow
-    - fonttools
+    # - pillow
+    # - fonttools
     # - fonttools =4.0.1
 
   run:
     - python
     - enable >=4.8.0,<4.9
-    - numpy
+    # - numpy
     - cython
-    - pillow
-    - fonttools
+    # - pillow
+    # - fonttools
     # - fonttools =4.0.1
 
 test:

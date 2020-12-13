@@ -7,7 +7,8 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-from time import clock
+from time import perf_counter
+clock = perf_counter
 
 from chaco.api import Plot
 from chaco.tools.api import PanTool, ZoomTool

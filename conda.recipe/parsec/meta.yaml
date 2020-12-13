@@ -1,28 +1,16 @@
+{% set name = "parsec" %}
+{% set version = "3.5" %}
+
 package:
-  name: parsec
-  version: "3.4"
+  name: '{{ name|lower }}'
+  version: '{{ version }}'
 
 source:
   path: ../../parsec.py
-#  patches:
-   # List any patch files here
-   # - fix.patch
 
-# build:
-  # noarch_python: True
-  # preserve_egg_dir: True
-  # entry_points:
-    # Put any entry points (scripts to be generated automatically) here. The
-    # syntax is module:function.  For example
-    #
-    # - parsec = parsec:main
-    #
-    # Would create an entry point called parsec that calls parsec.main()
-
-
-  # If this is a new build for the same version, increment the build
-  # number. If you do not include this key, it defaults to 0.
-  # number: 1
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
@@ -36,18 +24,6 @@ test:
   # Python imports
   imports:
     - parsec
-
-  # commands:
-    # You can put test commands to be run here.  Use this to test that the
-    # entry points work.
-
-
-  # You can also put a file called run_test.py in the recipe that will be run
-  # at test time.
-
-  # requires:
-    # Put any additional test requirements here.  For example
-    # - nose
 
 about:
   home: https://github.com/sighingnow/parsec.py
