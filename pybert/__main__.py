@@ -5,3 +5,6 @@ from pybert.pybert_view import traits_view
 def main():
     thePyBERT = PyBERT()
     thePyBERT.configure_traits(view=traits_view)
+
+if __name__ == '__main__':
+	main()
