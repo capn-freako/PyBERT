@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "3.3.4" %}
+{% set version = "3.3.4.1" %}
 
 package:
   version: '{{ version }}'
@@ -21,7 +21,7 @@ requirements:
     - python
     - kiwisolver
     - chaco
-    - pyibis-ami=3.3.3
+    - pyibis-ami>=3.3.3
     - scikit-rf
     - pyside2
     - pyyaml
@@ -30,7 +30,7 @@ requirements:
     - setuptools
     - kiwisolver
     - chaco
-    - pyibis-ami=3.3.3
+    - pyibis-ami>=3.3.3
     - scikit-rf
     - pyside2
     - pyyaml

@@ -394,7 +394,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         if ctle_out_h_main_lobe.size:
             conv_dly_ix = ctle_out_h_main_lobe[0]
         else:
-            conv_dly_ix = self.chnl_dly // Ts
+            conv_dly_ix = int(self.chnl_dly // Ts)
         # TEMPORARY DEBUGGING
         try:
             conv_dly = t[conv_dly_ix]  # Keep this line only.
