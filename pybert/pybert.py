@@ -1169,7 +1169,8 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_perf_info(self):
-        info_str = "<H2>Performance by Component</H2>\n"
+        info_str  = '<div style="width:90%;">\n'
+        info_str += "<H2>Performance by Component</H2>\n"
         info_str += '  <TABLE border="1">\n'
         info_str += '    <TR align="center">\n'
         info_str += "      <TH>Component</TH><TH>Performance (Msmpls./min.)</TH>\n"
@@ -1198,6 +1199,7 @@ class PyBERT(HasTraits):
         info_str += '      <TD align="center">Plotting</TD><TD>%6.3f</TD>\n' % (self.plotting_perf * 60.0e-6)
         info_str += "    </TR>\n"
         info_str += "  </TABLE>\n"
+        info_str += "</div>\n"
 
         return info_str
 
@@ -1405,13 +1407,18 @@ class PyBERT(HasTraits):
         try:
             self.tx_ami_valid = False
             if new_value:
+                self.log(f"Parsing Tx AMI file, '{new_value}'...")
                 with open(new_value) as pfile:
                     pcfg = AMIParamConfigurator(pfile.read())
-                self.log("Parsing Tx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
+                if pcfg.ami_parsing_errors:
+                    self.log(f"Non-fatal parsing errors:\n{pcfg.ami_parsing_errors}")
+                else:
+                    self.log("Success.")
                 self.tx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
                 self._tx_cfg = pcfg
                 self.tx_ami_valid = True
         except Exception as err:
+            raise
             error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
             self.log(error_message, alert=True)
 

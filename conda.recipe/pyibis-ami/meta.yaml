@@ -1,5 +1,5 @@
 {% set name = "pyibis-ami" %}
-{% set version = "3.3.4" %}
+{% set version = "3.3.5" %}
 # {% set hash_type = "sha256" %}
 # {% set hash_value = "03cd97ba09850d673bc6c3fd6e769fd48aa3c4e2212300dce219873204d53b6c" %}
 
@@ -15,7 +15,7 @@ source:
 
 build:
   # string: 4961a3_2
-  number: 0
+  number: 1
   # noarch: python
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
