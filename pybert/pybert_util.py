@@ -870,6 +870,43 @@ def sdd_21(ntwk):
     return 0.5 * (ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
 
 
+def se2mm(ntwk):
+    """
+    Given a 4-port single-ended network, return its mixed mode equivalent.
+
+    Args:
+        ntwk(skrf.Network): 4-port single ended network.
+
+    Returns:
+        skrf.Network: Mixed mode equivalent network, in the following format:
+            Sdd11  Sdd12  Sdc11  Sdc12
+            Sdd21  Sdd22  Sdc21  Sdc22
+            Scd11  Scd12  Scc11  Scc12
+            Scd21  Scd22  Scc21  Scc22
+    """
+    if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
+        ntwk.renumber((2, 3), (3, 2))
+    f = ntwk.f
+    s = np.zeros(ntwk.s.shape, dtype=complex)
+    s[:,0,0] = 0.5 * (ntwk.s11 - ntwk.s13 - ntwk.s31 + ntwk.s33).s.flatten()
+    s[:,0,1] = 0.5 * (ntwk.s12 - ntwk.s14 - ntwk.s32 + ntwk.s34).s.flatten()
+    s[:,0,2] = 0.5 * (ntwk.s11 + ntwk.s13 - ntwk.s31 - ntwk.s33).s.flatten()
+    s[:,0,3] = 0.5 * (ntwk.s12 + ntwk.s14 - ntwk.s32 - ntwk.s34).s.flatten()
+    s[:,1,0] = 0.5 * (ntwk.s21 - ntwk.s23 - ntwk.s41 + ntwk.s43).s.flatten()
+    s[:,1,1] = 0.5 * (ntwk.s22 - ntwk.s24 - ntwk.s42 + ntwk.s44).s.flatten()
+    s[:,1,2] = 0.5 * (ntwk.s21 + ntwk.s23 - ntwk.s41 - ntwk.s43).s.flatten()
+    s[:,1,3] = 0.5 * (ntwk.s22 + ntwk.s24 - ntwk.s42 - ntwk.s44).s.flatten()
+    s[:,2,0] = 0.5 * (ntwk.s11 - ntwk.s13 + ntwk.s31 - ntwk.s33).s.flatten()
+    s[:,2,1] = 0.5 * (ntwk.s12 - ntwk.s14 + ntwk.s32 - ntwk.s34).s.flatten()
+    s[:,2,2] = 0.5 * (ntwk.s11 + ntwk.s13 + ntwk.s31 + ntwk.s33).s.flatten()
+    s[:,2,3] = 0.5 * (ntwk.s12 + ntwk.s14 + ntwk.s32 + ntwk.s34).s.flatten()
+    s[:,3,0] = 0.5 * (ntwk.s21 - ntwk.s23 + ntwk.s41 - ntwk.s43).s.flatten()
+    s[:,3,1] = 0.5 * (ntwk.s22 - ntwk.s24 + ntwk.s42 - ntwk.s44).s.flatten()
+    s[:,3,2] = 0.5 * (ntwk.s21 + ntwk.s23 + ntwk.s41 + ntwk.s43).s.flatten()
+    s[:,3,3] = 0.5 * (ntwk.s22 + ntwk.s24 + ntwk.s42 + ntwk.s44).s.flatten()
+    return rf.Network(frequency=f, s=s)
+
+
 def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6):
     """
     Read in a single ended 4-port Touchstone file, and extract the

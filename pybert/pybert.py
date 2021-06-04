@@ -28,7 +28,7 @@ from math import isnan
 from chaco.api import ArrayPlotData, GridPlotContainer
 import numpy as np
 from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, sinc, where, zeros
-from numpy.fft import fft, ifft
+from numpy.fft import fft, ifft, irfft
 from numpy.random import randint
 from os.path import dirname, join
 from scipy.optimize import minimize, minimize_scalar
@@ -52,6 +52,8 @@ from traits.api import (
 )
 from traitsui.message import message
 
+import skrf as rf
+
 from pyibisami.ami_parse import AMIParamConfigurator
 from pyibisami.ami_model import AMIModel
 from pyibisami.ibis_file import IBISModel
@@ -74,8 +76,12 @@ from pybert.pybert_util import (
     safe_log10,
     trim_impulse,
     submodules,
+    se2mm,
 )
 from pybert.pybert_view import traits_view
+
+# DEBUG ONLY; REMOVE ME:
+from matplotlib import pyplot as plt
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -437,6 +443,7 @@ class PyBERT(HasTraits):
     )  #: List of TxTapTuner objects.
     rel_power = Float(1.0)  #: Tx power dissipation (W).
     tx_use_ami = Bool(False)  #: (Bool)
+    tx_use_ts4 = Bool(False)  #: (Bool)
     tx_use_getwave = Bool(False)  #: (Bool)
     tx_has_getwave = Bool(False)  #: (Bool)
     tx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
@@ -459,6 +466,7 @@ class PyBERT(HasTraits):
     ctle_offset = Float(gCTLEOffset)  #: CTLE d.c. offset (dB)
     ctle_mode = Enum("Off", "Passive", "AGC", "Manual")  #: CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
     rx_use_ami = Bool(False)  #: (Bool)
+    rx_use_ts4 = Bool(False)  #: (Bool)
     rx_use_getwave = Bool(False)  #: (Bool)
     rx_has_getwave = Bool(False)  #: (Bool)
     rx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
@@ -773,22 +781,21 @@ class PyBERT(HasTraits):
         """
         Calculate the frequency vector appropriate for indexing non-shifted FFT output, in Hz.
         # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
+
+        Note: Changed to positive freqs. only, in conjunction w/ irfft() usage.
         """
-
         t = self.t
-
         npts = len(t)
         f0 = 1.0 / (t[1] * npts)
         half_npts = npts // 2
-
-        return array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
+        # return array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
+        return array([i * f0 for i in range(half_npts)])
 
     @cached_property
     def _get_w(self):
         """
-        Calculate the frequency vector appropriate for indexing non-shifted FFT output, in rads./sec.
+        System frequency vector, in rads./sec.
         """
-
         return 2 * pi * self.f
 
     @cached_property
@@ -1506,7 +1513,8 @@ class PyBERT(HasTraits):
         """
 
         t = self.t
-        ts = t[1]
+        f = self.f
+        w = self.w
         nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
         Rs = self.rs
@@ -1514,23 +1522,24 @@ class PyBERT(HasTraits):
         RL = self.rin
         Cp = self.cin * 1.0e-12
         CL = self.cac * 1.0e-6
-        w = self.w
+        Zref = self.Zref
 
+        ts = t[1]
+        len_t = len(t)
+        
         if self.tx_use_ibis:
             model = self._tx_ibis.model
             Rs = model.zout * 2
             Cs = model.ccomp[0] * 2
         if self.use_ch_file:
-            Zref = self.Zref
+            Zc = Zref
             h = import_channel(self.ch_file, ts, self.padded, self.windowed)
             if h[-1] > (max(h) / 2.0):  # step response?
                 h = diff(h)  # impulse response is derivative of step response.
             h /= sum(h)  # Normalize d.c. to one.
             chnl_dly = t[where(h == max(h))[0][0]]
-            h.resize(len(t))
-            H = fft(h)
-            chnl_H = 2.0 * calc_G(H, Rs, Cs, Zref, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
-            chnl_h = real(ifft(chnl_H))
+            h.resize(len_t)
+            H = fft(h)[:len_t//2]
         else:
             l_ch = self.l_ch
             v0 = self.v0 * 3.0e8
@@ -1541,9 +1550,65 @@ class PyBERT(HasTraits):
             Theta0 = self.Theta0
             gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H = exp(-l_ch * gamma)
-            chnl_H = 2.0 * calc_G(H, Rs, Cs, Zc, RL, Cp, CL, w)  # Compensating for nominal /2 divider action.
-            chnl_h = real(ifft(chnl_H))
             chnl_dly = l_ch / v0
+        # Augment w/ IBIS-AMI on-die S-parameters, if appropriate.
+        def add_ondie_s(H, ts4f, Zc, Zref, f):
+            """Add the effect of on-die S-parameters to channel transfer function.
+
+            Args:
+                H([complex]): initial channel transfer function.
+                ts4f(string): on-die S-parameter file name.
+                Zc([complex]): frequency dependent impedance.
+                Zref(float): reference impedance.
+                f([float]): frequencies at which 'H' was sampled.
+
+            Returns:
+                ([float], [complex]): modified freq. vector and channel transfer function.
+
+            Notes:
+                1. Returned transfer function may have a different length,
+                and/or fundamental frequency (H[1]) than original.
+            """
+            self.log(f"About to load on-die S-parameters from: '{ts4f}'...")
+            ts4N = rf.Network(ts4f)
+            self.log(f"\t{ts4f}: {ts4N}")
+            ts2N = rf.Network(frequency=ts4N.frequency, s=se2mm(ts4N).s[:,0:2,0:2], name="Sdd[2,1]")
+            HS11 = (Zc - Zref)/(Zc + Zref)
+            fmin = max(ts2N.f.min(), f.min())
+            fmax = min(ts2N.f.max(), f.max())
+            print(f"fmin: {fmin}, fmax: {fmax}")
+            f2   = np.arange(fmin, fmax+fmin, fmin)
+            s    = np.zeros((len(f2), 2, 2), dtype=complex)
+            # s[:,0,0] = np.interp(f2, f, HS11)
+            s[:,0,0] = np.zeros(len(f2))
+            s[:,0,1] = np.interp(f2, f, H)
+            s[:,1,0] = s[:,0,1].copy()
+            s[:,1,1] = s[:,0,0].copy()
+            HN   = rf.Network(f=f2, f_unit='Hz', s=s, name="H'(f)")
+            resN = HN ** ts2N.interpolate(HN.frequency, basis='s', coords='polar')
+            return (f2, resN.s[:,1,0])
+        
+        f2 = f
+        H2 = H
+        if self.tx_use_ami and self.tx_use_ts4:
+            fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
+            # f2, H2 = add_ondie_s(H, fname, Zc, Zref, f)
+            f2, H2 = add_ondie_s(H, fname, Zref, Zref, f)
+            # plt.semilogx(f*1e-9,  20*np.log10(np.abs(H)),  label='Before On-die S-params.')
+            # plt.semilogx(f2*1e-9, 20*np.log10(np.abs(H2)), label='After On-die S-params.')
+        if self.rx_use_ami and self.rx_use_ts4:
+            fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
+            f2, H2 = add_ondie_s(H2, fname, Zref, Zref, f)
+        # chnl_H  = 2.0 * calc_G(H,  Rs, Cs, np.interp(f,  f, Zc), RL, Cp, CL, f*2*pi)   # Compensating for nominal /2 divider action.
+        # chnl_H2 = 2.0 * calc_G(H2, Rs, Cs, np.interp(f2, f, Zc), RL, Cp, CL, f2*2*pi)  # Compensating for nominal /2 divider action.
+        chnl_H  = 2.0 * calc_G(H,  Rs, Cs, Zref, RL, Cp, CL, f*2*pi)   # Compensating for nominal /2 divider action.
+        chnl_H2 = 2.0 * calc_G(H2, Rs, Cs, Zref, RL, Cp, CL, f2*2*pi)  # Compensating for nominal /2 divider action.
+        # plt.semilogx(f*1e-9,  20*np.log10(np.abs(chnl_H)),  label='Before On-die S-params.')
+        # plt.semilogx(f2*1e-9, 20*np.log10(np.abs(chnl_H2)), label='After On-die S-params.')
+        chnl_h2 = irfft(chnl_H2)
+        dt2     = 1/(2*f2[-1])
+        t2      = [i * dt2 for i in range(len(chnl_h2))]
+        chnl_h  = np.interp(t, t2, chnl_h2, left=0, right=0)
 
         min_len = 10 * nspui
         max_len = 100 * nspui
@@ -1558,15 +1623,15 @@ class PyBERT(HasTraits):
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
 
-        self.chnl_h = chnl_h
-        self.len_h = len(chnl_h)
-        self.chnl_dly = chnl_dly
-        self.chnl_H = chnl_H
+        self.chnl_h         = chnl_h
+        self.len_h          = len(chnl_h)
+        self.chnl_dly       = chnl_dly
+        self.chnl_H         = np.interp(f, f2, chnl_H2)
         self.chnl_trimmed_H = chnl_trimmed_H
-        self.start_ix = start_ix
-        self.t_ns_chnl = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
-        self.chnl_s = chnl_s
-        self.chnl_p = chnl_p
+        self.start_ix       = start_ix
+        self.t_ns_chnl      = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
+        self.chnl_s         = chnl_s
+        self.chnl_p         = chnl_p
 
         return chnl_h
 

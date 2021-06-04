@@ -74,7 +74,8 @@ class MyHandler(Handler):
             try:
                 with open(dlg.path, "w") as the_file:
                     # Grab all the instance variables from the_PyBertCfg
-                    yaml.dump(the_PyBertCfg, the_file)
+                    # yaml.dump(the_PyBertCfg, the_file)
+                    pickle.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
                 the_pybert.log(f"Configuration saved to {the_pybert.cfg_file}")
             except Exception as err:
@@ -90,7 +91,8 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             try:
                 with open(dlg.path, "r") as the_file:
-                    the_PyBertCfg = yaml.full_load(the_file)
+                    # the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
+                    the_PyBertCfg = pickle.load(the_file)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
@@ -306,6 +308,7 @@ traits_view = View(
                             Item(name="tx_use_ibis", label="Use IBIS"),
                             Item(name="btn_sel_tx", show_label=False),
                             Item(name="btn_view_tx", show_label=False),
+                            Item(name="tx_use_ts4", label="Use on-die S-parameters."),
                             enabled_when="tx_ibis_valid == True",
                         ),
                         label="IBIS",
@@ -428,6 +431,7 @@ traits_view = View(
                             Item(name="rx_use_ibis", label="Use IBIS"),
                             Item(name="btn_sel_rx", show_label=False),
                             Item(name="btn_view_rx", show_label=False),
+                            Item(name="rx_use_ts4", label="Use on-die S-parameters."),
                             enabled_when="rx_ibis_valid == True",
                         ),
                         label="IBIS",

@@ -47,6 +47,7 @@ class PyBertData:
         "tx_out_H",
         "ctle_out_H",
         "dfe_out_H",
+        "tx_out",
     ]
 
     def __init__(self, the_PyBERT):

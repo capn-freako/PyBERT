@@ -69,6 +69,7 @@ class PyBertCfg:
         for tap in the_PyBERT.tx_tap_tuners:
             self.tx_tap_tuners.append((tap.enabled, tap.value))
         self.tx_use_ami = the_PyBERT.tx_use_ami
+        self.tx_use_ts4 = the_PyBERT.tx_use_ts4
         self.tx_use_getwave = the_PyBERT.tx_use_getwave
         self.tx_ami_file = the_PyBERT.tx_ami_file
         self.tx_dll_file = the_PyBERT.tx_dll_file
@@ -87,6 +88,7 @@ class PyBertCfg:
         self.ctle_mode_tune = the_PyBERT.ctle_mode_tune
         self.ctle_offset_tune = the_PyBERT.ctle_offset_tune
         self.rx_use_ami = the_PyBERT.rx_use_ami
+        self.rx_use_ts4 = the_PyBERT.rx_use_ts4
         self.rx_use_getwave = the_PyBERT.rx_use_getwave
         self.rx_ami_file = the_PyBERT.rx_ami_file
         self.rx_dll_file = the_PyBERT.rx_dll_file
