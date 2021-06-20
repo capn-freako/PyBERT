@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "3.3.5" %}
+{% set version = "3.3.7" %}
 
 package:
   version: '{{ version }}'
@@ -10,7 +10,7 @@ source:
 
 build:
   # string: a72df0_5
-  number: 0
+  number: 1
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
