@@ -844,12 +844,12 @@ traits_view = View(
         springy=True,
         id="tabs",
     ),
-    resizable=False,  # Extends off screen to the right when True.
+    resizable=True,  # Extends off screen to the right when True.
     handler=MyHandler(),
     buttons=[run_sim, save_cfg, load_cfg, save_data, load_data],
     statusbar="status_str",
     title="PyBERT",
-    width=0.95,
-    height=0.9,
+    # width=0.95,
+    # height=0.9,
     icon=ImageResource("icon.png"),
 )

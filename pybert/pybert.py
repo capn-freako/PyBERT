@@ -789,7 +789,8 @@ class PyBERT(HasTraits):
         f0 = 1.0 / (t[1] * npts)
         half_npts = npts // 2
         # return array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
-        return array([i * f0 for i in range(half_npts)])
+        # return array([i * f0 for i in range(half_npts)])
+        return array([i * f0 for i in range(half_npts)][1:])
 
     @cached_property
     def _get_w(self):
