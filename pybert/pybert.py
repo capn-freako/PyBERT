@@ -611,7 +611,7 @@ class PyBERT(HasTraits):
             message(_msg, "PyBERT Alert")
 
     # Default initialization
-    def __init__(self, run_simulation=True):
+    def __init__(self, run_simulation=True, gui=True):
         """
         Initial plot setup occurs here.
 
@@ -625,12 +625,14 @@ class PyBERT(HasTraits):
                 importing PyBERT for its attributes and methods, and may
                 not want to run the full simulation. (Optional;
                 default = True)
+            gui(Bool): Set to `False` for script based usage.
         """
 
         # Super-class initialization is ABSOLUTELY NECESSARY, in order
         # to get all the Traits/UI machinery setup correctly.
         super(PyBERT, self).__init__()
 
+        self.GUI = gui
         self.log("Started.")
         self.log_information()
         if self.debug:
@@ -1393,7 +1395,7 @@ class PyBERT(HasTraits):
             self.tx_ibis_valid = False
             self.tx_use_ami = False
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, True)
+            ibis = IBISModel(new_value, True, gui=self.GUI)  # FIXME: True => self.debug?
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
@@ -1447,7 +1449,7 @@ class PyBERT(HasTraits):
             self.rx_ibis_valid = False
             self.rx_use_ami = False
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, self.debug)
+            ibis = IBISModel(new_value, self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True

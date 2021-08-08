@@ -252,6 +252,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             else:  # Init()-only.
                 tx_s = tx_h.cumsum()
                 tx_out = convolve(tx_h, self.x)
+            self.log("Test")
+            self.tx_model = tx_model
         else:
             # - Generate the ideal, post-preemphasis signal.
             # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
