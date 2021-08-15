@@ -1224,12 +1224,13 @@ class PyBERT(HasTraits):
 
         for item in sweep_results:
             info_str += '    <TR align="center">\n'
-            info_str += "      <TD>%+06.3f</TD><TD>%+06.3f</TD><TD>%d</TD><TD>%d</TD>\n" % (
-                item[0],
-                item[1],
-                item[2],
-                item[3],
-            )
+            info_str += str(item)
+            # info_str += "      <TD>%+06.3f</TD><TD>%+06.3f</TD><TD>%d</TD><TD>%d</TD>\n" % (
+            #     item[0],
+            #     item[1],
+            #     item[2],
+            #     item[3],
+            # )
             info_str += "    </TR>\n"
 
         info_str += "  </TABLE>\n"
