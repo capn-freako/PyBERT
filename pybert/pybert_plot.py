@@ -14,6 +14,9 @@ from numpy import linspace
 
 from pybert.pybert_cntrl import update_eyes
 
+title_size = 36
+axis_size  = 28
+tick_size  = 26
 
 def make_plots(self, n_dfe_taps):
     """ Create the plots used by the PyBERT GUI."""
@@ -275,7 +278,7 @@ def make_plots(self, n_dfe_taps):
 
     # - Outputs tab
     plot_out_chnl = Plot(plotdata, padding_left=75)
-    plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="lightgrey")
+    # plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="lightgrey")
     plot_out_chnl.plot(("t_ns", "chnl_out"), type="line", color="blue")
     plot_out_chnl.title = post_chnl_str
     plot_out_chnl.index_axis.title = "Time (ns)"
@@ -564,5 +567,54 @@ def make_plots(self, n_dfe_taps):
     container_bathtub.add(plot_bathtub_ctle)
     container_bathtub.add(plot_bathtub_dfe)
     self.plots_bathtub = container_bathtub
+
+    # Temporary hack, to fix small font size problem on high-res Windows laptop display.
+    for p in [  plot2,
+                plot9,
+                plot_clk_per_hist,
+                plot_clk_per_spec,
+                plot_h_tune,
+                plot_h_chnl,
+                plot_h_tx,
+                plot_h_ctle,
+                plot_h_dfe,
+                plot_s_chnl,
+                plot_s_tx,
+                plot_s_ctle,
+                plot_s_dfe,
+                plot_p_chnl,
+                plot_p_tx,
+                plot_p_ctle,
+                plot_p_dfe,
+                plot_H_chnl,
+                plot_H_tx,
+                plot_H_ctle,
+                plot_H_dfe,
+                plot_out_chnl,
+                plot_out_tx,
+                plot_out_ctle,
+                plot_out_dfe,
+                plot_eye_chnl,
+                plot_eye_tx,
+                plot_eye_ctle,
+                plot_eye_dfe,
+                plot_jitter_dist_chnl,
+                plot_jitter_dist_tx,
+                plot_jitter_dist_ctle,
+                plot_jitter_dist_dfe,
+                plot_jitter_spec_chnl,
+                plot_jitter_spec_tx,
+                plot_jitter_spec_ctle,
+                plot_jitter_spec_dfe,
+                plot_bathtub_chnl,
+                plot_bathtub_tx,
+                plot_bathtub_ctle,
+                plot_bathtub_dfe]:
+        p.title_font.size                 = title_size
+        p.index_axis.title_font.size      = axis_size
+        p.value_axis.title_font.size      = axis_size
+        p.index_axis.tick_label_font.size = tick_size
+        p.value_axis.tick_label_font.size = tick_size
+        p.legend.font.size                = axis_size
 
     update_eyes(self)

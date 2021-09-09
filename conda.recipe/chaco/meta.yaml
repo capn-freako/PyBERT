@@ -1,5 +1,5 @@
 {% set name = "chaco" %}
-{% set version = "4.8.0" %}
+{% set version = "5.0.0" %}
 
 package:
   name: "{{ name|lower }}"
@@ -9,48 +9,50 @@ source:
   path: ../../chaco/
 
 build:
-  string: 4a6683_2
-  number: 2
+  # string: 4a6683_2
+  number: 1
   # script: python setup.py install  --single-version-externally-managed --record=record.txt
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
+    # - setuptools
+    - vs2019_win-64
+    # - {{compiler('c')}}
+    # - {{compiler('cxx')}}
+    - git
+    - cmake
+  
+  host:
     - python
-    - setuptools
-    - enable >=4.8.0,<4.9
-    # - numpy
-    - cython
-    # - pillow
-    # - fonttools
-    # - fonttools =4.0.1
+    - enable =5.2.1
+    - Cython
+    - importlib_resources
 
   run:
-    - python
-    - enable >=4.8.0,<4.9
-    # - numpy
-    - cython
-    # - pillow
-    # - fonttools
-    # - fonttools =4.0.1
+    # - python
+    - enable =5.2.1
+    # - cython
+    - importlib_resources
 
 test:
   # Python imports
   imports:
     - chaco
-    - chaco.contour
-    - chaco.downsample
-    - chaco.downsample.tests
-    - chaco.layers
-    - chaco.overlays
-    - chaco.plugin
-    - chaco.scales
-    - chaco.scales.tests
-    - chaco.shell
-    - chaco.tests
-    - chaco.tools
-    - chaco.tools.tests
-    - chaco.tools.toolbars
+    - chaco.api
+    # - chaco.contour
+    # - chaco.downsample
+    # - chaco.downsample.tests
+    # - chaco.layers
+    # - chaco.overlays
+    # - chaco.plugin
+    # - chaco.scales
+    # - chaco.scales.tests
+    # - chaco.shell
+    # - chaco.tests
+    # - chaco.tools
+    # - chaco.tools.tests
+    # - chaco.tools.toolbars
     - chaco.ui
 
   # commands:

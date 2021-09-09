@@ -110,7 +110,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             conflicts and speed up this function's execution time.
             (Optional; default = True.)
     """
-
     num_sweeps = self.num_sweeps
     sweep_num = self.sweep_num
 
@@ -170,11 +169,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         if mod_type == 1:  # Handle duo-binary case.
             duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
             x = convolve(x, duob_h)[: len(t)]
-        self.ideal_signal = x           # Causes crash.
-        # self.ideal_signal = x[:-70000]    # Fixes crash.
-        # self.ideal_signal = x[:-62500]  # Causes crash again.
-        # self.ideal_signal = 0.6 * x     # Also fixes crash
-        # self.ideal_signal = 0.7 * x     # Causes crash again.
+        self.ideal_signal = x
 
         # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
         ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 2.0), mod_type=mod_type)
@@ -186,7 +181,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         #       create the duobinary waveform. We only create it explicitly, above,
         #       so that we'll have an ideal reference for comparison.
         chnl_h = self.calc_chnl_h()
-        self.log("Channel impulse response is {} samples long.".format(len(chnl_h)))
         chnl_out = convolve(self.x, chnl_h)[: len(t)]
 
         self.channel_perf = nbits * nspb / (clock() - start_time)
@@ -270,7 +264,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             tx_s = tx_h.cumsum()
         tx_out.resize(len(t))
         temp = tx_h.copy()
-        temp.resize(len(w))
+        temp.resize(len(t))
         tx_H = fft(temp)
         tx_H *= tx_s[-1] / abs(tx_H[0])
 
@@ -292,7 +286,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         # - Convolve w/ channel.
         tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
         temp = tx_out_h.copy()
-        temp.resize(len(w))
+        temp.resize(len(t))
         tx_out_H = fft(temp)
         rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
 
@@ -397,19 +391,10 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             conv_dly_ix = ctle_out_h_main_lobe[0]
         else:
             conv_dly_ix = int(self.chnl_dly // Ts)
-        # TEMPORARY DEBUGGING
-        try:
-            conv_dly = t[conv_dly_ix]  # Keep this line only.
-        except:
-            print("chnl_dly:", self.chnl_dly)
-            print("conv_dly_ix:", conv_dly_ix)
-            print("tx_h:", tx_h)
-            print("chnl_h:", chnl_h)
-            raise
-        #####
+        conv_dly = t[conv_dly_ix]  # Keep this line only.
         ctle_out_s = ctle_out_h.cumsum()
         temp = ctle_out_h.copy()
-        temp.resize(len(w))
+        temp.resize(len(t))
         ctle_out_H = fft(temp)
         # - Store local variables to class instance.
         self.ctle_out_s = ctle_out_s
@@ -490,7 +475,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         dfe_h = array([1.0] + list(zeros(nspb - 1)) + sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))
         dfe_h.resize(len(ctle_out_h))
         temp = dfe_h.copy()
-        temp.resize(len(w))
+        temp.resize(len(t))
         dfe_H = fft(temp)
         self.dfe_s = dfe_h.cumsum()
         dfe_out_H = ctle_out_H * dfe_H

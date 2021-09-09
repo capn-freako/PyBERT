@@ -525,11 +525,11 @@ class PyBERT(HasTraits):
 
     # About
     ident = String(
-        "PyBERT v{} - a serial communication link design tool, written in Python.\n\n \
-    {}\n \
-    {}\n\n \
-    {};\n \
-    All rights reserved World wide.".format(
+        '<font size="+2"><H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
+    {}<BR>\n \
+    {}<BR><BR>\n\n \
+    {};<BR>\n \
+    All rights reserved World wide.</font>'.format(
             VERSION, AUTHORS, DATE, COPY
         )
     )
@@ -1037,7 +1037,15 @@ class PyBERT(HasTraits):
             if rj_dfe:
                 rj_rej_total = rj_tx / rj_dfe
 
-            info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
+            # Temporary, until I figure out DPI independence.
+            info_str  = '<style>\n'
+            info_str += ' table td {font-size: 36px;}\n'
+            info_str += ' table th {font-size: 38px;}\n'
+            info_str += '</style>\n'
+            info_str += '<font size="+3">\n'
+            # End Temp.
+
+            info_str += "<H1>Jitter Rejection by Equalization Component</H1>\n"
 
             info_str += "<H2>Tx Preemphasis</H2>\n"
             info_str += '<TABLE border="1">\n'
@@ -1170,6 +1178,7 @@ class PyBERT(HasTraits):
             )
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
+            info_str += '</font>'
         except:
             info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
             info_str += "Sorry, an error occurred.\n"
@@ -1179,7 +1188,15 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_perf_info(self):
-        info_str  = '<div style="width:90%;">\n'
+        # Temporary, until I figure out DPI independence.
+        info_str  = '<style>\n'
+        info_str += ' table td {font-size: 36px;}\n'
+        info_str += ' table th {font-size: 38px;}\n'
+        info_str += '</style>\n'
+        info_str += '<font size="+3">\n'
+        # End Temp.
+
+        info_str += '<div style="width:90%;">\n'
         info_str += "<H2>Performance by Component</H2>\n"
         info_str += '  <TABLE border="1">\n'
         info_str += '    <TR align="center">\n'
@@ -1536,14 +1553,16 @@ class PyBERT(HasTraits):
             Rs = model.zout * 2
             Cs = model.ccomp[0] * 2
         if self.use_ch_file:
-            Zc = Zref
+            Zc = Zref * np.ones(np.shape(w))
             h = import_channel(self.ch_file, ts, self.padded, self.windowed)
+            h /= sum(h)  # a temporary crutch.
             if h[-1] > (max(h) / 2.0):  # step response?
                 h = diff(h)  # impulse response is derivative of step response.
             h /= sum(h)  # Normalize d.c. to one.
             chnl_dly = t[where(h == max(h))[0][0]]
             h.resize(len_t)
-            H = fft(h)[:len_t//2]
+            # H = fft(h)[:len_t//2]
+            H = fft(h)[:len(f)]
         else:
             l_ch = self.l_ch
             v0 = self.v0 * 3.0e8
@@ -1555,6 +1574,7 @@ class PyBERT(HasTraits):
             gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             H = exp(-l_ch * gamma)
             chnl_dly = l_ch / v0
+
         # Augment w/ IBIS-AMI on-die S-parameters, if appropriate.
         def add_ondie_s(H, ts4f, Zc, Zref, f):
             """Add the effect of on-die S-parameters to channel transfer function.
@@ -1604,9 +1624,11 @@ class PyBERT(HasTraits):
             fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
             f2, H2 = add_ondie_s(H2, fname, Zref, Zref, f)
         # chnl_H  = 2.0 * calc_G(H,  Rs, Cs, np.interp(f,  f, Zc), RL, Cp, CL, f*2*pi)   # Compensating for nominal /2 divider action.
-        # chnl_H2 = 2.0 * calc_G(H2, Rs, Cs, np.interp(f2, f, Zc), RL, Cp, CL, f2*2*pi)  # Compensating for nominal /2 divider action.
-        chnl_H  = 2.0 * calc_G(H,  Rs, Cs, Zref, RL, Cp, CL, f*2*pi)   # Compensating for nominal /2 divider action.
-        chnl_H2 = 2.0 * calc_G(H2, Rs, Cs, Zref, RL, Cp, CL, f2*2*pi)  # Compensating for nominal /2 divider action.
+        # assert (len(H) == len(f)), "Lengths of H and f must match!"
+        # chnl_H  = 2.0 * calc_G(H,  Rs, Cs, Zref, RL, Cp, CL, f*2*pi)   # Compensating for nominal /2 divider action.
+        chnl_H2 = calc_G(H2, Rs, Cs, np.interp(f2, f, Zc), RL, Cp, CL, f2*2*pi)
+        chnl_H2 /= np.abs(chnl_H2[0]) # Normalize to: d.c. = 1.
+        # chnl_H2 = 2.0 * calc_G(H2, Rs, Cs, Zref, RL, Cp, CL, f2*2*pi)  # Compensating for nominal /2 divider action.
         # plt.semilogx(f*1e-9,  20*np.log10(np.abs(chnl_H)),  label='Before On-die S-params.')
         # plt.semilogx(f2*1e-9, 20*np.log10(np.abs(chnl_H2)), label='After On-die S-params.')
         chnl_h2 = irfft(chnl_H2)

@@ -1,7 +1,5 @@
 {% set name = "pyibis-ami" %}
-{% set version = "3.4.1" %}
-# {% set hash_type = "sha256" %}
-# {% set hash_value = "03cd97ba09850d673bc6c3fd6e769fd48aa3c4e2212300dce219873204d53b6c" %}
+{% set version = "3.4.2" %}
 
 package:
   version: '{{ version }}'
@@ -9,9 +7,6 @@ package:
 
 source:
   path: ../../PyAMI/
-  # url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  # '{{ hash_type }}': '{{ hash_value }}'
-  # fn: '{{ name }}-{{ version }}.tar.gz'
 
 build:
   # string: 4961a3_2
@@ -25,14 +20,14 @@ requirements:
     - empy
     - scipy
     - matplotlib
-    - parsec
+    - parsec =3.9
   build:
     - python
     - setuptools
     - empy
     - scipy
     - matplotlib
-    - parsec
+    - parsec =3.9
 
 test:
   imports:

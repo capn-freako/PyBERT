@@ -1,5 +1,5 @@
 {% set name = "enable" %}
-{% set version = "4.8.1" %}
+{% set version = "5.2.1" %}
 
 package:
   name: "{{ name|lower }}"
@@ -10,20 +10,27 @@ source:
 
 build:
   number: 2
-  string: b328ed_2
+  # string: b328ed_2
   # noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
+  build:
+    # - {{compiler('c')}}
+    # - {{compiler('cxx')}}
+    - git
+    - cmake
+    # - vs2017_win-64
+    - vs2019_win-64
   host:
     - fonttools
     - numpy
     - pillow
     - pip
     - pyface
+    - pyparsing
     - python
     - six
-    # - traits
     - traitsui
     - Cython
   run:
@@ -34,7 +41,6 @@ requirements:
     - pyparsing
     - python
     - six
-    # - traits
     - traitsui
 
 test:
@@ -45,7 +51,7 @@ test:
     - enable.layout
     - enable.null
     - enable.primitives
-    - enable.pyglet_backend
+    # - enable.pyglet_backend
     - enable.qt4
     - enable.savage
     - enable.savage.compliance
@@ -65,7 +71,7 @@ test:
     - enable.tests.primitives
     - enable.tests.qt4
     - enable.tests.tools
-    - enable.tests.tools.apptools
+    # - enable.tests.tools.apptools
     - enable.tests.wx
     - enable.tools
     - enable.tools.apptools
@@ -75,7 +81,7 @@ test:
     - enable.trait_defs.ui
     - enable.trait_defs.ui.qt4
     - enable.trait_defs.ui.wx
-    - enable.vtk_backend
+    # - enable.vtk_backend
     - enable.wx
     - kiva
     - kiva.agg

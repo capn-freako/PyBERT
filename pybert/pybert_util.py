@@ -798,7 +798,8 @@ def import_channel(filename, sample_per, padded=False, windowed=False):
     """
 
     extension = os.path.splitext(filename)[1][1:]
-    if extension in ("s4p", "S4P"):
+    # if extension in ("s1p", "S1P", "s2p", "S2P", "s4p", "S4P"):
+    if re.search("^s\d+p$", extension, re.ASCII | re.IGNORECASE):
         return import_freq(filename, sample_per, padded=padded, windowed=windowed)
     return import_time(filename, sample_per)
 
@@ -909,20 +910,26 @@ def se2mm(ntwk):
 
 def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6):
     """
-    Read in a single ended 4-port Touchstone file, and extract the
+    Read in a single ended 1, 2, or 4-port Touchstone file, and extract the
     differential throughput step response, resampling as
     appropriate, via linear interpolation.
 
     Args:
         filename(str): Name of Touchstone file to read in.
         sample_per(float): New sample interval
-        padded(Bool): (Optional) Zero pad s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
-        windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)
+        padded(Bool): (Optional) Zero pad data, such that fmax >= 1/(2*sample_per)? (Default = False)
+        windowed(Bool): (Optional) Window data, before converting to time domain? (Default = False)
 
     Returns:
         [float]: Resampled step response waveform.
+
+    Raises:
+        ValueError: If Touchstone file is not 1, 2, or 4-port.
     """
     ntwk = rf.Network(filename)
+    (fs, rs, cs) = ntwk.s.shape
+    assert (rs == cs), "Non-square Touchstone file S-matrix!"
+    assert (rs in (1, 2, 4)), "Touchstone file must have 1, 2, or 4 ports!"
 
     # Form frequency vector.
     f = ntwk.f
@@ -934,7 +941,13 @@ def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6)
     F = rf.Frequency.from_f(f / 1e9)  # skrf.Frequency.from_f() expects its argument to be in units of GHz.
 
     # Form impulse response from frequency response.
-    H = sdd_21(ntwk).interpolate_from_f(F).s[:, 0, 0]
+    if rs == 4:
+        ntwk2 = sdd_21(ntwk)
+    elif rs == 2:
+        ntwk2 = ntwk
+    else:  # rs == 1
+        ntwk2 = rf.one_port_2_two_port(ntwk)
+    H = ntwk2.interpolate_from_f(F).s[:, 0, 0]
     H = np.pad(H, (1, 0), "constant", constant_values=1.0)  # Presume d.c. value = 1.
     if windowed:
         window = get_window(6.0, 2 * len(H))[len(H) :]
