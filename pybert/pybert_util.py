@@ -866,7 +866,7 @@ def sdd_21(ntwk):
         [float]: Sdd[2,1].
     """
     if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
-        ntwk.renumber((2, 3), (3, 2))
+        ntwk.renumber((1, 2), (2, 1))
 
     return 0.5 * (ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
 

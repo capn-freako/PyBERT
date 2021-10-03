@@ -1603,7 +1603,6 @@ class PyBERT(HasTraits):
             print(f"fmin: {fmin}, fmax: {fmax}")
             f2   = np.arange(fmin, fmax+fmin, fmin)
             s    = np.zeros((len(f2), 2, 2), dtype=complex)
-            # s[:,0,0] = np.interp(f2, f, HS11)
             s[:,0,0] = np.zeros(len(f2))
             s[:,0,1] = np.interp(f2, f, H)
             s[:,1,0] = s[:,0,1].copy()
@@ -1616,21 +1615,12 @@ class PyBERT(HasTraits):
         H2 = H
         if self.tx_use_ami and self.tx_use_ts4:
             fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
-            # f2, H2 = add_ondie_s(H, fname, Zc, Zref, f)
             f2, H2 = add_ondie_s(H, fname, Zref, Zref, f)
-            # plt.semilogx(f*1e-9,  20*np.log10(np.abs(H)),  label='Before On-die S-params.')
-            # plt.semilogx(f2*1e-9, 20*np.log10(np.abs(H2)), label='After On-die S-params.')
         if self.rx_use_ami and self.rx_use_ts4:
             fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
             f2, H2 = add_ondie_s(H2, fname, Zref, Zref, f)
-        # chnl_H  = 2.0 * calc_G(H,  Rs, Cs, np.interp(f,  f, Zc), RL, Cp, CL, f*2*pi)   # Compensating for nominal /2 divider action.
-        # assert (len(H) == len(f)), "Lengths of H and f must match!"
-        # chnl_H  = 2.0 * calc_G(H,  Rs, Cs, Zref, RL, Cp, CL, f*2*pi)   # Compensating for nominal /2 divider action.
-        chnl_H2 = calc_G(H2, Rs, Cs, np.interp(f2, f, Zc), RL, Cp, CL, f2*2*pi)
+        chnl_H2 = calc_G(H2[:len(f2)], Rs, Cs, np.interp(f2, f, Zc), RL, Cp, CL, f2*2*pi)
         chnl_H2 /= np.abs(chnl_H2[0]) # Normalize to: d.c. = 1.
-        # chnl_H2 = 2.0 * calc_G(H2, Rs, Cs, Zref, RL, Cp, CL, f2*2*pi)  # Compensating for nominal /2 divider action.
-        # plt.semilogx(f*1e-9,  20*np.log10(np.abs(chnl_H)),  label='Before On-die S-params.')
-        # plt.semilogx(f2*1e-9, 20*np.log10(np.abs(chnl_H2)), label='After On-die S-params.')
         chnl_h2 = irfft(chnl_H2)
         dt2     = 1/(2*f2[-1])
         t2      = [i * dt2 for i in range(len(chnl_h2))]

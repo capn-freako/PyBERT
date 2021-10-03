@@ -72,7 +72,7 @@ class MyHandler(Handler):
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "w") as the_file:
+                with open(dlg.path, "wb") as the_file:
                     # Grab all the instance variables from the_PyBertCfg
                     # yaml.dump(the_PyBertCfg, the_file)
                     pickle.dump(the_PyBertCfg, the_file)
@@ -90,7 +90,7 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "r") as the_file:
+                with open(dlg.path, "rb") as the_file:
                     # the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
                     the_PyBertCfg = pickle.load(the_file)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
