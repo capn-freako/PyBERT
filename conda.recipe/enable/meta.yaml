@@ -9,7 +9,7 @@ source:
   path: ../../enable/
 
 build:
-  number: 2
+  number: 3
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
@@ -17,6 +17,7 @@ requirements:
     - setuptools
     - git
     - cmake
+    - swig =3
     # - {{compiler('c')}}
     # - {{ compiler('cxx') }}
     # - {{ cdt('xorg-x11-devel') }}  # [linux]

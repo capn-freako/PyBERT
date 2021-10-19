@@ -525,11 +525,11 @@ class PyBERT(HasTraits):
 
     # About
     ident = String(
-        '<font size="+2"><H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
+        '<H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
     {}<BR>\n \
     {}<BR><BR>\n\n \
     {};<BR>\n \
-    All rights reserved World wide.</font>'.format(
+    All rights reserved World wide.'.format(
             VERSION, AUTHORS, DATE, COPY
         )
     )
@@ -1038,14 +1038,14 @@ class PyBERT(HasTraits):
                 rj_rej_total = rj_tx / rj_dfe
 
             # Temporary, until I figure out DPI independence.
-            info_str  = '<style>\n'
-            info_str += ' table td {font-size: 36px;}\n'
-            info_str += ' table th {font-size: 38px;}\n'
-            info_str += '</style>\n'
-            info_str += '<font size="+3">\n'
+            # info_str  = '<style>\n'
+            # info_str += ' table td {font-size: 36px;}\n'
+            # info_str += ' table th {font-size: 38px;}\n'
+            # info_str += '</style>\n'
+            # info_str += '<font size="+3">\n'
             # End Temp.
 
-            info_str += "<H1>Jitter Rejection by Equalization Component</H1>\n"
+            info_str  = "<H1>Jitter Rejection by Equalization Component</H1>\n"
 
             info_str += "<H2>Tx Preemphasis</H2>\n"
             info_str += '<TABLE border="1">\n'
@@ -1178,7 +1178,7 @@ class PyBERT(HasTraits):
             )
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
-            info_str += '</font>'
+            # info_str += '</font>'
         except:
             info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
             info_str += "Sorry, an error occurred.\n"
@@ -1189,14 +1189,14 @@ class PyBERT(HasTraits):
     @cached_property
     def _get_perf_info(self):
         # Temporary, until I figure out DPI independence.
-        info_str  = '<style>\n'
-        info_str += ' table td {font-size: 36px;}\n'
-        info_str += ' table th {font-size: 38px;}\n'
-        info_str += '</style>\n'
-        info_str += '<font size="+3">\n'
+        # info_str  = '<style>\n'
+        # info_str += ' table td {font-size: 36px;}\n'
+        # info_str += ' table th {font-size: 38px;}\n'
+        # info_str += '</style>\n'
+        # info_str += '<font size="+3">\n'
         # End Temp.
 
-        info_str += '<div style="width:90%;">\n'
+        info_str  = '<div style="width:90%;">\n'
         info_str += "<H2>Performance by Component</H2>\n"
         info_str += '  <TABLE border="1">\n'
         info_str += '    <TR align="center">\n'

@@ -10,7 +10,7 @@ source:
 
 build:
   # string: a72df0_5
-  number: 1
+  number: 3
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
@@ -18,20 +18,20 @@ build:
 
 requirements:
   run:
-    - python
+    - python =3.8
     - kiwisolver
-    - chaco
-    - pyibis-ami>=3.4.2
+    - chaco =5.0
+    - pyibis-ami >=3.4.2
     - scikit-rf
     - pyside2
     - pyyaml
     - importlib_resources
   build:
-    - python
+    - python =3.8
     - setuptools
     - kiwisolver
-    - chaco
-    - pyibis-ami>=3.4.2
+    - chaco =5.0
+    - pyibis-ami >=3.4.2
     - scikit-rf
     - pyside2
     - pyyaml
