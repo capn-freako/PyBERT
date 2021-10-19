@@ -10,18 +10,18 @@ source:
 
 build:
   number: 2
-  # string: b328ed_2
-  # noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
-    # - {{compiler('c')}}
-    # - {{compiler('cxx')}}
+    - setuptools
     - git
     - cmake
+    # - {{compiler('c')}}
+    # - {{ compiler('cxx') }}
+    # - {{ cdt('xorg-x11-devel') }}  # [linux]
     # - vs2017_win-64
-    - vs2019_win-64
+    # - vs2019_win-64
   host:
     - fonttools
     - numpy
