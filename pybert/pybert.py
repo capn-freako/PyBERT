@@ -14,9 +14,9 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-# from traits.trait_base import ETSConfig
-# ETSConfig.toolkit = "qt4"
-# ETSConfig.toolkit = "wx"
+from traits.etsconfig.api import ETSConfig
+# ETSConfig.toolkit = 'qt.celiagg'  # Yields unacceptably small font sizes in plot axis labels.
+ETSConfig.toolkit = 'qt.qpainter'
 
 from datetime import datetime
 import platform
@@ -81,7 +81,7 @@ from pybert.pybert_util import (
 from pybert.pybert_view import traits_view
 
 # DEBUG ONLY; REMOVE ME:
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -524,6 +524,7 @@ class PyBERT(HasTraits):
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
+    perf_info = Property(String, depends_on=["total_perf"])
     ident = String(
         '<H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
     {}<BR>\n \
@@ -545,10 +546,9 @@ class PyBERT(HasTraits):
     #
     # - Note: Don't make properties, which have a high calculation overhead, dependencies of other properties!
     #         This will slow the GUI down noticeably.
-    jitter_info = Property(HTML, depends_on=["jitter_perf"])
-    perf_info = Property(HTML, depends_on=["total_perf"])
+    jitter_info = Property(String, depends_on=["jitter_perf"])
     status_str = Property(String, depends_on=["status"])
-    sweep_info = Property(HTML, depends_on=["sweep_results"])
+    sweep_info = Property(String, depends_on=["sweep_results"])
     tx_h_tune = Property(Array, depends_on=["tx_tap_tuners.value", "nspui"])
     ctle_h_tune = Property(
         Array,
@@ -1038,10 +1038,12 @@ class PyBERT(HasTraits):
                 rj_rej_total = rj_tx / rj_dfe
 
             # Temporary, until I figure out DPI independence.
-            # info_str  = '<style>\n'
+            info_str  = '<style>\n'
             # info_str += ' table td {font-size: 36px;}\n'
             # info_str += ' table th {font-size: 38px;}\n'
-            # info_str += '</style>\n'
+            info_str += ' table td {font-size: 12em;}\n'
+            info_str += ' table th {font-size: 14em;}\n'
+            info_str += '</style>\n'
             # info_str += '<font size="+3">\n'
             # End Temp.
 
@@ -1188,16 +1190,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_perf_info(self):
-        # Temporary, until I figure out DPI independence.
-        # info_str  = '<style>\n'
-        # info_str += ' table td {font-size: 36px;}\n'
-        # info_str += ' table th {font-size: 38px;}\n'
-        # info_str += '</style>\n'
-        # info_str += '<font size="+3">\n'
-        # End Temp.
-
-        info_str  = '<div style="width:90%;">\n'
-        info_str += "<H2>Performance by Component</H2>\n"
+        info_str  = "<H2>Performance by Component</H2>\n"
         info_str += '  <TABLE border="1">\n'
         info_str += '    <TR align="center">\n'
         info_str += "      <TH>Component</TH><TH>Performance (Msmpls./min.)</TH>\n"
@@ -1226,7 +1219,6 @@ class PyBERT(HasTraits):
         info_str += '      <TD align="center">Plotting</TD><TD>%6.3f</TD>\n' % (self.plotting_perf * 60.0e-6)
         info_str += "    </TR>\n"
         info_str += "  </TABLE>\n"
-        info_str += "</div>\n"
 
         return info_str
 
@@ -1656,3 +1648,5 @@ class PyBERT(HasTraits):
         self.log(f"System: {platform.system()} {platform.release()}")
         self.log(f"Python Version: {platform.python_version()}")
         self.log(f"PyBERT Version: {VERSION}")
+        self.log(f"GUI Toolkit: {ETSConfig.toolkit}")
+        self.log(f"Kiva Backend: {ETSConfig.kiva_backend}")

@@ -252,7 +252,10 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             # - Generate the ideal, post-preemphasis signal.
             # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
             ffe_out = convolve(symbols, ffe)[: len(symbols)]
-            self.rel_power = mean(ffe_out ** 2)  # Store the relative average power dissipated in the Tx.
+            if self.use_ch_file:
+                self.rel_power = mean(ffe_out ** 2) / self.Zref
+            else:
+                self.rel_power = mean(ffe_out ** 2) / self.Z0
             tx_out = repeat(ffe_out, nspui)  # oversampled output
 
             # - Calculate the responses.

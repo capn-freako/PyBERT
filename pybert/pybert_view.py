@@ -832,12 +832,12 @@ traits_view = View(
         ),
         Group(  # Help
             Group(
-                Item("ident", style="readonly", show_label=False),
+                Item("ident",     style="readonly", show_label=False),
                 Item("perf_info", style="readonly", show_label=False),
                 label="About",
             ),
             Group(Item("instructions", style="readonly", show_label=False), label="Guide"),
-            Group(Item("console_log", show_label=False, style="custom"), label="Console", id="console"),
+            Group(Item("console_log",  style="custom",   show_label=False), label="Console", id="console"),
             layout='tabbed',
             label='Help',
             id='help'
@@ -846,7 +846,7 @@ traits_view = View(
         springy=True,
         id="tabs",
     ),
-    resizable=True,  # Extends off screen to the right when True.
+    resizable=True,
     handler=MyHandler(),
     buttons=[run_sim, save_cfg, load_cfg, save_data, load_data],
     statusbar="status_str",

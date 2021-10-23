@@ -14,10 +14,7 @@ from numpy import linspace
 
 from pybert.pybert_cntrl import update_eyes
 
-LARGE_FONTS = False
-title_size = 36
-axis_size  = 28
-tick_size  = 26
+PLOT_SPACING = 50
 
 def make_plots(self, n_dfe_taps):
     """ Create the plots used by the PyBERT GUI."""
@@ -63,7 +60,7 @@ def make_plots(self, n_dfe_taps):
     zoom_clk_per_spec = ZoomTool(plot_clk_per_spec, tool_mode="range", axis="index", always_on=False)
     plot_clk_per_spec.overlays.append(zoom_clk_per_spec)
 
-    container_dfe = GridPlotContainer(shape=(2, 2))
+    container_dfe = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_dfe.add(plot2)
     container_dfe.add(plot9)
     container_dfe.add(plot_clk_per_hist)
@@ -72,7 +69,8 @@ def make_plots(self, n_dfe_taps):
     self._dfe_plot = plot9
 
     # - EQ Tune tab
-    plot_h_tune = Plot(plotdata, padding_left=75)
+    # plot_h_tune = Plot(plotdata, padding_left=75)
+    plot_h_tune = Plot(plotdata, padding_bottom=75)
     plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="blue")
     plot_h_tune.plot(("t_ns_chnl", "clocks_tune"), type="line", color="gray")
     plot_h_tune.title = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + Ideal DFE"
@@ -120,7 +118,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_dfe.legend.align = "ur"
     plot_h_dfe.index_range = plot_h_chnl.index_range  # Zoom x-axes in tandem.
 
-    container_h = GridPlotContainer(shape=(2, 2))
+    container_h = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_h.add(plot_h_chnl)
     container_h.add(plot_h_tx)
     container_h.add(plot_h_ctle)
@@ -168,7 +166,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_dfe.legend.align = "lr"
     plot_s_dfe.index_range = plot_s_chnl.index_range  # Zoom x-axes in tandem.
 
-    container_s = GridPlotContainer(shape=(2, 2))
+    container_s = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_s.add(plot_s_chnl)
     container_s.add(plot_s_tx)
     container_s.add(plot_s_ctle)
@@ -213,7 +211,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_dfe.legend.align = "ur"
     plot_p_dfe.index_range = plot_p_chnl.index_range  # Zoom x-axes in tandem.
 
-    container_p = GridPlotContainer(shape=(2, 2))
+    container_p = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_p.add(plot_p_chnl)
     container_p.add(plot_p_tx)
     container_p.add(plot_p_ctle)
@@ -270,7 +268,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_dfe.legend.visible = True
     plot_H_dfe.legend.align = "ll"
 
-    container_H = GridPlotContainer(shape=(2, 2))
+    container_H = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_H.add(plot_H_chnl)
     container_H.add(plot_H_tx)
     container_H.add(plot_H_ctle)
@@ -309,7 +307,7 @@ def make_plots(self, n_dfe_taps):
     plot_out_dfe.y_axis.title = "Output (V)"
     plot_out_dfe.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
 
-    container_out = GridPlotContainer(shape=(2, 2))
+    container_out = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_out.add(plot_out_chnl)
     container_out.add(plot_out_tx)
     container_out.add(plot_out_ctle)
@@ -407,7 +405,7 @@ def make_plots(self, n_dfe_taps):
     plot_eye_dfe.x_grid.line_color = "gray"
     plot_eye_dfe.y_grid.line_color = "gray"
 
-    container_eye = GridPlotContainer(shape=(2, 2))
+    container_eye = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_eye.add(plot_eye_chnl)
     container_eye.add(plot_eye_tx)
     container_eye.add(plot_eye_ctle)
@@ -451,7 +449,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_dist_dfe.legend.visible = True
     plot_jitter_dist_dfe.legend.align = "ur"
 
-    container_jitter_dist = GridPlotContainer(shape=(2, 2))
+    container_jitter_dist = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_jitter_dist.add(plot_jitter_dist_chnl)
     container_jitter_dist.add(plot_jitter_dist_tx)
     container_jitter_dist.add(plot_jitter_dist_ctle)
@@ -518,7 +516,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_dfe.legend.align = "lr"
     plot_jitter_spec_dfe.value_range = plot_jitter_spec_tx.value_range
 
-    container_jitter_spec = GridPlotContainer(shape=(2, 2))
+    container_jitter_spec = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_jitter_spec.add(plot_jitter_spec_chnl)
     container_jitter_spec.add(plot_jitter_spec_tx)
     container_jitter_spec.add(plot_jitter_spec_ctle)
@@ -562,61 +560,11 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_dfe.index_axis.title = "Time (ps)"
     plot_bathtub_dfe.value_axis.title = "Log10(P(Transition occurs inside.))"
 
-    container_bathtub = GridPlotContainer(shape=(2, 2))
+    container_bathtub = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_bathtub.add(plot_bathtub_chnl)
     container_bathtub.add(plot_bathtub_tx)
     container_bathtub.add(plot_bathtub_ctle)
     container_bathtub.add(plot_bathtub_dfe)
     self.plots_bathtub = container_bathtub
-
-    # Temporary hack, to fix small font size problem on high-res Windows laptop display.
-    if LARGE_FONTS:
-        for p in [  plot2,
-                    plot9,
-                    plot_clk_per_hist,
-                    plot_clk_per_spec,
-                    plot_h_tune,
-                    plot_h_chnl,
-                    plot_h_tx,
-                    plot_h_ctle,
-                    plot_h_dfe,
-                    plot_s_chnl,
-                    plot_s_tx,
-                    plot_s_ctle,
-                    plot_s_dfe,
-                    plot_p_chnl,
-                    plot_p_tx,
-                    plot_p_ctle,
-                    plot_p_dfe,
-                    plot_H_chnl,
-                    plot_H_tx,
-                    plot_H_ctle,
-                    plot_H_dfe,
-                    plot_out_chnl,
-                    plot_out_tx,
-                    plot_out_ctle,
-                    plot_out_dfe,
-                    plot_eye_chnl,
-                    plot_eye_tx,
-                    plot_eye_ctle,
-                    plot_eye_dfe,
-                    plot_jitter_dist_chnl,
-                    plot_jitter_dist_tx,
-                    plot_jitter_dist_ctle,
-                    plot_jitter_dist_dfe,
-                    plot_jitter_spec_chnl,
-                    plot_jitter_spec_tx,
-                    plot_jitter_spec_ctle,
-                    plot_jitter_spec_dfe,
-                    plot_bathtub_chnl,
-                    plot_bathtub_tx,
-                    plot_bathtub_ctle,
-                    plot_bathtub_dfe]:
-            p.title_font.size                 = title_size
-            p.index_axis.title_font.size      = axis_size
-            p.value_axis.title_font.size      = axis_size
-            p.index_axis.tick_label_font.size = tick_size
-            p.value_axis.tick_label_font.size = tick_size
-            p.legend.font.size                = axis_size
 
     update_eyes(self)
