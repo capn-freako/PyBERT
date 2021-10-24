@@ -153,7 +153,7 @@ def find_crossing_times(
 
 
 def find_crossings(
-    t, x, amplitude, min_delay: float = 0.0, rising_first: bool = True, min_init_dev=0.1, mod_type=0,
+    t, x, amplitude=1.0, min_delay: float = 0.0, rising_first: bool = True, min_init_dev=0.1, mod_type=0,
 ):
     """
     Finds the crossing times in a signal, according to the modulation type.

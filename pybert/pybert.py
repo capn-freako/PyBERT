@@ -1650,3 +1650,4 @@ class PyBERT(HasTraits):
         self.log(f"PyBERT Version: {VERSION}")
         self.log(f"GUI Toolkit: {ETSConfig.toolkit}")
         self.log(f"Kiva Backend: {ETSConfig.kiva_backend}")
+        # self.log(f"Pixel Scale: {self.trait_view().window.base_pixel_scale}")

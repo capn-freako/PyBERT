@@ -14,7 +14,7 @@ from numpy import linspace
 
 from pybert.pybert_cntrl import update_eyes
 
-PLOT_SPACING = 50
+PLOT_SPACING = 20
 
 def make_plots(self, n_dfe_taps):
     """ Create the plots used by the PyBERT GUI."""
