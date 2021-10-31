@@ -776,11 +776,15 @@ def trim_impulse(g, min_len=0, max_len=1000000):
         P += g[i] ** 2
         i += 1
     stop_ix = min(max_ix + max_len, max(i, max_ix + min_len))
+    print(f"stop_ix: {stop_ix}")
 
-    # Set "front porch" to 20%, guarding against negative start index.
-    start_ix = max(0, max_ix - (stop_ix - max_ix) // 4)
-
-    return (g[start_ix:stop_ix], start_ix)
+    # Set "front/back porch" to 20%, doing appropriate bounds checking.
+    length   = stop_ix - max_ix
+    porch    = length // 3
+    start_ix = max(0,      max_ix  - porch)
+    stop_ix  = min(len(g), stop_ix + porch)
+    print(f"stop_ix: {stop_ix}")
+    return (g[start_ix : stop_ix], start_ix)
 
 
 def import_channel(filename, sample_per, padded=False, windowed=False):

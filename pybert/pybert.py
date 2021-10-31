@@ -1502,6 +1502,10 @@ class PyBERT(HasTraits):
             error_message = "Failed to open DLL/SO file!\n{}".format(err)
             self.log(error_message, alert=True)
 
+    def _rx_use_ami_changed(self, new_value):
+        if(new_value == True):
+            self.use_dfe = False
+
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
@@ -1568,57 +1572,32 @@ class PyBERT(HasTraits):
             chnl_dly = l_ch / v0
 
         # Augment w/ IBIS-AMI on-die S-parameters, if appropriate.
-        def add_ondie_s(H, ts4f, Zc, Zref, f):
+        def add_ondie_s(H, ts4f, f):
             """Add the effect of on-die S-parameters to channel transfer function.
 
             Args:
                 H([complex]): initial channel transfer function.
                 ts4f(string): on-die S-parameter file name.
-                Zc([complex]): frequency dependent impedance.
-                Zref(float): reference impedance.
                 f([float]): frequencies at which 'H' was sampled.
 
             Returns:
-                ([float], [complex]): modified freq. vector and channel transfer function.
-
-            Notes:
-                1. Returned transfer function may have a different length,
-                and/or fundamental frequency (H[1]) than original.
+                [complex]: modified channel transfer function.
             """
-            self.log(f"About to load on-die S-parameters from: '{ts4f}'...")
             ts4N = rf.Network(ts4f)
-            self.log(f"\t{ts4f}: {ts4N}")
-            ts2N = rf.Network(frequency=ts4N.frequency, s=se2mm(ts4N).s[:,0:2,0:2], name="Sdd[2,1]")
-            HS11 = (Zc - Zref)/(Zc + Zref)
-            fmin = max(ts2N.f.min(), f.min())
-            fmax = min(ts2N.f.max(), f.max())
-            print(f"fmin: {fmin}, fmax: {fmax}")
-            f2   = np.arange(fmin, fmax+fmin, fmin)
-            s    = np.zeros((len(f2), 2, 2), dtype=complex)
-            s[:,0,0] = np.zeros(len(f2))
-            s[:,0,1] = np.interp(f2, f, H)
-            s[:,1,0] = s[:,0,1].copy()
-            s[:,1,1] = s[:,0,0].copy()
-            HN   = rf.Network(f=f2, f_unit='Hz', s=s, name="H'(f)")
-            resN = HN ** ts2N.interpolate(HN.frequency, basis='s', coords='polar')
-            return (f2, resN.s[:,1,0])
-        
-        f2 = f
-        H2 = H
-        if self.tx_use_ami and self.tx_use_ts4:
-            fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
-            f2, H2 = add_ondie_s(H, fname, Zref, Zref, f)
-        if self.rx_use_ami and self.rx_use_ts4:
-            fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
-            f2, H2 = add_ondie_s(H2, fname, Zref, Zref, f)
-        chnl_H2 = calc_G(H2[:len(f2)], Rs, Cs, np.interp(f2, f, Zc), RL, Cp, CL, f2*2*pi)
-        chnl_H2 /= np.abs(chnl_H2[0]) # Normalize to: d.c. = 1.
-        chnl_h2 = irfft(chnl_H2)
-        dt2     = 1/(2*f2[-1])
-        t2      = [i * dt2 for i in range(len(chnl_h2))]
-        chnl_h  = np.interp(t, t2, chnl_h2, left=0, right=0)
+            return (f, H * np.interp(f, ts4N.f, sdd21(ts4N)))
 
-        min_len = 10 * nspui
+        H2 = H
+        if self.tx_use_ibis and self.tx_use_ts4:
+            fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
+            H2    = add_ondie_s(H, fname, f)
+        if self.rx_use_ibis and self.rx_use_ts4:
+            fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
+            H2    = add_ondie_s(H2, fname, f)
+        chnl_H2  = calc_G(H2, Rs, Cs, Zc, RL, Cp, CL, f*2*pi)
+        chnl_H2 /= np.abs(chnl_H2[0]) # Normalize to: d.c. = 1.
+        chnl_h   = irfft(chnl_H2)
+
+        min_len = 20 * nspui
         max_len = 100 * nspui
         if impulse_length:
             min_len = max_len = impulse_length / ts

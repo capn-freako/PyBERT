@@ -1,16 +1,20 @@
 {% set name = "pybert" %}
-{% set version = "3.4.2" %}
+{% set version = "3.4.3rc1" %}
 
 package:
   version: '{{ version }}'
   name: '{{ name|lower }}'
 
+# source:
+#   path: ../../
 source:
-  path: ../../
+  git_url: https://github.com/capn-freako/PyBERT.git
+  git_rev: {{ version }}
+  git_depth: 1 # (Defaults to -1/not shallow)
 
 build:
   # string: a72df0_5
-  number: 4
+  number: 1
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:

@@ -643,7 +643,6 @@ traits_view = View(
                                 ),
                                 label="CDR",
                                 show_border=True,
-                                enabled_when='rx_use_ami == False or rx_use_getwave == False',
                             ),
                             VGroup(
                                 HGroup(
@@ -651,7 +650,6 @@ traits_view = View(
                                         name="use_dfe",
                                         label="Use DFE",
                                         tooltip="Include DFE in simulation.",
-                                        enabled_when="rx_use_ami == False or rx_use_getwave == False",
                                     ),
                                     Item(
                                         name="sum_ideal",
@@ -661,16 +659,12 @@ traits_view = View(
                                     ),
                                 ),
                                 VGroup(
-                                    Item(name="n_taps", label="Taps", tooltip="# of taps"),
-                                    Item(name="gain", label="Gain", tooltip="error feedback gain"),
-                                    Item(name="decision_scaler", label="Level", tooltip="target output magnitude"),
-                                    Item(name="n_ave", label="Nave.", tooltip="# of CDR adaptations per DFE adaptation"),
-                                    Item(
-                                        name="sum_bw",
-                                        label="BW (GHz)",
-                                        tooltip="summing node bandwidth",
-                                        enabled_when="sum_ideal == False",
-                                    ),
+                                    Item(name="n_taps",          label="Taps",     tooltip="# of taps"),
+                                    Item(name="gain",            label="Gain",     tooltip="error feedback gain"),
+                                    Item(name="decision_scaler", label="Level",    tooltip="target output magnitude"),
+                                    Item(name="n_ave",           label="Nave.",    tooltip="# of CDR adaptations per DFE adaptation"),
+                                    Item(name="sum_bw",          label="BW (GHz)", tooltip="summing node bandwidth",
+                                         enabled_when="sum_ideal == False",),
                                     enabled_when="use_dfe == True",
                                 ),
                                 label="DFE",
@@ -679,6 +673,7 @@ traits_view = View(
                         ),
                         label="Native",
                         show_border=True,
+                        enabled_when="rx_use_ami == False",
                     ),
                     label="Rx Equalization",
                     show_border=True,
