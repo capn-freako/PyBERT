@@ -746,7 +746,7 @@ def trim_impulse(g, min_len=0, max_len=1000000):
     Trim impulse response, for more useful display, by:
       - clipping off the tail, after 99.8% of the total power has been
         captured (Using 99.9% was causing problems; I don't know why.), and
-      - setting the "front porch" length equal to 20% of the total length.
+      - setting the "front porch" length equal to 10% of the total length.
 
     Inputs:
 
@@ -776,14 +776,12 @@ def trim_impulse(g, min_len=0, max_len=1000000):
         P += g[i] ** 2
         i += 1
     stop_ix = min(max_ix + max_len, max(i, max_ix + min_len))
-    print(f"stop_ix: {stop_ix}")
 
     # Set "front/back porch" to 20%, doing appropriate bounds checking.
     length   = stop_ix - max_ix
-    porch    = length // 3
+    porch    = length // 8
     start_ix = max(0,      max_ix  - porch)
     stop_ix  = min(len(g), stop_ix + porch)
-    print(f"stop_ix: {stop_ix}")
     return (g[start_ix : stop_ix], start_ix)
 
 
@@ -867,7 +865,7 @@ def sdd_21(ntwk):
         ntwk(skrf.Network): 4-port single ended network.
 
     Returns:
-        [float]: Sdd[2,1].
+        skrf.Network(1-port): Sdd[2,1].
     """
     if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
         ntwk.renumber((1, 2), (2, 1))
@@ -948,9 +946,9 @@ def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6)
     if rs == 4:
         ntwk2 = sdd_21(ntwk)
     elif rs == 2:
-        ntwk2 = ntwk
+        ntwk2 = ntwk.s21
     else:  # rs == 1
-        ntwk2 = rf.one_port_2_two_port(ntwk)
+        ntwk2 = ntwk
     H = ntwk2.interpolate_from_f(F).s[:, 0, 0]
     H = np.pad(H, (1, 0), "constant", constant_values=1.0)  # Presume d.c. value = 1.
     if windowed:

@@ -76,7 +76,7 @@ from pybert.pybert_util import (
     safe_log10,
     trim_impulse,
     submodules,
-    se2mm,
+    sdd_21,
 )
 from pybert.pybert_view import traits_view
 
@@ -1401,11 +1401,12 @@ class PyBERT(HasTraits):
 
     def _tx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
+        dName = ""
         try:
             self.tx_ibis_valid = False
-            self.tx_use_ami = False
+            self.tx_use_ami    = False
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, True, gui=self.GUI)  # FIXME: True => self.debug?
+            ibis = IBISModel(new_value, True, debug=self.debug, gui=self.GUI)  # FIXME: True => self.debug?
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
@@ -1455,11 +1456,12 @@ class PyBERT(HasTraits):
 
     def _rx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
+        dName = ""
         try:
             self.rx_ibis_valid = False
             self.rx_use_ami = False
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value, False, self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
@@ -1584,7 +1586,7 @@ class PyBERT(HasTraits):
                 [complex]: modified channel transfer function.
             """
             ts4N = rf.Network(ts4f)
-            return (f, H * np.interp(f, ts4N.f, sdd21(ts4N)))
+            return (H * np.interp(f, ts4N.f, sdd_21(ts4N).s[:,0,0]))
 
         H2 = H
         if self.tx_use_ibis and self.tx_use_ts4:
@@ -1613,7 +1615,7 @@ class PyBERT(HasTraits):
         self.chnl_h         = chnl_h
         self.len_h          = len(chnl_h)
         self.chnl_dly       = chnl_dly
-        self.chnl_H         = np.interp(f, f2, chnl_H2)
+        self.chnl_H         = chnl_H2
         self.chnl_trimmed_H = chnl_trimmed_H
         self.start_ix       = start_ix
         self.t_ns_chnl      = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
