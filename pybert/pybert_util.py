@@ -746,7 +746,7 @@ def trim_impulse(g, min_len=0, max_len=1000000):
     Trim impulse response, for more useful display, by:
       - clipping off the tail, after 99.8% of the total power has been
         captured (Using 99.9% was causing problems; I don't know why.), and
-      - setting the "front porch" length equal to 10% of the total length.
+      - setting the "front porch" length equal to 20% of the total length.
 
     Inputs:
 
@@ -779,7 +779,7 @@ def trim_impulse(g, min_len=0, max_len=1000000):
 
     # Set "front/back porch" to 20%, doing appropriate bounds checking.
     length   = stop_ix - max_ix
-    porch    = length // 8
+    porch    = length // 3
     start_ix = max(0,      max_ix  - porch)
     stop_ix  = min(len(g), stop_ix + porch)
     return (g[start_ix : stop_ix], start_ix)
@@ -867,7 +867,8 @@ def sdd_21(ntwk):
     Returns:
         skrf.Network(1-port): Sdd[2,1].
     """
-    if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
+    ix = ntwk.s.shape[0] // 5
+    if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
         ntwk.renumber((1, 2), (2, 1))
 
     return 0.5 * (ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)

@@ -1181,10 +1181,11 @@ class PyBERT(HasTraits):
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
             # info_str += '</font>'
-        except:
+        except Exception as err:
             info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
-            info_str += "Sorry, an error occurred.\n"
-            raise
+            info_str += "Sorry, the following error occurred:\n"
+            # raise
+            info_str += str(err)
 
         return info_str
 
@@ -1559,7 +1560,6 @@ class PyBERT(HasTraits):
             h /= sum(h)  # Normalize d.c. to one.
             chnl_dly = t[where(h == max(h))[0][0]]
             h.resize(len_t)
-            # H = fft(h)[:len_t//2]
             H = fft(h)[:len(f)]
         else:
             l_ch = self.l_ch
@@ -1584,6 +1584,11 @@ class PyBERT(HasTraits):
 
             Returns:
                 [complex]: modified channel transfer function.
+
+            Notes:
+                1. This simplistic implementation assumes a very good
+                match between the reference impedance used in the
+                Touchstone file and the actual system impedance.
             """
             ts4N = rf.Network(ts4f)
             return (H * np.interp(f, ts4N.f, sdd_21(ts4N).s[:,0,0]))
@@ -1595,8 +1600,9 @@ class PyBERT(HasTraits):
         if self.rx_use_ibis and self.rx_use_ts4:
             fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
             H2    = add_ondie_s(H2, fname, f)
-        chnl_H2  = calc_G(H2, Rs, Cs, Zc, RL, Cp, CL, f*2*pi)
-        chnl_H2 /= np.abs(chnl_H2[0]) # Normalize to: d.c. = 1.
+
+        chnl_H2  = 2*calc_G(H2, Rs, Cs, Zc, RL, Cp, CL, f*2*pi)
+        # chnl_H2 /= np.abs(chnl_H2[0]) # Normalize to: d.c. = 1.
         chnl_h   = irfft(chnl_H2)
 
         min_len = 20 * nspui
@@ -1604,7 +1610,7 @@ class PyBERT(HasTraits):
         if impulse_length:
             min_len = max_len = impulse_length / ts
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
-        chnl_h /= sum(chnl_h)  # a temporary crutch.
+        # chnl_h /= sum(chnl_h)  # a temporary crutch.
         temp = chnl_h.copy()
         temp.resize(len(t))
         chnl_trimmed_H = fft(temp)
