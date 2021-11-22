@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "3.4.2" %}
+{% set version = "3.4.4" %}
 
 package:
   version: '{{ version }}'
@@ -10,7 +10,7 @@ source:
 
 build:
   # string: a72df0_5
-  number: 4
+  number: 1
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
@@ -20,7 +20,7 @@ requirements:
   run:
     - python =3.8
     - kiwisolver
-    - chaco =5.0
+    - chaco =5.0.0a
     - pyibis-ami >=3.4.2
     - scikit-rf
     - pyside2
@@ -30,7 +30,7 @@ requirements:
     - python =3.8
     - setuptools
     - kiwisolver
-    - chaco =5.0
+    - chaco =5.0.0a
     - pyibis-ami >=3.4.2
     - scikit-rf
     - pyside2

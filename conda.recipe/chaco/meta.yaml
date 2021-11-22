@@ -1,5 +1,5 @@
 {% set name = "chaco" %}
-{% set version = "5.0.0" %}
+{% set version = "5.0.0a" %}
 
 package:
   name: "{{ name|lower }}"
@@ -17,7 +17,7 @@ build:
 requirements:
   build:
     - setuptools
-    # - vs2019_win-64
+    - vs2019_win-64
     # - {{compiler('c')}}
     # - {{compiler('cxx')}}
     - git
@@ -25,13 +25,13 @@ requirements:
   
   host:
     - python
-    - enable =5.2.1
+    - enable =5.2.1a
     - Cython
     - importlib_resources
 
   run:
     # - python
-    - enable =5.2.1
+    - enable =5.2.1a
     # - cython
     - importlib_resources
 

@@ -520,13 +520,13 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
     if w[0] == 0:
         w[0] = 1.0e-12
 
-    Rac = R0 * sqrt(2 * 1j * w / w0)  # AC resistance vector
-    R = sqrt(power(Rdc, 2) + power(Rac, 2))  # total resistance vector
-    L0 = Z0 / v0  # "external" inductance per unit length (H/m)
-    C0 = 1.0 / (Z0 * v0)  # nominal capacitance per unit length (F/m)
+    Rac = R0 * sqrt(2 * 1j * w / w0)                     # AC resistance vector
+    R = sqrt(power(Rdc, 2) + power(Rac, 2))              # total resistance vector
+    L0 = Z0 / v0                                         # "external" inductance per unit length (H/m)
+    C0 = 1.0 / (Z0 * v0)                                 # nominal capacitance per unit length (F/m)
     C = C0 * power((1j * w / w0), (-2.0 * Theta0 / pi))  # complex capacitance per unit length (F/m)
-    gamma = sqrt((1j * w * L0 + R) * (1j * w * C))  # propagation constant (nepers/m)
-    Zc = sqrt((1j * w * L0 + R) / (1j * w * C))  # characteristic impedance (Ohms)
+    gamma = sqrt((1j * w * L0 + R) * (1j * w * C))       # propagation constant (nepers/m)
+    Zc = sqrt((1j * w * L0 + R) / (1j * w * C))          # characteristic impedance (Ohms)
 
     return (gamma, Zc)
 
@@ -590,13 +590,13 @@ def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
     ZL = 2.0 * 1.0 / (1j * w * CL) + RL / (1.0 + 1j * w * RL * Cp / 2)
     # Admittance into the interconnect is (Cs || Zc) / (Rs + (Cs || Zc)).
     Cs_par_Zc = Zc / (1.0 + 1j * w * Zc * Cs)
-    A = Cs_par_Zc / (Rs + Cs_par_Zc)
+    Y = Cs_par_Zc / (Rs + Cs_par_Zc)
     # Reflection coefficient at Rx:
     R1 = (ZL - Zc) / (ZL + Zc)
     # Reflection coefficient at Tx:
     R2 = (Zs - Zc) / (Zs + Zc)
     # Fully loaded channel transfer function:
-    G = A * H * (1 + R1) / (1 - R1 * R2 * H ** 2)
+    G = Y * H * (1 + R1) / (1 - R1 * R2 * H ** 2)
     G = G * (((RL / (1j * w * Cp / 2)) / (RL + 1 / (1j * w * Cp / 2))) / ZL)  # Corrected for divider action.
     # (i.e. - We're interested in what appears across RL.)
     return G
@@ -783,7 +783,7 @@ def trim_impulse(g, min_len=0, max_len=1000000):
     return (g[start_ix:stop_ix], start_ix)
 
 
-def import_channel(filename, sample_per, padded=False, windowed=False):
+def import_channel(filename, sample_per, padded=False, windowed=False, zref=100):
     """
     Read in a channel file.
 
@@ -792,17 +792,35 @@ def import_channel(filename, sample_per, padded=False, windowed=False):
         sample_per(float): Sample period of signal vector (s).
         padded(Bool): (Optional) Zero pad s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
         windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)
+        zref(float): (Optional) Reference impedance, for time domain files.
 
     Returns:
-        [float]: Imported channel impulse, or step, response.
+        ( [float]: Imported channel impulse response.
+        , [float]: Imported channel transfer function.
+        , [float]: Imported channel frequency dependent characteristic impedance.
+        , float:   Imported channel reference impedance.
+        )
+
+    Notes:
+        1. When a time domain (i.e. - impulse or step response) file is being imported,
+        we have little choice but to set Zc equal to Z0 for all frequencies.
+        This means that importing time domain descriptions of channels into PyBERT
+        yields necessarily lower fidelity results than importing Touchstone descriptions;
+        probably not a surprise to those skilled in the art.
     """
 
     extension = os.path.splitext(filename)[1][1:]
-    # if extension in ("s1p", "S1P", "s2p", "S2P", "s4p", "S4P"):
-    if re.search("^s\d+p$", extension, re.ASCII | re.IGNORECASE):
-        return import_freq(filename, sample_per, padded=padded, windowed=windowed)
-    return import_time(filename, sample_per)
-
+    if re.search("^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
+        H, Zc, Z0 = import_freq(filename, sample_per, padded=padded, windowed=windowed)
+        h         = irfft(H)
+    else:
+        h     = import_time(filename, sample_per)
+        if h[-1] > (max(h) / 2.0):  # step response?
+            h = diff(h)  # impulse response is derivative of step response.
+        H     = fft(h)
+        Z0    = zref
+        Zc    = np.repeat(Z0, len(H))
+    return (h, H, Zc, Z0)
 
 def interp_time(ts, xs, sample_per):
     """
@@ -886,7 +904,7 @@ def se2mm(ntwk):
             Scd21  Scd22  Scc21  Scc22
     """
     if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
-        ntwk.renumber((2, 3), (3, 2))
+        ntwk.renumber((1, 2), (2, 1))
     f = ntwk.f
     s = np.zeros(ntwk.s.shape, dtype=complex)
     s[:,0,0] = 0.5 * (ntwk.s11 - ntwk.s13 - ntwk.s31 + ntwk.s33).s.flatten()
@@ -910,21 +928,31 @@ def se2mm(ntwk):
 
 def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6):
     """
-    Read in a single ended 1, 2, or 4-port Touchstone file, and extract the
-    differential throughput step response, resampling as
-    appropriate, via linear interpolation.
+    Read in a 1, 2, or 4-port Touchstone file,
+    and extract the:
+        - transfer function,
+        - impedance, and
+        - reference impedance.
 
     Args:
         filename(str): Name of Touchstone file to read in.
         sample_per(float): New sample interval
+
+    KeywordArgs:
         padded(Bool): (Optional) Zero pad data, such that fmax >= 1/(2*sample_per)? (Default = False)
         windowed(Bool): (Optional) Window data, before converting to time domain? (Default = False)
+        f_step(float): (Optional) Frequency step. (Default = 10 MHz)
 
     Returns:
-        [float]: Resampled step response waveform.
+        ( [float]: Resampled step response waveform. (H(f))
+        , [float]: Impedance looking into port 1 vs. f. (Zc(f))
+        , float: Reference impedance(Z0)
 
     Raises:
         ValueError: If Touchstone file is not 1, 2, or 4-port.
+
+    Notes:
+        1. A 4-port Touchstone file is assumed single ended.
     """
     ntwk = rf.Network(filename)
     (fs, rs, cs) = ntwk.s.shape
@@ -947,7 +975,7 @@ def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6)
         ntwk2 = ntwk
     else:  # rs == 1
         ntwk2 = rf.one_port_2_two_port(ntwk)
-    H = ntwk2.interpolate_from_f(F).s[:, 0, 0]
+    H = ntwk2.interpolate_from_f(F).s[:, 0, 0]  # Why [0,0]?
     H = np.pad(H, (1, 0), "constant", constant_values=1.0)  # Presume d.c. value = 1.
     if windowed:
         window = get_window(6.0, 2 * len(H))[len(H) :]
