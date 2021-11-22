@@ -777,10 +777,12 @@ def trim_impulse(g, min_len=0, max_len=1000000):
         i += 1
     stop_ix = min(max_ix + max_len, max(i, max_ix + min_len))
 
-    # Set "front porch" to 20%, guarding against negative start index.
-    start_ix = max(0, max_ix - (stop_ix - max_ix) // 4)
-
-    return (g[start_ix:stop_ix], start_ix)
+    # Set "front/back porch" to 20%, doing appropriate bounds checking.
+    length   = stop_ix - max_ix
+    porch    = length // 3
+    start_ix = max(0,      max_ix  - porch)
+    stop_ix  = min(len(g), stop_ix + porch)
+    return (g[start_ix : stop_ix], start_ix)
 
 
 def import_channel(filename, sample_per, padded=False, windowed=False, zref=100):
@@ -881,9 +883,10 @@ def sdd_21(ntwk):
         ntwk(skrf.Network): 4-port single ended network.
 
     Returns:
-        [float]: Sdd[2,1].
+        skrf.Network(1-port): Sdd[2,1].
     """
-    if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
+    ix = ntwk.s.shape[0] // 5
+    if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
         ntwk.renumber((1, 2), (2, 1))
 
     return 0.5 * (ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
@@ -972,10 +975,10 @@ def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6)
     if rs == 4:
         ntwk2 = sdd_21(ntwk)
     elif rs == 2:
-        ntwk2 = ntwk
+        ntwk2 = ntwk.s21
     else:  # rs == 1
-        ntwk2 = rf.one_port_2_two_port(ntwk)
-    H = ntwk2.interpolate_from_f(F).s[:, 0, 0]  # Why [0,0]?
+        ntwk2 = ntwk
+    H = ntwk2.interpolate_from_f(F).s[:, 0, 0]
     H = np.pad(H, (1, 0), "constant", constant_values=1.0)  # Presume d.c. value = 1.
     if windowed:
         window = get_window(6.0, 2 * len(H))[len(H) :]
