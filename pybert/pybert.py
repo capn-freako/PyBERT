@@ -16,7 +16,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 from traits.etsconfig.api import ETSConfig
 # ETSConfig.toolkit = 'qt.celiagg'  # Yields unacceptably small font sizes in plot axis labels.
-ETSConfig.toolkit = 'qt.qpainter'
+# ETSConfig.toolkit = 'qt.qpainter'
 
 from datetime import datetime
 import platform
