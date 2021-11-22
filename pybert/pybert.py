@@ -1552,15 +1552,15 @@ class PyBERT(HasTraits):
             Rs = model.zout * 2
             Cs = model.ccomp[0] * 2
         if self.use_ch_file:
-            Zc = Zref * np.ones(np.shape(w))
-            h = import_channel(self.ch_file, ts, self.padded, self.windowed)
-            h /= sum(h)  # a temporary crutch.
-            if h[-1] > (max(h) / 2.0):  # step response?
-                h = diff(h)  # impulse response is derivative of step response.
-            h /= sum(h)  # Normalize d.c. to one.
+            # Zc = Zref * np.ones(np.shape(w))
+            # h = import_channel(self.ch_file, ts, self.padded, self.windowed)
+            h, H, Zc, Zref = import_channel(self.ch_file, ts, self.padded, self.windowed)
+            # if h[-1] > (max(h) / 2.0):  # step response?
+            #     h = diff(h)  # impulse response is derivative of step response.
+            # h /= sum(h)  # Normalize d.c. to one.
             chnl_dly = t[where(h == max(h))[0][0]]
-            h.resize(len_t)
-            H = fft(h)[:len(f)]
+            # h.resize(len_t)
+            # H = fft(h)[:len(f)]
         else:
             l_ch = self.l_ch
             v0 = self.v0 * 3.0e8
