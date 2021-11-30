@@ -35,7 +35,7 @@ class PyBertCfg:
         self.pattern_len = the_PyBERT.pattern_len
         self.nspb = the_PyBERT.nspb
         self.eye_bits = the_PyBERT.eye_bits
-        self.mod_type = the_PyBERT.mod_type
+        self.mod_type = list(the_PyBERT.mod_type)
         self.num_sweeps = the_PyBERT.num_sweeps
         self.sweep_num = the_PyBERT.sweep_num
         self.sweep_aves = the_PyBERT.sweep_aves
