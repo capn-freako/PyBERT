@@ -66,16 +66,15 @@ class MyHandler(Handler):
             self.run_sim_thread.stop()
 
     def do_save_cfg(self, info):
-        """Pickle out the current configuration."""
+        """Save out the current configuration as YAML."""
         the_pybert = info.object
         dlg = FileDialog(action="save as", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "wb") as the_file:
+                with open(dlg.path, "w") as the_file:
                     # Grab all the instance variables from the_PyBertCfg
-                    # yaml.dump(the_PyBertCfg, the_file)
-                    pickle.dump(the_PyBertCfg, the_file)
+                    yaml.dump(the_PyBertCfg, the_file)
                 the_pybert.cfg_file = dlg.path
                 the_pybert.log(f"Configuration saved to {the_pybert.cfg_file}")
             except Exception as err:
@@ -85,14 +84,13 @@ class MyHandler(Handler):
                 )
 
     def do_load_cfg(self, info):
-        """Read in the pickled configuration."""
+        """Read in the configuration."""
         the_pybert = info.object
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
                 with open(dlg.path, "rb") as the_file:
-                    # the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
-                    the_PyBertCfg = pickle.load(the_file)
+                    the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
