@@ -73,6 +73,7 @@ class PyBertCfg:
         self.tx_use_getwave = the_PyBERT.tx_use_getwave
         self.tx_ami_file = the_PyBERT.tx_ami_file
         self.tx_dll_file = the_PyBERT.tx_dll_file
+        self.tx_ibis_file = the_PyBERT.tx_ibis_file
 
         # Rx
         self.rin = the_PyBERT.rin
@@ -92,6 +93,7 @@ class PyBertCfg:
         self.rx_use_getwave = the_PyBERT.rx_use_getwave
         self.rx_ami_file = the_PyBERT.rx_ami_file
         self.rx_dll_file = the_PyBERT.rx_dll_file
+        self.rx_ibis_file = the_PyBERT.rx_ibis_file
 
         # DFE
         self.use_dfe = the_PyBERT.use_dfe
