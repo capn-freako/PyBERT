@@ -89,7 +89,7 @@ class MyHandler(Handler):
         dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rb") as the_file:
+                with open(dlg.path, "r") as the_file:
                     the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
