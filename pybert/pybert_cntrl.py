@@ -263,11 +263,11 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             #    This is partly due to the out of order nature in which we combine the Tx and channel,
             #    and partly due to the fact that we're adding noise to the Tx output.)
             tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
-            tx_h.resize(len(chnl_h))
+            tx_h = np.resize(tx_h, len(chnl_h))
             tx_s = tx_h.cumsum()
-        tx_out.resize(len(t))
+        tx_out = np.resize(tx_out, len(t))
         temp = tx_h.copy()
-        temp.resize(len(t))
+        temp = np.resize(temp, len(t))
         tx_H = fft(temp)
         tx_H *= tx_s[-1] / abs(tx_H[0])
 
@@ -289,7 +289,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         # - Convolve w/ channel.
         tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
         temp = tx_out_h.copy()
-        temp.resize(len(t))
+        temp = np.resize(temp, len(t))
         tx_out_H = fft(temp)
         rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
 
@@ -374,7 +374,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
                 else:
                     ctle_h *= ts  # Normalize to (V/sample)
-                ctle_h.resize(len(t))
+                ctle_h = np.resize(ctle_h, len(t))
                 ctle_H = fft(ctle_h)
                 ctle_H *= sum(ctle_h) / ctle_H[0]
             else:
@@ -387,7 +387,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 ctle_out *= 2.0 * decision_scaler / ctle_out.ptp()
             ctle_s = ctle_h.cumsum()
             ctle_out_h = convolve(tx_out_h, ctle_h)[: len(tx_out_h)]
-        ctle_out.resize(len(t))
+        ctle_out = np.resize(ctle_out, len(t))
         self.ctle_s = ctle_s
         ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
         if ctle_out_h_main_lobe.size:
@@ -397,7 +397,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         conv_dly = t[conv_dly_ix]  # Keep this line only.
         ctle_out_s = ctle_out_h.cumsum()
         temp = ctle_out_h.copy()
-        temp.resize(len(t))
+        temp = np.resize(temp, len(t))
         ctle_out_H = fft(temp)
         # - Store local variables to class instance.
         self.ctle_out_s = ctle_out_s
@@ -456,7 +456,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             )
         (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
         dfe_out = array(dfe_out)
-        dfe_out.resize(len(t))
+        dfe_out = np.resize(dfe_out, len(t))
         bits_out = array(bits_out)
         auto_corr = (
             1.0
@@ -476,9 +476,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.bit_errs = len(bit_errs)
 
         dfe_h = array([1.0] + list(zeros(nspb - 1)) + sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))
-        dfe_h.resize(len(ctle_out_h))
+        dfe_h = np.resize(dfe_h, len(ctle_out_h))
         temp = dfe_h.copy()
-        temp.resize(len(t))
+        temp = np.resize(temp, len(t))
         dfe_H = fft(temp)
         self.dfe_s = dfe_h.cumsum()
         dfe_out_H = ctle_out_H * dfe_H

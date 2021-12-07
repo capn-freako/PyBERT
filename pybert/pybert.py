@@ -1311,7 +1311,7 @@ class PyBERT(HasTraits):
 
         tx_out_h = convolve(tx_h, chnl_h)
         return(convolve(ctle_h, tx_out_h))
-        
+
     @cached_property
     def _get_cost(self):
         nspui = self.nspui
@@ -1424,7 +1424,7 @@ class PyBERT(HasTraits):
             self.log(error_message, alert=True, exception=err)
         self._tx_ibis_dir = dName
         self.status = "Done."
-        
+
     def _tx_ami_file_changed(self, new_value):
         try:
             self.tx_ami_valid = False
@@ -1546,7 +1546,7 @@ class PyBERT(HasTraits):
 
         ts = t[1]
         len_t = len(t)
-        
+
         if self.tx_use_ibis:
             model = self._tx_ibis.model
             Rs = model.zout * 2
@@ -1559,7 +1559,7 @@ class PyBERT(HasTraits):
             #     h = diff(h)  # impulse response is derivative of step response.
             # h /= sum(h)  # Normalize d.c. to one.
             chnl_dly = t[where(h == max(h))[0][0]]
-            # h.resize(len_t)
+            # h = np.resize(h, len_t)
             # H = fft(h)[:len(f)]
         else:
             l_ch = self.l_ch
@@ -1612,7 +1612,7 @@ class PyBERT(HasTraits):
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
         # chnl_h /= sum(chnl_h)  # a temporary crutch.
         temp = chnl_h.copy()
-        temp.resize(len(t))
+        temp = np.resize(temp, len(t))
         chnl_trimmed_H = fft(temp)
 
         chnl_s = chnl_h.cumsum()
