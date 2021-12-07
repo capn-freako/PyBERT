@@ -34,6 +34,8 @@ from numpy import (
     where,
     zeros,
 )
+
+import numpy as np
 from numpy.fft import fft, ifft
 from numpy.random import normal
 from scipy.signal import iirfilter, lfilter
