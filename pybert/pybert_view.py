@@ -36,6 +36,7 @@ from pybert.pybert_cfg import PyBertCfg
 from pybert.pybert_cntrl import my_run_sweeps
 from pybert.pybert_data import PyBertData
 
+USE_YAML = True  # `true`: yaml; `false`: pickle
 
 class RunSimThread(Thread):
     """Used to run the simulation in its own thread, in order to preserve GUI responsiveness."""
@@ -68,15 +69,21 @@ class MyHandler(Handler):
     def do_save_cfg(self, info):
         """Pickle out the current configuration."""
         the_pybert = info.object
-        dlg = FileDialog(action="save as", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
+        if USE_YAML:
+            dlg = FileDialog(action="save as", wildcard="*.yaml", default_path=the_pybert.cfg_file)
+        else:
+            dlg = FileDialog(action="save as", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             the_PyBertCfg = PyBertCfg(the_pybert)
             try:
-                with open(dlg.path, "wb") as the_file:
-                    # Grab all the instance variables from the_PyBertCfg
-                    # yaml.dump(the_PyBertCfg, the_file)
-                    pickle.dump(the_PyBertCfg, the_file)
-                the_pybert.cfg_file = dlg.path
+                # Store all the instance variables from `the_PyBertCfg` into the selected file.
+                if USE_YAML:
+                    with open(dlg.path, "wt") as the_file:
+                        yaml.dump(the_PyBertCfg, the_file)  # David Patterson's suggestion.
+                else:
+                    with open(dlg.path, "wb") as the_file:
+                        pickle.dump(the_PyBertCfg, the_file)
+                the_pybert.cfg_file = dlg.path  # Preserve the user-selected directory/file, for next time.
                 the_pybert.log(f"Configuration saved to {the_pybert.cfg_file}")
             except Exception as err:
                 error_message = f"The following error occured:\n\t{err}\nThe configuration was NOT saved."
@@ -87,12 +94,18 @@ class MyHandler(Handler):
     def do_load_cfg(self, info):
         """Read in the pickled configuration."""
         the_pybert = info.object
-        dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
+        if USE_YAML:
+            dlg = FileDialog(action="open", wildcard="*.yaml", default_path=the_pybert.cfg_file)
+        else:
+            dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
         if dlg.open() == OK:
             try:
-                with open(dlg.path, "rb") as the_file:
-                    # the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
-                    the_PyBertCfg = pickle.load(the_file)
+                if USE_YAML:
+                    with open(dlg.path, "rt") as the_file:
+                        the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
+                else:
+                    with open(dlg.path, "rb") as the_file:
+                        the_PyBertCfg = pickle.load(the_file)
                 if not isinstance(the_PyBertCfg, PyBertCfg):
                     raise Exception("The data structure read in is NOT of type: PyBertCfg!")
                 for prop, value in vars(the_PyBertCfg).items():
@@ -324,6 +337,7 @@ traits_view = View(
                             name="cout",
                             label="Tx_Cout (pF)",
                             tooltip="Tx parasitic output capacitance (each pin)",
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=float),
                         ),
                         label="Native",
                         show_border=True,
@@ -348,17 +362,11 @@ traits_view = View(
                                     label="Use file",
                                 ),
                                 spring,
-                                Item(name="padded",   label="Zero-padded", enabled_when="use_ch_file == True"),
-                                Item(name="windowed", label="Windowed",    enabled_when="use_ch_file == True"),
+                                # Item(name="padded",   label="Zero-padded", enabled_when="use_ch_file == True"),
+                                # Item(name="windowed", label="Windowed",    enabled_when="use_ch_file == True"),
                             ),
                         ),
                         HGroup(
-                            Item(
-                                name="Zref",
-                                label="Zref",
-                                tooltip="Reference Impedance.",
-                            ),
-                            Item(label="Ohms"),
                             Item(
                                 name="f_step",
                                 label="f_step",
@@ -447,6 +455,7 @@ traits_view = View(
                             name="cin",
                             label="Rx_Cin (pF)",
                             tooltip="Rx parasitic input capacitance (each pin)",
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=float),
                         ),
                         Item(
                             name="cac",

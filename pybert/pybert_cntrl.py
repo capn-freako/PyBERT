@@ -22,7 +22,6 @@ from numpy import (
     diff,
     histogram,
     linspace,
-    log10,
     mean,
     ones,
     pad,
@@ -34,14 +33,22 @@ from numpy import (
     where,
     zeros,
 )
-from numpy.fft import fft, ifft
+from numpy.fft import fft, irfft
 from numpy.random import normal
 from scipy.signal import iirfilter, lfilter
 from scipy.signal.windows import hann
 from pyibisami.ami_model import AMIModel, AMIModelInitializer
 
 from pybert.dfe import DFE
-from pybert.pybert_util import calc_eye, calc_jitter, find_crossings, import_channel, make_ctle
+from pybert.pybert_util import (
+    calc_eye,
+    calc_jitter,
+    find_crossings,
+    import_channel,
+    make_ctle,
+    safe_log10,
+    trim_impulse,
+)
 
 DEBUG = False
 MIN_BATHTUB_VAL = 1.0e-18
@@ -213,7 +220,9 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             tx_model.initialize(tx_model_init)
             self.log(
                 "Tx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
-                    tx_model.ami_params_in, tx_model.ami_params_out, tx_model.msg
+                    tx_model.ami_params_in.decode('utf-8'),
+                    tx_model.ami_params_out.decode('utf-8'),
+                    tx_model.msg.decode('utf-8')
                 )
             )
             if tx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
@@ -246,7 +255,6 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             else:  # Init()-only.
                 tx_s = tx_h.cumsum()
                 tx_out = convolve(tx_h, self.x)
-            self.log("Test")
             self.tx_model = tx_model
         else:
             # - Generate the ideal, post-preemphasis signal.
@@ -325,7 +333,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             rx_model.initialize(rx_model_init)
             self.log(
                 "Rx IBIS-AMI model initialization results:\nInput parameters: {}\nMessage: {}\nOutput parameters: {}".format(
-                    rx_model.ami_params_in, rx_model.msg, rx_model.ami_params_out
+                    rx_model.ami_params_in.decode('utf-8'),
+                    rx_model.msg.decode('utf-8'),
+                    rx_model.ami_params_out.decode('utf-8')
                 )
             )
             if rx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
@@ -351,10 +361,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     ctle_out, clock_times = rx_model.getWave(rx_in, 32)
                 else:
                     ctle_out, clock_times = rx_model.getWave(rx_in, len(rx_in))
-                self.log(rx_model.ami_params_out)
+                self.log(rx_model.ami_params_out.decode('utf-8'))
 
                 ctle_H = fft(ctle_out * hann(len(ctle_out))) / fft(rx_in * hann(len(rx_in)))
-                ctle_h = real(ifft(ctle_H)[: len(chnl_h)])
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
             else:  # Init() only.
                 ctle_out_h_padded = pad(
@@ -364,12 +373,13 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     tx_out_h, (nspb, len(rx_in) - nspb - len(tx_out_h)), "linear_ramp", end_values=(0.0, 0.0),
                 )
                 ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)
-                ctle_h = real(ifft(ctle_H)[: len(chnl_h)])
                 ctle_out = convolve(rx_in, ctle_h)
+            ctle_h = irfft(ctle_H)
             ctle_s = ctle_h.cumsum()
         else:
             if self.use_ctle_file:
-                ctle_h = import_channel(self.ctle_file, ts)
+                # FIXME: The new import_channel() implementation breaks this:
+                ctle_h = import_channel(self.ctle_file, ts, self.f)
                 if max(abs(ctle_h)) < 100.0:  # step response?
                     ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
                 else:
@@ -379,8 +389,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 ctle_H *= sum(ctle_h) / ctle_H[0]
             else:
                 _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-                ctle_h = real(ifft(ctle_H))[: len(chnl_h)]
-                ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
+                ctle_h = irfft(ctle_H)
+            ctle_h.resize(len(chnl_h))
             ctle_out = convolve(rx_in, ctle_h)
             ctle_out -= mean(ctle_out)  # Force zero mean.
             if self.ctle_mode == "AGC":  # Automatic gain control engaged?
@@ -388,7 +398,6 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             ctle_s = ctle_h.cumsum()
             ctle_out_h = convolve(tx_out_h, ctle_h)[: len(tx_out_h)]
         ctle_out.resize(len(t))
-        self.ctle_s = ctle_s
         ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
         if ctle_out_h_main_lobe.size:
             conv_dly_ix = ctle_out_h_main_lobe[0]
@@ -400,13 +409,14 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         temp.resize(len(t))
         ctle_out_H = fft(temp)
         # - Store local variables to class instance.
-        self.ctle_out_s = ctle_out_s
         # Consider changing this; it could be sensitive to insufficient "front porch" in the CTLE output step response.
-        self.ctle_out_p = self.ctle_out_s[nspui:] - self.ctle_out_s[:-nspui]
+        self.ctle_out_p = ctle_out_s[nspui:] - ctle_out_s[:-nspui]
         self.ctle_H = ctle_H
         self.ctle_h = ctle_h
+        self.ctle_s = ctle_s
         self.ctle_out_H = ctle_out_H
         self.ctle_out_h = ctle_out_h
+        self.ctle_out_s = ctle_out_s
         self.ctle_out = ctle_out
         self.conv_dly = conv_dly
         self.conv_dly_ix = conv_dly_ix
@@ -752,7 +762,7 @@ def update_results(self):
     clock_spec /= clock_spec[1:].mean()  # Normalize the mean non-d.c. value to 0 dB.
     self.plotdata.set_data("clk_per_hist_bins", bin_centers * 1.0e12)  # (ps)
     self.plotdata.set_data("clk_per_hist_vals", bin_counts)
-    self.plotdata.set_data("clk_spec", 10.0 * log10(clock_spec[1:]))  # Omit the d.c. value.
+    self.plotdata.set_data("clk_spec", 10.0 * safe_log10(clock_spec[1:]))  # Omit the d.c. value.
     self.plotdata.set_data("clk_freqs", spec_freqs[1:])
     self.plotdata.set_data("dfe_out", self.dfe_out)
     self.plotdata.set_data("ui_ests", self.ui_ests)
@@ -791,14 +801,14 @@ def update_results(self):
     self.plotdata.set_data("dfe_out", self.dfe_out[:len_t])
 
     # Frequency responses
-    self.plotdata.set_data("chnl_H", 20.0 * log10(abs(self.chnl_H[1:len_f_GHz])))
-    self.plotdata.set_data("chnl_trimmed_H", 20.0 * log10(abs(self.chnl_trimmed_H[1:len_f_GHz])))
-    self.plotdata.set_data("tx_H", 20.0 * log10(abs(self.tx_H[1:len_f_GHz])))
-    self.plotdata.set_data("tx_out_H", 20.0 * log10(abs(self.tx_out_H[1:len_f_GHz])))
-    self.plotdata.set_data("ctle_H", 20.0 * log10(abs(self.ctle_H[1:len_f_GHz])))
-    self.plotdata.set_data("ctle_out_H", 20.0 * log10(abs(self.ctle_out_H[1:len_f_GHz])))
-    self.plotdata.set_data("dfe_H", 20.0 * log10(abs(self.dfe_H[1:len_f_GHz])))
-    self.plotdata.set_data("dfe_out_H", 20.0 * log10(abs(self.dfe_out_H[1:len_f_GHz])))
+    self.plotdata.set_data("chnl_H", 20.0 * safe_log10(abs(self.chnl_H[1:len_f_GHz])))
+    self.plotdata.set_data("chnl_trimmed_H", 20.0 * safe_log10(abs(self.chnl_trimmed_H[1:len_f_GHz])))
+    self.plotdata.set_data("tx_H", 20.0 * safe_log10(abs(self.tx_H[1:len_f_GHz])))
+    self.plotdata.set_data("tx_out_H", 20.0 * safe_log10(abs(self.tx_out_H[1:len_f_GHz])))
+    self.plotdata.set_data("ctle_H", 20.0 * safe_log10(abs(self.ctle_H[1:len_f_GHz])))
+    self.plotdata.set_data("ctle_out_H", 20.0 * safe_log10(abs(self.ctle_out_H[1:len_f_GHz])))
+    self.plotdata.set_data("dfe_H", 20.0 * safe_log10(abs(self.dfe_H[1:len_f_GHz])))
+    self.plotdata.set_data("dfe_out_H", 20.0 * safe_log10(abs(self.dfe_out_H[1:len_f_GHz])))
 
     # Jitter distributions
     jitter_ext_chnl = self.jitter_ext_chnl  # These are used, again, in bathtub curve generation, below.
@@ -816,21 +826,21 @@ def update_results(self):
     self.plotdata.set_data("jitter_ext_dfe", jitter_ext_dfe)
 
     # Jitter spectrums
-    log10_ui = log10(ui)
+    log10_ui = safe_log10(ui)
     self.plotdata.set_data("f_MHz", self.f_MHz[1:])
     self.plotdata.set_data("f_MHz_dfe", self.f_MHz_dfe[1:])
-    self.plotdata.set_data("jitter_spectrum_chnl", 10.0 * (log10(self.jitter_spectrum_chnl[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_ind_spectrum_chnl", 10.0 * (log10(self.jitter_ind_spectrum_chnl[1:]) - log10_ui))
-    self.plotdata.set_data("thresh_chnl", 10.0 * (log10(self.thresh_chnl[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_spectrum_tx", 10.0 * (log10(self.jitter_spectrum_tx[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_ind_spectrum_tx", 10.0 * (log10(self.jitter_ind_spectrum_tx[1:]) - log10_ui))
-    self.plotdata.set_data("thresh_tx", 10.0 * (log10(self.thresh_tx[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_spectrum_ctle", 10.0 * (log10(self.jitter_spectrum_ctle[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_ind_spectrum_ctle", 10.0 * (log10(self.jitter_ind_spectrum_ctle[1:]) - log10_ui))
-    self.plotdata.set_data("thresh_ctle", 10.0 * (log10(self.thresh_ctle[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_spectrum_dfe", 10.0 * (log10(self.jitter_spectrum_dfe[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_ind_spectrum_dfe", 10.0 * (log10(self.jitter_ind_spectrum_dfe[1:]) - log10_ui))
-    self.plotdata.set_data("thresh_dfe", 10.0 * (log10(self.thresh_dfe[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_spectrum_chnl", 10.0 * (safe_log10(self.jitter_spectrum_chnl[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_ind_spectrum_chnl", 10.0 * (safe_log10(self.jitter_ind_spectrum_chnl[1:]) - log10_ui))
+    self.plotdata.set_data("thresh_chnl", 10.0 * (safe_log10(self.thresh_chnl[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_spectrum_tx", 10.0 * (safe_log10(self.jitter_spectrum_tx[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_ind_spectrum_tx", 10.0 * (safe_log10(self.jitter_ind_spectrum_tx[1:]) - log10_ui))
+    self.plotdata.set_data("thresh_tx", 10.0 * (safe_log10(self.thresh_tx[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_spectrum_ctle", 10.0 * (safe_log10(self.jitter_spectrum_ctle[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_ind_spectrum_ctle", 10.0 * (safe_log10(self.jitter_ind_spectrum_ctle[1:]) - log10_ui))
+    self.plotdata.set_data("thresh_ctle", 10.0 * (safe_log10(self.thresh_ctle[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_spectrum_dfe", 10.0 * (safe_log10(self.jitter_spectrum_dfe[1:]) - log10_ui))
+    self.plotdata.set_data("jitter_ind_spectrum_dfe", 10.0 * (safe_log10(self.jitter_ind_spectrum_dfe[1:]) - log10_ui))
+    self.plotdata.set_data("thresh_dfe", 10.0 * (safe_log10(self.thresh_dfe[1:]) - log10_ui))
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
     # Bathtubs
@@ -842,7 +852,7 @@ def update_results(self):
     bathtub_chnl = where(
         bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl,
     )  # To avoid Chaco log scale plot wierdness.
-    self.plotdata.set_data("bathtub_chnl", log10(bathtub_chnl))
+    self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))
     #  - Tx
     bathtub_tx = list(cumsum(jitter_ext_tx[-1 : -(half_len + 1) : -1]))
     bathtub_tx.reverse()
@@ -850,7 +860,7 @@ def update_results(self):
     bathtub_tx = where(
         bathtub_tx < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_tx)), bathtub_tx
     )  # To avoid Chaco log scale plot wierdness.
-    self.plotdata.set_data("bathtub_tx", log10(bathtub_tx))
+    self.plotdata.set_data("bathtub_tx", safe_log10(bathtub_tx))
     #  - CTLE
     bathtub_ctle = list(cumsum(jitter_ext_ctle[-1 : -(half_len + 1) : -1]))
     bathtub_ctle.reverse()
@@ -858,7 +868,7 @@ def update_results(self):
     bathtub_ctle = where(
         bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle,
     )  # To avoid Chaco log scale plot wierdness.
-    self.plotdata.set_data("bathtub_ctle", log10(bathtub_ctle))
+    self.plotdata.set_data("bathtub_ctle", safe_log10(bathtub_ctle))
     #  - DFE
     bathtub_dfe = list(cumsum(jitter_ext_dfe[-1 : -(half_len + 1) : -1]))
     bathtub_dfe.reverse()
@@ -866,7 +876,7 @@ def update_results(self):
     bathtub_dfe = where(
         bathtub_dfe < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_dfe)), bathtub_dfe
     )  # To avoid Chaco log scale plot wierdness.
-    self.plotdata.set_data("bathtub_dfe", log10(bathtub_dfe))
+    self.plotdata.set_data("bathtub_dfe", safe_log10(bathtub_dfe))
 
     # Eyes
     width = 2 * samps_per_ui

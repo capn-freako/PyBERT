@@ -40,7 +40,9 @@ from numpy import (
 from numpy.fft import fft, ifft
 from scipy.signal import freqs, get_window, invres
 from scipy.stats import norm
+from scipy.linalg import inv
 import skrf as rf
+from cmath import rect, phase
 
 debug = False
 gDebugOptimize = False
@@ -527,6 +529,7 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
     C = C0 * power((1j * w / w0), (-2.0 * Theta0 / pi))  # complex capacitance per unit length (F/m)
     gamma = sqrt((1j * w * L0 + R) * (1j * w * C))       # propagation constant (nepers/m)
     Zc = sqrt((1j * w * L0 + R) / (1j * w * C))          # characteristic impedance (Ohms)
+    Zc[0] = Z0                                           # d.c. impedance blows up and requires correcting.
 
     return (gamma, Zc)
 
@@ -559,22 +562,21 @@ def calc_gamma_RLGC(R, L, G, C, ws):
     return (gamma, Zc)
 
 
-def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
+def calc_G(H, Rs, Cs, Zc, RL, Cp, ws):
     """
     Calculates fully loaded transfer function of complete channel.
 
     Inputs:
       - H     unloaded transfer function of interconnect
-      - Rs    source series resistance
-      - Cs    source parallel (parasitic) capacitance
+      - Rs    source series resistance (differential)
+      - Cs    source parallel (parasitic) capacitance (single ended)
       - Zc    frequency dependent characteristic impedance of the interconnect
       - RL    load resistance (differential)
       - Cp    load parallel (parasitic) capacitance (single ended)
-      - CL    load series (d.c. blocking) capacitance (single ended)
       - ws    frequency sample points vector
 
     Outputs:
-      - G     frequency dependent transfer function of channel
+      - G     transfer function of fully loaded channel
     """
 
     w = array(ws).copy()
@@ -582,24 +584,29 @@ def calc_G(H, Rs, Cs, Zc, RL, Cp, CL, ws):
     # Guard against /0.
     if w[0] == 0:
         w[0] = 1.0e-12
+    if Cp == 0:
+        Cp = 1e-18
+
+    def Rpar2C(R, C):
+        """Calculates the impedance of the parallel combination of
+        `R` with two `C`s in series.
+        """
+        return R / (1.0 + 1j * w * R * C/2)
 
     # Impedance looking back into the Tx output is a simple parallel RC network.
-    Zs = Rs / (1.0 + 1j * w * Rs * Cs)
-    # Rx load impedance is 2 series, a.c.-coupling capacitors, in series w/ parallel comb. of Rterm & parasitic cap.
+    Zs = Rpar2C(Rs, Cs)  # The parasitic capacitances are in series.
+    # Rx load impedance is parallel comb. of Rterm & parasitic cap.
     # (The two parasitic capacitances are in series.)
-    ZL = 2.0 * 1.0 / (1j * w * CL) + RL / (1.0 + 1j * w * RL * Cp / 2)
+    ZL = Rpar2C(RL, Cp)
     # Admittance into the interconnect is (Cs || Zc) / (Rs + (Cs || Zc)).
-    Cs_par_Zc = Zc / (1.0 + 1j * w * Zc * Cs)
+    Cs_par_Zc = Rpar2C(Zc, Cs)
     Y = Cs_par_Zc / (Rs + Cs_par_Zc)
     # Reflection coefficient at Rx:
     R1 = (ZL - Zc) / (ZL + Zc)
     # Reflection coefficient at Tx:
     R2 = (Zs - Zc) / (Zs + Zc)
     # Fully loaded channel transfer function:
-    G = Y * H * (1 + R1) / (1 - R1 * R2 * H ** 2)
-    G = G * (((RL / (1j * w * Cp / 2)) / (RL + 1 / (1j * w * Cp / 2))) / ZL)  # Corrected for divider action.
-    # (i.e. - We're interested in what appears across RL.)
-    return G
+    return (Y * H * (1 + R1) / (1 - R1 * R2 * H ** 2))
 
 
 def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
@@ -784,45 +791,77 @@ def trim_impulse(g, min_len=0, max_len=1000000):
     stop_ix  = min(len(g), stop_ix + porch)
     return (g[start_ix : stop_ix], start_ix)
 
+def H_2_s2p(H, Zc, fs, Zref=50):
+    """ Convert transfer function to 2-port network.
 
-def import_channel(filename, sample_per, padded=False, windowed=False, zref=100):
+    Args:
+        H([complex]): transfer function of medium alone.
+        Zc([complex]): complex impedance of medium.
+        fs([real]): frequencies at which `H` and `Zc` were sampled (Hz).
+
+    KeywordArgs:
+        Zref(real): reference (i.e. - port) impedance to be used in constructing the network (Ohms). (Default: 50)
+
+    Returns:
+        skrf.Network: 2-port network representing the channel to which `H` and `Zc` pertain.
     """
-    Read in a channel file.
+    ws = 2*pi*fs
+    G    = calc_G(H, Zref, 0, Zc, Zref, 0, ws)  # See `calc_G()` docstring.
+    R1   = (Zc - Zref) / (Zc + Zref)  # reflection coefficient looking into medium from port
+    T1    = 1 + R1           # transmission coefficient looking into medium from port
+    # Z2   = Zc * (1 - R1*H**2)         # impedance looking into port 2, with port 1 terminated into Zref
+    # R2   = (Z2 - Zc) / (Z2 + Zc)      # reflection coefficient looking out of port 2
+    # R2   = 0
+    # Z1   = Zc * (1 + R2*H**2)         # impedance looking into port 1, with port 2 terminated into Z2
+    # Calculate the one-way transfer function of medium capped w/ ports of the chosen impedance.
+    # G    = calc_G(H, Zref, 0, Zc, Zc, 0, 2*pi*fs)  # See `calc_G()` docstring.
+    # R2   = -R1                        # reflection coefficient looking into ref. impedance
+    S21  = G
+    # S11  = 2*(R1 + H*R2*G)
+    tmp  = np.array(list(zip(zip(S11,S21),zip(S21,S11))))
+    return rf.Network(s=tmp, f=fs/1e9, z0=[Zref,Zref])  # `f` is presumed to have units: GHz.
+
+def import_channel(filename, sample_per, freqs, zref=100):
+    """
+    Read in a channel description file.
 
     Args:
         filename(str): Name of file from which to import channel description.
-        sample_per(float): Sample period of signal vector (s).
-        padded(Bool): (Optional) Zero pad s4p data, such that fmax >= 1/(2*sample_per)? (Default = False)
-        windowed(Bool): (Optional) Window s4p data, before converting to time domain? (Default = False)
-        zref(float): (Optional) Reference impedance, for time domain files.
+        sample_per(real): Sample period of system signal vector.
+        freqs([real]): (Positive only) frequency values being used by caller.
+
+    KeywordArgs:
+        zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
 
     Returns:
-        ( [float]: Imported channel impulse response.
-        , [float]: Imported channel transfer function.
-        , [float]: Imported channel frequency dependent characteristic impedance.
-        , float:   Imported channel reference impedance.
-        )
+        skrf.Network: 2-port network description of channel.
 
     Notes:
         1. When a time domain (i.e. - impulse or step response) file is being imported,
-        we have little choice but to set Zc equal to Z0 for all frequencies.
-        This means that importing time domain descriptions of channels into PyBERT
-        yields necessarily lower fidelity results than importing Touchstone descriptions;
-        probably not a surprise to those skilled in the art.
-    """
+        we have little choice but to use the given reference impedance as the channel
+        characteristic impedance, for all frequencies. This implies two things:
 
+            1. Importing time domain descriptions of channels into PyBERT
+            yields necessarily lower fidelity results than importing Touchstone descriptions;
+            probably not a surprise to those skilled in the art.
+
+            2. The user should take care to ensure that the reference impedance value
+            in the GUI is equal to the nominal characteristic impedance of the channel
+            being imported when using time domain channel description files.
+    """
     extension = os.path.splitext(filename)[1][1:]
     if re.search("^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
-        H, Zc, Z0 = import_freq(filename, sample_per, padded=padded, windowed=windowed)
-        h         = irfft(H)
-    else:
-        h     = import_time(filename, sample_per)
+        ts2N = import_freq(filename)
+    else:  # simple 2-column time domain description (impulse or step).
+        h = import_time(filename, sample_per)
+        # Fixme: an a.c. coupled channel breaks this naive approach!
         if h[-1] > (max(h) / 2.0):  # step response?
             h = diff(h)  # impulse response is derivative of step response.
-        H     = fft(h)
-        Z0    = zref
-        Zc    = np.repeat(Z0, len(H))
-    return (h, H, Zc, Z0)
+        Nf = len(freqs)
+        h.resize(2*Nf)
+        H = fft(h * sample_per)[:Nf]  # Keep the positive frequencies only.
+        ts2N = H_2_s2p(H, zref * ones(len(H)), freqs, Zref=zref)
+    return ts2N
 
 def interp_time(ts, xs, sample_per):
     """
@@ -863,41 +902,56 @@ def import_time(filename, sample_per):
     """
     ts = []
     xs = []
+    tmp = []
     with open(filename, mode="rU") as file:
         for line in file:
             try:
-                tmp = list(map(float, [_f for _f in re.split("[, ;:]+", line) if _f][0:2]))
+                vals = [_f for _f in re.split("[, ;:]+", line) if _f]
+                tmp = list(map(float, vals[0:2]))
+                ts.append(tmp[0])
+                xs.append(tmp[1])
             except:
+                # print(f"vals: {vals}; tmp: {tmp}; len(ts): {len(ts)}")
                 continue
-            ts.append(tmp[0])
-            xs.append(tmp[1])
 
     return interp_time(ts, xs, sample_per)
 
 
-def sdd_21(ntwk):
+def sdd_21(ntwk, norm=0.5):
     """
-    Given a 4-port single-ended network, return its differential throughput.
+    Given a 4-port single-ended network, return its differential 2-port network.
 
     Args:
         ntwk(skrf.Network): 4-port single ended network.
 
+    KeywordArgs:
+        norm(real): Normalization factor. (Default = 0.5)
+
     Returns:
-        skrf.Network(1-port): Sdd[2,1].
+        skrf.Network: Sdd (2-port).
     """
-    ix = ntwk.s.shape[0] // 5
-    if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
-        ntwk.renumber((1, 2), (2, 1))
+    # ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
+    # if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
+    #     ntwk.renumber((1, 2), (2, 1))
 
-    return 0.5 * (ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
+    # Sdd11 = norm * (ntwk.s11 - ntwk.s13 + ntwk.s33 - ntwk.s31)
+    # Sdd12 = norm * (ntwk.s12 - ntwk.s14 + ntwk.s34 - ntwk.s32)
+    # Sdd21 = norm * (ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
+    # Sdd22 = norm * (ntwk.s22 - ntwk.s24 + ntwk.s44 - ntwk.s42)
 
+    # return (rf.network.four_oneports_2_twoport(Sdd11, Sdd12, Sdd21, Sdd22))
+    mm = se2mm(ntwk)
+    return rf.Network(frequency=ntwk.f/1e9, s=mm.s[:,0:2,0:2], z0=mm.z0[:,0:2])
 
-def se2mm(ntwk):
+def se2mm(ntwk, norm=0.5):
     """
     Given a 4-port single-ended network, return its mixed mode equivalent.
 
     Args:
         ntwk(skrf.Network): 4-port single ended network.
+
+    KeywordArgs:
+        norm(real): Normalization factor. (Default = 0.5)
 
     Returns:
         skrf.Network: Mixed mode equivalent network, in the following format:
@@ -906,99 +960,77 @@ def se2mm(ntwk):
             Scd11  Scd12  Scc11  Scc12
             Scd21  Scd22  Scc21  Scc22
     """
-    if real(ntwk.s21.s[0, 0, 0]) < 0.5:  # 1 ==> 3 port numbering?
+    # Confirm correct network dimmensions.
+    (fs, rs, cs) = ntwk.s.shape
+    assert (rs == cs), "Non-square Touchstone file S-matrix!"
+    assert (rs == 4),  "Touchstone file must have 4 ports!"
+    
+    # Detect/correct "1 => 3" port numbering.
+    ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
+    if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
         ntwk.renumber((1, 2), (2, 1))
-    f = ntwk.f
+    
+    # Convert S-parameter data.
     s = np.zeros(ntwk.s.shape, dtype=complex)
-    s[:,0,0] = 0.5 * (ntwk.s11 - ntwk.s13 - ntwk.s31 + ntwk.s33).s.flatten()
-    s[:,0,1] = 0.5 * (ntwk.s12 - ntwk.s14 - ntwk.s32 + ntwk.s34).s.flatten()
-    s[:,0,2] = 0.5 * (ntwk.s11 + ntwk.s13 - ntwk.s31 - ntwk.s33).s.flatten()
-    s[:,0,3] = 0.5 * (ntwk.s12 + ntwk.s14 - ntwk.s32 - ntwk.s34).s.flatten()
-    s[:,1,0] = 0.5 * (ntwk.s21 - ntwk.s23 - ntwk.s41 + ntwk.s43).s.flatten()
-    s[:,1,1] = 0.5 * (ntwk.s22 - ntwk.s24 - ntwk.s42 + ntwk.s44).s.flatten()
-    s[:,1,2] = 0.5 * (ntwk.s21 + ntwk.s23 - ntwk.s41 - ntwk.s43).s.flatten()
-    s[:,1,3] = 0.5 * (ntwk.s22 + ntwk.s24 - ntwk.s42 - ntwk.s44).s.flatten()
-    s[:,2,0] = 0.5 * (ntwk.s11 - ntwk.s13 + ntwk.s31 - ntwk.s33).s.flatten()
-    s[:,2,1] = 0.5 * (ntwk.s12 - ntwk.s14 + ntwk.s32 - ntwk.s34).s.flatten()
-    s[:,2,2] = 0.5 * (ntwk.s11 + ntwk.s13 + ntwk.s31 + ntwk.s33).s.flatten()
-    s[:,2,3] = 0.5 * (ntwk.s12 + ntwk.s14 + ntwk.s32 + ntwk.s34).s.flatten()
-    s[:,3,0] = 0.5 * (ntwk.s21 - ntwk.s23 + ntwk.s41 - ntwk.s43).s.flatten()
-    s[:,3,1] = 0.5 * (ntwk.s22 - ntwk.s24 + ntwk.s42 - ntwk.s44).s.flatten()
-    s[:,3,2] = 0.5 * (ntwk.s21 + ntwk.s23 + ntwk.s41 + ntwk.s43).s.flatten()
-    s[:,3,3] = 0.5 * (ntwk.s22 + ntwk.s24 + ntwk.s42 + ntwk.s44).s.flatten()
-    return rf.Network(frequency=f, s=s)
+    s[:,0,0] = norm * (ntwk.s11 - ntwk.s13 - ntwk.s31 + ntwk.s33).s.flatten()
+    s[:,0,1] = norm * (ntwk.s12 - ntwk.s14 - ntwk.s32 + ntwk.s34).s.flatten()
+    s[:,0,2] = norm * (ntwk.s11 + ntwk.s13 - ntwk.s31 - ntwk.s33).s.flatten()
+    s[:,0,3] = norm * (ntwk.s12 + ntwk.s14 - ntwk.s32 - ntwk.s34).s.flatten()
+    s[:,1,0] = norm * (ntwk.s21 - ntwk.s23 - ntwk.s41 + ntwk.s43).s.flatten()
+    s[:,1,1] = norm * (ntwk.s22 - ntwk.s24 - ntwk.s42 + ntwk.s44).s.flatten()
+    s[:,1,2] = norm * (ntwk.s21 + ntwk.s23 - ntwk.s41 - ntwk.s43).s.flatten()
+    s[:,1,3] = norm * (ntwk.s22 + ntwk.s24 - ntwk.s42 - ntwk.s44).s.flatten()
+    s[:,2,0] = norm * (ntwk.s11 - ntwk.s13 + ntwk.s31 - ntwk.s33).s.flatten()
+    s[:,2,1] = norm * (ntwk.s12 - ntwk.s14 + ntwk.s32 - ntwk.s34).s.flatten()
+    s[:,2,2] = norm * (ntwk.s11 + ntwk.s13 + ntwk.s31 + ntwk.s33).s.flatten()
+    s[:,2,3] = norm * (ntwk.s12 + ntwk.s14 + ntwk.s32 + ntwk.s34).s.flatten()
+    s[:,3,0] = norm * (ntwk.s21 - ntwk.s23 + ntwk.s41 - ntwk.s43).s.flatten()
+    s[:,3,1] = norm * (ntwk.s22 - ntwk.s24 + ntwk.s42 - ntwk.s44).s.flatten()
+    s[:,3,2] = norm * (ntwk.s21 + ntwk.s23 + ntwk.s41 + ntwk.s43).s.flatten()
+    s[:,3,3] = norm * (ntwk.s22 + ntwk.s24 + ntwk.s42 + ntwk.s44).s.flatten()
+
+    # Convert port impedances.
+    f = ntwk.f
+    z = np.zeros((len(f), 4), dtype=complex)
+    z[:,0] = ntwk.z0[:,0] + ntwk.z0[:,2]
+    z[:,1] = ntwk.z0[:,1] + ntwk.z0[:,3]
+    z[:,2] = (ntwk.z0[:,0] + ntwk.z0[:,2]) / 2
+    z[:,3] = (ntwk.z0[:,1] + ntwk.z0[:,3]) / 2
+
+    return rf.Network(frequency=f/1e9, s=s, z0=z)
 
 
-def import_freq(filename, sample_per, padded=False, windowed=False, f_step=10e6):
+def import_freq(filename, freqs):
     """
     Read in a 1, 2, or 4-port Touchstone file,
-    and extract the:
-        - transfer function,
-        - impedance, and
-        - reference impedance.
+    and return an equivalent 2-port network.
 
     Args:
         filename(str): Name of Touchstone file to read in.
-        sample_per(float): New sample interval
-
-    KeywordArgs:
-        padded(Bool): (Optional) Zero pad data, such that fmax >= 1/(2*sample_per)? (Default = False)
-        windowed(Bool): (Optional) Window data, before converting to time domain? (Default = False)
-        f_step(float): (Optional) Frequency step. (Default = 10 MHz)
 
     Returns:
-        ( [float]: Resampled step response waveform. (H(f))
-        , [float]: Impedance looking into port 1 vs. f. (Zc(f))
-        , float: Reference impedance(Z0)
+        skrf.Network: 2-port network.
 
     Raises:
         ValueError: If Touchstone file is not 1, 2, or 4-port.
 
     Notes:
-        1. A 4-port Touchstone file is assumed single ended.
+        1. A 4-port Touchstone file is assumed single-ended,
+        and the "DD" quadrant of its mixed-mode equivalent gets returned.
     """
+    # Import and sanity check the Touchstone file.
     ntwk = rf.Network(filename)
     (fs, rs, cs) = ntwk.s.shape
     assert (rs == cs), "Non-square Touchstone file S-matrix!"
     assert (rs in (1, 2, 4)), "Touchstone file must have 1, 2, or 4 ports!"
 
-    # Form frequency vector.
-    f = ntwk.f
-    fmin = f_step
-    if f[0] > 0:
-        fmin = max(fmin, f[0])
-    fmax = f[-1]
-    f = np.arange(fmin, fmax + fmin, fmin)
-    F = rf.Frequency.from_f(f / 1e9)  # skrf.Frequency.from_f() expects its argument to be in units of GHz.
-
-    # Form impulse response from frequency response.
-    if rs == 4:
-        ntwk2 = sdd_21(ntwk)
+    # Convert to a 2-port network.
+    if rs == 4:  # 4-port Touchstone files are assumed single-ended!
+        return sdd_21(ntwk)
     elif rs == 2:
-        ntwk2 = ntwk.s21
+        return ntwk
     else:  # rs == 1
-        ntwk2 = ntwk
-    H = ntwk2.interpolate_from_f(F).s[:, 0, 0]
-    H = np.pad(H, (1, 0), "constant", constant_values=1.0)  # Presume d.c. value = 1.
-    if windowed:
-        window = get_window(6.0, 2 * len(H))[len(H) :]
-        H *= window
-    if padded:
-        h = np.fft.irfft(H, int(1.0 / (fmin * sample_per)) + 1)
-        fmax = 1.0 / (2.0 * sample_per)
-    else:
-        h = np.fft.irfft(H)
-    h /= np.abs(h.sum())  # Equivalent to assuming that step response settles at 1.
-
-    # Form step response from impulse response.
-    s = np.cumsum(h)
-
-    # Form time vector.
-    t0 = 1.0 / (2.0 * fmax)  # Sampling interval = 1 / (2 fNyquist).
-    t = np.array([n * t0 for n in range(len(h))])
-
-    return interp_time(t, s, sample_per)
-
+        return rf.network.one_port_2_two_port(ntwk)
 
 def lfsr_bits(taps, seed):
     """
@@ -1082,3 +1114,125 @@ def submodules(package):
         rst[name] = mod
 
     return rst
+
+
+def cap_mag(zs, maxMag=1.0):
+    """Cap the magnitude of a list of complex values,
+    leaving the phase unchanged.
+
+    Args:
+        zs([complex]): The complex values to be capped.
+
+    KeywordArgs:
+        maxMag(real): The maximum allowed magnitude. (Default = 1)
+
+    Notes:
+        1. Any pre-existing shape of the input will be preserved.
+    """
+    orig_shape = zs.shape
+    zs_flat = zs.flatten()
+    subs = [rect(maxMag, phase(z)) for z in zs_flat]
+    return where(abs(zs_flat) > maxMag, subs, zs_flat).reshape(zs.shape)
+
+
+def mon_mag(zs):
+    """Enforce monotonically decreasing magnitude in list of complex values,
+    leaving the phase unchanged.
+
+    Args:
+        zs([complex]): The complex values to be adjusted.
+
+    Notes:
+        1. Any pre-existing shape of the input will be preserved.
+    """
+    orig_shape = zs.shape
+    zs_flat = zs.flatten()
+    for ix in range(1, len(zs_flat)):
+        zs_flat[ix] = rect(min(abs(zs_flat[ix-1]), abs(zs_flat[ix])), phase(zs_flat[ix]))
+    return zs_flat.reshape(zs.shape)
+
+
+def interp_s2p(ntwk, f):
+    """Safely interpolate a 2-port network, by applying certain
+    constraints to any necessary extrapolation.
+
+    Args:
+        ntwk(skrf.Network): The 2-port network to be interpolated.
+        f([real]): The list of new frequency sampling points.
+
+    Returns:
+        skrf.Network: The interpolated/extrapolated 2-port network.
+
+    Raises:
+        ValueError: If `ntwk` is _not_ a 2-port network.
+    """
+    (fs, rs, cs) = ntwk.s.shape
+    assert (rs == cs), "Non-square Touchstone file S-matrix!"
+    assert (rs == 2),  "Touchstone file must have 2 ports!"
+    
+    extrap = ntwk.interpolate(f/1e9, fill_value="extrapolate", coords="polar", assume_sorted=True )
+    s11 = cap_mag(extrap.s[:, 0, 0])
+    s22 = cap_mag(extrap.s[:, 1, 1])
+    s12 = ntwk.s12.interpolate(f/1e9, fill_value=0, bounds_error=False,
+                               coords="polar", assume_sorted=True
+                              ).s.flatten()
+    s21 = ntwk.s21.interpolate(f/1e9, fill_value=0, bounds_error=False,
+                               coords="polar", assume_sorted=True
+                              ).s.flatten()
+    s = np.array(list(zip(zip(s11,s12),zip(s21,s22))))
+    if ntwk.name is None:
+        ntwk.name = "s2p"
+    return rf.Network(f=f/1e9, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"))
+
+
+def renorm_s2p(ntwk, zs):
+    """Renormalize a simple 2-port network to a new set of port impedances.
+
+    This function was originally written as a check on the
+    `skrf.Network.renormalize()` function, which I was attempting to use
+    to model the Rx termination when calculating the channel impulse
+    response. (See lines 1640-1650'ish of `pybert.py`.)
+
+    In my original specific case, I was attempting to model an open
+    circuit termination. And when I did the magnitude of my resultant
+    S21 dropped from 0 to -44 dB!
+    I didn't think that could possibly be correct.
+    So, I wrote this function as a check on that.
+
+    Args:
+        ntwk(skrf.Network): A 2-port network, which must use the same
+        (singular) impedance at both ports.
+
+        zs(complex array-like): The set of new port impedances to be
+        used. This set of frequencies may be unique for each port and at
+        each frequency.
+
+    Returns:
+        skrf.Network: The renormalized 2-port network.
+    """
+    (Nf, Nr, Nc) = ntwk.s.shape
+    assert (Nr == 2 and Nc == 2), "May only be used to renormalize a 2-port network!"
+    assert (all(ntwk.z0[:, 0] == ntwk.z0[0, 0]) and all(ntwk.z0[:, 0] == ntwk.z0[:, 1])), \
+        f"May only be used to renormalize a network with equal (singular) reference impedances! z0: {ntwk.z0}"
+    assert (zs.shape == (2,) or zs.shape == (len(ntwk.f), 2)), \
+        "The list of new impedances must have shape (2,) or (len(ntwk.f), 2)!"
+
+    if zs.shape == (2,):
+        zt = zs.repeat(len(Nf))
+    else:
+        zt = np.array(zs)
+    z0 = ntwk.z0[0,0]
+    S = ntwk.s
+    I = np.identity(2)
+    Z = []
+    for s in S:
+        Z.append(inv(I - s).dot(I + s))  # Resultant values are normalized to z0.
+    Z = np.array(Z)
+    Zn = []
+    for (z, zn) in zip(Z, zt):  # Iterration is over frequency and yields: (2x2 array, 2-element vector).
+        Zn.append(z.dot(z0/zn))
+    Zn = np.array(Zn)
+    Sn = []
+    for z in Zn:
+        Sn.append(inv(z + I).dot(z - I))
+    return(rf.Network(s=Sn, f=ntwk.f/1e9, z0=zs))

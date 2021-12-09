@@ -16,19 +16,20 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 from traits.etsconfig.api import ETSConfig
 # ETSConfig.toolkit = 'qt.celiagg'  # Yields unacceptably small font sizes in plot axis labels.
-# ETSConfig.toolkit = 'qt.qpainter'
+# ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
 
 from datetime import datetime
 import platform
 from threading import Event, Thread
 from time import sleep
 
-from math import isnan
+from math  import isnan
+from cmath import rect, phase
 
 from chaco.api import ArrayPlotData, GridPlotContainer
 import numpy as np
 from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, sinc, where, zeros
-from numpy.fft import fft, ifft, irfft
+from numpy.fft import fft, irfft
 from numpy.random import randint
 from os.path import dirname, join
 from scipy.optimize import minimize, minimize_scalar
@@ -54,6 +55,7 @@ from traitsui.message import message
 
 import skrf as rf
 
+from pyibisami import __version__ as PyAMI_VERSION
 from pyibisami.ami_parse import AMIParamConfigurator
 from pyibisami.ami_model import AMIModel
 from pyibisami.ibis_file import IBISModel
@@ -77,11 +79,13 @@ from pybert.pybert_util import (
     trim_impulse,
     submodules,
     sdd_21,
+    H_2_s2p,
+    interp_time,
+    cap_mag,
+    interp_s2p,
+    renorm_s2p,
 )
 from pybert.pybert_view import traits_view
-
-# DEBUG ONLY; REMOVE ME:
-# from matplotlib import pyplot as plt
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -390,9 +394,8 @@ class PyBERT(HasTraits):
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
     )                          #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
-    Zref = Float(100)          #: Reference (or, nominal) channel impedance.
-    padded = Bool(False)       #: Zero pad imported Touchstone data? (Default = False)
-    windowed = Bool(False)     #: Apply windowing to the Touchstone data? (Default = False)
+    # padded = Bool(False)       #: Zero pad imported Touchstone data? (Default = False)
+    # windowed = Bool(False)     #: Apply windowing to the Touchstone data? (Default = False)
     f_step = Float(10)         #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(gRdc)            #: Channel d.c. resistance (Ohms/m).
@@ -429,7 +432,7 @@ class PyBERT(HasTraits):
     # - Tx
     vod = Float(gVod)  #: Tx differential output voltage (V)
     rs = Float(gRs)  #: Tx source impedance (Ohms)
-    cout = Range(low=0.001, value=gCout)  #: Tx parasitic output capacitance (pF)
+    cout = Range(low=0.001, high=1000, value=gCout)  #: Tx parasitic output capacitance (pF)
     pn_mag = Float(gPnMag)  #: Periodic noise magnitude (V).
     pn_freq = Float(gPnFreq)  #: Periodic noise frequency (MHz).
     rn = Float(gRn)  #: Standard deviation of Gaussian random noise (V).
@@ -456,7 +459,7 @@ class PyBERT(HasTraits):
 
     # - Rx
     rin = Float(gRin)  #: Rx input impedance (Ohm)
-    cin = Range(low=0.001, value=gCin)  #: Rx parasitic input capacitance (pF)
+    cin = Range(low=0.001, high=1000, value=gCin)  #: Rx parasitic input capacitance (pF)
     cac = Float(gCac)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
     ctle_file = File("", entries=5, filter=["*.csv"])  #: CTLE response file (when use_ctle_file = True).
@@ -600,14 +603,14 @@ class PyBERT(HasTraits):
     def log(self, msg, alert=False, exception=None):
         """Log a message to the console and, optionally, to terminal and/or pop-up dialog."""
         _msg = msg.strip()
-        txt = "\n[{}]: {}\n".format(datetime.now(), _msg)
+        txt = "\n[{}]: PyBERT: {}\n".format(datetime.now(), _msg)
         if self.debug:
             ## In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt)
         self.console_log += txt
         if exception:
             raise exception
-        if alert:
+        if alert and self.GUI:
             message(_msg, "PyBERT Alert")
 
     # Default initialization
@@ -790,9 +793,7 @@ class PyBERT(HasTraits):
         npts = len(t)
         f0 = 1.0 / (t[1] * npts)
         half_npts = npts // 2
-        # return array([i * f0 for i in range(half_npts + 1)] + [(half_npts - i) * -f0 for i in range(1, half_npts)])
-        # return array([i * f0 for i in range(half_npts)])
-        return array([i * f0 for i in range(half_npts)][1:])
+        return array([i * f0 for i in range(half_npts)])
 
     @cached_property
     def _get_w(self):
@@ -1180,11 +1181,9 @@ class PyBERT(HasTraits):
             )
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
-            # info_str += '</font>'
         except Exception as err:
             info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
             info_str += "Sorry, the following error occurred:\n"
-            # raise
             info_str += str(err)
 
         return info_str
@@ -1298,8 +1297,7 @@ class PyBERT(HasTraits):
         mode = self.ctle_mode_tune
 
         _, H = make_ctle(rx_bw, peak_freq, peak_mag, w, mode, offset)
-        h = real(ifft(H))[:len_h]
-        h *= abs(H[0]) / sum(h)
+        h = irfft(H)
 
         return h
 
@@ -1407,7 +1405,7 @@ class PyBERT(HasTraits):
             self.tx_ibis_valid = False
             self.tx_use_ami    = False
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, True, debug=self.debug, gui=self.GUI)  # FIXME: True => self.debug?
+            ibis = IBISModel(new_value, True, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
@@ -1477,6 +1475,7 @@ class PyBERT(HasTraits):
             self.status = "IBIS file parsing error!"
             error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
             self.log(error_message, alert=True)
+            raise
         self._rx_ibis_dir = dName
         self.status = "Done."
 
@@ -1542,75 +1541,113 @@ class PyBERT(HasTraits):
         RL = self.rin
         Cp = self.cin * 1.0e-12
         CL = self.cac * 1.0e-6
-        Zref = self.Zref
 
         ts = t[1]
         len_t = len(t)
-        
+        len_f = len(f)
+
+        # Form the pre-on-die S-parameter 2-port network for the channel.
+        if self.use_ch_file:
+            ch_s2p_pre = import_channel(self.ch_file, ts, self.f)
+        else:
+            # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
+            # - Grab model parameters from PyBERT instance.
+            l_ch   = self.l_ch
+            v0     = self.v0 * 3.0e8
+            R0     = self.R0
+            w0     = self.w0
+            Rdc    = self.Rdc
+            Z0     = self.Z0
+            Theta0 = self.Theta0
+            # - Calculate propagation constant, characteristic impedance, and transfer function.
+            gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+            self.Zc = Zc
+            H = exp(-l_ch * gamma)
+            self.H = H
+            # - Use the transfer function and characteristic impedance to form "perfectly matched" network.
+            tmp = np.array(list(zip(zip(zeros(len_f),H),zip(H,zeros(len_f)))))
+            ch_s2p_pre = rf.Network(s=tmp, f=f/1e9, z0=Zc)
+            # - And, finally, renormalize to driver impedance.
+            ch_s2p_pre.renormalize(Rs)
+        ch_s2p_pre.name = "ch_s2p_pre"
+        self.ch_s2p_pre = ch_s2p_pre
+        ch_s2p = ch_s2p_pre  # In case neither set of on-die S-parameters is being invoked, below.
+
+        # Augment w/ IBIS-AMI on-die S-parameters, if appropriate.
+        def add_ondie_s(s2p, ts4f, isRx=False):
+            """Add the effect of on-die S-parameters to channel network.
+
+            Args:
+                s2p(skrf.Network): initial 2-port network.
+                ts4f(string): on-die S-parameter file name.
+
+            KeywordArgs:
+                isRx(bool): True when Rx on-die S-params. are being added. (Default = False).
+
+            Returns:
+                skrf.Network: Resultant 2-port network.
+            """
+            ts4N = rf.Network(ts4f)  # Grab the 4-port single-ended on-die network.
+            ntwk = sdd_21(ts4N)      # Convert it to a differential, 2-port network.
+            ntwk2 = interp_s2p(ntwk, s2p.f)  # Interpolate to system freqs.
+            if isRx:
+                res = s2p ** ntwk2
+            else:  # Tx
+                res = ntwk2 ** s2p
+            return (res, ts4N, ntwk2)
+
         if self.tx_use_ibis:
             model = self._tx_ibis.model
             Rs = model.zout * 2
-            Cs = model.ccomp[0] * 2
-        if self.use_ch_file:
-            # Zc = Zref * np.ones(np.shape(w))
-            # h = import_channel(self.ch_file, ts, self.padded, self.windowed)
-            h, H, Zc, Zref = import_channel(self.ch_file, ts, self.padded, self.windowed)
-            # if h[-1] > (max(h) / 2.0):  # step response?
-            #     h = diff(h)  # impulse response is derivative of step response.
-            # h /= sum(h)  # Normalize d.c. to one.
-            chnl_dly = t[where(h == max(h))[0][0]]
-            # h.resize(len_t)
-            # H = fft(h)[:len(f)]
-        else:
-            l_ch = self.l_ch
-            v0 = self.v0 * 3.0e8
-            R0 = self.R0
-            w0 = self.w0
-            Rdc = self.Rdc
-            Z0 = self.Z0
-            Theta0 = self.Theta0
-            gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-            H = exp(-l_ch * gamma)
-            chnl_dly = l_ch / v0
+            Cs = model.ccomp[0] / 2  # They're in series.
+            self.Rs = Rs  # Primarily for debugging.
+            self.Cs = Cs
+            if self.tx_use_ts4:
+                fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
+                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
+                ch_s2p.name = "ch_s2p_post"
+                self.ts4N   = ts4N
+                self.ntwk   = ntwk
+        if self.rx_use_ibis:
+            model = self._rx_ibis.model
+            RL = model.zin * 2
+            Cp = model.ccomp[0] / 2
+            self.RL = RL  # Primarily for debugging.
+            self.Cp = Cp
+            if self.debug:
+                print(f"RL: {RL}, Cp: {Cp}, Zt: {Zt}")
+            if self.rx_use_ts4:
+                fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
+                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
+                ch_s2p.name = "ch_s2p_post"
+                self.ts4N   = ts4N
+                self.ntwk   = ntwk
+        ch_s2p.name = "ch_s2p"
+        self.ch_s2p = ch_s2p
 
-        # Augment w/ IBIS-AMI on-die S-parameters, if appropriate.
-        def add_ondie_s(H, ts4f, f):
-            """Add the effect of on-die S-parameters to channel transfer function.
-
-            Args:
-                H([complex]): initial channel transfer function.
-                ts4f(string): on-die S-parameter file name.
-                f([float]): frequencies at which 'H' was sampled.
-
-            Returns:
-                [complex]: modified channel transfer function.
-
-            Notes:
-                1. This simplistic implementation assumes a very good
-                match between the reference impedance used in the
-                Touchstone file and the actual system impedance.
-            """
-            ts4N = rf.Network(ts4f)
-            return (H * np.interp(f, ts4N.f, sdd_21(ts4N).s[:,0,0]))
-
-        H2 = H
-        if self.tx_use_ibis and self.tx_use_ts4:
-            fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
-            H2    = add_ondie_s(H, fname, f)
-        if self.rx_use_ibis and self.rx_use_ts4:
-            fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
-            H2    = add_ondie_s(H2, fname, f)
-
-        chnl_H2  = 2*calc_G(H2, Rs, Cs, Zc, RL, Cp, CL, f*2*pi)
-        # chnl_H2 /= np.abs(chnl_H2[0]) # Normalize to: d.c. = 1.
-        chnl_h   = irfft(chnl_H2)
+        # Calculate channel impulse response.
+        Zt = RL / (1 + 1j*w*RL*Cp)                                # Rx termination impedance
+        Rt = (Zt - ch_s2p.z[:, 1, 1]) / (Zt + ch_s2p.z[:, 1, 1])  # reflection coefficient at term.
+        ch_s2p_term = rf.Network(s=ch_s2p.s21.s.flatten() * (1 + Rt * ch_s2p.s22.s.flatten()),
+                                 f=ch_s2p.f/1e9,
+                                 z0=ch_s2p.z0[0,0])
+        chnl_H = ch_s2p_term.s.flatten()
+        ch_s2p_term.name = "ch_s2p_term"
+        self.ch_s2p_term = ch_s2p_term
+        t_h, chnl_h = ch_s2p_term.impulse_response()
+        self.t_h         = t_h
+        self.chnl_h_orig = chnl_h
+        # - Interpolate to system time vector.
+        chnl_h = interp_time(t_h, chnl_h, ts)  # `ts` is system sample interval.
+        chnl_h.resize(len(t))
+        self.chnl_h_interp = chnl_h
+        chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
 
         min_len = 20 * nspui
         max_len = 100 * nspui
         if impulse_length:
             min_len = max_len = impulse_length / ts
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
-        # chnl_h /= sum(chnl_h)  # a temporary crutch.
         temp = chnl_h.copy()
         temp.resize(len(t))
         chnl_trimmed_H = fft(temp)
@@ -1621,7 +1658,7 @@ class PyBERT(HasTraits):
         self.chnl_h         = chnl_h
         self.len_h          = len(chnl_h)
         self.chnl_dly       = chnl_dly
-        self.chnl_H         = chnl_H2
+        self.chnl_H         = chnl_H
         self.chnl_trimmed_H = chnl_trimmed_H
         self.start_ix       = start_ix
         self.t_ns_chnl      = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
@@ -1635,6 +1672,7 @@ class PyBERT(HasTraits):
         self.log(f"System: {platform.system()} {platform.release()}")
         self.log(f"Python Version: {platform.python_version()}")
         self.log(f"PyBERT Version: {VERSION}")
+        self.log(f"PyAMI Version: {PyAMI_VERSION}")
         self.log(f"GUI Toolkit: {ETSConfig.toolkit}")
         self.log(f"Kiva Backend: {ETSConfig.kiva_backend}")
         # self.log(f"Pixel Scale: {self.trait_view().window.base_pixel_scale}")

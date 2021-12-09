@@ -1,5 +1,5 @@
 {% set name = "enable" %}
-{% set version = "5.2.1a" %}
+{% set version = "5.2.1.1" %}
 
 package:
   name: "{{ name|lower }}"
@@ -25,7 +25,7 @@ requirements:
     # - {{ compiler('cxx') }}
     # - {{ cdt('xorg-x11-devel') }}  # [linux]
     # - vs2017_win-64
-    - vs2019_win-64
+    # - vs2019_win-64
   host:
     - fonttools
     - numpy

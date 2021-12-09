@@ -1,12 +1,15 @@
 {% set name = "pyibis-ami" %}
-{% set version = "3.4.2" %}
+{% set version = "3.5.0.0" %}
 
 package:
   version: '{{ version }}'
   name: '{{ name|lower }}'
 
 source:
-  path: ../../PyAMI/
+  # path: ../../PyAMI/
+  git_url: https://github.com/capn-freako/PyAMI.git
+  git_rev: {{ version }}
+  git_depth: 1 # (Defaults to -1/not shallow)
 
 build:
   # string: 4961a3_2

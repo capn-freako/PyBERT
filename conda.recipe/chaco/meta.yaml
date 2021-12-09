@@ -1,5 +1,5 @@
 {% set name = "chaco" %}
-{% set version = "5.0.0a" %}
+{% set version = "5.0.0.1" %}
 
 package:
   name: "{{ name|lower }}"
@@ -17,21 +17,21 @@ build:
 requirements:
   build:
     - setuptools
-    - vs2019_win-64
-    # - {{compiler('c')}}
+    # - vs2019_win-64        # Uncomment for Windows build only.
+    # - {{compiler('c')}}    # Would like to get one of these working, instead of above hack.
     # - {{compiler('cxx')}}
     - git
     - cmake
   
   host:
     - python
-    - enable =5.2.1a
+    - enable =5.2.1.1
     - Cython
     - importlib_resources
 
   run:
     # - python
-    - enable =5.2.1a
+    - enable =5.2.1.1
     # - cython
     - importlib_resources
 

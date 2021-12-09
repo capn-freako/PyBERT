@@ -35,11 +35,12 @@ class PyBertCfg:
         self.pattern_len = the_PyBERT.pattern_len
         self.nspb = the_PyBERT.nspb
         self.eye_bits = the_PyBERT.eye_bits
-        self.mod_type = the_PyBERT.mod_type
+        self.mod_type = list(the_PyBERT.mod_type)  # See Issue #95 and PR #98 (jdpatt)
         self.num_sweeps = the_PyBERT.num_sweeps
         self.sweep_num = the_PyBERT.sweep_num
         self.sweep_aves = the_PyBERT.sweep_aves
         self.do_sweep = the_PyBERT.do_sweep
+        self.debug = the_PyBERT.debug
 
         # Channel Control
         self.use_ch_file = the_PyBERT.use_ch_file
@@ -73,6 +74,8 @@ class PyBertCfg:
         self.tx_use_getwave = the_PyBERT.tx_use_getwave
         self.tx_ami_file = the_PyBERT.tx_ami_file
         self.tx_dll_file = the_PyBERT.tx_dll_file
+        self.tx_ibis_file = the_PyBERT.tx_ibis_file
+        self.tx_use_ibis = the_PyBERT.tx_use_ibis
 
         # Rx
         self.rin = the_PyBERT.rin
@@ -92,6 +95,8 @@ class PyBertCfg:
         self.rx_use_getwave = the_PyBERT.rx_use_getwave
         self.rx_ami_file = the_PyBERT.rx_ami_file
         self.rx_dll_file = the_PyBERT.rx_dll_file
+        self.rx_ibis_file = the_PyBERT.rx_ibis_file
+        self.rx_use_ibis = the_PyBERT.rx_use_ibis
 
         # DFE
         self.use_dfe = the_PyBERT.use_dfe
