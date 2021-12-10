@@ -446,6 +446,7 @@ class PyBERT(HasTraits):
     )  #: List of TxTapTuner objects.
     rel_power = Float(1.0)  #: Tx power dissipation (W).
     tx_use_ami = Bool(False)  #: (Bool)
+    tx_has_ts4 = Bool(False)  #: (Bool)
     tx_use_ts4 = Bool(False)  #: (Bool)
     tx_use_getwave = Bool(False)  #: (Bool)
     tx_has_getwave = Bool(False)  #: (Bool)
@@ -469,6 +470,7 @@ class PyBERT(HasTraits):
     ctle_offset = Float(gCTLEOffset)  #: CTLE d.c. offset (dB)
     ctle_mode = Enum("Off", "Passive", "AGC", "Manual")  #: CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
     rx_use_ami = Bool(False)  #: (Bool)
+    rx_has_ts4 = Bool(False)  #: (Bool)
     rx_use_ts4 = Bool(False)  #: (Bool)
     rx_use_getwave = Bool(False)  #: (Bool)
     rx_has_getwave = Bool(False)  #: (Bool)
@@ -1435,6 +1437,10 @@ class PyBERT(HasTraits):
                 else:
                     self.log("Success.")
                 self.tx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
+                if pcfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]):
+                    self.tx_has_ts4 = True
+                else:
+                    self.tx_has_ts4 = False
                 self._tx_cfg = pcfg
                 self.tx_ami_valid = True
         except Exception as err:
@@ -1487,6 +1493,10 @@ class PyBERT(HasTraits):
                     pcfg = AMIParamConfigurator(pfile.read())
                 self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
                 self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
+                if pcfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]):
+                    self.rx_has_ts4 = True
+                else:
+                    self.rx_has_ts4 = False
                 self._rx_cfg = pcfg
                 self.rx_ami_valid = True
         except Exception as err:
@@ -1603,7 +1613,7 @@ class PyBERT(HasTraits):
             self.Rs = Rs  # Primarily for debugging.
             self.Cs = Cs
             if self.tx_use_ts4:
-                fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
+                fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
                 ch_s2p.name = "ch_s2p_post"
                 self.ts4N   = ts4N
@@ -1617,7 +1627,7 @@ class PyBERT(HasTraits):
             if self.debug:
                 print(f"RL: {RL}, Cp: {Cp}, Zt: {Zt}")
             if self.rx_use_ts4:
-                fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"]))
+                fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
                 ch_s2p.name = "ch_s2p_post"
                 self.ts4N   = ts4N
