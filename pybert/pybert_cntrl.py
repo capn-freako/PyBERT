@@ -364,6 +364,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 self.log(rx_model.ami_params_out.decode('utf-8'))
 
                 ctle_H = fft(ctle_out * hann(len(ctle_out))) / fft(rx_in * hann(len(rx_in)))
+                ctle_h = irfft(ctle_H)
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
             else:  # Init() only.
                 ctle_out_h_padded = pad(
@@ -373,8 +374,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     tx_out_h, (nspb, len(rx_in) - nspb - len(tx_out_h)), "linear_ramp", end_values=(0.0, 0.0),
                 )
                 ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)
+                ctle_h = irfft(ctle_H)
                 ctle_out = convolve(rx_in, ctle_h)
-            ctle_h = irfft(ctle_H)
             ctle_s = ctle_h.cumsum()
         else:
             if self.use_ctle_file:
