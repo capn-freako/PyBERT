@@ -212,9 +212,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             tx_param_dict = tx_cfg.input_ami_params
             tx_model_init = AMIModelInitializer(tx_param_dict)
             tx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
-            tx_model_init.channel_response = [1.0 / ts] + [0.0] * (
-                len(chnl_h) - 1
-            )  # Start with a delta function, to capture the model's impulse response.
+            # Start with a delta function, to capture the model's impulse response.
+            tx_model_init.channel_response = [1.0 / ts] + [0.0] * (len(chnl_h) - 1)
             tx_model_init.bit_time = ui
             tx_model = AMIModel(self.tx_dll_file)
             tx_model.initialize(tx_model_init)
@@ -247,9 +246,13 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 # order to minimize high frequency artifactual energy
                 # introduced by frequency domain processing in some models.
                 half_len = len(chnl_h) // 2
-                tx_s, _ = tx_model.getWave(array([0.0] * half_len + [1.0] * half_len))
+                tmp = array([0.0] * half_len + [1.0] * half_len)
+                self.log(f"tmp: {tmp}, max: {max(tmp)}, min: {min(tmp)}")
+                tx_s, _ = tx_model.getWave(tmp)
                 # Shift the result back to the correct location, extending the last sample.
+                self.log(f"tx_s: {tx_s}, max: {max(tx_s)}, min: {min(tx_s)}")
                 tx_s = pad(tx_s[half_len:], (0, half_len), "edge")
+                self.log(f"tx_s: {tx_s}, max: {max(tx_s)}, min: {min(tx_s)}")
                 tx_h = diff(concatenate((array([0.0]), tx_s)))  # Without the leading 0, we miss the pre-tap.
                 tx_out, _ = tx_model.getWave(self.x)
             else:  # Init()-only.
@@ -365,6 +368,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
                 ctle_H = fft(ctle_out * hann(len(ctle_out))) / fft(rx_in * hann(len(rx_in)))
                 ctle_h = irfft(ctle_H)
+                ctle_h.resize(len(chnl_h))
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
             else:  # Init() only.
                 ctle_out_h_padded = pad(
@@ -375,6 +379,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 )
                 ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)
                 ctle_h = irfft(ctle_H)
+                ctle_h.resize(len(chnl_h))
                 ctle_out = convolve(rx_in, ctle_h)
             ctle_s = ctle_h.cumsum()
         else:
