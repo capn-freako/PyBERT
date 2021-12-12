@@ -124,7 +124,7 @@ gRin = 100  # differential input resistance
 gCin = 0.50  # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
 gCac = 1.0  # a.c. coupling capacitance (uF) (Assumed to exist at both 'P' and 'N' nodes.)
 gBW = 12.0  # Rx signal path bandwidth, assuming no CTLE action. (GHz)
-gUseDfe = True  # Include DFE when running simulation.
+gUseDfe = False  # Include DFE when running simulation.
 gDfeIdeal = True  # DFE ideal summing node selector
 gPeakFreq = 5.0  # CTLE peaking frequency (GHz)
 gPeakMag = 10.0  # CTLE peaking magnitude (dB)
@@ -1625,7 +1625,7 @@ class PyBERT(HasTraits):
             self.RL = RL  # Primarily for debugging.
             self.Cp = Cp
             if self.debug:
-                print(f"RL: {RL}, Cp: {Cp}, Zt: {Zt}")
+                print(f"RL: {RL}, Cp: {Cp}")
             if self.rx_use_ts4:
                 fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)

@@ -12,6 +12,7 @@ clock = perf_counter
 
 from chaco.api import Plot
 from chaco.tools.api import PanTool, ZoomTool
+import numpy as np
 from numpy import (
     arange,
     array,
@@ -242,22 +243,30 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 return
             if self.tx_use_getwave:
                 # For GetWave, use a step to extract the model's native properties.
-                # Position the input edge at the center of the vector, in
-                # order to minimize high frequency artifactual energy
-                # introduced by frequency domain processing in some models.
-                half_len = len(chnl_h) // 2
-                tmp = array([0.0] * half_len + [1.0] * half_len)
-                self.log(f"tmp: {tmp}, max: {max(tmp)}, min: {min(tmp)}")
-                tx_s, _ = tx_model.getWave(tmp)
-                # Shift the result back to the correct location, extending the last sample.
-                self.log(f"tx_s: {tx_s}, max: {max(tx_s)}, min: {min(tx_s)}")
-                tx_s = pad(tx_s[half_len:], (0, half_len), "edge")
-                self.log(f"tx_s: {tx_s}, max: {max(tx_s)}, min: {min(tx_s)}")
-                tx_h = diff(concatenate((array([0.0]), tx_s)))  # Without the leading 0, we miss the pre-tap.
+                # Delay the input edge slightly, in order to minimize high
+                # frequency artifactual energy sometimes introduced near
+                # the signal edges by frequency domain processing in some models.
+                tmp       = array([-1.0] * 128 + [1.0] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
+                tx_s, _   = tx_model.getWave(tmp)
+                # Some models delay signal flow through GetWave() arbitrarily.
+                tmp       = array([1.0] * 1024)
+                max_tries = 10
+                n_tries   =  0
+                while max(tx_s) < 0.1 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
+                    tx_s, _  = tx_model.getWave(tmp)
+                    n_tries += 1
+                if n_tries == max_tries:
+                    self.status = "Tx GetWave() Error."
+                    self.log("ERROR: Never saw a rising step come out of Tx GetWave()!", alert=True)
+                    return
+                # Make one more call, just to ensure a sufficient "tail".
+                tmp, _    = tx_model.getWave(tmp)
+                tx_s      = np.append(tx_s, tmp)
+                tx_h,   _ = trim_impulse(diff(tx_s))
                 tx_out, _ = tx_model.getWave(self.x)
             else:  # Init()-only.
-                tx_s = tx_h.cumsum()
                 tx_out = convolve(tx_h, self.x)
+            tx_s = tx_h.cumsum()
             self.tx_model = tx_model
         else:
             # - Generate the ideal, post-preemphasis signal.

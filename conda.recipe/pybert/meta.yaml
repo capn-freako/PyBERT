@@ -1,19 +1,19 @@
 {% set name = "pybert" %}
-{% set version = "3.5.0.0" %}
+{% set version = "3.5.1" %}
 
 package:
   version: '{{ version }}'
   name: '{{ name|lower }}'
 
 source:
-  # path: ../../
-  git_url: https://github.com/capn-freako/PyBERT.git
-  git_rev: {{ version }}
-  git_depth: 1 # (Defaults to -1/not shallow)
+  path: ../../
+  # git_url: https://github.com/capn-freako/PyBERT.git
+  # git_rev: {{ version }}
+  # git_depth: 1 # (Defaults to -1/not shallow)
 
 build:
   # string: a72df0_5
-  number: 2
+  number: 1
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
@@ -24,7 +24,7 @@ requirements:
     - python =3.8
     - kiwisolver
     - chaco =5.0.0.1
-    - pyibis-ami >=3.5.0.0
+    - pyibis-ami >=3.5.1
     - scikit-rf
     - pyside2
     - pyyaml
@@ -34,7 +34,7 @@ requirements:
     - setuptools
     - kiwisolver
     - chaco =5.0.0.1
-    - pyibis-ami >=3.5.0.0
+    - pyibis-ami >=3.5.1
     - scikit-rf
     - pyside2
     - pyyaml
