@@ -273,7 +273,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
             ffe_out = convolve(symbols, ffe)[: len(symbols)]
             if self.use_ch_file:
-                self.rel_power = mean(ffe_out ** 2) / self.Zref
+                self.rel_power = mean(ffe_out ** 2) / self.rs
             else:
                 self.rel_power = mean(ffe_out ** 2) / self.Z0
             tx_out = repeat(ffe_out, nspui)  # oversampled output
@@ -768,7 +768,7 @@ def update_results(self):
         start_t = t[lockedsTrue[0]]
     else:
         start_t = 0
-    start_ix = where(clock_times > start_t)[0][0]
+    start_ix = where(array(clock_times) > start_t)[0][0]
     (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     clock_spec = fft(clock_pers[start_ix:])
