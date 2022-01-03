@@ -46,7 +46,7 @@ The application source is divided among several files, as follows:
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-__version__ = "3.5.1"
-__date__    = "December 12, 2021"
+__version__ = "3.5.2"
+__date__    = "December 14, 2021"
 __authors__ = "David Banas & David Patterson"
 __copy__    = "Copyright (c) 2014 David Banas, 2019 David Patterson"
