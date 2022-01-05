@@ -821,14 +821,14 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     tmp  = np.array(list(zip(zip(S11,S21),zip(S21,S11))))
     return rf.Network(s=tmp, f=fs/1e9, z0=[Zref,Zref])  # `f` is presumed to have units: GHz.
 
-def import_channel(filename, sample_per, freqs, zref=100):
+def import_channel(filename, sample_per, fs, zref=100):
     """
     Read in a channel description file.
 
     Args:
         filename(str): Name of file from which to import channel description.
         sample_per(real): Sample period of system signal vector.
-        freqs([real]): (Positive only) frequency values being used by caller.
+        fs([real]): (Positive only) frequency values being used by caller.
 
     KeywordArgs:
         zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
@@ -851,16 +851,16 @@ def import_channel(filename, sample_per, freqs, zref=100):
     """
     extension = os.path.splitext(filename)[1][1:]
     if re.search("^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
-        ts2N = import_freq(filename)
+        ts2N = interp_s2p(import_freq(filename), fs)
     else:  # simple 2-column time domain description (impulse or step).
         h = import_time(filename, sample_per)
         # Fixme: an a.c. coupled channel breaks this naive approach!
         if h[-1] > (max(h) / 2.0):  # step response?
             h = diff(h)  # impulse response is derivative of step response.
-        Nf = len(freqs)
+        Nf = len(fs)
         h.resize(2*Nf)
         H = fft(h * sample_per)[:Nf]  # Keep the positive frequencies only.
-        ts2N = H_2_s2p(H, zref * ones(len(H)), freqs, Zref=zref)
+        ts2N = H_2_s2p(H, zref * ones(len(H)), fs, Zref=zref)
     return ts2N
 
 def interp_time(ts, xs, sample_per):
@@ -990,7 +990,7 @@ def se2mm(ntwk, norm=0.5):
     return rf.Network(frequency=f/1e9, s=s, z0=z)
 
 
-def import_freq(filename, freqs):
+def import_freq(filename):
     """
     Read in a 1, 2, or 4-port Touchstone file,
     and return an equivalent 2-port network.
