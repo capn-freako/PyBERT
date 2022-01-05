@@ -930,16 +930,6 @@ def sdd_21(ntwk, norm=0.5):
     Returns:
         skrf.Network: Sdd (2-port).
     """
-    # ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
-    # if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
-    #     ntwk.renumber((1, 2), (2, 1))
-
-    # Sdd11 = norm * (ntwk.s11 - ntwk.s13 + ntwk.s33 - ntwk.s31)
-    # Sdd12 = norm * (ntwk.s12 - ntwk.s14 + ntwk.s34 - ntwk.s32)
-    # Sdd21 = norm * (ntwk.s21 - ntwk.s23 + ntwk.s43 - ntwk.s41)
-    # Sdd22 = norm * (ntwk.s22 - ntwk.s24 + ntwk.s44 - ntwk.s42)
-
-    # return (rf.network.four_oneports_2_twoport(Sdd11, Sdd12, Sdd21, Sdd22))
     mm = se2mm(ntwk)
     return rf.Network(frequency=ntwk.f/1e9, s=mm.s[:,0:2,0:2], z0=mm.z0[:,0:2])
 

@@ -460,7 +460,7 @@ class PyBERT(HasTraits):
 
     # - Rx
     rin = Float(gRin)  #: Rx input impedance (Ohm)
-    cin = Range(low=0.001, high=1000, value=gCin)  #: Rx parasitic input capacitance (pF)
+    cin = Range(low=0, high=1000, value=gCin)  #: Rx parasitic input capacitance (pF)
     cac = Float(gCac)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
     ctle_file = File("", entries=5, filter=["*.csv"])  #: CTLE response file (when use_ctle_file = True).
@@ -1615,7 +1615,6 @@ class PyBERT(HasTraits):
             if self.tx_use_ts4:
                 fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
-                ch_s2p.name = "ch_s2p_post"
                 self.ts4N   = ts4N
                 self.ntwk   = ntwk
         if self.rx_use_ibis:
@@ -1625,32 +1624,25 @@ class PyBERT(HasTraits):
             self.RL = RL  # Primarily for debugging.
             self.Cp = Cp
             if self.debug:
-                print(f"RL: {RL}, Cp: {Cp}")
+                self.log(f"RL: {RL}, Cp: {Cp}")
             if self.rx_use_ts4:
                 fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
-                ch_s2p.name = "ch_s2p_post"
                 self.ts4N   = ts4N
                 self.ntwk   = ntwk
         ch_s2p.name = "ch_s2p"
         self.ch_s2p = ch_s2p
 
         # Calculate channel impulse response.
-        Zt = RL / (1 + 1j*w*RL*Cp)                                # Rx termination impedance
-        Rt = (Zt - ch_s2p.z[:, 1, 1]) / (Zt + ch_s2p.z[:, 1, 1])  # reflection coefficient at term.
-        ch_s2p_term = rf.Network(s=ch_s2p.s21.s.flatten() * (1 + Rt * ch_s2p.s22.s.flatten()),
-                                 f=ch_s2p.f/1e9,
-                                 z0=ch_s2p.z0[0,0])
-        chnl_H = ch_s2p_term.s.flatten()
+        Zt   = RL / (1 + 1j*w*RL*Cp)    # Rx termination impedance
+        ch_s2p_term = ch_s2p.copy()
+        ch_s2p_term_z0 = ch_s2p.z0.copy()
+        ch_s2p_term_z0[:,1] = Zt
+        ch_s2p_term.renormalize(ch_s2p_term_z0)
         ch_s2p_term.name = "ch_s2p_term"
         self.ch_s2p_term = ch_s2p_term
-        t_h, chnl_h = ch_s2p_term.impulse_response()
-        self.t_h         = t_h
-        self.chnl_h_orig = chnl_h
-        # - Interpolate to system time vector.
-        chnl_h = interp_time(t_h, chnl_h, ts)  # `ts` is system sample interval.
-        chnl_h.resize(len(t))
-        self.chnl_h_interp = chnl_h
+        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:,1]) / np.sqrt(ch_s2p_term.z0[:,0])
+        chnl_h = irfft(chnl_H)
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
 
         min_len = 20 * nspui
