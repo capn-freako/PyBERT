@@ -1641,8 +1641,11 @@ class PyBERT(HasTraits):
         ch_s2p_term.renormalize(ch_s2p_term_z0)
         ch_s2p_term.name = "ch_s2p_term"
         self.ch_s2p_term = ch_s2p_term
-        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:,1]) / np.sqrt(ch_s2p_term.z0[:,0])
+        # We take the transfer function, H, to be a ratio of voltages.
+        # So, we must normalize our (now generalized) S-parameters.
+        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:,1] / ch_s2p_term.z0[:,0])
         chnl_h = irfft(chnl_H)
+        # t_h, chnl_h = ch_s2p_term.s21.impulse_response()
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
 
         min_len = 20 * nspui
