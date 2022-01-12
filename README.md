@@ -7,6 +7,14 @@ as well as the NumPy and SciPy packages.
 
 Notice: Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
 
+## Wiki
+
+- https://github.com/capn-freako/PyBERT/wiki
+
+## FAQ
+
+- https://github.com/capn-freako/PyBERT/wiki/pybert_faq
+
 ## User Installation
 
 - <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
