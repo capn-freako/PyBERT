@@ -16,7 +16,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 from traits.etsconfig.api import ETSConfig
 # ETSConfig.toolkit = 'qt.celiagg'  # Yields unacceptably small font sizes in plot axis labels.
-ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
+# ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
 
 from datetime import datetime
 import platform
@@ -460,7 +460,8 @@ class PyBERT(HasTraits):
 
     # - Rx
     rin = Float(gRin)  #: Rx input impedance (Ohm)
-    cin = Range(low=0, high=1000, value=gCin)  #: Rx parasitic input capacitance (pF)
+    # cin = Range(low=0, high=1000, value=gCin)  #: Rx parasitic input capacitance (pF)
+    cin = Float(gCin)  #: Rx parasitic input capacitance (pF)
     cac = Float(gCac)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
     ctle_file = File("", entries=5, filter=["*.csv"])  #: CTLE response file (when use_ctle_file = True).
@@ -794,8 +795,7 @@ class PyBERT(HasTraits):
         t = self.t
         npts = len(t)
         f0 = 1.0 / (t[1] * npts)
-        half_npts = npts // 2
-        return array([i * f0 for i in range(half_npts)])
+        return array([i * f0 for i in range(npts // 2 + 1)])  # The "+ 1" captures the Nyquist freq. and yields the correct length from irfft().
 
     @cached_property
     def _get_w(self):
@@ -1621,15 +1621,20 @@ class PyBERT(HasTraits):
             model = self._rx_ibis.model
             RL = model.zin * 2
             Cp = model.ccomp[0] / 2
+            if self.rx_use_ts4:
+                fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
+                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
+                Rx_R = self._rx_cfg.fetch_param_val(["Reserved_Parameters","Rx_R"])
+                if Rx_R:  # None means we didn't find the parameter.
+                    RL = 2 * Rx_R
+                else:
+                    RL = 2 * 10e6  # Using 10 MOhms as a proxy for open circuit.
+                self.ts4N   = ts4N
+                self.ntwk   = ntwk
             self.RL = RL  # Primarily for debugging.
             self.Cp = Cp
             if self.debug:
                 self.log(f"RL: {RL}, Cp: {Cp}")
-            if self.rx_use_ts4:
-                fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
-                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
-                self.ts4N   = ts4N
-                self.ntwk   = ntwk
         ch_s2p.name = "ch_s2p"
         self.ch_s2p = ch_s2p
 

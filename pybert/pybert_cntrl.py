@@ -36,7 +36,7 @@ from numpy import (
 )
 from numpy.fft import fft, irfft
 from numpy.random import normal
-from scipy.signal import iirfilter, lfilter
+from scipy.signal import iirfilter, lfilter, deconvolve
 from scipy.signal.windows import hann
 from pyibisami.ami_model import AMIModel, AMIModelInitializer
 
@@ -128,6 +128,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
+    f = self.f
+    flen = len(f)
     w = self.w
     bits = self.bits
     symbols = self.symbols
@@ -246,28 +248,33 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 # Delay the input edge slightly, in order to minimize high
                 # frequency artifactual energy sometimes introduced near
                 # the signal edges by frequency domain processing in some models.
-                tmp       = array([-1.0] * 128 + [1.0] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
+                tmp       = array([0.0] * 128 + [1.0] * 3968)  # Stick w/ 2^n, for freq. domain models' sake.
                 tx_s, _   = tx_model.getWave(tmp)
+                print(f"min(tx_s): {min(tx_s)}; max(tx_s): {max(tx_s)}; tx_s[-1]: {tx_s[-1]}")
                 # Some models delay signal flow through GetWave() arbitrarily.
-                tmp       = array([1.0] * 1024)
-                max_tries = 10
-                n_tries   =  0
-                while max(tx_s) < 0.1 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-                    tx_s, _  = tx_model.getWave(tmp)
-                    n_tries += 1
-                if n_tries == max_tries:
-                    self.status = "Tx GetWave() Error."
-                    self.log("ERROR: Never saw a rising step come out of Tx GetWave()!", alert=True)
-                    return
+                # tmp       = array([1.0] * 1024)
+                # max_tries = 10
+                # n_tries   =  0
+                # while max(tx_s) < 0.1 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
+                #     tx_s, _  = tx_model.getWave(tmp)
+                #     n_tries += 1
+                # if n_tries == max_tries:
+                #     self.status = "Tx GetWave() Error."
+                #     self.log("ERROR: Never saw a rising step come out of Tx GetWave()!", alert=True)
+                #     return
                 # Make one more call, just to ensure a sufficient "tail".
-                tmp, _    = tx_model.getWave(tmp)
-                tx_s      = np.append(tx_s, tmp)
-                tx_h,   _ = trim_impulse(diff(tx_s))
+                # tmp, _    = tx_model.getWave(tmp)
+                # tx_s      = np.append(tx_s, tmp)
+                tx_h,   _ = trim_impulse(diff(tx_s), min_len=1024)
+                # tx_h = diff(tx_s[4000:])
+                print(f"len(tx_h): {len(tx_h)}")
+                _, _      = tx_model.getWave(array([0]*8192))  # GetWave() preserves state; clear it.
                 tx_out, _ = tx_model.getWave(self.x)
             else:  # Init()-only.
                 tx_out = convolve(tx_h, self.x)
             tx_s = tx_h.cumsum()
-            self.tx_model = tx_model
+            # self.tx_model = tx_model
+            tx_model = None  # Trying to cure a mysterious seg. fault.
         else:
             # - Generate the ideal, post-preemphasis signal.
             # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
@@ -282,7 +289,11 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             # - (The Tx is unique in that the calculated responses aren't used to form the output.
             #    This is partly due to the out of order nature in which we combine the Tx and channel,
             #    and partly due to the fact that we're adding noise to the Tx output.)
-            tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
+            # tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
+            tx_h = list(zeros(nspui))
+            for wgt in ffe:
+                tx_h += [wgt] + list(zeros(nspui - 1))
+            tx_h = array(tx_h)
             tx_h.resize(len(chnl_h))
             tx_s = tx_h.cumsum()
         tx_out.resize(len(t))
@@ -369,15 +380,18 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 )
                 return
             if self.rx_use_getwave:
-                if False:
-                    ctle_out, clock_times = rx_model.getWave(rx_in, 32)
-                else:
-                    ctle_out, clock_times = rx_model.getWave(rx_in, len(rx_in))
+                ctle_out, clock_times = rx_model.getWave(rx_in, 32)  # 32 bits per call to `AMIGetWave()`; parameterize?
                 self.log(rx_model.ami_params_out.decode('utf-8'))
 
-                ctle_H = fft(ctle_out * hann(len(ctle_out))) / fft(rx_in * hann(len(rx_in)))
+                ctle_out_calc = ctle_out[-eye_bits*nspui:].copy()
+                ctle_out_calc = np.resize(ctle_out_calc, len(rx_in))  # Repeats, as opposed to zero padding.
+                rx_in_calc = rx_in[-eye_bits*nspui:].copy()
+                rx_in_calc = np.resize(rx_in_calc, len(rx_in))
+                win = hann(len(rx_in))
+                rx_in_H         = fft(rx_in_calc * win)[:flen]    / np.sqrt(len(rx_in))
+                ctle_out_calc_H = fft(ctle_out_calc * win)[:flen] / np.sqrt(len(rx_in))
+                ctle_H = ctle_out_calc_H / rx_in_H
                 ctle_h = irfft(ctle_H)
-                ctle_h.resize(len(chnl_h))
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
             else:  # Init() only.
                 ctle_out_h_padded = pad(
@@ -391,6 +405,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 ctle_h.resize(len(chnl_h))
                 ctle_out = convolve(rx_in, ctle_h)
             ctle_s = ctle_h.cumsum()
+            rx_model = None  # Trying to cure a mysterious seg. fault.
         else:
             if self.use_ctle_file:
                 # FIXME: The new import_channel() implementation breaks this:
@@ -422,7 +437,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         ctle_out_s = ctle_out_h.cumsum()
         temp = ctle_out_h.copy()
         temp.resize(len(t))
-        ctle_out_H = fft(temp)
+        ctle_out_H = fft(temp)[:flen]
+        # if self.rx_use_getwave:
+        #     ctle_out_H = ctle_out_calc_H  # DEBUG ONLY; REMOVE!
         # - Store local variables to class instance.
         # Consider changing this; it could be sensitive to insufficient "front porch" in the CTLE output step response.
         self.ctle_out_p = ctle_out_s[nspui:] - ctle_out_s[:-nspui]
@@ -479,7 +496,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 bandwidth=bandwidth,
                 ideal=True,
             )
+        self.log("About to run DFE/CDR...")
         (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
+        self.log("Done.")
         dfe_out = array(dfe_out)
         dfe_out.resize(len(t))
         bits_out = array(bits_out)
@@ -500,15 +519,27 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         bit_errs = where(bits_tst ^ bits_ref)[0]
         self.bit_errs = len(bit_errs)
 
-        dfe_h = array([1.0] + list(zeros(nspb - 1)) + sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))
+        self.log(f"tap_weights[-1]: {tap_weights[-1]}")
+        # dfe_h = array([1.0] + list(zeros(nspb - 1)) + sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))
+        dfe_h  = [1.0] + list(zeros(nspb - 1))
+        for wgt in tap_weights[-1]:
+            dfe_h += [-wgt] + list(zeros(nspb - 1))
+        # dfe_h += sum( [ [-wgt] + list(zeros(nspb - 1)) for wgt in tap_weights[-1] ],
+        #               []
+        #             )
+        self.log("I'm here.")
+        dfe_h = array(dfe_h)
+
         dfe_h.resize(len(ctle_out_h))
         temp = dfe_h.copy()
         temp.resize(len(t))
-        dfe_H = fft(temp)
+
+        dfe_H = fft(temp)[:flen]
         self.dfe_s = dfe_h.cumsum()
         dfe_out_H = ctle_out_H * dfe_H
         dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
         dfe_out_s = dfe_out_h.cumsum()
+
         self.dfe_out_p = dfe_out_s - pad(dfe_out_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
         self.dfe_H = dfe_H
         self.dfe_h = dfe_h
