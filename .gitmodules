@@ -9,5 +9,5 @@
 	url = https://github.com/enthought/chaco.git
 [submodule "parsec.py"]
 	path = parsec.py
-	url = https://github.com/sighingnow/parsec.py.git
+	url = https://github.com/capn-freako/parsec.py.git
 
