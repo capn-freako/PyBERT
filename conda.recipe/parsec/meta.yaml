@@ -1,5 +1,5 @@
 {% set name = "parsec" %}
-{% set version = "3.9" %}
+{% set version = "3.13" %}
 
 package:
   name: '{{ name|lower }}'
@@ -10,15 +10,16 @@ source:
 
 build:
   number: 1
+  noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
-    - python
+    - python >=3.6,<3.10
     - setuptools
 
   run:
-    - python
+    - python >=3.6,<3.10
 
 test:
   # Python imports
