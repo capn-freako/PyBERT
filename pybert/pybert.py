@@ -608,7 +608,7 @@ class PyBERT(HasTraits):
         txt = "\n[{}]: PyBERT: {}\n".format(datetime.now(), _msg)
         if self.debug:
             ## In case PyBERT crashes, before we can read this in its `Console` tab:
-            print(txt)
+            print(txt, flush=True)
         self.console_log += txt
         if exception:
             raise exception
@@ -1311,7 +1311,7 @@ class PyBERT(HasTraits):
 
         tx_out_h = convolve(tx_h, chnl_h)
         return(convolve(ctle_h, tx_out_h))
-        
+
     @cached_property
     def _get_cost(self):
         nspui = self.nspui
@@ -1382,7 +1382,7 @@ class PyBERT(HasTraits):
     # Changed property handlers.
     def _status_str_changed(self):
         if gDebugStatus:
-            print(self.status_str)
+            print(self.status_str, flush=True)
 
     def _use_dfe_changed(self, new_value):
         if not new_value:
@@ -1424,7 +1424,7 @@ class PyBERT(HasTraits):
             self.log(error_message, alert=True, exception=err)
         self._tx_ibis_dir = dName
         self.status = "Done."
-        
+
     def _tx_ami_file_changed(self, new_value):
         try:
             self.tx_ami_valid = False
