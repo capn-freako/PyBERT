@@ -789,7 +789,7 @@ def trim_impulse(g, min_len=0, max_len=1000000):
     porch    = length // 3
     start_ix = max(0,      max_ix  - porch)
     stop_ix  = min(len(g), stop_ix + porch)
-    return (g[start_ix : stop_ix], start_ix)
+    return (g[start_ix : stop_ix].copy(), start_ix)
 
 def H_2_s2p(H, Zc, fs, Zref=50):
     """ Convert transfer function to 2-port network.
@@ -1226,3 +1226,34 @@ def renorm_s2p(ntwk, zs):
     for z in Zn:
         Sn.append(inv(z + I).dot(z - I))
     return(rf.Network(s=Sn, f=ntwk.f/1e9, z0=zs))
+
+def getwave_step_resp(ami_model):
+    """Use a model's GetWave() function to extract its step response.
+
+    Args:
+        ami_model (): The AMI model to use.
+
+    Returns:
+        NumPy 1-D array: The model's step response.
+
+    Raises:
+        RuntimeError: When no step rise is detected.
+    """
+    # Delay the input edge slightly, in order to minimize high
+    # frequency artifactual energy sometimes introduced near
+    # the signal edges by frequency domain processing in some models.
+    tmp       = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
+    tx_s, _   = ami_model.getWave(tmp)
+    # Some models delay signal flow through GetWave() arbitrarily.
+    tmp       = array([0.5] * 1024)
+    max_tries = 10
+    n_tries   =  0
+    while max(tx_s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
+        tx_s, _  = ami_model.getWave(tmp)
+        n_tries += 1
+    if n_tries == max_tries:
+        raise RuntimeError("No step rise detected!")
+    # Make one more call, just to ensure a sufficient "tail".
+    tmp, _    = ami_model.getWave(tmp)
+    tx_s      = np.append(tx_s, tmp)
+    return (tx_s - tx_s[0])
