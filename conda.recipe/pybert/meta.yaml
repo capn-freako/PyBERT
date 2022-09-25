@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "3.5.6" %}
+{% set version = "3.5.6.1" %}
 
 package:
   version: '{{ version }}'
@@ -38,7 +38,7 @@ requirements:
     - scikit-rf
     - pyside2
     - pyyaml
-    
+
 test:
   imports:
     - pybert

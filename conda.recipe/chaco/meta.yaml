@@ -17,12 +17,12 @@ build:
 requirements:
   build:
     - setuptools
-    # - vs2019_win-64        # Uncomment for Windows build only.
+    - vs2019_win-64        # Uncomment for Windows build only.
     # - {{compiler('c')}}    # Would like to get one of these working, instead of above hack.
     # - {{compiler('cxx')}}
     - git
     - cmake
-  
+
   host:
     - python
     - enable =5.2.1.1
