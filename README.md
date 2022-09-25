@@ -60,3 +60,9 @@ I would like to thank the following individuals, for their contributions to PyBE
 - Low Kian Seong  
 - Amanda Bukur
 - David Patterson
+- Dennis Han
+- Yuri Shlepnev
+- Jason Ellison
+- Tod Westerhoff
+- Michael Gielda
+- Peter Pupalaikis
