@@ -15,6 +15,10 @@ Notice: Before using this package for any purpose, you MUST read and understand 
 
 - https://github.com/capn-freako/PyBERT/wiki/pybert_faq
 
+## Email List
+
+- <pybert@freelists.org>
+
 ## User Installation
 
 - <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
