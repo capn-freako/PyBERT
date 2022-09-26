@@ -66,3 +66,5 @@ I would like to thank the following individuals, for their contributions to PyBE
 - Tod Westerhoff
 - Michael Gielda
 - Peter Pupalaikis
+- Denz Choe
+
