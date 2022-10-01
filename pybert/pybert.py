@@ -1438,6 +1438,9 @@ class PyBERT(HasTraits):
                 else:
                     self.log("Success.")
                 self.tx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
+                _tx_returns_impulse = pcfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"])
+                if not _tx_returns_impulse:
+                    self.tx_use_getwave = True
                 if pcfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]):
                     self.tx_has_ts4 = True
                 else:
@@ -1494,6 +1497,9 @@ class PyBERT(HasTraits):
                     pcfg = AMIParamConfigurator(pfile.read())
                 self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
                 self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
+                _rx_returns_impulse = pcfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"])
+                if not _rx_returns_impulse:
+                    self.rx_use_getwave = True
                 if pcfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]):
                     self.rx_has_ts4 = True
                 else:
