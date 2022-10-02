@@ -850,7 +850,7 @@ traits_view = View(
                 label="About",
             ),
             Group(Item("instructions", style="readonly", show_label=False), label="Guide"),
-            Group(Item("console_log",  style="custom",   show_label=False), label="Console", id="console"),
+            Group(Item("console_log",  style="readonly",   show_label=False), label="Console", id="console"),
             layout='tabbed',
             label='Help',
             id='help'
