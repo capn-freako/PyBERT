@@ -32,7 +32,8 @@ class PyBertCfg:
         # Simulation Control
         self.bit_rate = the_PyBERT.bit_rate
         self.nbits = the_PyBERT.nbits
-        self.pattern_len = the_PyBERT.pattern_len
+        self.pattern = the_PyBERT.pattern
+        self.seed = the_PyBERT.seed
         self.nspb = the_PyBERT.nspb
         self.eye_bits = the_PyBERT.eye_bits
         self.mod_type = list(the_PyBERT.mod_type)  # See Issue #95 and PR #98 (jdpatt)

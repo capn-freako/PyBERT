@@ -267,11 +267,18 @@ traits_view = View(
                                 tooltip="# of trials, per sweep, for averaging.",
                                 enabled_when="do_sweep == True",
                             ),
-                            Item(
-                                name="pattern_len",
-                                label="PatLen",
-                                tooltip="length of random pattern to use to construct bit stream",
-                                editor=TextEditor(auto_set=False, enter_set=True, evaluate=int),
+                            HGroup(
+                                Item(
+                                    name="pattern",
+                                    label="Pattern",
+                                    tooltip="pattern to use to construct bit stream",
+                                    # editor=TextEditor(auto_set=False, enter_set=True, evaluate=int),
+                                ),
+                                Item(
+                                    name="seed",
+                                    label="Seed",
+                                    tooltip="LFSR seed. 0 means new random seed for each run.",
+                                ),
                             ),
                             Item(
                                 name="eye_bits",
