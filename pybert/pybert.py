@@ -34,6 +34,7 @@ from numpy.random import randint
 from os.path import dirname, join
 from scipy.optimize import minimize, minimize_scalar
 from traits.api import (
+    cached_property,
     HTML,
     Array,
     Bool,
@@ -45,10 +46,10 @@ from traits.api import (
     Instance,
     Int,
     List,
+    Map,
     Property,
     Range,
     String,
-    cached_property,
     Trait,
 )
 from traitsui.message import message
@@ -379,7 +380,12 @@ class PyBERT(HasTraits):
     # - Simulation Control
     bit_rate = Range(low=0.1, high=120.0, value=gBitRate)     #: (Gbps)
     nbits = Range(low=1000, high=10000000, value=gNbits)      #: Number of bits to simulate.
-    pattern_len = Range(low=7, high=10000000, value=gPatLen)  #: PRBS pattern length.
+    pattern = Map({
+        "PRBS-7":  [ 7,  6],
+        "PRBS-15": [15, 14],
+        "PRBS-23": [23, 18],
+        }, default_value="PRBS-7")
+    seed = Int(1)  # LFSR seed. 0 means regenerate bits, using a new random seed, each run.
     nspb = Range(low=2, high=256, value=gNspb)                #: Signal vector samples per bit.
     eye_bits = Int(gNbits // 5)  #: # of bits used to form eye. (Default = last 20%)
     mod_type = List([0])         #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
@@ -577,7 +583,7 @@ class PyBERT(HasTraits):
     t_ns = Property(Array, depends_on=["t"])
     f = Property(Array, depends_on=["t"])
     w = Property(Array, depends_on=["f"])
-    bits = Property(Array, depends_on=["pattern_len", "nbits", "run_count"])
+    bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count"])
     symbols = Property(Array, depends_on=["bits", "mod_type", "vod"])
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
     ui = Property(Float, depends_on=["bit_rate", "mod_type"])
@@ -807,33 +813,18 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_bits(self):
-        """
-        Generate the bit stream.
-        """
+        "Generate the bit stream."
+        pattern = self.pattern_
+        seed    = self.seed
+        nbits   = self.nbits
 
-        pattern_len = self.pattern_len
-        nbits = self.nbits
-        mod_type = self.mod_type[0]
-
-        bits = []
-        seed = randint(128)
-        while not seed:  # We don't want to seed our LFSR with zero.
+        if not seed:  # The user sets `seed` to zero when she wants a new random seed generated for each run.
             seed = randint(128)
-        bit_gen = lfsr_bits([7, 6], seed)
-        for _ in range(pattern_len - 4):
-            bits.append(next(bit_gen))
-
-        # The 4-bit prequels, below, are to ensure that the first zero crossing
-        # in the actual slicer input signal occurs. This is necessary, because
-        # we assume it does, when aligning the ideal and actual signals for
-        # jitter calculation.
-        #
-        # We may want to talk to Mike Steinberger, of SiSoft, about his
-        # correlation based approach to this alignment chore. It's
-        # probably more robust.
-        if mod_type == 1:  # Duo-binary precodes, using XOR.
-            return resize(array([0, 0, 1, 0] + bits), nbits)
-        return resize(array([0, 0, 1, 1] + bits), nbits)
+            while not seed:  # We don't want to seed our LFSR with zero.
+                seed = randint(128)
+        bit_gen = lfsr_bits(pattern, seed)
+        bits = [next(bit_gen) for _ in range(nbits)]
+        return array(bits)
 
     @cached_property
     def _get_ui(self):
@@ -1524,6 +1515,20 @@ class PyBERT(HasTraits):
     def _rx_use_ami_changed(self, new_value):
         if(new_value == True):
             self.use_dfe = False
+
+    def check_pat_len(self):
+        taps = self.pattern_
+        pat_len = 2 * pow(2, max(taps))
+        if pat_len > 5*self.nbits:
+            self.log( f"Accurate jitter decomposition may not be possible with the current configuration!\n \
+Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
+                    , alert=True)
+
+    def _pattern_changed(self, new_value):
+        self.check_pat_len()
+
+    def _nbits_changed(self, new_value):
+        self.check_pat_len()
 
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and

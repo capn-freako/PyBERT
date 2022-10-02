@@ -172,7 +172,7 @@ def find_crossings(
             found. When this option is True, the first rising edge
             crossing is the first crossing returned. This is the desired
             behavior for PyBERT, because we always initialize the bit
-            stream with [0, 1, 1], in order to provide a known
+            stream with [0, 0, 1, 1], in order to provide a known
             synchronization point for jitter analysis.
             (Optional; default = True.)
         min_init_dev(float): The minimum initial deviation from zero,
@@ -266,6 +266,9 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
       - hist_synth  : The histogram of the extrapolated jitter.
       - bin_centers : The bin center values for both histograms.
 
+    Notes:
+        1. The actual crossings should arrive pre-aligned to the ideal crossings.
+        And both should start near zero time.
     """
 
     def my_hist(x):
@@ -289,17 +292,13 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     if not actual_xings.all():
         raise ValueError("calc_jitter(): zero length actual crossings vector received!")
 
-    # Line up first ideal/actual crossings, and count/validate crossings per pattern.
-    ideal_xings = array(ideal_xings) - (ideal_xings[0] - ui / 2.0)
-    actual_xings = array(actual_xings) - (actual_xings[0] - ui / 2.0)
+    num_patterns = nui // pattern_len
+    assert num_patterns, f"Need at least one full pattern repetition! (pattern_len: {pattern_len}; nui: {nui})"
     xings_per_pattern = where(ideal_xings > (pattern_len * ui))[0][0]
     if xings_per_pattern % 2 or not xings_per_pattern:
         print("xings_per_pattern:", xings_per_pattern)
-        print("len(ideal_xings):", len(ideal_xings))
         print("min(ideal_xings):", min(ideal_xings))
-        print("max(ideal_xings):", max(ideal_xings))
         raise AssertionError("pybert_util.calc_jitter(): Odd number of (or, no) crossings per pattern detected!")
-    num_patterns = nui // pattern_len
 
     # Assemble the TIE track.
     i = 0
@@ -324,9 +323,9 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
             jitter.append(3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.
             jitter.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
             skip_next_ideal_xing = True  # If we missed one, we missed two.
-        else:  # Noise may produce several crossings. We find all those
-            xings = []  # within the interval [-UI/2, +UI/2] centered
-            j = i  # around the ideal crossing, and take the average.
+        else:           # Noise may produce several crossings. 
+            xings = []  # We find all those within the interval [-UI/2, +UI/2] 
+            j = i       # centered around the ideal crossing, and take the average.
             while j < len(actual_xings) and actual_xings[j] <= max_t:
                 xings.append(actual_xings[j])
                 j += 1

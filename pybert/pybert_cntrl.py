@@ -15,6 +15,7 @@ from chaco.tools.api import PanTool, ZoomTool
 import numpy as np
 from numpy import (
     arange,
+    argmax,
     array,
     concatenate,
     convolve,
@@ -36,6 +37,7 @@ from numpy import (
 )
 from numpy.fft import fft, irfft
 from numpy.random import normal
+import scipy.signal as sig
 from scipy.signal import iirfilter, lfilter
 from scipy.signal.windows import hann
 from pyibisami.ami_model import AMIModel, AMIModelInitializer
@@ -125,7 +127,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     start_time = clock()
     self.status = "Running channel...(sweep %d of %d)" % (sweep_num, num_sweeps)
 
-    self.run_count += 1  # Force regeneration of bit stream.
+    if not self.seed:  # The user sets `seed` to zero to indicate that she wants new bits generated for each run.
+        self.run_count += 1  # Force regeneration of bit stream.
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
@@ -143,7 +146,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     rn = self.rn
     pn_mag = self.pn_mag
     pn_freq = self.pn_freq * 1.0e6
-    pattern_len = self.pattern_len
+    pattern = self.pattern_
     rx_bw = self.rx_bw * 1.0e9
     peak_freq = self.peak_freq * 1.0e9
     peak_mag = self.peak_mag
@@ -181,7 +184,9 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.ideal_signal = x
 
         # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
-        ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 2.0), mod_type=mod_type)
+        # We have to skip the first 4 UI, because they consist of a one-time "prequel", which does not repeat.
+        # ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 4.0), mod_type=mod_type)
+        ideal_xings = find_crossings(t, x, decision_scaler, mod_type=mod_type)
         self.ideal_xings = ideal_xings
 
         # Calculate the channel output.
@@ -539,15 +544,18 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
     self.f_MHz_dfe = array([])
     self.jitter_rejection_ratio = array([])
 
+    # The pattern length must be doubled in the duo-binary and PAM-4 cases anyway, because:
+    #  - in the duo-binary case, the XOR pre-coding can invert every other pattern rep., and
+    #  - in the PAM-4 case, the bits are taken in pairs to form the symbols and we start w/ an odd # of bits.
+    # So, while it isn't strictly necessary, doubling it in the NRZ case as well provides a certain consistency.
     try:
-        if mod_type == 1:  # Handle duo-binary case.
-            pattern_len *= 2  # Because, the XOR pre-coding can invert every other pattern rep.
-        if mod_type == 2:  # Handle PAM-4 case.
-            if pattern_len % 2:
-                pattern_len *= 2  # Because, the bits are taken in pairs, to form the symbols.
+        pattern_len = (pow(2, max(pattern)) - 1) * 2
 
         # - channel output
+        len_x_m1 = len(x) - 1
         actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
+        actual_xings -= ofst
         (
             _,
             t_jitter,
@@ -579,6 +587,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
         # - Tx output
         actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
+        actual_xings -= ofst
         (
             _,
             t_jitter,
@@ -607,6 +617,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
         # - CTLE output
         actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
+        actual_xings -= ofst
         (
             jitter,
             t_jitter,
@@ -634,12 +646,14 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
 
         # - DFE output
-        ignore_until = (nui - eye_uis) * ui + 0.75 * ui  # 0.5 was causing an occasional misalignment.
-        ideal_xings = array([x for x in list(ideal_xings) if x > ignore_until])
-        min_delay = ignore_until + conv_dly
-        actual_xings = find_crossings(
-            t, dfe_out, decision_scaler, min_delay=min_delay, mod_type=mod_type, rising_first=False
-        )
+        ignore_until = (nui - eye_uis) * ui
+        ideal_xings = array(list(filter(lambda x: x >= ignore_until, ideal_xings)))
+        ideal_xings -= ignore_until
+        actual_xings = find_crossings(t, dfe_out, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
+        actual_xings -= ofst
+        actual_xings = array(list(filter(lambda x: x >= ignore_until, actual_xings)))
+        actual_xings -= ignore_until
         (
             jitter,
             t_jitter,
@@ -675,7 +689,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.status = "Updating plots...(sweep %d of %d)" % (sweep_num, num_sweeps)
     except Exception:
         self.status = "Exception: jitter"
-        # raise
+        raise
 
     # Update plots.
     try:
