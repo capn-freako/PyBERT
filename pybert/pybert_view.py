@@ -734,11 +734,19 @@ traits_view = View(
                 ),
                 # HGroup(
                     VGroup(
-                        Item(
-                            name="peak_mag_tune",
-                            label="CTLE: boost (dB)",
-                            tooltip="CTLE peaking magnitude (dB)",
-                            format_str="%4.1f",
+                        HGroup(
+                            Item(
+                                name="peak_mag_tune",
+                                label="CTLE: boost (dB)",
+                                tooltip="CTLE peaking magnitude (dB)",
+                                format_str="%4.1f",
+                            ),
+                            Item(
+                                name="max_mag_tune",
+                                label="Max boost (dB)",
+                                tooltip="CTLE maximum peaking magnitude (dB)",
+                                format_str="%4.1f",
+                            ),
                         ),
                         HGroup(
                             Item(name="peak_freq_tune",
@@ -796,7 +804,7 @@ traits_view = View(
             Item(
                 label="Note: Only CTLE boost will be optimized; please, set peak frequency, bandwidth, and mode appropriately.",
             ),
-            Item("plot_h_tune", editor=ComponentEditor(), show_label=False, springy=True),
+            Item("plot_h_tune", editor=ComponentEditor(high_resolution=False), show_label=False, springy=True),
             HGroup(
                 Item("btn_rst_eq", show_label=False, tooltip="Reset all values to those on the 'Config.' tab."),
                 Item("btn_save_eq", show_label=False, tooltip="Store all values to 'Config.' tab."),
@@ -809,19 +817,19 @@ traits_view = View(
             id="eq_tune",
         ),
         Group(  # Responses
-            Group(Item("plots_h", editor=ComponentEditor(), show_label=False), label="Impulses", id="plots_h"),
-            Group(Item("plots_s", editor=ComponentEditor(), show_label=False), label="Steps", id="plots_s"),
-            Group(Item("plots_p", editor=ComponentEditor(), show_label=False), label="Pulses", id="plots_p"),
-            Group(Item("plots_H", editor=ComponentEditor(), show_label=False), label="Freq. Resp.", id="plots_H"),
+            Group(Item("plots_h", editor=ComponentEditor(high_resolution=False), show_label=False), label="Impulses", id="plots_h"),
+            Group(Item("plots_s", editor=ComponentEditor(high_resolution=False), show_label=False), label="Steps", id="plots_s"),
+            Group(Item("plots_p", editor=ComponentEditor(high_resolution=False), show_label=False), label="Pulses", id="plots_p"),
+            Group(Item("plots_H", editor=ComponentEditor(high_resolution=False), show_label=False), label="Freq. Resp.", id="plots_H"),
             layout='tabbed',
             label='Responses',
             id='responses'
         ),
         Group(  # Results
-            Group(Item("plots_dfe", editor=ComponentEditor(), show_label=False), label="DFE", id="plots_dfe"),
-            Group(Item("plots_out", editor=ComponentEditor(), show_label=False), label="Outputs", id="plots_out"),
-            Group(Item("plots_eye", editor=ComponentEditor(), show_label=False), label="Eyes", id="plots_eye"),
-            Group(Item("plots_bathtub", editor=ComponentEditor(), show_label=False), label="Bathtubs", id="plots_bathtub"),
+            Group(Item("plots_dfe", editor=ComponentEditor(high_resolution=False), show_label=False), label="DFE", id="plots_dfe"),
+            Group(Item("plots_out", editor=ComponentEditor(high_resolution=False), show_label=False), label="Outputs", id="plots_out"),
+            Group(Item("plots_eye", editor=ComponentEditor(high_resolution=False), show_label=False), label="Eyes", id="plots_eye"),
+            Group(Item("plots_bathtub", editor=ComponentEditor(high_resolution=False), show_label=False), label="Bathtubs", id="plots_bathtub"),
             Group(Item("sweep_info", style="readonly", show_label=False), label="Sweep Info"),
             layout='tabbed',
             label='Results',
@@ -829,12 +837,12 @@ traits_view = View(
         ),
         Group(  # Jitter
             Group(
-                Item("plots_jitter_dist", editor=ComponentEditor(), show_label=False),
+                Item("plots_jitter_dist", editor=ComponentEditor(high_resolution=False), show_label=False),
                 label="Jitter Dist.",
                 id="plots_jitter_dist",
             ),
             Group(
-                Item("plots_jitter_spec", editor=ComponentEditor(), show_label=False),
+                Item("plots_jitter_spec", editor=ComponentEditor(high_resolution=False), show_label=False),
                 label="Jitter Spec.",
                 id="plots_jitter_spec",
             ),

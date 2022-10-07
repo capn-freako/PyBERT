@@ -15,8 +15,11 @@ can be used to explore the concepts of serial communication link design.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 from traits.etsconfig.api import ETSConfig
-# ETSConfig.toolkit = 'qt.celiagg'  # Yields unacceptably small font sizes in plot axis labels.
+# ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
+# ETSConfig.toolkit = 'qt4.celiagg'   # Yields unacceptably small font sizes in plot axis labels.
 # ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
+# ETSConfig.toolkit = 'qt.image'     # Program runs, but very small fonts in plot titles and axis labels.
+# ETSConfig.toolkit = 'wx'           # Crashes on launch.
 
 from datetime import datetime
 import platform
@@ -253,19 +256,20 @@ class RxOptThread(StoppableThread):
 
         pybert.status = "Optimizing Rx..."
         max_iter = pybert.max_iter
+        max_mag_tune = pybert.max_mag_tune
 
         try:
             if gDebugOptimize:
                 res = minimize_scalar(
                     self.do_opt_rx,
-                    bounds=(0, gMaxCTLEPeak),
+                    bounds=(0, max_mag_tune),
                     method="Bounded",
                     options={"disp": True, "maxiter": max_iter},
                 )
             else:
                 res = minimize_scalar(
                     self.do_opt_rx,
-                    bounds=(0, gMaxCTLEPeak),
+                    bounds=(0, max_mag_tune),
                     method="Bounded",
                     options={"disp": False, "maxiter": max_iter},
                 )
@@ -300,19 +304,20 @@ class CoOptThread(StoppableThread):
 
         pybert.status = "Co-optimizing..."
         max_iter = pybert.max_iter
+        max_mag_tune = pybert.max_mag_tune
 
         try:
             if gDebugOptimize:
                 res = minimize_scalar(
                     self.do_coopt,
-                    bounds=(0, gMaxCTLEPeak),
+                    bounds=(0, max_mag_tune),
                     method="Bounded",
                     options={"disp": True, "maxiter": max_iter},
                 )
             else:
                 res = minimize_scalar(
                     self.do_coopt,
-                    bounds=(0, gMaxCTLEPeak),
+                    bounds=(0, max_mag_tune),
                     method="Bounded",
                     options={"disp": False, "maxiter": max_iter},
                 )
@@ -400,8 +405,6 @@ class PyBERT(HasTraits):
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
     )                          #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
-    # padded = Bool(False)       #: Zero pad imported Touchstone data? (Default = False)
-    # windowed = Bool(False)     #: Apply windowing to the Touchstone data? (Default = False)
     f_step = Float(10)         #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(gRdc)            #: Channel d.c. resistance (Ohms/m).
@@ -420,20 +423,21 @@ class PyBERT(HasTraits):
             TxTapTuner(name="Post-tap2", enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
             TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
         ]
-    )  #: EQ optimizer list of TxTapTuner objects.
-    rx_bw_tune = Float(gBW)  #: EQ optimizer CTLE bandwidth (GHz).
-    peak_freq_tune = Float(gPeakFreq)  #: EQ optimizer CTLE peaking freq. (GHz).
-    peak_mag_tune = Float(gPeakMag)  #: EQ optimizer CTLE peaking mag. (dB).
+    )                                      #: EQ optimizer list of TxTapTuner objects.
+    rx_bw_tune = Float(gBW)                #: EQ optimizer CTLE bandwidth (GHz).
+    peak_freq_tune = Float(gPeakFreq)      #: EQ optimizer CTLE peaking freq. (GHz).
+    peak_mag_tune = Float(gPeakMag)        #: EQ optimizer CTLE peaking mag. (dB).
+    max_mag_tune = Float(20)               #: EQ optimizer CTLE peaking mag. (dB).
     ctle_offset_tune = Float(gCTLEOffset)  #: EQ optimizer CTLE d.c. offset (dB).
     ctle_mode_tune = Enum(
         "Off", "Passive", "AGC", "Manual"
-    )  #: EQ optimizer CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
-    use_dfe_tune = Bool(gUseDfe)  #: EQ optimizer DFE select (Bool).
-    n_taps_tune = Int(gNtaps)  #: EQ optimizer # DFE taps.
-    max_iter = Int(50)  #: EQ optimizer max. # of optimization iterations.
+    )                                      #: EQ optimizer CTLE mode
+    use_dfe_tune = Bool(gUseDfe)           #: EQ optimizer DFE select (Bool).
+    n_taps_tune = Int(gNtaps)              #: EQ optimizer # DFE taps.
+    max_iter = Int(50)                     #: EQ optimizer max. # of optimization iterations.
     tx_opt_thread = Instance(TxOptThread)  #: Tx EQ optimization thread.
     rx_opt_thread = Instance(RxOptThread)  #: Rx EQ optimization thread.
-    coopt_thread = Instance(CoOptThread)  #: EQ co-optimization thread.
+    coopt_thread = Instance(CoOptThread)   #: EQ co-optimization thread.
 
     # - Tx
     vod = Float(gVod)  #: Tx differential output voltage (V)
