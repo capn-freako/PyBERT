@@ -14,7 +14,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 from numpy import array, sign, zeros
 from scipy.signal import iirfilter
 
-from pybert.cdr import CDR
+from pybert.sim.cdr import CDR
 
 gNch_taps = 3  # Number of taps used in summing node filter.
 
