@@ -53,8 +53,7 @@ def csdr_num():
     xs = yield sepBy1(number, slash)
     if len(xs) > 1:
         return float(xs[0]) + 1j * float(xs[1])
-    else:
-        return float(xs[0])
+    return float(xs[0])
 
 
 def val_samps(n):

@@ -6,9 +6,7 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-from time import perf_counter
-
-clock = perf_counter
+import time
 
 import scipy.signal as sig
 from numpy import (
@@ -117,8 +115,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     num_sweeps = self.num_sweeps
     sweep_num = self.sweep_num
 
-    start_time = clock()
-    self.status = "Running channel...(sweep %d of %d)" % (sweep_num, num_sweeps)
+    start_time = time.perf_counter()
+    self.status = f"Running channel...(sweep {int(sweep_num)} of {int(num_sweeps)})"
 
     if not self.seed:  # The user sets `seed` to zero to indicate that she wants new bits generated for each run.
         self.run_count += 1  # Force regeneration of bit stream.
@@ -190,9 +188,9 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         chnl_h = self.calc_chnl_h()
         chnl_out = convolve(self.x, chnl_h)[: len(t)]
 
-        self.channel_perf = nbits * nspb / (clock() - start_time)
-        split_time = clock()
-        self.status = "Running Tx...(sweep %d of %d)" % (sweep_num, num_sweeps)
+        self.channel_perf = nbits * nspb / (time.perf_counter() - start_time)
+        split_time = time.perf_counter()
+        self.status = f"Running Tx...(sweep {int(sweep_num)} of {int(num_sweeps)})"
     except Exception:
         self.status = "Exception: channel"
         raise
@@ -310,9 +308,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.tx_out_H = tx_out_H
         self.tx_out_h = tx_out_h
 
-        self.tx_perf = nbits * nspb / (clock() - split_time)
-        split_time = clock()
-        self.status = "Running CTLE...(sweep %d of %d)" % (sweep_num, num_sweeps)
+        self.tx_perf = nbits * nspb / (time.perf_counter() - split_time)
+        split_time = time.perf_counter()
+        self.status = f"Running CTLE...(sweep {int(sweep_num)} of {int(num_sweeps)})"
     except Exception:
         self.status = "Exception: Tx"
         raise
@@ -431,9 +429,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.conv_dly = conv_dly
         self.conv_dly_ix = conv_dly_ix
 
-        self.ctle_perf = nbits * nspb / (clock() - split_time)
-        split_time = clock()
-        self.status = "Running DFE/CDR...(sweep %d of %d)" % (sweep_num, num_sweeps)
+        self.ctle_perf = nbits * nspb / (time.perf_counter() - split_time)
+        split_time = time.perf_counter()
+        self.status = f"Running DFE/CDR...(sweep {int(sweep_num)} of {int(num_sweeps)})"
     except Exception:
         self.status = "Exception: Rx"
         raise
@@ -512,9 +510,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.dfe_out_s = dfe_out_s
         self.dfe_out = dfe_out
 
-        self.dfe_perf = nbits * nspb / (clock() - split_time)
-        split_time = clock()
-        self.status = "Analyzing jitter...(sweep %d of %d)" % (sweep_num, num_sweeps)
+        self.dfe_perf = nbits * nspb / (time.perf_counter() - split_time)
+        split_time = time.perf_counter()
+        self.status = f"Analyzing jitter...(sweep {int(sweep_num)} of {int(num_sweeps)})"
     except Exception:
         self.status = "Exception: DFE"
         raise
@@ -684,10 +682,10 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         dfe_spec = self.jitter_spectrum_dfe
         self.jitter_rejection_ratio = zeros(len(dfe_spec))
 
-        self.jitter_perf = nbits * nspb / (clock() - split_time)
-        self.total_perf = nbits * nspb / (clock() - start_time)
-        split_time = clock()
-        self.status = "Updating plots...(sweep %d of %d)" % (sweep_num, num_sweeps)
+        self.jitter_perf = nbits * nspb / (time.perf_counter() - split_time)
+        self.total_perf = nbits * nspb / (time.perf_counter() - start_time)
+        split_time = time.perf_counter()
+        self.status = f"Updating plots...(sweep {int(sweep_num)} of {int(num_sweeps)})"
     except Exception:
         self.status = "Exception: jitter"
         raise
@@ -699,7 +697,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             if not initial_run:
                 update_eyes(self)
 
-        self.plotting_perf = nbits * nspb / (clock() - split_time)
+        self.plotting_perf = nbits * nspb / (time.perf_counter() - split_time)
         self.status = "Ready."
     except Exception:
         self.status = "Exception: plotting"
@@ -742,7 +740,7 @@ def update_results(self):
     tap_weights = transpose(array(self.adaptation))
     i = 1
     for tap_weight in tap_weights:
-        self.plotdata.set_data("tap%d_weights" % i, tap_weight)
+        self.plotdata.set_data(f"tap{int(i)}_weights", tap_weight)
         i += 1
     self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))
     if self._old_n_taps != n_taps:
@@ -753,10 +751,10 @@ def update_results(self):
         )
         for i in range(self.n_taps):
             new_plot.plot(
-                ("tap_weight_index", "tap%d_weights" % (i + 1)),
+                ("tap_weight_index", f"tap{int(i + 1)}_weights"),
                 type="line",
                 color="auto",
-                name="tap%d" % (i + 1),
+                name=f"tap{int(i + 1)}",
             )
         new_plot.title = "DFE Adaptation"
         new_plot.tools.append(PanTool(new_plot, constrain=True, constrain_key=None, constrain_direction="x"))

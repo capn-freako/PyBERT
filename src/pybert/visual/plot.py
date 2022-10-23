@@ -37,10 +37,10 @@ def make_plots(self, n_dfe_taps):
     )
     for i in range(n_dfe_taps):
         plot9.plot(
-            ("tap_weight_index", "tap%d_weights" % (i + 1)),
+            ("tap_weight_index", f"tap{int(i + 1)}_weights"),
             type="line",
             color="auto",
-            name="tap%d" % (i + 1),
+            name=f"tap{int(i + 1)}",
         )
     plot9.title = "DFE Adaptation"
     plot9.tools.append(PanTool(plot9, constrain=True, constrain_key=None, constrain_direction="x"))

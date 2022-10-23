@@ -207,7 +207,7 @@ class TxOptThread(StoppableThread):
                 if res["success"]:
                     pybert.status = "Optimization succeeded."
                 else:
-                    pybert.status = "Optimization failed: {}".format(res["message"])
+                    pybert.status = f"Optimization failed: {res['message']}"
 
         except Exception as err:
             pybert.status = err
@@ -260,7 +260,7 @@ class RxOptThread(StoppableThread):
             if res["success"]:
                 pybert.status = "Optimization succeeded."
             else:
-                pybert.status = "Optimization failed: {}".format(res["message"])
+                pybert.status = f"Optimization failed: {res['message']}"
 
         except Exception as err:
             pybert.status = err
@@ -309,7 +309,7 @@ class CoOptThread(StoppableThread):
             if res["success"]:
                 pybert.status = "Optimization succeeded."
             else:
-                pybert.status = "Optimization failed: {}".format(res["message"])
+                pybert.status = f"Optimization failed: {res['message']}"
 
         except Exception as err:
             pybert.status = err
@@ -347,7 +347,7 @@ class TxTapTuner(HasTraits):
 
         # Super-class initialization is ABSOLUTELY NECESSARY, in order
         # to get all the Traits/UI machinery setup correctly.
-        super(TxTapTuner, self).__init__()
+        super().__init__()
 
         self.name = name
         self.enabled = enabled
@@ -609,7 +609,7 @@ class PyBERT(HasTraits):
         """Log a message to the console and, optionally, to terminal and/or
         pop-up dialog."""
         _msg = msg.strip()
-        txt = "\n[{}]: PyBERT: {}\n".format(datetime.now(), _msg)
+        txt = f"\n[{datetime.now()}]: PyBERT: {_msg}\n"
         if self.debug:
             ## In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt, flush=True)
@@ -638,7 +638,7 @@ class PyBERT(HasTraits):
 
         # Super-class initialization is ABSOLUTELY NECESSARY, in order
         # to get all the Traits/UI machinery setup correctly.
-        super(PyBERT, self).__init__()
+        super().__init__()
 
         self.GUI = gui
         self.log("Started.")
@@ -1174,19 +1174,19 @@ class PyBERT(HasTraits):
         info_str += "      <TH>Component</TH><TH>Performance (Msmpls./min.)</TH>\n"
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
-        info_str += '      <TD align="center">Channel</TD><TD>%6.3f</TD>\n' % (self.channel_perf * 60.0e-6)
+        info_str += f'      <TD align="center">Channel</TD><TD>{self.channel_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
-        info_str += '      <TD align="center">Tx Preemphasis</TD><TD>%6.3f</TD>\n' % (self.tx_perf * 60.0e-6)
+        info_str += f'      <TD align="center">Tx Preemphasis</TD><TD>{self.tx_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
-        info_str += '      <TD align="center">CTLE</TD><TD>%6.3f</TD>\n' % (self.ctle_perf * 60.0e-6)
+        info_str += f'      <TD align="center">CTLE</TD><TD>{self.ctle_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
-        info_str += '      <TD align="center">DFE</TD><TD>%6.3f</TD>\n' % (self.dfe_perf * 60.0e-6)
+        info_str += f'      <TD align="center">DFE</TD><TD>{self.dfe_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
-        info_str += '      <TD align="center">Jitter Analysis</TD><TD>%6.3f</TD>\n' % (self.jitter_perf * 60.0e-6)
+        info_str += f'      <TD align="center">Jitter Analysis</TD><TD>{self.jitter_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
         info_str += '      <TD align="center"><strong>TOTAL</strong></TD><TD><strong>%6.3f</strong></TD>\n' % (
@@ -1194,7 +1194,7 @@ class PyBERT(HasTraits):
         )
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
-        info_str += '      <TD align="center">Plotting</TD><TD>%6.3f</TD>\n' % (self.plotting_perf * 60.0e-6)
+        info_str += f'      <TD align="center">Plotting</TD><TD>{self.plotting_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += "  </TABLE>\n"
 
@@ -1231,9 +1231,9 @@ class PyBERT(HasTraits):
             self.status,
             self.total_perf * 60.0e-6,
         )
-        dly_str = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.0e9)
-        err_str = "         | BitErrs: %d" % self.bit_errs
-        pwr_str = "         | TxPwr (W): %4.2f" % self.rel_power
+        dly_str = f"         | ChnlDly (ns):    {self.chnl_dly * 1000000000.0:5.3f}"
+        err_str = f"         | BitErrs: {int(self.bit_errs)}"
+        pwr_str = f"         | TxPwr (W): {self.rel_power:4.2f}"
         status_str += dly_str + err_str + pwr_str
 
         try:
@@ -1399,7 +1399,7 @@ class PyBERT(HasTraits):
                 self.tx_ami_file = ""
         except Exception as err:
             self.status = "IBIS file parsing error!"
-            error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
+            error_message = f"Failed to open and/or parse IBIS file!\n{err}"
             self.log(error_message, alert=True, exception=err)
         self._tx_ibis_dir = dName
         self.status = "Done."
@@ -1409,7 +1409,7 @@ class PyBERT(HasTraits):
             self.tx_ami_valid = False
             if new_value:
                 self.log(f"Parsing Tx AMI file, '{new_value}'...")
-                with open(new_value) as pfile:
+                with open(new_value, mode="r", encoding="utf-8") as pfile:
                     pcfg = AMIParamConfigurator(pfile.read())
                 if pcfg.ami_parsing_errors:
                     self.log(f"Non-fatal parsing errors:\n{pcfg.ami_parsing_errors}")
@@ -1427,7 +1427,7 @@ class PyBERT(HasTraits):
                 self.tx_ami_valid = True
         except Exception as err:
             raise
-            error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
+            error_message = f"Failed to open and/or parse AMI file!\n{err}"
             self.log(error_message, alert=True)
 
     def _tx_dll_file_changed(self, new_value):
@@ -1438,7 +1438,7 @@ class PyBERT(HasTraits):
                 self._tx_model = model
                 self.tx_dll_valid = True
         except Exception as err:
-            error_message = "Failed to open DLL/SO file!\n{}".format(err)
+            error_message = f"Failed to open DLL/SO file!\n{err}"
             self.log(error_message, alert=True)
 
     def _rx_ibis_file_changed(self, new_value):
@@ -1461,7 +1461,7 @@ class PyBERT(HasTraits):
                 self.rx_ami_file = ""
         except Exception as err:
             self.status = "IBIS file parsing error!"
-            error_message = "Failed to open and/or parse IBIS file!\n{}".format(err)
+            error_message = f"Failed to open and/or parse IBIS file!\n{err}"
             self.log(error_message, alert=True)
             raise
         self._rx_ibis_dir = dName
@@ -1471,9 +1471,9 @@ class PyBERT(HasTraits):
         try:
             self.rx_ami_valid = False
             if new_value:
-                with open(new_value) as pfile:
+                with open(new_value, mode="r", encoding="utf-8") as pfile:
                     pcfg = AMIParamConfigurator(pfile.read())
-                self.log("Parsing Rx AMI file, '{}'...\n{}".format(new_value, pcfg.ami_parsing_errors))
+                self.log(f"Parsing Rx AMI file, '{new_value}'...\n{pcfg.ami_parsing_errors}")
                 self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
                 _rx_returns_impulse = pcfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"])
                 if not _rx_returns_impulse:
@@ -1485,7 +1485,7 @@ class PyBERT(HasTraits):
                 self._rx_cfg = pcfg
                 self.rx_ami_valid = True
         except Exception as err:
-            error_message = "Failed to open and/or parse AMI file!\n{}".format(err)
+            error_message = f"Failed to open and/or parse AMI file!\n{err}"
             self.log(error_message, alert=True)
 
     def _rx_dll_file_changed(self, new_value):
@@ -1496,11 +1496,11 @@ class PyBERT(HasTraits):
                 self._rx_model = model
                 self.rx_dll_valid = True
         except Exception as err:
-            error_message = "Failed to open DLL/SO file!\n{}".format(err)
+            error_message = f"Failed to open DLL/SO file!\n{err}"
             self.log(error_message, alert=True)
 
     def _rx_use_ami_changed(self, new_value):
-        if new_value == True:
+        if new_value:
             self.use_dfe = False
 
     def check_pat_len(self):
@@ -1508,7 +1508,7 @@ class PyBERT(HasTraits):
         pat_len = 2 * pow(2, max(taps))
         if pat_len > 5 * self.nbits:
             self.log(
-                f"Accurate jitter decomposition may not be possible with the current configuration!\n \
+                "Accurate jitter decomposition may not be possible with the current configuration!\n \
 Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
                 alert=True,
             )

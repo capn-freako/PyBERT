@@ -21,7 +21,6 @@ from numpy import (
     convolve,
     cumsum,
     diff,
-    float,
     histogram,
     insert,
     log10,
@@ -61,7 +60,7 @@ def moving_average(a, n=3):
             vector unchanged.
     """
 
-    ret = cumsum(a, dtype=float)
+    ret = cumsum(a, dtype=np.float)
     ret[n:] = ret[n:] - ret[:-n]
     return insert(ret[n - 1 :], 0, ret[n - 1] * ones(n - 1)) / n
 
@@ -100,7 +99,7 @@ def find_crossing_times(
     """
 
     if len(t) != len(x):
-        raise ValueError("len(t) (%d) and len(x) (%d) need to be the same." % (len(t), len(x)))
+        raise ValueError(f"len(t) ({len(t)}) and len(x) ({len(x)}) need to be the same.")
 
     t = array(t)
     x = array(x)
@@ -129,20 +128,18 @@ def find_crossing_times(
 
     i = 0
     if min_delay:
-        assert min_delay < xings[-1], "min_delay ({}) must be less than last crossing time ({}).".format(
-            min_delay, xings[-1]
-        )
+        assert min_delay < xings[-1], f"min_delay ({min_delay}) must be less than last crossing time ({xings[-1]})."
         while xings[i] < min_delay:
             i += 1
 
     if debug:
-        print("min_delay: {}".format(min_delay))
-        print("rising_first: {}".format(rising_first))
-        print("i: {}".format(i))
-        print("max_mag_x: {}".format(max_mag_x))
-        print("min_mag_x: {}".format(min_mag_x))
-        print("xings[0]: {}".format(xings[0]))
-        print("xings[i]: {}".format(xings[i]))
+        print(f"min_delay: {min_delay}")
+        print(f"rising_first: {rising_first}")
+        print(f"i: {i}")
+        print(f"max_mag_x: {max_mag_x}")
+        print(f"min_mag_x: {min_mag_x}")
+        print(f"xings[0]: {xings[0]}")
+        print(f"xings[i]: {xings[i]}")
 
     try:
         if rising_first and diff_sign_x[xing_ix[i]] < 0.0:
@@ -194,9 +191,7 @@ def find_crossings(
         [float]: The signal threshold crossing times.
     """
 
-    assert mod_type >= 0 and mod_type <= 2, "ERROR: pybert_util.find_crossings(): Unknown modulation type: {}".format(
-        mod_type
-    )
+    assert mod_type >= 0 and mod_type <= 2, f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}"
 
     xings = []
     if mod_type == 0:  # NRZ
@@ -280,9 +275,11 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
 
     def my_hist(x):
         """Calculates the probability mass function (PMF) of the input vector,
-        enforcing an output range of [-UI/2, +UI/2], sweeping everything in
-        [-UI, -UI/2] into the first bin, and everything in [UI/2, UI] into the
-        last bin."""
+        enforcing an output range of [-UI/2, +UI/2], sweeping everything in.
+
+        [-UI, -UI/2] into the first bin, and everything in [UI/2, UI]
+        into the last bin.
+        """
         hist, bin_edges = histogram(
             x, [-ui] + [-ui / 2.0 + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui]
         )
@@ -290,7 +287,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
             [-ui / 2.0] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) for i in range(len(bin_edges) - 3)] + [ui / 2.0]
         )
 
-        return (array(list(map(float, hist))) / sum(hist), bin_centers)
+        return (array(list(map(np.float, hist))) / sum(hist), bin_centers)
 
     # Check inputs.
     if not ideal_xings.all():
@@ -742,7 +739,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
     elif mode in ("Manual", "AGC"):
         H *= pow(10.0, dc_offset / 20.0) / abs(H[0])  # Enforce d.c. offset.
     else:
-        raise RuntimeError("pybert_util.make_ctle(): Unrecognized value for 'mode' parameter: {}.".format(mode))
+        raise RuntimeError(f"pybert_util.make_ctle(): Unrecognized value for 'mode' parameter: {mode}.")
 
     return (w, H)
 
@@ -901,11 +898,11 @@ def import_time(filename, sample_per):
     ts = []
     xs = []
     tmp = []
-    with open(filename, mode="rU") as file:
+    with open(filename, mode="rU", encoding="utf-8") as file:
         for line in file:
             try:
                 vals = [_f for _f in re.split("[, ;:]+", line) if _f]
-                tmp = list(map(float, vals[0:2]))
+                tmp = list(map(np.float, vals[0:2]))
                 ts.append(tmp[0])
                 xs.append(tmp[1])
             except:
@@ -1014,10 +1011,9 @@ def import_freq(filename):
     # Convert to a 2-port network.
     if rs == 4:  # 4-port Touchstone files are assumed single-ended!
         return sdd_21(ntwk)
-    elif rs == 2:
+    if rs == 2:
         return ntwk
-    else:  # rs == 1
-        return rf.network.one_port_2_two_port(ntwk)
+    return rf.network.one_port_2_two_port(ntwk)
 
 
 def lfsr_bits(taps, seed):
@@ -1095,7 +1091,7 @@ def submodules(package):
     rst = {}
 
     for imp, name, _ in pkgutil.iter_modules(package.__path__):
-        fullModuleName = "{0}.{1}".format(package.__name__, name)
+        fullModuleName = f"{package.__name__}.{name}"
         mod = importlib.import_module(fullModuleName, package=package.__path__)
         rst[name] = mod
 
