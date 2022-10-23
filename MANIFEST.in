@@ -1,10 +1,4 @@
 include README.md
 include LICENSE
-include requirements.txt
-include pybert/images/icon.png
-recursive-include docs/
-recursive-include tests/
-global-exclude *.swp
-global-exclude *.DS_Store
-global-exclude *.buildinfo
-
+recursive-include src/pybert/images *.png
+recursive-include docs *
