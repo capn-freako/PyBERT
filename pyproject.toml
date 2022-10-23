@@ -20,7 +20,7 @@ dependencies = [
         "scipy==1.9.2",
         "traits==6.4.1",
         "traitsui==7.4.1",
-        "PyIBIS-AMI>=3.5.0",
+        "PyIBIS-AMI>=3.5.7",
         "pyyaml==6.0",
         "pyside2==5.15.2.1",
 ]
