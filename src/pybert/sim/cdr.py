@@ -1,5 +1,4 @@
-"""
-Behavioral model of a "bang-bang" clock data recovery (CDR) unit.
+"""Behavioral model of a "bang-bang" clock data recovery (CDR) unit.
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -11,16 +10,14 @@ integration into the larger *PyBERT* framework.
 
 Copyright (c) 2019 by David Banas; All rights reserved World wide.
 """
-from typing import Sequence, Tuple, List
+from typing import List, Sequence, Tuple
 
 from numpy import array, mean, sign, where
 
 
 class CDR:
-    """
-    A class providing behavioral modeling of a 'bang- bang' clock
-    data recovery (CDR) unit.
-    """
+    """A class providing behavioral modeling of a 'bang- bang' clock data
+    recovery (CDR) unit."""
 
     def __init__(
         self,
@@ -74,8 +71,7 @@ class CDR:
         return self._locked
 
     def adapt(self, samples: Sequence[float]) -> Tuple[float, bool]:
-        """
-        Adapt period/phase, according to 3 samples.
+        """Adapt period/phase, according to 3 samples.
 
         Should be called, when the clock has just struck.
 
@@ -92,7 +88,6 @@ class CDR:
         Returns:
             (float, bool): The new unit interval estimate, in seconds, and
                 a flag indicating 'locked' status.
-
         """
 
         integral_corrections = self.integral_corrections
@@ -124,7 +119,7 @@ class CDR:
             proportional_corrections.pop(0)
         if len(proportional_corrections) == n_lock_ave:
             x = array(integral_corrections)  # - mean(integral_corrections)
-            var = sum(x ** 2) / n_lock_ave
+            var = sum(x**2) / n_lock_ave
             lock = abs(mean(proportional_corrections) / delta_t) < rel_lock_tol and (var / delta_t) < rel_lock_tol
             lockeds.append(lock)
             if len(lockeds) > lock_sustain:

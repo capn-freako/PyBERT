@@ -1,5 +1,4 @@
-"""
-Simulation configuration data encapsulation, for PyBERT.
+"""Simulation configuration data encapsulation, for PyBERT.
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -15,8 +14,7 @@ Copyright (c) 2017 by David Banas; All rights reserved World wide.
 
 
 class PyBertCfg:
-    """
-    PyBERT simulation configuration data encapsulation class.
+    """PyBERT simulation configuration data encapsulation class.
 
     This class is used to encapsulate that subset of the configuration
     data for a PyBERT instance, which is to be saved when the user
@@ -24,10 +22,8 @@ class PyBertCfg:
     """
 
     def __init__(self, the_PyBERT):
-        """
-        Copy just that subset of the supplied PyBERT instance's
-        __dict__, which should be saved during pickling.
-        """
+        """Copy just that subset of the supplied PyBERT instance's __dict__,
+        which should be saved during pickling."""
 
         # Simulation Control
         self.bit_rate = the_PyBERT.bit_rate

@@ -1,5 +1,4 @@
-"""
-Plot definitions for PyBERT class.
+"""Plot definitions for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -9,20 +8,18 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
 from chaco.api import ColorMapper, GridPlotContainer, Plot
 from chaco.tools.api import PanTool, ZoomTool
-
-from numpy import linspace
-
 from pybert.sim.simulation import update_eyes
 
 PLOT_SPACING = 20
 
+
 def make_plots(self, n_dfe_taps):
-    """ Create the plots used by the PyBERT GUI."""
+    """Create the plots used by the PyBERT GUI."""
 
     post_chnl_str = "Channel"
-    post_tx_str   = "Channel + Tx Preemphasis"
+    post_tx_str = "Channel + Tx Preemphasis"
     post_ctle_str = "Channel + Tx Preemphasis + CTLE (+ AMI DFE)"
-    post_dfe_str  = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + PyBERT DFE"
+    post_dfe_str = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + PyBERT DFE"
 
     plotdata = self.plotdata
 
@@ -33,10 +30,17 @@ def make_plots(self, n_dfe_taps):
     plot2.index_axis.title = "Time (ns)"
     plot2.value_axis.title = "UI (ps)"
 
-    plot9 = Plot(plotdata, auto_colors=["red", "orange", "yellow", "green", "blue", "purple"], padding_left=75,)
+    plot9 = Plot(
+        plotdata,
+        auto_colors=["red", "orange", "yellow", "green", "blue", "purple"],
+        padding_left=75,
+    )
     for i in range(n_dfe_taps):
         plot9.plot(
-            ("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d" % (i + 1),
+            ("tap_weight_index", "tap%d_weights" % (i + 1)),
+            type="line",
+            color="auto",
+            name="tap%d" % (i + 1),
         )
     plot9.title = "DFE Adaptation"
     plot9.tools.append(PanTool(plot9, constrain=True, constrain_key=None, constrain_direction="x"))

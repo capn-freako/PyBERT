@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
-"""
-Bit error rate tester (BERT) simulator, written in Python.
+"""Bit error rate tester (BERT) simulator, written in Python.
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -14,31 +13,23 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-from traits.etsconfig.api import ETSConfig
-# ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
-# ETSConfig.toolkit = 'qt4.celiagg'   # Yields unacceptably small font sizes in plot axis labels.
-# ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
-# ETSConfig.toolkit = 'qt.image'     # Program runs, but very small fonts in plot titles and axis labels.
-# ETSConfig.toolkit = 'wx'           # Crashes on launch.
-
-from datetime import datetime
 import platform
+from datetime import datetime
+from os.path import dirname, join
 from threading import Event, Thread
 from time import sleep
 
-from math  import isnan
-from cmath import rect, phase
-
-from chaco.api import ArrayPlotData, GridPlotContainer
 import numpy as np
-from numpy import array, convolve, cos, diff, exp, ones, pad, pi, real, resize, sinc, where, zeros
+import skrf as rf
+from numpy import array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
 from numpy.fft import fft, irfft
 from numpy.random import randint
-from os.path import dirname, join
+from pyibisami import __version__ as PyAMI_VERSION
+from pyibisami.ami.model import AMIModel
+from pyibisami.ami.parser import AMIParamConfigurator
+from pyibisami.ibis.file import IBISModel
 from scipy.optimize import minimize, minimize_scalar
 from traits.api import (
-    cached_property,
-    HTML,
     Array,
     Bool,
     Button,
@@ -53,42 +44,37 @@ from traits.api import (
     Property,
     Range,
     String,
-    Trait,
+    cached_property,
 )
+from traits.etsconfig.api import ETSConfig
 from traitsui.message import message
 
-import skrf as rf
-
-from pyibisami import __version__ as PyAMI_VERSION
-from pyibisami.ami.parser import AMIParamConfigurator
-from pyibisami.ami.model import AMIModel
-from pyibisami.ibis.file import IBISModel
-
-from pybert import __version__ as VERSION
-from pybert import __date__ as DATE
+from chaco.api import ArrayPlotData, GridPlotContainer
 from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
-
+from pybert import __date__ as DATE
+from pybert import __version__ as VERSION
 from pybert.sim.simulation import my_run_simulation
-from pybert.visual.help import help_str
-from pybert.visual.plot import make_plots
 from pybert.utility import (
-    calc_G,
     calc_gamma,
     import_channel,
+    interp_s2p,
     lfsr_bits,
     make_ctle,
     pulse_center,
     safe_log10,
-    trim_impulse,
-    submodules,
     sdd_21,
-    H_2_s2p,
-    interp_time,
-    cap_mag,
-    interp_s2p,
-    renorm_s2p,
+    trim_impulse,
 )
+from pybert.visual.help import help_str
+from pybert.visual.plot import make_plots
+
+# ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
+# ETSConfig.toolkit = 'qt4.celiagg'   # Yields unacceptably small font sizes in plot axis labels.
+# ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
+# ETSConfig.toolkit = 'qt.image'     # Program runs, but very small fonts in plot titles and axis labels.
+# ETSConfig.toolkit = 'wx'           # Crashes on launch.
+
 
 gDebugStatus = False
 gDebugOptimize = False
@@ -114,8 +100,8 @@ gZ0 = 100.0  # characteristic impedance in LC region (Ohms)
 gv0 = 0.67  # relative propagation velocity (c)
 gl_ch = 1.0  # cable length (m)
 gRn = (
-    0.001
-)  # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+    0.001  # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
+)
 # - Tx
 gVod = 1.0  # output drive strength (Vp)
 gRs = 100  # differential source impedance (Ohms)
@@ -149,8 +135,7 @@ gThresh = 6  # threshold for identifying periodic jitter spectral elements (sigm
 
 
 class StoppableThread(Thread):
-    """
-    Thread class with a stop() method.
+    """Thread class with a stop() method.
 
     The thread itself has to check regularly for the stopped() condition.
 
@@ -162,7 +147,8 @@ class StoppableThread(Thread):
         self._stop_event = Event()
 
     def stop(self):
-        """Called by thread invoker, when thread should be stopped prematurely."""
+        """Called by thread invoker, when thread should be stopped
+        prematurely."""
         self._stop_event.set()
 
     def stopped(self):
@@ -173,9 +159,8 @@ class StoppableThread(Thread):
 
 
 class TxOptThread(StoppableThread):
-    """Used to run Tx tap weight optimization in its own thread,
-    in order to preserve GUI responsiveness.
-    """
+    """Used to run Tx tap weight optimization in its own thread, in order to
+    preserve GUI responsiveness."""
 
     def run(self):
         """Run the Tx equalization optimization thread."""
@@ -244,9 +229,8 @@ class TxOptThread(StoppableThread):
 
 
 class RxOptThread(StoppableThread):
-    """Used to run Rx tap weight optimization in its own thread,
-    in order to preserve GUI responsiveness.
-    """
+    """Used to run Rx tap weight optimization in its own thread, in order to
+    preserve GUI responsiveness."""
 
     def run(self):
         """Run the Rx equalization optimization thread."""
@@ -294,7 +278,8 @@ class RxOptThread(StoppableThread):
 
 
 class CoOptThread(StoppableThread):
-    """Used to run co-optimization in its own thread, in order to preserve GUI responsiveness."""
+    """Used to run co-optimization in its own thread, in order to preserve GUI
+    responsiveness."""
 
     def run(self):
         """Run the Tx/Rx equalization co-optimization thread."""
@@ -373,70 +358,72 @@ class TxTapTuner(HasTraits):
 
 
 class PyBERT(HasTraits):
-    """
-    A serial communication link bit error rate tester (BERT) simulator with a GUI interface.
+    """A serial communication link bit error rate tester (BERT) simulator with
+    a GUI interface.
 
-    Useful for exploring the concepts of serial communication link design.
+    Useful for exploring the concepts of serial communication link
+    design.
     """
 
     # Independent variables
 
     # - Simulation Control
-    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)     #: (Gbps)
-    nbits = Range(low=1000, high=10000000, value=gNbits)      #: Number of bits to simulate.
-    pattern = Map({
-        "PRBS-7":  [ 7,  6],
-        "PRBS-15": [15, 14],
-        "PRBS-23": [23, 18],
-        }, default_value="PRBS-7")
+    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)  #: (Gbps)
+    nbits = Range(low=1000, high=10000000, value=gNbits)  #: Number of bits to simulate.
+    pattern = Map(
+        {
+            "PRBS-7": [7, 6],
+            "PRBS-15": [15, 14],
+            "PRBS-23": [23, 18],
+        },
+        default_value="PRBS-7",
+    )
     seed = Int(1)  # LFSR seed. 0 means regenerate bits, using a new random seed, each run.
-    nspb = Range(low=2, high=256, value=gNspb)                #: Signal vector samples per bit.
+    nspb = Range(low=2, high=256, value=gNspb)  #: Signal vector samples per bit.
     eye_bits = Int(gNbits // 5)  #: # of bits used to form eye. (Default = last 20%)
-    mod_type = List([0])         #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
-    num_sweeps = Int(1)          #: Number of sweeps to run.
+    mod_type = List([0])  #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    num_sweeps = Int(1)  #: Number of sweeps to run.
     sweep_num = Int(1)
     sweep_aves = Int(gNumAve)
     do_sweep = Bool(False)  #: Run sweeps? (Default = False)
-    debug = Bool(False)     #: Send log messages to terminal, as well as console, when True. (Default = False)
+    debug = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
 
     # - Channel Control
     ch_file = File(
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
-    )                          #: Channel file name.
+    )  #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
-    f_step = Float(10)         #: Frequency step to use when constructing H(f). (Default = 10 MHz)
+    f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
-    Rdc = Float(gRdc)            #: Channel d.c. resistance (Ohms/m).
-    w0 = Float(gw0)              #: Channel transition frequency (rads./s).
-    R0 = Float(gR0)              #: Channel skin effect resistance (Ohms/m).
-    Theta0 = Float(gTheta0)      #: Channel loss tangent (unitless).
-    Z0 = Float(gZ0)              #: Channel characteristic impedance, in LC region (Ohms).
-    v0 = Float(gv0)              #: Channel relative propagation velocity (c).
-    l_ch = Float(gl_ch)          #: Channel length (m).
+    Rdc = Float(gRdc)  #: Channel d.c. resistance (Ohms/m).
+    w0 = Float(gw0)  #: Channel transition frequency (rads./s).
+    R0 = Float(gR0)  #: Channel skin effect resistance (Ohms/m).
+    Theta0 = Float(gTheta0)  #: Channel loss tangent (unitless).
+    Z0 = Float(gZ0)  #: Channel characteristic impedance, in LC region (Ohms).
+    v0 = Float(gv0)  #: Channel relative propagation velocity (c).
+    l_ch = Float(gl_ch)  #: Channel length (m).
 
     # - EQ Tune
     tx_tap_tuners = List(
         [
-            TxTapTuner(name="Pre-tap",   enabled=True,  min_val=-0.2, max_val=0.2, value=0.0),
+            TxTapTuner(name="Pre-tap", enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
             TxTapTuner(name="Post-tap1", enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
             TxTapTuner(name="Post-tap2", enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
             TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
         ]
-    )                                      #: EQ optimizer list of TxTapTuner objects.
-    rx_bw_tune = Float(gBW)                #: EQ optimizer CTLE bandwidth (GHz).
-    peak_freq_tune = Float(gPeakFreq)      #: EQ optimizer CTLE peaking freq. (GHz).
-    peak_mag_tune = Float(gPeakMag)        #: EQ optimizer CTLE peaking mag. (dB).
-    max_mag_tune = Float(20)               #: EQ optimizer CTLE peaking mag. (dB).
+    )  #: EQ optimizer list of TxTapTuner objects.
+    rx_bw_tune = Float(gBW)  #: EQ optimizer CTLE bandwidth (GHz).
+    peak_freq_tune = Float(gPeakFreq)  #: EQ optimizer CTLE peaking freq. (GHz).
+    peak_mag_tune = Float(gPeakMag)  #: EQ optimizer CTLE peaking mag. (dB).
+    max_mag_tune = Float(20)  #: EQ optimizer CTLE peaking mag. (dB).
     ctle_offset_tune = Float(gCTLEOffset)  #: EQ optimizer CTLE d.c. offset (dB).
-    ctle_mode_tune = Enum(
-        "Off", "Passive", "AGC", "Manual"
-    )                                      #: EQ optimizer CTLE mode
-    use_dfe_tune = Bool(gUseDfe)           #: EQ optimizer DFE select (Bool).
-    n_taps_tune = Int(gNtaps)              #: EQ optimizer # DFE taps.
-    max_iter = Int(50)                     #: EQ optimizer max. # of optimization iterations.
+    ctle_mode_tune = Enum("Off", "Passive", "AGC", "Manual")  #: EQ optimizer CTLE mode
+    use_dfe_tune = Bool(gUseDfe)  #: EQ optimizer DFE select (Bool).
+    n_taps_tune = Int(gNtaps)  #: EQ optimizer # DFE taps.
+    max_iter = Int(50)  #: EQ optimizer max. # of optimization iterations.
     tx_opt_thread = Instance(TxOptThread)  #: Tx EQ optimization thread.
     rx_opt_thread = Instance(RxOptThread)  #: Rx EQ optimization thread.
-    coopt_thread = Instance(CoOptThread)   #: EQ co-optimization thread.
+    coopt_thread = Instance(CoOptThread)  #: EQ co-optimization thread.
 
     # - Tx
     vod = Float(gVod)  #: Tx differential output voltage (V)
@@ -447,7 +434,7 @@ class PyBERT(HasTraits):
     rn = Float(gRn)  #: Standard deviation of Gaussian random noise (V).
     tx_taps = List(
         [
-            TxTapTuner(name="Pre-tap",   enabled=True,  min_val=-0.2, max_val=0.2, value=0.0),
+            TxTapTuner(name="Pre-tap", enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
             TxTapTuner(name="Post-tap1", enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
             TxTapTuner(name="Post-tap2", enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
             TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
@@ -463,7 +450,13 @@ class PyBERT(HasTraits):
     tx_ami_valid = Bool(False)  #: (Bool)
     tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     tx_dll_valid = Bool(False)  #: (Bool)
-    tx_ibis_file = File("", entries=5, filter=["IBIS Models (*.ibs)|*.ibs",])  #: (File)
+    tx_ibis_file = File(
+        "",
+        entries=5,
+        filter=[
+            "IBIS Models (*.ibs)|*.ibs",
+        ],
+    )  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
     tx_use_ibis = Bool(False)  #: (Bool)
 
@@ -541,11 +534,11 @@ class PyBERT(HasTraits):
     # About
     perf_info = Property(String, depends_on=["total_perf"])
     ident = String(
-        '<H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
+        "<H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
     {}<BR>\n \
     {}<BR><BR>\n\n \
     {};<BR>\n \
-    All rights reserved World wide.'.format(
+    All rights reserved World wide.".format(
             VERSION, AUTHORS, DATE, COPY
         )
     )
@@ -606,14 +599,15 @@ class PyBERT(HasTraits):
     btn_abort = Button(label="Abort")
     btn_cfg_tx = Button(label="Configure")  # Configure AMI parameters.
     btn_cfg_rx = Button(label="Configure")
-    btn_sel_tx = Button(label="Select")     # Select IBIS model.
+    btn_sel_tx = Button(label="Select")  # Select IBIS model.
     btn_sel_rx = Button(label="Select")
-    btn_view_tx = Button(label="View")      # View IBIS model.
+    btn_view_tx = Button(label="View")  # View IBIS model.
     btn_view_rx = Button(label="View")
 
     # Logger & Pop-up
     def log(self, msg, alert=False, exception=None):
-        """Log a message to the console and, optionally, to terminal and/or pop-up dialog."""
+        """Log a message to the console and, optionally, to terminal and/or
+        pop-up dialog."""
         _msg = msg.strip()
         txt = "\n[{}]: PyBERT: {}\n".format(datetime.now(), _msg)
         if self.debug:
@@ -627,8 +621,7 @@ class PyBERT(HasTraits):
 
     # Default initialization
     def __init__(self, run_simulation=True, gui=True):
-        """
-        Initial plot setup occurs here.
+        """Initial plot setup occurs here.
 
         In order to populate the data structure we need to
         construct the plots, we must run the simulation.
@@ -771,10 +764,7 @@ class PyBERT(HasTraits):
     # Dependent variable definitions
     @cached_property
     def _get_t(self):
-        """
-        Calculate the system time vector, in seconds.
-
-        """
+        """Calculate the system time vector, in seconds."""
 
         ui = self.ui
         nspui = self.nspui
@@ -787,16 +777,15 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_t_ns(self):
-        """
-        Calculate the system time vector, in ns.
-        """
+        """Calculate the system time vector, in ns."""
 
         return self.t * 1.0e9
 
     @cached_property
     def _get_f(self):
-        """
-        Calculate the frequency vector appropriate for indexing non-shifted FFT output, in Hz.
+        """Calculate the frequency vector appropriate for indexing non-shifted
+        FFT output, in Hz.
+
         # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
 
         Note: Changed to positive freqs. only, in conjunction w/ irfft() usage.
@@ -809,17 +798,15 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_w(self):
-        """
-        System frequency vector, in rads./sec.
-        """
+        """System frequency vector, in rads./sec."""
         return 2 * pi * self.f
 
     @cached_property
     def _get_bits(self):
         "Generate the bit stream."
         pattern = self.pattern_
-        seed    = self.seed
-        nbits   = self.nbits
+        seed = self.seed
+        nbits = self.nbits
 
         if not seed:  # The user sets `seed` to zero when she wants a new random seed generated for each run.
             seed = randint(128)
@@ -846,9 +833,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_nui(self):
-        """
-        Returns the number of unit intervals in the test vectors.
-        """
+        """Returns the number of unit intervals in the test vectors."""
 
         mod_type = self.mod_type[0]
         nbits = self.nbits
@@ -861,9 +846,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_nspui(self):
-        """
-        Returns the number of samples per unit interval.
-        """
+        """Returns the number of samples per unit interval."""
 
         mod_type = self.mod_type[0]
         nspb = self.nspb
@@ -876,9 +859,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_eye_uis(self):
-        """
-        Returns the number of unit intervals to use for eye construction.
-        """
+        """Returns the number of unit intervals to use for eye construction."""
 
         mod_type = self.mod_type[0]
         eye_bits = self.eye_bits
@@ -891,9 +872,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ideal_h(self):
-        """
-        Returns the ideal link impulse response.
-        """
+        """Returns the ideal link impulse response."""
 
         ui = self.ui
         nspui = self.nspui
@@ -922,9 +901,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_symbols(self):
-        """
-        Generate the symbol stream.
-        """
+        """Generate the symbol stream."""
 
         mod_type = self.mod_type[0]
         vod = self.vod
@@ -955,9 +932,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ffe(self):
-        """
-        Generate the Tx pre-emphasis FIR numerator.
-        """
+        """Generate the Tx pre-emphasis FIR numerator."""
 
         tap_tuners = self.tx_taps
 
@@ -1036,16 +1011,16 @@ class PyBERT(HasTraits):
                 rj_rej_total = rj_tx / rj_dfe
 
             # Temporary, until I figure out DPI independence.
-            info_str  = '<style>\n'
+            info_str = "<style>\n"
             # info_str += ' table td {font-size: 36px;}\n'
             # info_str += ' table th {font-size: 38px;}\n'
-            info_str += ' table td {font-size: 12em;}\n'
-            info_str += ' table th {font-size: 14em;}\n'
-            info_str += '</style>\n'
+            info_str += " table td {font-size: 12em;}\n"
+            info_str += " table th {font-size: 14em;}\n"
+            info_str += "</style>\n"
             # info_str += '<font size="+3">\n'
             # End Temp.
 
-            info_str  = "<H1>Jitter Rejection by Equalization Component</H1>\n"
+            info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
 
             info_str += "<H2>Tx Preemphasis</H2>\n"
             info_str += '<TABLE border="1">\n'
@@ -1067,10 +1042,16 @@ class PyBERT(HasTraits):
             )
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
-            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (pj_chnl, pj_tx,)
+            info_str += '<TD align="center">Pj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (
+                pj_chnl,
+                pj_tx,
+            )
             info_str += "</TR>\n"
             info_str += '<TR align="right">\n'
-            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (rj_chnl, rj_tx,)
+            info_str += '<TD align="center">Rj</TD><TD>%6.3f</TD><TD>%6.3f</TD><TD>n/a</TD>\n' % (
+                rj_chnl,
+                rj_tx,
+            )
             info_str += "</TR>\n"
             info_str += "</TABLE>\n"
 
@@ -1187,7 +1168,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_perf_info(self):
-        info_str  = "<H2>Performance by Component</H2>\n"
+        info_str = "<H2>Performance by Component</H2>\n"
         info_str += '  <TABLE border="1">\n'
         info_str += '    <TR align="center">\n'
         info_str += "      <TH>Component</TH><TH>Performance (Msmpls./min.)</TH>\n"
@@ -1246,7 +1227,10 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (self.status, self.total_perf * 60.0e-6,)
+        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (
+            self.status,
+            self.total_perf * 60.0e-6,
+        )
         dly_str = "         | ChnlDly (ns):    %5.3f" % (self.chnl_dly * 1.0e9)
         err_str = "         | BitErrs: %d" % self.bit_errs
         pwr_str = "         | TxPwr (W): %4.2f" % self.rel_power
@@ -1305,7 +1289,7 @@ class PyBERT(HasTraits):
         ctle_h = self.ctle_h_tune
 
         tx_out_h = convolve(tx_h, chnl_h)
-        return(convolve(ctle_h, tx_out_h))
+        return convolve(ctle_h, tx_out_h)
 
     @cached_property
     def _get_cost(self):
@@ -1370,9 +1354,9 @@ class PyBERT(HasTraits):
         for i in range(n_taps):
             ix = clock_pos + (i + 1) * nspui
             if ix < len_p:
-                err += p[ix]**2
+                err += p[ix] ** 2
 
-        return err / p[clock_pos]**2
+        return err / p[clock_pos] ** 2
 
     # Changed property handlers.
     def _status_str_changed(self):
@@ -1400,7 +1384,7 @@ class PyBERT(HasTraits):
         dName = ""
         try:
             self.tx_ibis_valid = False
-            self.tx_use_ami    = False
+            self.tx_use_ami = False
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
             ibis = IBISModel(new_value, True, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
@@ -1516,16 +1500,18 @@ class PyBERT(HasTraits):
             self.log(error_message, alert=True)
 
     def _rx_use_ami_changed(self, new_value):
-        if(new_value == True):
+        if new_value == True:
             self.use_dfe = False
 
     def check_pat_len(self):
         taps = self.pattern_
         pat_len = 2 * pow(2, max(taps))
-        if pat_len > 5*self.nbits:
-            self.log( f"Accurate jitter decomposition may not be possible with the current configuration!\n \
-Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
-                    , alert=True)
+        if pat_len > 5 * self.nbits:
+            self.log(
+                f"Accurate jitter decomposition may not be possible with the current configuration!\n \
+Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
+                alert=True,
+            )
 
     def _pattern_changed(self, new_value):
         self.check_pat_len()
@@ -1537,8 +1523,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
     def calc_chnl_h(self):
-        """
-        Calculates the channel impulse response.
+        """Calculates the channel impulse response.
 
         Also sets, in 'self':
          - chnl_dly:
@@ -1553,7 +1538,6 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
              channel step response
          - chnl_p:
              channel pulse response
-
         """
 
         t = self.t
@@ -1577,12 +1561,12 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
-            l_ch   = self.l_ch
-            v0     = self.v0 * 3.0e8
-            R0     = self.R0
-            w0     = self.w0
-            Rdc    = self.Rdc
-            Z0     = self.Z0
+            l_ch = self.l_ch
+            v0 = self.v0 * 3.0e8
+            R0 = self.R0
+            w0 = self.w0
+            Rdc = self.Rdc
+            Z0 = self.Z0
             Theta0 = self.Theta0
             # - Calculate propagation constant, characteristic impedance, and transfer function.
             gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
@@ -1590,8 +1574,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
             H = exp(-l_ch * gamma)
             self.H = H
             # - Use the transfer function and characteristic impedance to form "perfectly matched" network.
-            tmp = np.array(list(zip(zip(zeros(len_f),H),zip(H,zeros(len_f)))))
-            ch_s2p_pre = rf.Network(s=tmp, f=f/1e9, z0=Zc)
+            tmp = np.array(list(zip(zip(zeros(len_f), H), zip(H, zeros(len_f)))))
+            ch_s2p_pre = rf.Network(s=tmp, f=f / 1e9, z0=Zc)
             # - And, finally, renormalize to driver impedance.
             ch_s2p_pre.renormalize(Rs)
         ch_s2p_pre.name = "ch_s2p_pre"
@@ -1613,12 +1597,12 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
                 skrf.Network: Resultant 2-port network.
             """
             ts4N = rf.Network(ts4f)  # Grab the 4-port single-ended on-die network.
-            ntwk = sdd_21(ts4N)      # Convert it to a differential, 2-port network.
+            ntwk = sdd_21(ts4N)  # Convert it to a differential, 2-port network.
             ntwk2 = interp_s2p(ntwk, s2p.f)  # Interpolate to system freqs.
             if isRx:
-                res = s2p ** ntwk2
+                res = s2p**ntwk2
             else:  # Tx
-                res = ntwk2 ** s2p
+                res = ntwk2**s2p
             return (res, ts4N, ntwk2)
 
         if self.tx_use_ibis:
@@ -1628,10 +1612,10 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
             self.Rs = Rs  # Primarily for debugging.
             self.Cs = Cs
             if self.tx_use_ts4:
-                fname  = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
+                fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
-                self.ts4N   = ts4N
-                self.ntwk   = ntwk
+                self.ts4N = ts4N
+                self.ntwk = ntwk
         if self.rx_use_ibis:
             model = self._rx_ibis.model
             RL = model.zin * 2
@@ -1641,24 +1625,24 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
             if self.debug:
                 self.log(f"RL: {RL}, Cp: {Cp}")
             if self.rx_use_ts4:
-                fname  = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters","Ts4file"])[0])
+                fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
-                self.ts4N   = ts4N
-                self.ntwk   = ntwk
+                self.ts4N = ts4N
+                self.ntwk = ntwk
         ch_s2p.name = "ch_s2p"
         self.ch_s2p = ch_s2p
 
         # Calculate channel impulse response.
-        Zt   = RL / (1 + 1j*w*RL*Cp)    # Rx termination impedance
+        Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
         ch_s2p_term = ch_s2p.copy()
         ch_s2p_term_z0 = ch_s2p.z0.copy()
-        ch_s2p_term_z0[:,1] = Zt
+        ch_s2p_term_z0[:, 1] = Zt
         ch_s2p_term.renormalize(ch_s2p_term_z0)
         ch_s2p_term.name = "ch_s2p_term"
         self.ch_s2p_term = ch_s2p_term
         # We take the transfer function, H, to be a ratio of voltages.
         # So, we must normalize our (now generalized) S-parameters.
-        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:,1] / ch_s2p_term.z0[:,0])
+        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])
         chnl_h = irfft(chnl_H)
         # t_h, chnl_h = ch_s2p_term.s21.impulse_response()
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
@@ -1675,15 +1659,15 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
 
-        self.chnl_h         = chnl_h
-        self.len_h          = len(chnl_h)
-        self.chnl_dly       = chnl_dly
-        self.chnl_H         = chnl_H
+        self.chnl_h = chnl_h
+        self.len_h = len(chnl_h)
+        self.chnl_dly = chnl_dly
+        self.chnl_H = chnl_H
         self.chnl_trimmed_H = chnl_trimmed_H
-        self.start_ix       = start_ix
-        self.t_ns_chnl      = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
-        self.chnl_s         = chnl_s
-        self.chnl_p         = chnl_p
+        self.start_ix = start_ix
+        self.t_ns_chnl = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
+        self.chnl_s = chnl_s
+        self.chnl_p = chnl_p
 
         return chnl_h
 

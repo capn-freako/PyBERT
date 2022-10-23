@@ -1,5 +1,4 @@
-"""
-General purpose utilities for PyBERT.
+"""General purpose utilities for PyBERT.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -7,13 +6,15 @@ Original date:   September 27, 2014 (Copied from pybert_cntrl.py.)
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-import os.path
-import re
-from functools import reduce
-import pkgutil
 import importlib
+import os.path
+import pkgutil
+import re
+from cmath import phase, rect
+from functools import reduce
 
 import numpy as np
+import skrf as rf
 from numpy import (
     array,
     concatenate,
@@ -38,11 +39,9 @@ from numpy import (
     zeros,
 )
 from numpy.fft import fft, ifft
-from scipy.signal import freqs, get_window, invres
-from scipy.stats import norm
 from scipy.linalg import inv
-import skrf as rf
-from cmath import rect, phase
+from scipy.signal import freqs, invres
+from scipy.stats import norm
 
 debug = False
 gDebugOptimize = False
@@ -50,8 +49,7 @@ gMaxCTLEPeak = 20  # max. allowed CTLE peaking (dB) (when optimizing, only)
 
 
 def moving_average(a, n=3):
-    """
-    Calculates a sliding average over the input vector.
+    """Calculates a sliding average over the input vector.
 
     Args:
         a([float]): Input vector to be averaged.
@@ -69,10 +67,14 @@ def moving_average(a, n=3):
 
 
 def find_crossing_times(
-    t, x, min_delay: float = 0.0, rising_first: bool = True, min_init_dev: float = 0.1, thresh: float = 0.0,
+    t,
+    x,
+    min_delay: float = 0.0,
+    rising_first: bool = True,
+    min_init_dev: float = 0.1,
+    thresh: float = 0.0,
 ):
-    """
-    Finds the threshold crossing times of the input signal.
+    """Finds the threshold crossing times of the input signal.
 
     Args:
         t([float]): Vector of sample times. Intervals do NOT need to be
@@ -155,10 +157,15 @@ def find_crossing_times(
 
 
 def find_crossings(
-    t, x, amplitude=1.0, min_delay: float = 0.0, rising_first: bool = True, min_init_dev=0.1, mod_type=0,
+    t,
+    x,
+    amplitude=1.0,
+    min_delay: float = 0.0,
+    rising_first: bool = True,
+    min_init_dev=0.1,
+    mod_type=0,
 ):
-    """
-    Finds the crossing times in a signal, according to the modulation type.
+    """Finds the crossing times in a signal, according to the modulation type.
 
     Args:
         t([float]): The times associated with each signal sample.
@@ -235,8 +242,8 @@ def find_crossings(
 
 
 def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
-    """
-    Calculate the jitter in a set of actual zero crossings, given the ideal crossings and unit interval.
+    """Calculate the jitter in a set of actual zero crossings, given the ideal
+    crossings and unit interval.
 
     Inputs:
 
@@ -272,11 +279,10 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     """
 
     def my_hist(x):
-        """
-        Calculates the probability mass function (PMF) of the input vector,
-        enforcing an output range of [-UI/2, +UI/2], sweeping everything in [-UI, -UI/2] into the first bin,
-        and everything in [UI/2, UI] into the last bin.
-        """
+        """Calculates the probability mass function (PMF) of the input vector,
+        enforcing an output range of [-UI/2, +UI/2], sweeping everything in
+        [-UI, -UI/2] into the first bin, and everything in [UI/2, UI] into the
+        last bin."""
         hist, bin_edges = histogram(
             x, [-ui] + [-ui / 2.0 + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui]
         )
@@ -323,9 +329,9 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
             jitter.append(3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.
             jitter.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
             skip_next_ideal_xing = True  # If we missed one, we missed two.
-        else:           # Noise may produce several crossings. 
-            xings = []  # We find all those within the interval [-UI/2, +UI/2] 
-            j = i       # centered around the ideal crossing, and take the average.
+        else:  # Noise may produce several crossings.
+            xings = []  # We find all those within the interval [-UI/2, +UI/2]
+            j = i  # centered around the ideal crossing, and take the average.
             while j < len(actual_xings) and actual_xings[j] <= max_t:
                 xings.append(actual_xings[j])
                 j += 1
@@ -446,8 +452,8 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
 
 
 def make_uniform(t, jitter, ui, nbits):
-    """
-    Make the jitter vector uniformly sampled in time, by zero-filling where necessary.
+    """Make the jitter vector uniformly sampled in time, by zero-filling where
+    necessary.
 
     The trick, here, is creating a uniformly sampled input vector for the FFT operation,
     since the jitter samples are almost certainly not uniformly sampled.
@@ -468,7 +474,6 @@ def make_uniform(t, jitter, ui, nbits):
     - y      : The uniformly sampled, zero padded jitter vector.
 
     - y_ix   : The indices where y is valid (i.e. - not zero padded).
-
     """
 
     if len(t) < len(jitter):
@@ -495,8 +500,7 @@ def make_uniform(t, jitter, ui, nbits):
 
 
 def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
-    """
-    Calculates propagation constant from cross-sectional parameters.
+    """Calculates propagation constant from cross-sectional parameters.
 
     The formula's applied are taken from Howard Johnson's "Metallic Transmission Model"
     (See "High Speed Signal Propagation", Sec. 3.1.)
@@ -521,21 +525,20 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):
     if w[0] == 0:
         w[0] = 1.0e-12
 
-    Rac = R0 * sqrt(2 * 1j * w / w0)                     # AC resistance vector
-    R = sqrt(power(Rdc, 2) + power(Rac, 2))              # total resistance vector
-    L0 = Z0 / v0                                         # "external" inductance per unit length (H/m)
-    C0 = 1.0 / (Z0 * v0)                                 # nominal capacitance per unit length (F/m)
+    Rac = R0 * sqrt(2 * 1j * w / w0)  # AC resistance vector
+    R = sqrt(power(Rdc, 2) + power(Rac, 2))  # total resistance vector
+    L0 = Z0 / v0  # "external" inductance per unit length (H/m)
+    C0 = 1.0 / (Z0 * v0)  # nominal capacitance per unit length (F/m)
     C = C0 * power((1j * w / w0), (-2.0 * Theta0 / pi))  # complex capacitance per unit length (F/m)
-    gamma = sqrt((1j * w * L0 + R) * (1j * w * C))       # propagation constant (nepers/m)
-    Zc = sqrt((1j * w * L0 + R) / (1j * w * C))          # characteristic impedance (Ohms)
-    Zc[0] = Z0                                           # d.c. impedance blows up and requires correcting.
+    gamma = sqrt((1j * w * L0 + R) * (1j * w * C))  # propagation constant (nepers/m)
+    Zc = sqrt((1j * w * L0 + R) / (1j * w * C))  # characteristic impedance (Ohms)
+    Zc[0] = Z0  # d.c. impedance blows up and requires correcting.
 
     return (gamma, Zc)
 
 
 def calc_gamma_RLGC(R, L, G, C, ws):
-    """
-    Calculates propagation constant from R, L, G, and C.
+    """Calculates propagation constant from R, L, G, and C.
 
     Inputs:
       - R           resistance per unit length (Ohms/m)
@@ -562,8 +565,7 @@ def calc_gamma_RLGC(R, L, G, C, ws):
 
 
 def calc_G(H, Rs, Cs, Zc, RL, Cp, ws):
-    """
-    Calculates fully loaded transfer function of complete channel.
+    """Calculates fully loaded transfer function of complete channel.
 
     Inputs:
       - H     unloaded transfer function of interconnect
@@ -587,10 +589,9 @@ def calc_G(H, Rs, Cs, Zc, RL, Cp, ws):
         Cp = 1e-18
 
     def Rpar2C(R, C):
-        """Calculates the impedance of the parallel combination of
-        `R` with two `C`s in series.
-        """
-        return R / (1.0 + 1j * w * R * C/2)
+        """Calculates the impedance of the parallel combination of `R` with two
+        `C`s in series."""
+        return R / (1.0 + 1j * w * R * C / 2)
 
     # Impedance looking back into the Tx output is a simple parallel RC network.
     Zs = Rpar2C(Rs, Cs)  # The parasitic capacitances are in series.
@@ -605,12 +606,11 @@ def calc_G(H, Rs, Cs, Zc, RL, Cp, ws):
     # Reflection coefficient at Tx:
     R2 = (Zs - Zc) / (Zs + Zc)
     # Fully loaded channel transfer function:
-    return (Y * H * (1 + R1) / (1 - R1 * R2 * H ** 2))
+    return Y * H * (1 + R1) / (1 - R1 * R2 * H**2)
 
 
 def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
-    """
-    Calculates the "eye" diagram of the input signal vector.
+    """Calculates the "eye" diagram of the input signal vector.
 
     Args:
         ui(float): unit interval (s)
@@ -654,7 +654,8 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
             interp_fac = (start_time - start_ix * tsamp) // tsamp
             i = 0
             for (samp1, samp2) in zip(
-                ys[start_ix : start_ix + 2 * samps_per_ui], ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui],
+                ys[start_ix : start_ix + 2 * samps_per_ui],
+                ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui],
             ):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
@@ -671,10 +672,10 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
 
     return img_array
 
+
 def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
-    """
-    Generate the frequency response of a continuous time linear
-    equalizer (CTLE), given the:
+    """Generate the frequency response of a continuous time linear equalizer
+    (CTLE), given the:
 
     - signal path bandwidth,
     - peaking specification
@@ -719,7 +720,6 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
 
       - w, H         The resultant complex frequency response, at the
                      given frequencies.
-
     """
 
     if mode == "Off":
@@ -748,8 +748,8 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
 
 
 def trim_impulse(g, min_len=0, max_len=1000000):
-    """
-    Trim impulse response, for more useful display, by:
+    """Trim impulse response, for more useful display, by:
+
       - clipping off the tail, after 99.8% of the total power has been
         captured (Using 99.9% was causing problems; I don't know why.), and
       - setting the "front porch" length equal to 20% of the total length.
@@ -767,7 +767,6 @@ def trim_impulse(g, min_len=0, max_len=1000000):
       - g_trim    trimmed impulse response
 
       - start_ix  index of first returned sample
-
     """
 
     # Trim off potential FFT artifacts from the end and capture peak location.
@@ -775,7 +774,7 @@ def trim_impulse(g, min_len=0, max_len=1000000):
     max_ix = np.argmax(g)
 
     # Capture 99.8% of the total energy.
-    Pt = 0.998 * sum(g ** 2)
+    Pt = 0.998 * sum(g**2)
     i = 0
     P = 0
     while P < Pt:
@@ -784,14 +783,15 @@ def trim_impulse(g, min_len=0, max_len=1000000):
     stop_ix = min(max_ix + max_len, max(i, max_ix + min_len))
 
     # Set "front/back porch" to 20%, doing appropriate bounds checking.
-    length   = stop_ix - max_ix
-    porch    = length // 3
-    start_ix = max(0,      max_ix  - porch)
-    stop_ix  = min(len(g), stop_ix + porch)
-    return (g[start_ix : stop_ix].copy(), start_ix)
+    length = stop_ix - max_ix
+    porch = length // 3
+    start_ix = max(0, max_ix - porch)
+    stop_ix = min(len(g), stop_ix + porch)
+    return (g[start_ix:stop_ix].copy(), start_ix)
+
 
 def H_2_s2p(H, Zc, fs, Zref=50):
-    """ Convert transfer function to 2-port network.
+    """Convert transfer function to 2-port network.
 
     Args:
         H([complex]): transfer function of medium alone.
@@ -804,10 +804,10 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     Returns:
         skrf.Network: 2-port network representing the channel to which `H` and `Zc` pertain.
     """
-    ws = 2*pi*fs
-    G    = calc_G(H, Zref, 0, Zc, Zref, 0, ws)  # See `calc_G()` docstring.
-    R1   = (Zc - Zref) / (Zc + Zref)  # reflection coefficient looking into medium from port
-    T1    = 1 + R1           # transmission coefficient looking into medium from port
+    ws = 2 * pi * fs
+    G = calc_G(H, Zref, 0, Zc, Zref, 0, ws)  # See `calc_G()` docstring.
+    R1 = (Zc - Zref) / (Zc + Zref)  # reflection coefficient looking into medium from port
+    T1 = 1 + R1  # transmission coefficient looking into medium from port
     # Z2   = Zc * (1 - R1*H**2)         # impedance looking into port 2, with port 1 terminated into Zref
     # R2   = (Z2 - Zc) / (Z2 + Zc)      # reflection coefficient looking out of port 2
     # R2   = 0
@@ -815,14 +815,14 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     # Calculate the one-way transfer function of medium capped w/ ports of the chosen impedance.
     # G    = calc_G(H, Zref, 0, Zc, Zc, 0, 2*pi*fs)  # See `calc_G()` docstring.
     # R2   = -R1                        # reflection coefficient looking into ref. impedance
-    S21  = G
+    S21 = G
     # S11  = 2*(R1 + H*R2*G)
-    tmp  = np.array(list(zip(zip(S11,S21),zip(S21,S11))))
-    return rf.Network(s=tmp, f=fs/1e9, z0=[Zref,Zref])  # `f` is presumed to have units: GHz.
+    tmp = np.array(list(zip(zip(S11, S21), zip(S21, S11))))
+    return rf.Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
+
 
 def import_channel(filename, sample_per, fs, zref=100):
-    """
-    Read in a channel description file.
+    """Read in a channel description file.
 
     Args:
         filename(str): Name of file from which to import channel description.
@@ -857,14 +857,14 @@ def import_channel(filename, sample_per, fs, zref=100):
         if h[-1] > (max(h) / 2.0):  # step response?
             h = diff(h)  # impulse response is derivative of step response.
         Nf = len(fs)
-        h.resize(2*Nf)
+        h.resize(2 * Nf)
         H = fft(h * sample_per)[:Nf]  # Keep the positive frequencies only.
         ts2N = H_2_s2p(H, zref * ones(len(H)), fs, Zref=zref)
     return ts2N
 
+
 def interp_time(ts, xs, sample_per):
-    """
-    Resample time domain data, using linear interpolation.
+    """Resample time domain data, using linear interpolation.
 
     Args:
         ts([float]): Original time values.
@@ -888,9 +888,8 @@ def interp_time(ts, xs, sample_per):
 
 
 def import_time(filename, sample_per):
-    """
-    Read in a time domain waveform file, resampling as
-    appropriate, via linear interpolation.
+    """Read in a time domain waveform file, resampling as appropriate, via
+    linear interpolation.
 
     Args:
         filename(str): Name of waveform file to read in.
@@ -917,8 +916,8 @@ def import_time(filename, sample_per):
 
 
 def sdd_21(ntwk, norm=0.5):
-    """
-    Given a 4-port single-ended network, return its differential 2-port network.
+    """Given a 4-port single-ended network, return its differential 2-port
+    network.
 
     Args:
         ntwk(skrf.Network): 4-port single ended network.
@@ -930,11 +929,11 @@ def sdd_21(ntwk, norm=0.5):
         skrf.Network: Sdd (2-port).
     """
     mm = se2mm(ntwk)
-    return rf.Network(frequency=ntwk.f/1e9, s=mm.s[:,0:2,0:2], z0=mm.z0[:,0:2])
+    return rf.Network(frequency=ntwk.f / 1e9, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
+
 
 def se2mm(ntwk, norm=0.5):
-    """
-    Given a 4-port single-ended network, return its mixed mode equivalent.
+    """Given a 4-port single-ended network, return its mixed mode equivalent.
 
     Args:
         ntwk(skrf.Network): 4-port single ended network.
@@ -951,48 +950,47 @@ def se2mm(ntwk, norm=0.5):
     """
     # Confirm correct network dimmensions.
     (fs, rs, cs) = ntwk.s.shape
-    assert (rs == cs), "Non-square Touchstone file S-matrix!"
-    assert (rs == 4),  "Touchstone file must have 4 ports!"
-    
+    assert rs == cs, "Non-square Touchstone file S-matrix!"
+    assert rs == 4, "Touchstone file must have 4 ports!"
+
     # Detect/correct "1 => 3" port numbering.
     ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
     if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
         ntwk.renumber((1, 2), (2, 1))
-    
+
     # Convert S-parameter data.
     s = np.zeros(ntwk.s.shape, dtype=complex)
-    s[:,0,0] = norm * (ntwk.s11 - ntwk.s13 - ntwk.s31 + ntwk.s33).s.flatten()
-    s[:,0,1] = norm * (ntwk.s12 - ntwk.s14 - ntwk.s32 + ntwk.s34).s.flatten()
-    s[:,0,2] = norm * (ntwk.s11 + ntwk.s13 - ntwk.s31 - ntwk.s33).s.flatten()
-    s[:,0,3] = norm * (ntwk.s12 + ntwk.s14 - ntwk.s32 - ntwk.s34).s.flatten()
-    s[:,1,0] = norm * (ntwk.s21 - ntwk.s23 - ntwk.s41 + ntwk.s43).s.flatten()
-    s[:,1,1] = norm * (ntwk.s22 - ntwk.s24 - ntwk.s42 + ntwk.s44).s.flatten()
-    s[:,1,2] = norm * (ntwk.s21 + ntwk.s23 - ntwk.s41 - ntwk.s43).s.flatten()
-    s[:,1,3] = norm * (ntwk.s22 + ntwk.s24 - ntwk.s42 - ntwk.s44).s.flatten()
-    s[:,2,0] = norm * (ntwk.s11 - ntwk.s13 + ntwk.s31 - ntwk.s33).s.flatten()
-    s[:,2,1] = norm * (ntwk.s12 - ntwk.s14 + ntwk.s32 - ntwk.s34).s.flatten()
-    s[:,2,2] = norm * (ntwk.s11 + ntwk.s13 + ntwk.s31 + ntwk.s33).s.flatten()
-    s[:,2,3] = norm * (ntwk.s12 + ntwk.s14 + ntwk.s32 + ntwk.s34).s.flatten()
-    s[:,3,0] = norm * (ntwk.s21 - ntwk.s23 + ntwk.s41 - ntwk.s43).s.flatten()
-    s[:,3,1] = norm * (ntwk.s22 - ntwk.s24 + ntwk.s42 - ntwk.s44).s.flatten()
-    s[:,3,2] = norm * (ntwk.s21 + ntwk.s23 + ntwk.s41 + ntwk.s43).s.flatten()
-    s[:,3,3] = norm * (ntwk.s22 + ntwk.s24 + ntwk.s42 + ntwk.s44).s.flatten()
+    s[:, 0, 0] = norm * (ntwk.s11 - ntwk.s13 - ntwk.s31 + ntwk.s33).s.flatten()
+    s[:, 0, 1] = norm * (ntwk.s12 - ntwk.s14 - ntwk.s32 + ntwk.s34).s.flatten()
+    s[:, 0, 2] = norm * (ntwk.s11 + ntwk.s13 - ntwk.s31 - ntwk.s33).s.flatten()
+    s[:, 0, 3] = norm * (ntwk.s12 + ntwk.s14 - ntwk.s32 - ntwk.s34).s.flatten()
+    s[:, 1, 0] = norm * (ntwk.s21 - ntwk.s23 - ntwk.s41 + ntwk.s43).s.flatten()
+    s[:, 1, 1] = norm * (ntwk.s22 - ntwk.s24 - ntwk.s42 + ntwk.s44).s.flatten()
+    s[:, 1, 2] = norm * (ntwk.s21 + ntwk.s23 - ntwk.s41 - ntwk.s43).s.flatten()
+    s[:, 1, 3] = norm * (ntwk.s22 + ntwk.s24 - ntwk.s42 - ntwk.s44).s.flatten()
+    s[:, 2, 0] = norm * (ntwk.s11 - ntwk.s13 + ntwk.s31 - ntwk.s33).s.flatten()
+    s[:, 2, 1] = norm * (ntwk.s12 - ntwk.s14 + ntwk.s32 - ntwk.s34).s.flatten()
+    s[:, 2, 2] = norm * (ntwk.s11 + ntwk.s13 + ntwk.s31 + ntwk.s33).s.flatten()
+    s[:, 2, 3] = norm * (ntwk.s12 + ntwk.s14 + ntwk.s32 + ntwk.s34).s.flatten()
+    s[:, 3, 0] = norm * (ntwk.s21 - ntwk.s23 + ntwk.s41 - ntwk.s43).s.flatten()
+    s[:, 3, 1] = norm * (ntwk.s22 - ntwk.s24 + ntwk.s42 - ntwk.s44).s.flatten()
+    s[:, 3, 2] = norm * (ntwk.s21 + ntwk.s23 + ntwk.s41 + ntwk.s43).s.flatten()
+    s[:, 3, 3] = norm * (ntwk.s22 + ntwk.s24 + ntwk.s42 + ntwk.s44).s.flatten()
 
     # Convert port impedances.
     f = ntwk.f
     z = np.zeros((len(f), 4), dtype=complex)
-    z[:,0] = ntwk.z0[:,0] + ntwk.z0[:,2]
-    z[:,1] = ntwk.z0[:,1] + ntwk.z0[:,3]
-    z[:,2] = (ntwk.z0[:,0] + ntwk.z0[:,2]) / 2
-    z[:,3] = (ntwk.z0[:,1] + ntwk.z0[:,3]) / 2
+    z[:, 0] = ntwk.z0[:, 0] + ntwk.z0[:, 2]
+    z[:, 1] = ntwk.z0[:, 1] + ntwk.z0[:, 3]
+    z[:, 2] = (ntwk.z0[:, 0] + ntwk.z0[:, 2]) / 2
+    z[:, 3] = (ntwk.z0[:, 1] + ntwk.z0[:, 3]) / 2
 
-    return rf.Network(frequency=f/1e9, s=s, z0=z)
+    return rf.Network(frequency=f / 1e9, s=s, z0=z)
 
 
 def import_freq(filename):
-    """
-    Read in a 1, 2, or 4-port Touchstone file,
-    and return an equivalent 2-port network.
+    """Read in a 1, 2, or 4-port Touchstone file, and return an equivalent
+    2-port network.
 
     Args:
         filename(str): Name of Touchstone file to read in.
@@ -1010,8 +1008,8 @@ def import_freq(filename):
     # Import and sanity check the Touchstone file.
     ntwk = rf.Network(filename)
     (fs, rs, cs) = ntwk.s.shape
-    assert (rs == cs), "Non-square Touchstone file S-matrix!"
-    assert (rs in (1, 2, 4)), "Touchstone file must have 1, 2, or 4 ports!"
+    assert rs == cs, "Non-square Touchstone file S-matrix!"
+    assert rs in (1, 2, 4), "Touchstone file must have 1, 2, or 4 ports!"
 
     # Convert to a 2-port network.
     if rs == 4:  # 4-port Touchstone files are assumed single-ended!
@@ -1021,9 +1019,9 @@ def import_freq(filename):
     else:  # rs == 1
         return rf.network.one_port_2_two_port(ntwk)
 
+
 def lfsr_bits(taps, seed):
-    """
-    Given a set of tap indices and a seed, generate a PRBS.
+    """Given a set of tap indices and a seed, generate a PRBS.
 
     Args:
         taps([int]): The set of fed back taps.
@@ -1059,8 +1057,7 @@ def safe_log10(x):
 
 
 def pulse_center(p, nspui):
-    """
-    Determines the center of the pulse response, using the "Hula Hoop"
+    """Determines the center of the pulse response, using the "Hula Hoop"
     algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
 
     Args:
@@ -1106,8 +1103,8 @@ def submodules(package):
 
 
 def cap_mag(zs, maxMag=1.0):
-    """Cap the magnitude of a list of complex values,
-    leaving the phase unchanged.
+    """Cap the magnitude of a list of complex values, leaving the phase
+    unchanged.
 
     Args:
         zs([complex]): The complex values to be capped.
@@ -1137,13 +1134,13 @@ def mon_mag(zs):
     orig_shape = zs.shape
     zs_flat = zs.flatten()
     for ix in range(1, len(zs_flat)):
-        zs_flat[ix] = rect(min(abs(zs_flat[ix-1]), abs(zs_flat[ix])), phase(zs_flat[ix]))
+        zs_flat[ix] = rect(min(abs(zs_flat[ix - 1]), abs(zs_flat[ix])), phase(zs_flat[ix]))
     return zs_flat.reshape(zs.shape)
 
 
 def interp_s2p(ntwk, f):
-    """Safely interpolate a 2-port network, by applying certain
-    constraints to any necessary extrapolation.
+    """Safely interpolate a 2-port network, by applying certain constraints to
+    any necessary extrapolation.
 
     Args:
         ntwk(skrf.Network): The 2-port network to be interpolated.
@@ -1156,22 +1153,22 @@ def interp_s2p(ntwk, f):
         ValueError: If `ntwk` is _not_ a 2-port network.
     """
     (fs, rs, cs) = ntwk.s.shape
-    assert (rs == cs), "Non-square Touchstone file S-matrix!"
-    assert (rs == 2),  "Touchstone file must have 2 ports!"
-    
-    extrap = ntwk.interpolate(f/1e9, fill_value="extrapolate", coords="polar", assume_sorted=True )
+    assert rs == cs, "Non-square Touchstone file S-matrix!"
+    assert rs == 2, "Touchstone file must have 2 ports!"
+
+    extrap = ntwk.interpolate(f / 1e9, fill_value="extrapolate", coords="polar", assume_sorted=True)
     s11 = cap_mag(extrap.s[:, 0, 0])
     s22 = cap_mag(extrap.s[:, 1, 1])
-    s12 = ntwk.s12.interpolate(f/1e9, fill_value=0, bounds_error=False,
-                               coords="polar", assume_sorted=True
-                              ).s.flatten()
-    s21 = ntwk.s21.interpolate(f/1e9, fill_value=0, bounds_error=False,
-                               coords="polar", assume_sorted=True
-                              ).s.flatten()
-    s = np.array(list(zip(zip(s11,s12),zip(s21,s22))))
+    s12 = ntwk.s12.interpolate(
+        f / 1e9, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True
+    ).s.flatten()
+    s21 = ntwk.s21.interpolate(
+        f / 1e9, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True
+    ).s.flatten()
+    s = np.array(list(zip(zip(s11, s12), zip(s21, s22))))
     if ntwk.name is None:
         ntwk.name = "s2p"
-    return rf.Network(f=f/1e9, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"))
+    return rf.Network(f=f / 1e9, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"))
 
 
 def renorm_s2p(ntwk, zs):
@@ -1200,17 +1197,20 @@ def renorm_s2p(ntwk, zs):
         skrf.Network: The renormalized 2-port network.
     """
     (Nf, Nr, Nc) = ntwk.s.shape
-    assert (Nr == 2 and Nc == 2), "May only be used to renormalize a 2-port network!"
-    assert (all(ntwk.z0[:, 0] == ntwk.z0[0, 0]) and all(ntwk.z0[:, 0] == ntwk.z0[:, 1])), \
-        f"May only be used to renormalize a network with equal (singular) reference impedances! z0: {ntwk.z0}"
-    assert (zs.shape == (2,) or zs.shape == (len(ntwk.f), 2)), \
-        "The list of new impedances must have shape (2,) or (len(ntwk.f), 2)!"
+    assert Nr == 2 and Nc == 2, "May only be used to renormalize a 2-port network!"
+    assert all(ntwk.z0[:, 0] == ntwk.z0[0, 0]) and all(
+        ntwk.z0[:, 0] == ntwk.z0[:, 1]
+    ), f"May only be used to renormalize a network with equal (singular) reference impedances! z0: {ntwk.z0}"
+    assert zs.shape == (2,) or zs.shape == (
+        len(ntwk.f),
+        2,
+    ), "The list of new impedances must have shape (2,) or (len(ntwk.f), 2)!"
 
     if zs.shape == (2,):
         zt = zs.repeat(len(Nf))
     else:
         zt = np.array(zs)
-    z0 = ntwk.z0[0,0]
+    z0 = ntwk.z0[0, 0]
     S = ntwk.s
     I = np.identity(2)
     Z = []
@@ -1219,12 +1219,13 @@ def renorm_s2p(ntwk, zs):
     Z = np.array(Z)
     Zn = []
     for (z, zn) in zip(Z, zt):  # Iterration is over frequency and yields: (2x2 array, 2-element vector).
-        Zn.append(z.dot(z0/zn))
+        Zn.append(z.dot(z0 / zn))
     Zn = np.array(Zn)
     Sn = []
     for z in Zn:
         Sn.append(inv(z + I).dot(z - I))
-    return(rf.Network(s=Sn, f=ntwk.f/1e9, z0=zs))
+    return rf.Network(s=Sn, f=ntwk.f / 1e9, z0=zs)
+
 
 def getwave_step_resp(ami_model):
     """Use a model's GetWave() function to extract its step response.
@@ -1241,18 +1242,18 @@ def getwave_step_resp(ami_model):
     # Delay the input edge slightly, in order to minimize high
     # frequency artifactual energy sometimes introduced near
     # the signal edges by frequency domain processing in some models.
-    tmp       = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
-    tx_s, _   = ami_model.getWave(tmp)
+    tmp = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
+    tx_s, _ = ami_model.getWave(tmp)
     # Some models delay signal flow through GetWave() arbitrarily.
-    tmp       = array([0.5] * 1024)
+    tmp = array([0.5] * 1024)
     max_tries = 10
-    n_tries   =  0
+    n_tries = 0
     while max(tx_s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-        tx_s, _  = ami_model.getWave(tmp)
+        tx_s, _ = ami_model.getWave(tmp)
         n_tries += 1
     if n_tries == max_tries:
         raise RuntimeError("No step rise detected!")
     # Make one more call, just to ensure a sufficient "tail".
-    tmp, _    = ami_model.getWave(tmp)
-    tx_s      = np.append(tx_s, tmp)
-    return (tx_s - tx_s[0])
+    tmp, _ = ami_model.getWave(tmp)
+    tx_s = np.append(tx_s, tmp)
+    return tx_s - tx_s[0]

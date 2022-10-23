@@ -1,5 +1,4 @@
-"""
-Initialization file for Simbeor solver.
+"""Initialization file for Simbeor solver.
 
 .. moduleauthor:: David Banas <capn.freako@gmail.com>
 
@@ -17,7 +16,9 @@ Copyright (c) 2019 by David Banas; all rights reserved World wide.
 """
 import os
 import os.path as osp
+
 import numpy as np
+
 from pybert.solvers import solver as slvr
 
 sdkdir = os.environ.get("SIMBEOR_SDK")

@@ -1,5 +1,4 @@
-"""
-A package of Python modules, used by the *PyBERT* application.
+"""A package of Python modules, used by the *PyBERT* application.
 
 .. moduleauthor:: David Banas <capn.freako@gmail.com>
 
@@ -47,6 +46,6 @@ The application source is divided among several files, as follows:
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 __version__ = "3.5.7"
-__date__    = "September 25, 2022"
+__date__ = "September 25, 2022"
 __authors__ = "David Banas & David Patterson"
-__copy__    = "Copyright (c) 2014 David Banas, 2019 David Patterson"
+__copy__ = "Copyright (c) 2014 David Banas, 2019 David Patterson"
