@@ -60,19 +60,19 @@ from traitsui.message import message
 import skrf as rf
 
 from pyibisami import __version__ as PyAMI_VERSION
-from pyibisami.ami_parse import AMIParamConfigurator
-from pyibisami.ami_model import AMIModel
-from pyibisami.ibis_file import IBISModel
+from pyibisami.ami.parser import AMIParamConfigurator
+from pyibisami.ami.model import AMIModel
+from pyibisami.ibis.file import IBISModel
 
 from pybert import __version__ as VERSION
 from pybert import __date__ as DATE
 from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
 
-from pybert.pybert_cntrl import my_run_simulation
-from pybert.pybert_help import help_str
-from pybert.pybert_plot import make_plots
-from pybert.pybert_util import (
+from pybert.sim.simulation import my_run_simulation
+from pybert.visual.help import help_str
+from pybert.visual.plot import make_plots
+from pybert.utility import (
     calc_G,
     calc_gamma,
     import_channel,
@@ -89,7 +89,6 @@ from pybert.pybert_util import (
     interp_s2p,
     renorm_s2p,
 )
-from pybert.pybert_view import traits_view
 
 gDebugStatus = False
 gDebugOptimize = False

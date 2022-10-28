@@ -12,7 +12,7 @@ from chaco.tools.api import PanTool, ZoomTool
 
 from numpy import linspace
 
-from pybert.pybert_cntrl import update_eyes
+from pybert.sim.simulation import update_eyes
 
 PLOT_SPACING = 20
 
