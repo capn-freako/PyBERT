@@ -40,10 +40,10 @@ from numpy.random import normal
 import scipy.signal as sig
 from scipy.signal import iirfilter, lfilter
 from scipy.signal.windows import hann
-from pyibisami.ami_model import AMIModel, AMIModelInitializer
+from pyibisami.ami.model import AMIModel, AMIModelInitializer
 
-from pybert.dfe import DFE
-from pybert.pybert_util import (
+from pybert.sim.dfe import DFE
+from pybert.utility import (
     calc_eye,
     calc_jitter,
     find_crossings,

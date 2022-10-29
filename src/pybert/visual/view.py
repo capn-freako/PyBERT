@@ -32,9 +32,9 @@ from traitsui.api import (
     EnumEditor,
     spring,
 )
-from pybert.pybert_cfg import PyBertCfg
-from pybert.pybert_cntrl import my_run_sweeps
-from pybert.pybert_data import PyBertData
+from pybert.configuration import PyBertCfg
+from pybert.sim.simulation import my_run_sweeps
+from pybert.results import PyBertData
 
 USE_YAML = True  # `true`: yaml; `false`: pickle
 
