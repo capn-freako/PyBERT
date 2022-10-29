@@ -17,7 +17,7 @@ build:
 
 requirements:
   run:
-    - python =3.8
+    - python >=3.8 <3.10
     - kiwisolver
     - chaco =5.0.0.2
     - pyibis-ami >=3.5.7
