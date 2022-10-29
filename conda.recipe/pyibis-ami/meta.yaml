@@ -20,17 +20,20 @@ build:
 requirements:
   run:
     - python =3.8
+    - chaco =5.0.0.2
+    - click
     - empy
-    - scipy
     - matplotlib
     - parsec =3.13
+    - scipy
+
   build:
     - python =3.8
-    - setuptools
     - empy
-    - scipy
     - matplotlib
     - parsec =3.13
+    - scipy
+    - setuptools
 
 test:
   imports:
