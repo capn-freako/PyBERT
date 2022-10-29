@@ -1,6 +1,6 @@
 """Main entry into the PyBERT GUI."""
 from pybert.pybert      import PyBERT
-from pybert.visual.view import traits_view
+from pybert.gui.view import traits_view
 
 def main():
     thePyBERT = PyBERT()

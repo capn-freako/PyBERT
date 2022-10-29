@@ -33,7 +33,7 @@ from traitsui.api import (
     spring,
 )
 from pybert.configuration import PyBertCfg
-from pybert.sim.simulation import my_run_sweeps
+from pybert.models.bert import my_run_sweeps
 from pybert.results import PyBertData
 
 USE_YAML = True  # `true`: yaml; `false`: pickle
