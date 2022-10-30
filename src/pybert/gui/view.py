@@ -31,8 +31,8 @@ from traitsui.api import (
 
 from enable.component_editor import ComponentEditor
 from pybert.configuration import PyBertCfg
+from pybert.models.bert import my_run_sweeps
 from pybert.results import PyBertData
-from pybert.sim.simulation import my_run_sweeps
 
 USE_YAML = True  # `true`: yaml; `false`: pickle
 

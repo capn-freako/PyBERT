@@ -1,5 +1,4 @@
 include README.md
 include LICENSE
-include src/pybert/py.typed
-recursive-include src/pybert/images *.png
+recursive-include src/pybert/gui/images *.png
 recursive-include docs *

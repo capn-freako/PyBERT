@@ -6,9 +6,11 @@ Original date:   February 21, 2015 (Copied from pybert.py, as part of a major co
 
 Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
+from numpy import linspace
+
 from chaco.api import ColorMapper, GridPlotContainer, Plot
 from chaco.tools.api import PanTool, ZoomTool
-from pybert.sim.simulation import update_eyes
+from pybert.models.bert import update_eyes
 
 PLOT_SPACING = 20
 
