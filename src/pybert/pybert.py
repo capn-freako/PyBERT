@@ -69,9 +69,9 @@ from pybert import __date__ as DATE
 from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
 
-from pybert.sim.simulation import my_run_simulation
-from pybert.visual.help import help_str
-from pybert.visual.plot import make_plots
+from pybert.models.bert import my_run_simulation
+from pybert.gui.help import help_str
+from pybert.gui.plot import make_plots
 from pybert.utility import (
     calc_G,
     calc_gamma,
