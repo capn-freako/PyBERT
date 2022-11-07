@@ -345,8 +345,8 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
     tie_risings = jitter.take(list(range(0, len(jitter), 2)))
     tie_fallings = jitter.take(list(range(1, len(jitter), 2)))
-    tie_risings.resize(num_patterns * xings_per_pattern // 2)
-    tie_fallings.resize(num_patterns * xings_per_pattern // 2)
+    tie_risings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
+    tie_fallings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
     tie_risings = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))
     tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
 

@@ -1669,7 +1669,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`."
             min_len = max_len = impulse_length / ts
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
         temp = chnl_h.copy()
-        temp.resize(len(t))
+        temp.resize(len(t), refcheck=False)
         chnl_trimmed_H = fft(temp)
 
         chnl_s = chnl_h.cumsum()
