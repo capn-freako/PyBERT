@@ -1,5 +1,4 @@
-"""
-Default controller definition for PyBERT class.
+"""Default controller definition for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -8,16 +7,14 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 from time import perf_counter
+
 clock = perf_counter
 
-from chaco.api import Plot
-from chaco.tools.api import PanTool, ZoomTool
-import numpy as np
+import scipy.signal as sig
 from numpy import (
     arange,
     argmax,
     array,
-    concatenate,
     convolve,
     correlate,
     cumsum,
@@ -27,7 +24,6 @@ from numpy import (
     mean,
     ones,
     pad,
-    real,
     repeat,
     resize,
     std,
@@ -37,21 +33,21 @@ from numpy import (
 )
 from numpy.fft import fft, irfft
 from numpy.random import normal
-import scipy.signal as sig
-from scipy.signal import iirfilter, lfilter
-from scipy.signal.windows import hann
 from pyibisami.ami.model import AMIModel, AMIModelInitializer
+from scipy.signal import iirfilter, lfilter
 
+from chaco.api import Plot
+from chaco.tools.api import PanTool, ZoomTool
 from pybert.models.dfe import DFE
 from pybert.utility import (
     calc_eye,
     calc_jitter,
     find_crossings,
+    getwave_step_resp,
     import_channel,
     make_ctle,
     safe_log10,
     trim_impulse,
-    getwave_step_resp,
 )
 
 DEBUG = False
@@ -61,12 +57,10 @@ gFc = 1.0e6  # Corner frequency of high-pass filter used to model capacitive cou
 
 
 def my_run_sweeps(self):
-    """
-    Runs the simulation sweeps.
+    """Runs the simulation sweeps.
 
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.
-
     """
 
     sweep_aves = self.sweep_aves
@@ -108,8 +102,7 @@ def my_run_sweeps(self):
 
 
 def my_run_simulation(self, initial_run=False, update_plots=True):
-    """
-    Runs the simulation.
+    """Runs the simulation.
 
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.
@@ -226,25 +219,27 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             tx_model.initialize(tx_model_init)
             self.log(
                 "Tx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
-                    tx_model.ami_params_in.decode('utf-8'),
-                    tx_model.ami_params_out.decode('utf-8'),
-                    tx_model.msg.decode('utf-8')
+                    tx_model.ami_params_in.decode("utf-8"),
+                    tx_model.ami_params_out.decode("utf-8"),
+                    tx_model.msg.decode("utf-8"),
                 )
             )
             if tx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
                 tx_h = array(tx_model.initOut) * ts
             elif not tx_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]):
                 self.status = "Simulation Error."
-                self.log( "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
+                self.log(
+                    "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
 I cannot continue.\nYou will have to select a different model.",
-                    alert=True
+                    alert=True,
                 )
                 return
             elif not self.tx_use_getwave:
                 self.status = "Simulation Error."
-                self.log( "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
+                self.log(
+                    "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
 I cannot continue.\nPlease, select 'Use GetWave' and try again.",
-                    alert=True
+                    alert=True,
                 )
                 return
             if self.tx_use_getwave:
@@ -254,7 +249,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     self.status = "Tx GetWave() Error."
                     self.log("ERROR: Never saw a rising step come out of Tx GetWave()!", alert=True)
                     return
-                tx_h,   _ = trim_impulse(diff(tx_s))
+                tx_h, _ = trim_impulse(diff(tx_s))
                 tx_out, _ = tx_model.getWave(self.x)
             else:  # Init()-only.
                 tx_out = convolve(tx_h, self.x)
@@ -265,9 +260,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
             ffe_out = convolve(symbols, ffe)[: len(symbols)]
             if self.use_ch_file:
-                self.rel_power = mean(ffe_out ** 2) / self.rs
+                self.rel_power = mean(ffe_out**2) / self.rs
             else:
-                self.rel_power = mean(ffe_out ** 2) / self.Z0
+                self.rel_power = mean(ffe_out**2) / self.Z0
             tx_out = repeat(ffe_out, nspui)  # oversampled output
 
             # - Calculate the responses.
@@ -337,9 +332,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             rx_model.initialize(rx_model_init)
             self.log(
                 "Rx IBIS-AMI model initialization results:\nInput parameters: {}\nMessage: {}\nOutput parameters: {}".format(
-                    rx_model.ami_params_in.decode('utf-8'),
-                    rx_model.msg.decode('utf-8'),
-                    rx_model.ami_params_out.decode('utf-8')
+                    rx_model.ami_params_in.decode("utf-8"),
+                    rx_model.msg.decode("utf-8"),
+                    rx_model.ami_params_out.decode("utf-8"),
                 )
             )
             if rx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
@@ -349,7 +344,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 self.log(
                     "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
 I cannot continue.\nYou will have to select a different model.",
-                    alert=True
+                    alert=True,
                 )
                 return
             elif not self.rx_use_getwave:
@@ -357,7 +352,7 @@ I cannot continue.\nYou will have to select a different model.",
                 self.log(
                     "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
 I cannot continue.\nPlease, select 'Use GetWave' and try again.",
-                    alert=True
+                    alert=True,
                 )
                 return
             if self.rx_use_getwave:
@@ -375,10 +370,16 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
             else:  # Init() only.
                 ctle_out_h_padded = pad(
-                    ctle_out_h, (nspb, len(rx_in) - nspb - len(ctle_out_h)), "linear_ramp", end_values=(0.0, 0.0),
+                    ctle_out_h,
+                    (nspb, len(rx_in) - nspb - len(ctle_out_h)),
+                    "linear_ramp",
+                    end_values=(0.0, 0.0),
                 )
                 tx_out_h_padded = pad(
-                    tx_out_h, (nspb, len(rx_in) - nspb - len(tx_out_h)), "linear_ramp", end_values=(0.0, 0.0),
+                    tx_out_h,
+                    (nspb, len(rx_in) - nspb - len(tx_out_h)),
+                    "linear_ramp",
+                    end_values=(0.0, 0.0),
                 )
                 ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)  # ToDo: I think this is wrong.
                 ctle_h = irfft(ctle_H)  # I shouldn't be sending the output of `fft()` into `irfft()`, should I?
@@ -707,12 +708,10 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
 # Plot updating
 def update_results(self):
-    """
-    Updates all plot data used by GUI.
+    """Updates all plot data used by GUI.
 
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.
-
     """
 
     # Copy globals into local namespace.
@@ -748,11 +747,16 @@ def update_results(self):
     self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))
     if self._old_n_taps != n_taps:
         new_plot = Plot(
-            self.plotdata, auto_colors=["red", "orange", "yellow", "green", "blue", "purple"], padding_left=75,
+            self.plotdata,
+            auto_colors=["red", "orange", "yellow", "green", "blue", "purple"],
+            padding_left=75,
         )
         for i in range(self.n_taps):
             new_plot.plot(
-                ("tap_weight_index", "tap%d_weights" % (i + 1)), type="line", color="auto", name="tap%d" % (i + 1),
+                ("tap_weight_index", "tap%d_weights" % (i + 1)),
+                type="line",
+                color="auto",
+                name="tap%d" % (i + 1),
             )
         new_plot.title = "DFE Adaptation"
         new_plot.tools.append(PanTool(new_plot, constrain=True, constrain_key=None, constrain_direction="x"))
@@ -848,13 +852,17 @@ def update_results(self):
     self.plotdata.set_data("f_MHz", self.f_MHz[1:])
     self.plotdata.set_data("f_MHz_dfe", self.f_MHz_dfe[1:])
     self.plotdata.set_data("jitter_spectrum_chnl", 10.0 * (safe_log10(self.jitter_spectrum_chnl[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_ind_spectrum_chnl", 10.0 * (safe_log10(self.jitter_ind_spectrum_chnl[1:]) - log10_ui))
+    self.plotdata.set_data(
+        "jitter_ind_spectrum_chnl", 10.0 * (safe_log10(self.jitter_ind_spectrum_chnl[1:]) - log10_ui)
+    )
     self.plotdata.set_data("thresh_chnl", 10.0 * (safe_log10(self.thresh_chnl[1:]) - log10_ui))
     self.plotdata.set_data("jitter_spectrum_tx", 10.0 * (safe_log10(self.jitter_spectrum_tx[1:]) - log10_ui))
     self.plotdata.set_data("jitter_ind_spectrum_tx", 10.0 * (safe_log10(self.jitter_ind_spectrum_tx[1:]) - log10_ui))
     self.plotdata.set_data("thresh_tx", 10.0 * (safe_log10(self.thresh_tx[1:]) - log10_ui))
     self.plotdata.set_data("jitter_spectrum_ctle", 10.0 * (safe_log10(self.jitter_spectrum_ctle[1:]) - log10_ui))
-    self.plotdata.set_data("jitter_ind_spectrum_ctle", 10.0 * (safe_log10(self.jitter_ind_spectrum_ctle[1:]) - log10_ui))
+    self.plotdata.set_data(
+        "jitter_ind_spectrum_ctle", 10.0 * (safe_log10(self.jitter_ind_spectrum_ctle[1:]) - log10_ui)
+    )
     self.plotdata.set_data("thresh_ctle", 10.0 * (safe_log10(self.thresh_ctle[1:]) - log10_ui))
     self.plotdata.set_data("jitter_spectrum_dfe", 10.0 * (safe_log10(self.jitter_spectrum_dfe[1:]) - log10_ui))
     self.plotdata.set_data("jitter_ind_spectrum_dfe", 10.0 * (safe_log10(self.jitter_ind_spectrum_dfe[1:]) - log10_ui))
@@ -868,7 +876,9 @@ def update_results(self):
     bathtub_chnl.reverse()
     bathtub_chnl = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[: half_len + 1])))
     bathtub_chnl = where(
-        bathtub_chnl < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)), bathtub_chnl,
+        bathtub_chnl < MIN_BATHTUB_VAL,
+        0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)),
+        bathtub_chnl,
     )  # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))
     #  - Tx
@@ -884,7 +894,9 @@ def update_results(self):
     bathtub_ctle.reverse()
     bathtub_ctle = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[: half_len + 1])))
     bathtub_ctle = where(
-        bathtub_ctle < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)), bathtub_ctle,
+        bathtub_ctle < MIN_BATHTUB_VAL,
+        0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)),
+        bathtub_ctle,
     )  # To avoid Chaco log scale plot wierdness.
     self.plotdata.set_data("bathtub_ctle", safe_log10(bathtub_ctle))
     #  - DFE
@@ -920,12 +932,10 @@ def update_results(self):
 
 
 def update_eyes(self):
-    """
-    Update the heat plots representing the eye diagrams.
+    """Update the heat plots representing the eye diagrams.
 
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.
-
     """
 
     ui = self.ui
