@@ -27,6 +27,16 @@ Notice: Before using this package for any purpose, you MUST read and understand 
 
 - <https://github.com/capn-freako/PyBERT/wiki/dev_install>
 
+## Testing
+
+Tox is used for the test runner and documentation builder.  By default, it will try to unit test
+for any installed/supported of versions and it will skip any missing versions.
+
+- `pip install tox`
+- `tox -p all`
+
+To run a single environment such as "docs" run: `tox -e docs`
+
 ## Documentation
 
 PyBERT documentation exists in 2 separate forms:
