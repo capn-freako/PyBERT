@@ -2,7 +2,7 @@ include README.md
 include LICENSE
 recursive-include src/pybert/gui/images *.png
 recursive-include docs *
-recursive-include tests/
+recursive-include tests *
 global-exclude *.swp
 global-exclude *.DS_Store
 global-exclude *.buildinfo
