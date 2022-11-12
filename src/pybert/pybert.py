@@ -13,6 +13,17 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
+# fmt: off
+# isort: off
+from traits.etsconfig.api import ETSConfig
+# ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
+# ETSConfig.toolkit = 'qt4.celiagg'   # Yields unacceptably small font sizes in plot axis labels.
+# ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
+# ETSConfig.toolkit = 'qt.image'     # Program runs, but very small fonts in plot titles and axis labels.
+# ETSConfig.toolkit = 'wx'           # Crashes on launch.
+# fmt: on
+# isort: on
+
 import platform
 from datetime import datetime
 from os.path import dirname, join
@@ -46,7 +57,6 @@ from traits.api import (
     String,
     cached_property,
 )
-from traits.etsconfig.api import ETSConfig
 from traitsui.message import message
 
 from chaco.api import ArrayPlotData, GridPlotContainer
@@ -68,13 +78,6 @@ from pybert.utility import (
     sdd_21,
     trim_impulse,
 )
-
-# ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
-# ETSConfig.toolkit = 'qt4.celiagg'   # Yields unacceptably small font sizes in plot axis labels.
-# ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
-# ETSConfig.toolkit = 'qt.image'     # Program runs, but very small fonts in plot titles and axis labels.
-# ETSConfig.toolkit = 'wx'           # Crashes on launch.
-
 
 gDebugStatus = False
 gDebugOptimize = False
