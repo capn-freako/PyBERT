@@ -127,10 +127,10 @@ gRin = 100  # differential input resistance
 gCin = 0.50  # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
 gCac = 1.0  # a.c. coupling capacitance (uF) (Assumed to exist at both 'P' and 'N' nodes.)
 gBW = 12.0  # Rx signal path bandwidth, assuming no CTLE action. (GHz)
-gUseDfe = False  # Include DFE when running simulation.
+gUseDfe = True  # Include DFE when running simulation.
 gDfeIdeal = True  # DFE ideal summing node selector
 gPeakFreq = 5.0  # CTLE peaking frequency (GHz)
-gPeakMag = 10.0  # CTLE peaking magnitude (dB)
+gPeakMag = 1.7  # CTLE peaking magnitude (dB)
 gCTLEOffset = 0.0  # CTLE d.c. offset (dB)
 # - DFE
 gDecisionScaler = 0.5
@@ -447,7 +447,7 @@ class PyBERT(HasTraits):
     rn = Float(gRn)  #: Standard deviation of Gaussian random noise (V).
     tx_taps = List(
         [
-            TxTapTuner(name="Pre-tap",   enabled=True,  min_val=-0.2, max_val=0.2, value=0.0),
+            TxTapTuner(name="Pre-tap",   enabled=True,  min_val=-0.2, max_val=0.2, value=-0.066),
             TxTapTuner(name="Post-tap1", enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
             TxTapTuner(name="Post-tap2", enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
             TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
@@ -469,7 +469,6 @@ class PyBERT(HasTraits):
 
     # - Rx
     rin = Float(gRin)  #: Rx input impedance (Ohm)
-    # cin = Range(low=0, high=1000, value=gCin)  #: Rx parasitic input capacitance (pF)
     cin = Float(gCin)  #: Rx parasitic input capacitance (pF)
     cac = Float(gCac)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
@@ -479,6 +478,7 @@ class PyBERT(HasTraits):
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
     ctle_offset = Float(gCTLEOffset)  #: CTLE d.c. offset (dB)
     ctle_mode = Enum("Off", "Passive", "AGC", "Manual")  #: CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
+    ctle_mode = "Passive"
     rx_use_ami = Bool(False)  #: (Bool)
     rx_has_ts4 = Bool(False)  #: (Bool)
     rx_use_ts4 = Bool(False)  #: (Bool)
