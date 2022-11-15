@@ -25,9 +25,15 @@ pybert/tags
 pybert/doc/build/*
 *~
 docs/_build
+docs/build
 tests/htmlcov
 venv
 env
 
 htmlcov
 pybert.log
+*.PNG
+*.png
+*.sublime-*
+*.gcbench
+misc/*
