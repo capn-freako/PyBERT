@@ -1,5 +1,4 @@
-"""
-Simulation results data encapsulation, for PyBERT.
+"""Simulation results data encapsulation, for PyBERT.
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -16,12 +15,11 @@ from chaco.api import ArrayPlotData
 
 
 class PyBertData:
-    """
-    PyBERT simulation results data encapsulation class.
+    """PyBERT simulation results data encapsulation class.
 
-    This class is used to encapsulate that subset of the results
-    data for a PyBERT instance, which is to be saved when the user
-    clicks the "Save Results" button.
+    This class is used to encapsulate that subset of the results data
+    for a PyBERT instance, which is to be saved when the user clicks the
+    "Save Results" button.
     """
 
     _item_names = [
@@ -52,10 +50,8 @@ class PyBertData:
     ]
 
     def __init__(self, the_PyBERT):
-        """
-        Copy just that subset of the supplied PyBERT instance's
-        'plotdata' attribute, which should be saved during pickling.
-        """
+        """Copy just that subset of the supplied PyBERT instance's 'plotdata'
+        attribute, which should be saved during pickling."""
 
         plotdata = the_PyBERT.plotdata
 

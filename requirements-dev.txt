@@ -15,3 +15,6 @@ tox
 # Documentation tooling
 sphinx
 m2r
+
+# Type Stubs
+types-PyYAML

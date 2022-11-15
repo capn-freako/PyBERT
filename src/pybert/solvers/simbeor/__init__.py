@@ -1,5 +1,6 @@
-"""
-Initialization file for Simbeor solver.
+# pylint: disable=undefined-variable
+# type: ignore
+"""Initialization file for Simbeor solver.
 
 .. moduleauthor:: David Banas <capn.freako@gmail.com>
 
@@ -17,7 +18,10 @@ Copyright (c) 2019 by David Banas; all rights reserved World wide.
 """
 import os
 import os.path as osp
+from typing import List
+
 import numpy as np
+
 from pybert.solvers import solver as slvr
 
 sdkdir = os.environ.get("SIMBEOR_SDK")
@@ -31,9 +35,6 @@ from . import *  # Makes each submodule available as: pybert.solvers.simbeor.sim
 class Solver(slvr.Solver):
     """Simbeor-specific override of `pybert.solver.Solver` class."""
 
-    def __init__(self):
-        super().__init__()
-
     def solve(
         self,
         ch_type: slvr.ChType = "microstrip_se",  #: Channel cross-sectional configuration.
@@ -45,7 +46,7 @@ class Solver(slvr.Solver):
         height: float = 0.127,  #: Trace height above/below ground plane (mm).
         separation: float = 0.508,  #: Trace separation (mm).
         roughness: float = 0.004,  #: Trace surface roughness (mm-rms).
-        fs: [float] = None,  #: Angular frequency sample points (Hz).
+        fs: List[float] = None,  #: Angular frequency sample points (Hz).
         lic_path: str = "",
         lic_name: str = "simbeor_complete",
         prj_name: str = "SimbeorPyBERT",
@@ -84,7 +85,7 @@ class Solver(slvr.Solver):
             raise RuntimeError("Couldn't create a conductor material: " + simbeor.GetErrorMessage())
 
         # - Setup stack-up.
-        if ch_type == "stripline_se" or ch_type == "stripline_diff":  # stripline
+        if ch_type in ("stripline_se", "stripline_diff"):  # stripline
             pln0 = simbeor.LayerAddPlane(osp.join(prj_name, "Plane0"), "Copper", "FR4", thickness * 1.0e-3)
             if pln0 == 0:
                 raise RuntimeError("Couldn't create a plane layer: " + simbeor.GetErrorMessage())
@@ -111,7 +112,7 @@ class Solver(slvr.Solver):
 
         # Setup transmission line properties, as per the parameters we've been called with.
         # (Note that Simbeor library expects units of meters.)
-        if ch_type == "stripline_se" or ch_type == "microstrip_se":  # single-ended
+        if ch_type in ("stripline_se", "microstrip_se"):  # single-ended
             tline = simbeor.InitSingleTLine()
         else:  # differential
             tline = simbeor.InitDiffTLine()
@@ -123,7 +124,7 @@ class Solver(slvr.Solver):
         tline["LayerName"] = "TOP"  # Surface layer.
 
         # Calculate Z0.
-        if ch_type == "stripline_se" or ch_type == "microstrip_se":  # single-ended
+        if ch_type in ("stripline_se", "microstrip_se"):  # single-ended
             zresult, result = simbeor.CalcSingleTLine_Z(prj_name, tline)
         else:
             zresult, result = simbeor.CalcDiffTLine_Z(prj_name, tline)
@@ -145,7 +146,7 @@ class Solver(slvr.Solver):
 
         # - Build model and simulate
         ModelName = osp.join(prj_name, "SingleMSL")
-        if ch_type == "stripline_se" or ch_type == "microstrip_se":  # single-ended
+        if ch_type in ("stripline_se", "microstrip_se"):  # single-ended
             result = simbeor.ModelSingleTLine_SFS(
                 ModelName, tline, frqSweep, opt
             )  # frqSweep is not needed if common default sweep is used, opt are not needed most of the time
@@ -158,9 +159,7 @@ class Solver(slvr.Solver):
         # - Sanity check the results.
         frqCount = simbeor.GetFrequencyPointsCount(ModelName)  # get number of computed frequency points
         if frqCount != len(fs):
-            raise RuntimeError(
-                "Simbeor channel simulation returned wrong number of frequency points: {}".format(frqCount)
-            )
+            raise RuntimeError(f"Simbeor channel simulation returned wrong number of frequency points: {frqCount}")
         pfrqs = simbeor.GetFrequencyPoints(ModelName)  # get all frequency points
         if (pfrqs != fs).any():
             raise RuntimeError("Simbeor channel simulation returned different set of frequency points!")

@@ -1,5 +1,4 @@
-"""
-User instructions for PyBERT class.
+"""User instructions for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 

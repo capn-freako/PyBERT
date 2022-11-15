@@ -84,4 +84,13 @@ ignore = [
 ]
 
 [[tool.mypy.overrides]]
+module = [
+    "scipy.*",
+    "skrf.*",
+    "chaco.*",
+    "enable.*",
+    "pyface.*",
+    "traits.*",
+    "traitsui.*"
+]
 ignore_missing_imports = true
