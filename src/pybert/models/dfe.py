@@ -1,5 +1,4 @@
-"""
-Behavioral model of a decision feedback equalizer (DFE).
+"""Behavioral model of a decision feedback equalizer (DFE).
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -14,7 +13,7 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 from numpy import array, sign, zeros
 from scipy.signal import iirfilter
 
-from pybert.sim.cdr import CDR
+from pybert.models.cdr import CDR
 
 gNch_taps = 3  # Number of taps used in summing node filter.
 
@@ -39,8 +38,7 @@ class LfilterSS:
         self.ys = [0.0] * (len(a) - 1)
 
     def step(self, x):
-        """
-        Step the filter.
+        """Step the filter.
 
         Args:
             x(float): Next input value.
@@ -163,8 +161,7 @@ class DFE:
         self.thresholds = thresholds
 
     def step(self, decision, error, update):
-        """
-        Step the DFE, according to the new decision and error inputs.
+        """Step the DFE, according to the new decision and error inputs.
 
         Args:
             decision(float): Current slicer output.
@@ -201,8 +198,7 @@ class DFE:
         return filter_out
 
     def decide(self, x):
-        """
-        Make the bit decisions, according to modulation type.
+        """Make the bit decisions, according to modulation type.
 
         Args:
             x(float): The signal value, at the decision time.
@@ -224,7 +220,6 @@ class DFE:
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
-
         """
 
         mod_type = self.mod_type
@@ -261,8 +256,7 @@ class DFE:
         return decision, bits
 
     def run(self, sample_times, signal):
-        """
-        Run the DFE on the input signal.
+        """Run the DFE on the input signal.
 
         Args:
             sample_times([float]): Vector of time values at wich

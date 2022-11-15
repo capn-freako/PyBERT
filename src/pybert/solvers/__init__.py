@@ -1,5 +1,4 @@
-"""
-A group of channel solvers, used by the *PyBERT* application.
+"""A group of channel solvers, used by the *PyBERT* application.
 
 .. moduleauthor:: David Banas <capn.freako@gmail.com>
 

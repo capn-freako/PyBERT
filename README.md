@@ -29,10 +29,11 @@ Notice: Before using this package for any purpose, you MUST read and understand 
 
 ## Testing
 
-Tox is used for the test runner and documentation builder.  By default, it runs the following
-environments: _py36_, _py37_, _pylint_, _flake8_ and _docs_.  It will skip any missing python versions.
-* `pip install tox`
-* `tox`
+Tox is used for the test runner and documentation builder.  By default, it will try to unit test
+for any installed/supported of versions and it will skip any missing versions.
+
+- `pip install tox`
+- `tox -p all`
 
 To run a single environment such as "docs" run: `tox -e docs`
 
@@ -40,11 +41,11 @@ To run a single environment such as "docs" run: `tox -e docs`
 
 PyBERT documentation exists in 2 separate forms:
 
-- For developers: 
-  
+- For developers:
+
   - pybert/doc/build/html/index.html  (See testing on how to build the documentation)
   - https://github.com/capn-freako/PyBERT/wiki/dev_install
-  
+
 - For users:
 
   - Quick installation instructions at <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
@@ -54,10 +55,10 @@ PyBERT documentation exists in 2 separate forms:
 
 ## Acknowledgements
 
-I would like to thank the following individuals, for their contributions to PyBERT:  
+I would like to thank the following individuals, for their contributions to PyBERT:
 
-- Mark Marlett  
-- Low Kian Seong  
+- Mark Marlett
+- Low Kian Seong
 - Amanda Bukur
 - David Patterson
 - Dennis Han
@@ -67,4 +68,3 @@ I would like to thank the following individuals, for their contributions to PyBE
 - Michael Gielda
 - Peter Pupalaikis
 - Denz Choe
-
