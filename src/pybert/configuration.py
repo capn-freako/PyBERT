@@ -13,6 +13,12 @@ Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
 
 
+import pickle
+from pathlib import Path
+
+import yaml
+
+
 class PyBertCfg:
     """PyBERT simulation configuration data encapsulation class.
 
@@ -114,3 +120,44 @@ class PyBertCfg:
 
         # Analysis
         self.thresh = the_PyBERT.thresh
+
+    @staticmethod
+    def load_from_file(filepath, pybert):
+        """Apply all of the configuration settings to the pybert instance."""
+        filepath = Path(filepath)
+        if filepath.suffix == ".yaml":
+            with open(filepath, "r", encoding="UTF-8") as yaml_file:
+                user_config = yaml.load(yaml_file, Loader=yaml.Loader)
+        elif filepath.suffix == ".pybert_cfg":
+            with open(filepath, "rb") as pickle_file:
+                user_config = pickle.load(pickle_file)
+        else:
+            raise ValueError("Pybert does not support this file type.")
+
+        if not isinstance(user_config, PyBertCfg):
+            raise ValueError("The data structure read in is NOT of type: PyBertCfg!")
+
+        for prop, value in vars(user_config).items():
+            if prop == "tx_taps":
+                for count, (enabled, val) in enumerate(value):
+                    setattr(pybert.tx_taps[count], "enabled", enabled)
+                    setattr(pybert.tx_taps[count], "value", val)
+            elif prop == "tx_tap_tuners":
+                for count, (enabled, val) in enumerate(value):
+                    setattr(pybert.tx_tap_tuners[count], "enabled", enabled)
+                    setattr(pybert.tx_tap_tuners[count], "value", val)
+            elif prop in ("version", "timestamp"):
+                pass  # Just including it for some good housekeeping.  Not currently used.
+            else:
+                setattr(pybert, prop, value)
+
+    def save(self, filepath: Path):
+        """Save out pybert's current configuration to a file."""
+        if filepath.suffix == ".yaml":
+            with open(filepath, "w", encoding="UTF-8") as yaml_file:
+                yaml.dump(self, yaml_file)
+        elif filepath.suffix == ".pybert_cfg":
+            with open(filepath, "wb") as pickle_file:
+                pickle.dump(self, pickle_file)
+        else:
+            raise ValueError("Pybert does not support this file type.")

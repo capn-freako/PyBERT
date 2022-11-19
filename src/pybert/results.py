@@ -11,6 +11,9 @@ result could be saved and later restored, as a reference waveform.
 
 Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
+import pickle
+from pathlib import Path
+
 from chaco.api import ArrayPlotData
 
 
@@ -61,3 +64,65 @@ class PyBertData:
             the_data.set_data(item_name, plotdata.get_data(item_name))
 
         self.the_data = the_data
+
+    def save(self, filepath: Path):
+        """Save all of the plot data out to a file."""
+        with open(filepath, "wb") as the_file:
+            pickle.dump(self, the_file)
+
+    @staticmethod
+    def load_from_file(filepath: Path, pybert):
+        """Recall all the results from a file and load them as reference plots."""
+        with open(filepath, "rb") as the_file:
+            user_results = pickle.load(the_file)
+        if not isinstance(user_results, PyBertData):
+            raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
+        for prop, value in user_results.the_data.arrays.items():
+            pybert.plotdata.set_data(prop + "_ref", value)
+
+        # Add reference plots, if necessary.
+        # - time domain
+        for (container, suffix, has_both) in [
+            (pybert.plots_h.component_grid.flat, "h", False),
+            (pybert.plots_s.component_grid.flat, "s", True),
+            (pybert.plots_p.component_grid.flat, "p", False),
+        ]:
+            if "Reference" not in container[0].plots:
+                (ix, prefix) = (0, "chnl")
+                item_name = prefix + "_" + suffix + "_ref"
+                container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkcyan", name="Inc_ref")
+                for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                    item_name = prefix + "_out_" + suffix + "_ref"
+                    container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkmagenta", name="Cum_ref")
+                if has_both:
+                    for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                        item_name = prefix + "_" + suffix + "_ref"
+                        container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkcyan", name="Inc_ref")
+
+        # - frequency domain
+        for (container, suffix, has_both) in [(pybert.plots_H.component_grid.flat, "H", True)]:
+            if "Reference" not in container[0].plots:
+                (ix, prefix) = (0, "chnl")
+                item_name = prefix + "_" + suffix + "_ref"
+                container[ix].plot(
+                    ("f_GHz", item_name), type="line", color="darkcyan", name="Inc_ref", index_scale="log"
+                )
+                for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                    item_name = prefix + "_out_" + suffix + "_ref"
+                    container[ix].plot(
+                        ("f_GHz", item_name),
+                        type="line",
+                        color="darkmagenta",
+                        name="Cum_ref",
+                        index_scale="log",
+                    )
+                if has_both:
+                    for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                        item_name = prefix + "_" + suffix + "_ref"
+                        container[ix].plot(
+                            ("f_GHz", item_name),
+                            type="line",
+                            color="darkcyan",
+                            name="Inc_ref",
+                            index_scale="log",
+                        )

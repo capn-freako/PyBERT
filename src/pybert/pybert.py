@@ -23,10 +23,11 @@ from traits.etsconfig.api import ETSConfig
 # ETSConfig.toolkit = 'wx'           # Crashes on launch.
 # fmt: on
 # isort: on
-
 import platform
+import time
 from datetime import datetime
 from os.path import dirname, join
+from pathlib import Path
 from threading import Event, Thread
 from time import sleep
 
@@ -64,9 +65,11 @@ from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
 from pybert import __date__ as DATE
 from pybert import __version__ as VERSION
+from pybert.configuration import PyBertCfg
 from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots
 from pybert.models.bert import my_run_simulation
+from pybert.results import PyBertData
 from pybert.utility import (
     calc_gamma,
     import_channel,
@@ -1673,6 +1676,76 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.chnl_p = chnl_p
 
         return chnl_h
+
+    def simulate(self, initial_run=False, update_plots=True):
+        """Run all queued simulations.
+
+        Normally, this is just one simulation unless `sweep_sim` is set.  Then it will run
+        `num_sweeps` which is the product of all tx pre/post tap settings multipled by `sweep_aves`.
+        If `sweep_aves` is one then its just one run of all pre/post tap combinations.
+        When sweeping plots will not be updated, so the plot results is from the prior run.  The
+        averaged bit error and standard deviation can be found under Results/Sweep Info.
+        Otherwise just one simulation is run and all the plots are updated.
+        """
+        ...
+
+    def load_configuration(self, filepath: Path):
+        """Load in a configuration into pybert.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertCfg.load_from_file(filepath, self)
+            self.cfg_file = filepath
+            self.status = "Loaded configuration."
+        except Exception as error:
+            self.log(
+                "Failed to load configuration.",
+                exception=error,
+            )
+
+    def save_configuration(self, filepath: Path):
+        """Save out a configuration from pybert.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertCfg(self, time.asctime(), VERSION).save(filepath)
+            self.cfg_file = filepath
+            self.status = "Configuration saved."
+        except Exception as error:
+            self.log(
+                "Failed to save current user configuration.",
+                exception=error,
+            )
+
+    def load_results(self, filepath: Path):
+        """Load results from a file into pybert.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertData.load_from_file(filepath, self)
+            self.data_file = filepath
+            self.status = "Loaded results."
+        except Exception as error:
+            self.log("Failed to load results from file.", exception=error)
+
+    def save_results(self, filepath: Path):
+        """Save the existing results to a pickle file.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertData(self).save(filepath)
+            self.data_file = filepath
+            self.status = "Saved results."
+        except Exception as error:
+            self.log("Failed to save results to file.", exception=error)
 
     def log_information(self):
         """Log the system information."""
