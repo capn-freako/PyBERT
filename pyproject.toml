@@ -49,7 +49,7 @@ classifiers=[
 ]
 
 [project.scripts]
-pybert = "pybert.__main__:main"
+pybert = "pybert.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
