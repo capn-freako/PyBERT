@@ -19,6 +19,11 @@ from pathlib import Path
 import yaml
 
 
+class InvalidFileType(Exception):
+    """Raised when a filetype that isn't supported is used when trying to load
+    or save files.."""
+
+
 class PyBertCfg:
     """PyBERT simulation configuration data encapsulation class.
 
@@ -129,14 +134,14 @@ class PyBertCfg:
     def load_from_file(filepath, pybert):
         """Apply all of the configuration settings to the pybert instance."""
         filepath = Path(filepath)
-        if filepath.suffix == ".yaml":
+        if filepath.suffix in [".yaml", ".yml"]:
             with open(filepath, "r", encoding="UTF-8") as yaml_file:
                 user_config = yaml.load(yaml_file, Loader=yaml.Loader)
         elif filepath.suffix == ".pybert_cfg":
             with open(filepath, "rb") as pickle_file:
                 user_config = pickle.load(pickle_file)
         else:
-            raise ValueError("Pybert does not support this file type.")
+            raise InvalidFileType("Pybert does not support this file type.")
 
         if not isinstance(user_config, PyBertCfg):
             raise ValueError("The data structure read in is NOT of type: PyBertCfg!")
@@ -157,11 +162,11 @@ class PyBertCfg:
 
     def save(self, filepath: Path):
         """Save out pybert's current configuration to a file."""
-        if filepath.suffix == ".yaml":
+        if filepath.suffix in [".yaml", ".yml"]:
             with open(filepath, "w", encoding="UTF-8") as yaml_file:
                 yaml.dump(self, yaml_file, indent=4, sort_keys=False)
         elif filepath.suffix == ".pybert_cfg":
             with open(filepath, "wb") as pickle_file:
                 pickle.dump(self, pickle_file)
         else:
-            raise ValueError("Pybert does not support this file type.")
+            raise InvalidFileType("Pybert does not support this file type.")

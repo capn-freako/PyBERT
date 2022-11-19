@@ -88,7 +88,7 @@ class MyHandler(Handler):
         pybert = info.object
         dialog = FileDialog(
             action="open",
-            wildcard="Yaml Config (*.yaml)|*.yaml|Pickle Config (*.pybert_cfg)|*.pybert_cfg|All Files|*",
+            wildcard="Yaml Config (*.yaml,*.yml)|*.yaml;*.yml|Pickle Config (*.pybert_cfg)|*.pybert_cfg|All Files|*",
             default_path=pybert.cfg_file,
         )
         if dialog.open() == OK:

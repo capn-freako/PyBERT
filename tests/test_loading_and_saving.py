@@ -1,6 +1,5 @@
 """Unit test coverage to make sure that the pybert can correctly save and load files."""
 
-import logging
 import pickle
 
 import numpy as np
@@ -36,16 +35,14 @@ def test_save_config_as_pickle(tmp_path):
         assert user_config.version == __version__
 
 
-def test_save_config_as_invalid(tmp_path, caplog):
+def test_save_config_as_invalid(tmp_path):
     """When given an unsupported file suffix, no file should be generated and an message logged."""
-    caplog.set_level(logging.DEBUG)
-
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.json")
     app.save_configuration(save_file)
 
     assert not save_file.exists()  # File should not have been created.
-    assert "Pybert does not support this file type." in caplog.text
+    assert "This filetype is not currently supported." in app.console_log
 
 
 def test_save_results_as_pickle(tmp_path):
@@ -97,20 +94,17 @@ def test_load_config_from_pickle(tmp_path):
     assert app.pattern_len == TEST_PATTERN_LENGTH
 
 
-def test_load_config_from_invalid(tmp_path, caplog):
+def test_load_config_from_invalid(tmp_path):
     """When given an unsupported file suffix, no file should be read and an message logged."""
-    caplog.set_level(logging.DEBUG)
-
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.json")
     app.load_configuration(save_file)
 
-    assert "Pybert does not support this file type." in caplog.text
+    assert "This filetype is not currently supported." in app.console_log
 
 
-def test_load_results_from_pickle(tmp_path, caplog):
+def test_load_results_from_pickle(tmp_path):
     """Make sure that pybert can correctly load a pickle file."""
-    caplog.set_level(logging.DEBUG)
     app = PyBERT(run_simulation=True, gui=False)
     save_file = tmp_path.joinpath("config.pybert_data")
     app.save_results(save_file)
@@ -122,7 +116,6 @@ def test_load_results_from_pickle(tmp_path, caplog):
     with open(save_file, "wb") as saved_results_file:
         pickle.dump(user_results, saved_results_file)
 
-    caplog.clear()
     app.load_results(save_file)
     # pybert doesn't directly reload the waveform back into the same plot.
     # instead if creates a reference plot to compare old vs. new.

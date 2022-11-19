@@ -60,6 +60,9 @@ line-length = 119
 [tool.isort]
 profile = "black"
 
+[tool.docformatter]
+wrap-summaries = 0
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-vv"
