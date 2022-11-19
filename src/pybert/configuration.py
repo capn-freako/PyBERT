@@ -11,9 +11,8 @@ configuration could be saved and later restored.
 
 Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
-
-
 import pickle
+import warnings
 from pathlib import Path
 
 import yaml
@@ -138,6 +137,11 @@ class PyBertCfg:
             with open(filepath, "r", encoding="UTF-8") as yaml_file:
                 user_config = yaml.load(yaml_file, Loader=yaml.Loader)
         elif filepath.suffix == ".pybert_cfg":
+            warnings.warn(
+                "Using pickle for configuration is not suggested and will be removed in a later release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             with open(filepath, "rb") as pickle_file:
                 user_config = pickle.load(pickle_file)
         else:
@@ -166,6 +170,11 @@ class PyBertCfg:
             with open(filepath, "w", encoding="UTF-8") as yaml_file:
                 yaml.dump(self, yaml_file, indent=4, sort_keys=False)
         elif filepath.suffix == ".pybert_cfg":
+            warnings.warn(
+                "Using pickle for configuration is not suggested and will be removed in a later release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             with open(filepath, "wb") as pickle_file:
                 pickle.dump(self, pickle_file)
         else:
