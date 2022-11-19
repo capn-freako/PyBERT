@@ -63,17 +63,33 @@ def test_load_config_from_yaml(tmp_path):
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.yaml")
     app.save_configuration(save_file)
-    TEST_NUMBER_OF_BITS = 1234
 
     # Modify the saved yaml file.
     with open(save_file, "r", encoding="UTF-8") as saved_config_file:
         user_config = yaml.load(saved_config_file, Loader=yaml.Loader)
-        user_config.nbits = TEST_NUMBER_OF_BITS  # Normally, 8000
+        # Change a lot of settings throughout the different tabs of the application.
+        user_config.nbits = 1234  # Normally 8000
+        user_config.bit_rate = 20  # Normally 10
+        user_config.mod_type = [1]  # Normally [0]
+        user_config.pattern = "PRBS-23"  # Normally PRBS-7
+        user_config.Rdc = 2  # Normally 0.1876
+        user_config.rin = 85  # Normally 100
+        user_config.n_taps = 2  # Normally 5
+        user_config.delta_t = 0.01  # Normally 0.1
+        user_config.thresh = 5  # Normally 6
     with open(save_file, "w", encoding="UTF-8") as saved_config_file:
         yaml.dump(user_config, saved_config_file)
 
     app.load_configuration(save_file)
-    assert app.nbits == TEST_NUMBER_OF_BITS
+
+    # For everything saved in configuration, make sure they match.
+    # All items should exist in both, so fail if one isn't found.
+    for name in user_config.__dict__.keys():
+
+        # These are handled differently so skip them.
+        if name not in ["tx_taps", "tx_tap_tuners", "version", "date_created"]:
+            # Test the values
+            assert getattr(user_config, name) == getattr(app, name)
 
 
 def test_load_config_from_pickle(tmp_path):

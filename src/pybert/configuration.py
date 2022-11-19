@@ -41,12 +41,12 @@ class PyBertCfg:
     clicks the "Save Config." button.
     """
 
-    def __init__(self, the_PyBERT, timestamp: str, version: str):
+    def __init__(self, the_PyBERT, date_created: str, version: str):
         """Copy just that subset of the supplied PyBERT instance's __dict__,
         which should be saved during pickling."""
 
         # Generic Information
-        self.date_created = timestamp
+        self.date_created = date_created
         self.version = version
 
         # Simulation Control
@@ -169,7 +169,7 @@ class PyBertCfg:
                 for count, (enabled, val) in enumerate(value):
                     setattr(pybert.tx_tap_tuners[count], "enabled", enabled)
                     setattr(pybert.tx_tap_tuners[count], "value", val)
-            elif prop in ("version", "timestamp"):
+            elif prop in ("version", "date_created"):
                 pass  # Just including it for some good housekeeping.  Not currently used.
             else:
                 setattr(pybert, prop, value)
