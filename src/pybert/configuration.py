@@ -23,6 +23,16 @@ class InvalidFileType(Exception):
     or save files.."""
 
 
+CONFIG_FILEDIALOG_WILDCARD = "|".join(
+    [
+        "Yaml Config (*.yaml;*.yml)|*.yaml;*.yml",
+        "Pickle Config (*.pybert_cfg)|*.pybert_cfg",
+        "All files (*)|*",
+    ]
+)
+"""This sets the supported file types in the GUI's save-as or loading dialog."""
+
+
 class PyBertCfg:
     """PyBERT simulation configuration data encapsulation class.
 

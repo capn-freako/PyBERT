@@ -16,6 +16,9 @@ from pathlib import Path
 
 from chaco.api import ArrayPlotData
 
+RESULTS_FILEDIALOG_WILDCARD = "*.pybert_data"
+"""This sets the supported file types in the GUI's save-as or loading dialog."""
+
 
 class PyBertData:
     """PyBERT simulation results data encapsulation class.

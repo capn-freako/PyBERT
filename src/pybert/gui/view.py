@@ -29,7 +29,9 @@ from traitsui.api import (
 )
 
 from enable.component_editor import ComponentEditor
+from pybert.configuration import CONFIG_FILEDIALOG_WILDCARD
 from pybert.models.bert import my_run_sweeps
+from pybert.results import RESULTS_FILEDIALOG_WILDCARD
 
 
 class RunSimThread(Thread):
@@ -72,7 +74,7 @@ class MyHandler(Handler):
         pybert = info.object
         dialog = FileDialog(
             action="save as",
-            wildcard="Yaml Config (*.yaml)|*.yaml|Pickle Config (*.pybert_cfg)|*.pybert_cfg|All Files|*",
+            wildcard=CONFIG_FILEDIALOG_WILDCARD,
             default_path=pybert.cfg_file,
         )
         if dialog.open() == OK:
@@ -88,7 +90,7 @@ class MyHandler(Handler):
         pybert = info.object
         dialog = FileDialog(
             action="open",
-            wildcard="Yaml Config (*.yaml,*.yml)|*.yaml;*.yml|Pickle Config (*.pybert_cfg)|*.pybert_cfg|All Files|*",
+            wildcard=CONFIG_FILEDIALOG_WILDCARD,
             default_path=pybert.cfg_file,
         )
         if dialog.open() == OK:
@@ -102,7 +104,7 @@ class MyHandler(Handler):
         """
         # pylint: disable=no-self-use
         pybert = info.object
-        dialog = FileDialog(action="save as", wildcard="*.pybert_data", default_path=pybert.data_file)
+        dialog = FileDialog(action="save as", wildcard=RESULTS_FILEDIALOG_WILDCARD, default_path=pybert.data_file)
         if dialog.open() == OK:
             pybert.save_results(Path(dialog.path))
 
@@ -116,7 +118,7 @@ class MyHandler(Handler):
         """
         # pylint: disable=no-self-use
         pybert = info.object
-        dialog = FileDialog(action="open", wildcard="*.pybert_data", default_path=pybert.data_file)
+        dialog = FileDialog(action="open", wildcard=RESULTS_FILEDIALOG_WILDCARD, default_path=pybert.data_file)
         if dialog.open() == OK:
             pybert.load_results(Path(dialog.path))
 
