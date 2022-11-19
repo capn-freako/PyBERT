@@ -653,10 +653,7 @@ class PyBERT(HasTraits):
             self.log("Debug Mode Enabled.")
 
         if run_simulation:
-            # Running the simulation will fill in the required data structure.
-            my_run_simulation(self, initial_run=True)
-            # Once the required data structure is filled in, we can create the plots.
-            make_plots(self, n_dfe_taps=gNtaps)
+            self.simulate(initial_run=True)
         else:
             self.calc_chnl_h()  # Prevents missing attribute error in _get_ctle_out_h_tune().
 
@@ -1687,7 +1684,10 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         averaged bit error and standard deviation can be found under Results/Sweep Info.
         Otherwise just one simulation is run and all the plots are updated.
         """
-        ...
+        # Running the simulation will fill in the required data structure.
+        my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
+        # Once the required data structure is filled in, we can create the plots.
+        make_plots(self, n_dfe_taps=gNtaps)
 
     def load_configuration(self, filepath: Path):
         """Load in a configuration into pybert.
@@ -1699,11 +1699,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             PyBertCfg.load_from_file(filepath, self)
             self.cfg_file = filepath
             self.status = "Loaded configuration."
-        except Exception as error:
-            self.log(
-                "Failed to load configuration.",
-                exception=error,
-            )
+        except Exception:
+            self.log("Failed to load configuration. See the console for more detail.")
 
     def save_configuration(self, filepath: Path):
         """Save out a configuration from pybert.
@@ -1715,11 +1712,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             PyBertCfg(self, time.asctime(), VERSION).save(filepath)
             self.cfg_file = filepath
             self.status = "Configuration saved."
-        except Exception as error:
-            self.log(
-                "Failed to save current user configuration.",
-                exception=error,
-            )
+        except Exception:
+            self.log("Failed to save current user configuration. See the console for more detail.")
 
     def load_results(self, filepath: Path):
         """Load results from a file into pybert.
@@ -1731,8 +1725,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             PyBertData.load_from_file(filepath, self)
             self.data_file = filepath
             self.status = "Loaded results."
-        except Exception as error:
-            self.log("Failed to load results from file.", exception=error)
+        except Exception:
+            self.log("Failed to load results from file. See the console for more detail.")
 
     def save_results(self, filepath: Path):
         """Save the existing results to a pickle file.
@@ -1741,11 +1735,11 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             filepath: A full filepath include the suffix.
         """
         try:
-            PyBertData(self).save(filepath)
+            PyBertData(self, time.asctime(), VERSION).save(filepath)
             self.data_file = filepath
             self.status = "Saved results."
-        except Exception as error:
-            self.log("Failed to save results to file.", exception=error)
+        except Exception:
+            self.log("Failed to save results to file. See the console for more detail.")
 
     def log_information(self):
         """Log the system information."""

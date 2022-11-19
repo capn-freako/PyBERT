@@ -52,7 +52,7 @@ class PyBertData:
         "rx_in",
     ]
 
-    def __init__(self, the_PyBERT):
+    def __init__(self, the_PyBERT, timestamp: str, version: str):
         """Copy just that subset of the supplied PyBERT instance's 'plotdata'
         attribute, which should be saved during pickling."""
 
@@ -64,6 +64,10 @@ class PyBertData:
             the_data.set_data(item_name, plotdata.get_data(item_name))
 
         self.the_data = the_data
+
+        # Generic Information
+        self.date_created = timestamp
+        self.version = version
 
     def save(self, filepath: Path):
         """Save all of the plot data out to a file."""

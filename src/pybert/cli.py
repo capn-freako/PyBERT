@@ -29,7 +29,7 @@ def cli(ctx, config, results):
 
 @cli.command(context_settings=dict(help_option_names=["-h", "--help"]))
 @click.argument("config", type=click.Path(exists=True))
-def run(config):
+def sim(config):
     """Run a simulation without opening the GUI."""
     pybert = PyBERT(run_simulation=False, gui=False)
     pybert.load_configuration(config)

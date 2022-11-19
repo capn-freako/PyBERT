@@ -27,9 +27,13 @@ class PyBertCfg:
     clicks the "Save Config." button.
     """
 
-    def __init__(self, the_PyBERT):
+    def __init__(self, the_PyBERT, timestamp: str, version: str):
         """Copy just that subset of the supplied PyBERT instance's __dict__,
         which should be saved during pickling."""
+
+        # Generic Information
+        self.date_created = timestamp
+        self.version = version
 
         # Simulation Control
         self.bit_rate = the_PyBERT.bit_rate
@@ -155,7 +159,7 @@ class PyBertCfg:
         """Save out pybert's current configuration to a file."""
         if filepath.suffix == ".yaml":
             with open(filepath, "w", encoding="UTF-8") as yaml_file:
-                yaml.dump(self, yaml_file)
+                yaml.dump(self, yaml_file, indent=4, sort_keys=False)
         elif filepath.suffix == ".pybert_cfg":
             with open(filepath, "wb") as pickle_file:
                 pickle.dump(self, pickle_file)
