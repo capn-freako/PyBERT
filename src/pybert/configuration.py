@@ -14,6 +14,7 @@ Copyright (c) 2017 by David Banas; All rights reserved World wide.
 import pickle
 import warnings
 from pathlib import Path
+from typing import Union
 
 import yaml
 
@@ -43,7 +44,7 @@ class PyBertCfg:
 
     def __init__(self, the_PyBERT, date_created: str, version: str):
         """Copy just that subset of the supplied PyBERT instance's __dict__,
-        which should be saved during pickling."""
+        which should be saved."""
 
         # Generic Information
         self.date_created = date_created
@@ -140,9 +141,22 @@ class PyBertCfg:
         self.thresh = the_PyBERT.thresh
 
     @staticmethod
-    def load_from_file(filepath, pybert):
-        """Apply all of the configuration settings to the pybert instance."""
-        filepath = Path(filepath)
+    def load_from_file(filepath: Union[str, Path], pybert):
+        """Apply all of the configuration settings to the pybert instance.
+
+        Confirms that the file actually exists, is the correct extension and
+        attempts to set the values back in pybert.
+
+        Args:
+            filepath: The full filepath including the extension to save too.
+            pybert: instance of the main app
+        """
+        filepath = Path(filepath)  # incase a string was passed convert to a path.
+
+        if not filepath.exists():
+            raise FileNotFoundError(f"{filepath} does not exist.")
+
+        # If its a valid extension load it.
         if filepath.suffix in [".yaml", ".yml"]:
             with open(filepath, "r", encoding="UTF-8") as yaml_file:
                 user_config = yaml.load(yaml_file, Loader=yaml.Loader)
@@ -157,9 +171,11 @@ class PyBertCfg:
         else:
             raise InvalidFileType("Pybert does not support this file type.")
 
+        # Right now the loads deserialize back into a `PyBertCfg` class.
         if not isinstance(user_config, PyBertCfg):
             raise ValueError("The data structure read in is NOT of type: PyBertCfg!")
 
+        # Actually load values back into pybert using `setattr`.
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
                 for count, (enabled, val) in enumerate(value):
@@ -175,17 +191,17 @@ class PyBertCfg:
                 setattr(pybert, prop, value)
 
     def save(self, filepath: Path):
-        """Save out pybert's current configuration to a file."""
+        """Save out pybert's current configuration to a file.
+
+        The extension must match a yaml file extension or it will still raise
+        an invalid file type.  Additional filetypes can be added/supported by
+        just adding another if statement and adding to `CONFIG_FILEDIALOG_WILDCARD`.
+
+        Args:
+            filepath: The full filepath including the extension to save too.
+        """
         if filepath.suffix in [".yaml", ".yml"]:
             with open(filepath, "w", encoding="UTF-8") as yaml_file:
                 yaml.dump(self, yaml_file, indent=4, sort_keys=False)
-        elif filepath.suffix == ".pybert_cfg":
-            warnings.warn(
-                "Using pickle for configuration is not suggested and will be removed in a later release.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            with open(filepath, "wb") as pickle_file:
-                pickle.dump(self, pickle_file)
         else:
             raise InvalidFileType("Pybert does not support this file type.")

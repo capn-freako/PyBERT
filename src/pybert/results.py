@@ -13,6 +13,7 @@ Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
 import pickle
 from pathlib import Path
+from typing import Union
 
 from chaco.api import ArrayPlotData
 
@@ -73,17 +74,37 @@ class PyBertData:
         self.version = version
 
     def save(self, filepath: Path):
-        """Save all of the plot data out to a file."""
+        """Save all of the plot data out to a file.
+
+        Args:
+            filepath: The full filepath including the extension to save too.
+        """
         with open(filepath, "wb") as the_file:
             pickle.dump(self, the_file)
 
     @staticmethod
-    def load_from_file(filepath: Path, pybert):
-        """Recall all the results from a file and load them as reference plots."""
+    def load_from_file(filepath: Union[str, Path], pybert):
+        """Recall all the results from a file and load them as reference plots.
+
+        Confirms that the file actually exists and attempts to load back the
+        graphs as reference plots in pybert.
+
+        Args:
+            filepath: The full filepath including the extension to save too.
+            pybert: instance of the main app
+        """
+        filepath = Path(filepath)  # incase a string was passed convert to a path.
+
+        if not filepath.exists():
+            raise FileNotFoundError(f"{filepath} does not exist.")
+
+        # Right now the loads deserialize back into a `PyBertData` class.
         with open(filepath, "rb") as the_file:
             user_results = pickle.load(the_file)
         if not isinstance(user_results, PyBertData):
             raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
+
+        # Load the reference plots.
         for prop, value in user_results.the_data.arrays.items():
             pybert.plotdata.set_data(prop + "_ref", value)
 
