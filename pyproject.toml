@@ -12,7 +12,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "BSD"}
 dependencies = [
-        "chaco==5.0.0",
+        "chaco==5.1.0",
         "click==8.1.3",
         "enable==5.3.1",
         "numpy==1.23.3",
