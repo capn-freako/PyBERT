@@ -846,7 +846,7 @@ def import_channel(filename, sample_per, fs, zref=100):
             being imported when using time domain channel description files.
     """
     extension = os.path.splitext(filename)[1][1:]
-    if re.search("^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
+    if re.search(r"^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
         ts2N = interp_s2p(import_freq(filename), fs)
     else:  # simple 2-column time domain description (impulse or step).
         h = import_time(filename, sample_per)
