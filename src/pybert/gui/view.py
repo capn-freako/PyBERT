@@ -29,7 +29,7 @@ from traitsui.api import (
 )
 
 from enable.component_editor import ComponentEditor
-from pybert.configuration import CONFIG_FILEDIALOG_WILDCARD
+from pybert.configuration import CONFIG_LOAD_WILDCARD, CONFIG_SAVE_WILDCARD
 from pybert.models.bert import my_run_sweeps
 from pybert.results import RESULTS_FILEDIALOG_WILDCARD
 
@@ -74,7 +74,7 @@ class MyHandler(Handler):
         pybert = info.object
         dialog = FileDialog(
             action="save as",
-            wildcard=CONFIG_FILEDIALOG_WILDCARD,
+            wildcard=CONFIG_SAVE_WILDCARD,
             default_path=pybert.cfg_file,
         )
         if dialog.open() == OK:
@@ -90,7 +90,7 @@ class MyHandler(Handler):
         pybert = info.object
         dialog = FileDialog(
             action="open",
-            wildcard=CONFIG_FILEDIALOG_WILDCARD,
+            wildcard=CONFIG_LOAD_WILDCARD,
             default_path=pybert.cfg_file,
         )
         if dialog.open() == OK:
