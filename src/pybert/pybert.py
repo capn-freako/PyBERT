@@ -1695,7 +1695,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             self.log("This filetype is not currently supported.")
         except Exception as exp:
             self.log("Failed to load configuration. See the console for more detail.")
-            self.log(exp)
+            self.log(str(exp))
 
     def save_configuration(self, filepath: Path):
         """Save out a configuration from pybert.
@@ -1711,7 +1711,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             self.log("This filetype is not currently supported. Please try again as a yaml file.")
         except Exception as exp:
             self.log("Failed to save current user configuration. See the console for more detail.")
-            self.log(exp)
+            self.log(str(exp))
 
     def load_results(self, filepath: Path):
         """Load results from a file into pybert.
@@ -1725,7 +1725,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             self.status = "Loaded results."
         except Exception as exp:
             self.log("Failed to load results from file. See the console for more detail.")
-            self.log(exp)
+            self.log(str(exp))
 
     def save_results(self, filepath: Path):
         """Save the existing results to a pickle file.
@@ -1739,7 +1739,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             self.status = "Saved results."
         except Exception as exp:
             self.log("Failed to save results to file. See the console for more detail.")
-            self.log(exp)
+            self.log(str(exp))
 
     def log_information(self):
         """Log the system information."""
