@@ -1,15 +1,17 @@
 """Unit test coverage to make sure that the pybert can correctly save and load files."""
 
 import pickle
+from pathlib import Path
 
 import numpy as np
 import yaml
 
 from pybert import __version__
+from pybert.configuration import PyBertCfg
 from pybert.pybert import PyBERT
 
 
-def test_save_config_as_yaml(tmp_path):
+def test_save_config_as_yaml(tmp_path: Path):
     """Make sure that pybert can correctly generate a yaml file that can get reloaded."""
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.yaml")
@@ -22,20 +24,7 @@ def test_save_config_as_yaml(tmp_path):
         assert user_config.version == __version__
 
 
-def test_save_config_as_pickle(tmp_path):
-    """Make sure that pybert can correctly generate a pickle file that can get reloaded."""
-    app = PyBERT(run_simulation=False, gui=False)
-    save_file = tmp_path.joinpath("config.pybert_cfg")
-    app.save_configuration(save_file)
-
-    assert save_file.exists()  # File was created.
-
-    with open(save_file, "rb") as saved_config_file:
-        user_config = pickle.load(saved_config_file)
-        assert user_config.version == __version__
-
-
-def test_save_config_as_invalid(tmp_path):
+def test_save_config_as_invalid(tmp_path: Path):
     """When given an unsupported file suffix, no file should be generated and an message logged."""
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.json")
@@ -45,7 +34,7 @@ def test_save_config_as_invalid(tmp_path):
     assert "This filetype is not currently supported." in app.console_log
 
 
-def test_save_results_as_pickle(tmp_path):
+def test_save_results_as_pickle(tmp_path: Path):
     """Make sure that pybert can correctly generate a waveform pickle file that can get reloaded."""
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("results.pybert_data")
@@ -58,7 +47,7 @@ def test_save_results_as_pickle(tmp_path):
         assert results.the_data.arrays
 
 
-def test_load_config_from_yaml(tmp_path):
+def test_load_config_from_yaml(tmp_path: Path):
     """Make sure that pybert can correctly load a yaml file."""
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.yaml")
@@ -92,11 +81,15 @@ def test_load_config_from_yaml(tmp_path):
             assert getattr(user_config, name) == getattr(app, name)
 
 
-def test_load_config_from_pickle(tmp_path):
+def test_load_config_from_pickle(tmp_path: Path):
     """Make sure that pybert can correctly load a pickle file."""
     app = PyBERT(run_simulation=False, gui=False)
+
+    # Manually save a configuration as pickle
+    config = PyBertCfg(app, "string_time", "test.test.test")
     save_file = tmp_path.joinpath("config.pybert_cfg")
-    app.save_configuration(save_file)
+    with open(save_file, "wb") as out_file:
+        pickle.dump(config, out_file)
     TEST_PATTERN_LENGTH = 31
 
     # Modify the saved pickle file.
@@ -110,16 +103,17 @@ def test_load_config_from_pickle(tmp_path):
     assert app.pattern_len == TEST_PATTERN_LENGTH
 
 
-def test_load_config_from_invalid(tmp_path):
+def test_load_config_from_invalid(tmp_path: Path):
     """When given an unsupported file suffix, no file should be read and an message logged."""
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.json")
+    save_file.touch()
     app.load_configuration(save_file)
 
     assert "This filetype is not currently supported." in app.console_log
 
 
-def test_load_results_from_pickle(tmp_path):
+def test_load_results_from_pickle(tmp_path: Path):
     """Make sure that pybert can correctly load a pickle file."""
     app = PyBERT(run_simulation=True, gui=False)
     save_file = tmp_path.joinpath("config.pybert_data")
