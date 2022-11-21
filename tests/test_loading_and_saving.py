@@ -4,6 +4,7 @@ import pickle
 from pathlib import Path
 
 import numpy as np
+import pytest
 import yaml
 
 from pybert import __version__
@@ -11,11 +12,12 @@ from pybert.configuration import PyBertCfg
 from pybert.pybert import PyBERT
 
 
-def test_save_config_as_yaml(tmp_path: Path):
+@pytest.mark.parametrize("filepath_converter", [str, Path])
+def test_save_config_as_yaml(filepath_converter, tmp_path: Path):
     """Make sure that pybert can correctly generate a yaml file that can get reloaded."""
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.yaml")
-    app.save_configuration(save_file)
+    app.save_configuration(filepath_converter(save_file))
 
     assert save_file.exists()  # File was created.
 
@@ -47,7 +49,8 @@ def test_save_results_as_pickle(tmp_path: Path):
         assert results.the_data.arrays
 
 
-def test_load_config_from_yaml(tmp_path: Path):
+@pytest.mark.parametrize("filepath_converter", [str, Path])
+def test_load_config_from_yaml(filepath_converter, tmp_path: Path):
     """Make sure that pybert can correctly load a yaml file."""
     app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.yaml")
@@ -69,7 +72,7 @@ def test_load_config_from_yaml(tmp_path: Path):
     with open(save_file, "w", encoding="UTF-8") as saved_config_file:
         yaml.dump(user_config, saved_config_file)
 
-    app.load_configuration(save_file)
+    app.load_configuration(filepath_converter(save_file))
 
     # For everything saved in configuration, make sure they match.
     # All items should exist in both, so fail if one isn't found.

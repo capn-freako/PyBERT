@@ -200,7 +200,7 @@ class PyBertCfg:
             else:
                 setattr(pybert, prop, value)
 
-    def save(self, filepath: Path):
+    def save(self, filepath: Union[str, Path]):
         """Save out pybert's current configuration to a file.
 
         The extension must match a yaml file extension or it will still raise
@@ -210,6 +210,8 @@ class PyBertCfg:
         Args:
             filepath: The full filepath including the extension to save too.
         """
+        filepath = Path(filepath)  # incase a string was passed convert to a path.
+
         if filepath.suffix in [".yaml", ".yml"]:
             with open(filepath, "w", encoding="UTF-8") as yaml_file:
                 yaml.dump(self, yaml_file, indent=4, sort_keys=False)
