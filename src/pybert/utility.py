@@ -60,7 +60,7 @@ def moving_average(a, n=3):
             vector unchanged.
     """
 
-    ret = cumsum(a, dtype=np.float)
+    ret = cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return insert(ret[n - 1 :], 0, ret[n - 1] * ones(n - 1)) / n
 
@@ -287,7 +287,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
             [-ui / 2.0] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) for i in range(len(bin_edges) - 3)] + [ui / 2.0]
         )
 
-        return (array(list(map(np.float, hist))) / sum(hist), bin_centers)
+        return (array(list(map(float, hist))) / sum(hist), bin_centers)
 
     # Check inputs.
     if not ideal_xings.all():

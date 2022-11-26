@@ -177,8 +177,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.ideal_signal = x
 
         # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
-        # We have to skip the first 4 UI, because they consist of a one-time "prequel", which does not repeat.
-        # ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 4.0), mod_type=mod_type)
         ideal_xings = find_crossings(t, x, decision_scaler, mod_type=mod_type)
         self.ideal_xings = ideal_xings
 
@@ -187,8 +185,15 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         # Note: We're not using 'self.ideal_signal', because we rely on the system response to
         #       create the duobinary waveform. We only create it explicitly, above,
         #       so that we'll have an ideal reference for comparison.
+        split_time = clock()
         chnl_h = self.calc_chnl_h()
+        _calc_chnl_time = clock() - split_time
+        split_time = clock()
         chnl_out = convolve(self.x, chnl_h)[: len(t)]
+        _conv_chnl_time = clock() - split_time
+        if self.debug:
+            self.log(f"Channel calculation time: {_calc_chnl_time}")
+            self.log(f"Channel convolution time: {_conv_chnl_time}")
 
         self.channel_perf = nbits * nspb / (clock() - start_time)
         split_time = clock()
