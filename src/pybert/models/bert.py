@@ -177,8 +177,6 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         self.ideal_signal = x
 
         # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
-        # We have to skip the first 4 UI, because they consist of a one-time "prequel", which does not repeat.
-        # ideal_xings = find_crossings(t, x, decision_scaler, min_delay=(ui / 4.0), mod_type=mod_type)
         ideal_xings = find_crossings(t, x, decision_scaler, mod_type=mod_type)
         self.ideal_xings = ideal_xings
 
@@ -187,8 +185,15 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
         # Note: We're not using 'self.ideal_signal', because we rely on the system response to
         #       create the duobinary waveform. We only create it explicitly, above,
         #       so that we'll have an ideal reference for comparison.
+        split_time = clock()
         chnl_h = self.calc_chnl_h()
+        _calc_chnl_time = clock() - split_time
+        split_time = clock()
         chnl_out = convolve(self.x, chnl_h)[: len(t)]
+        _conv_chnl_time = clock() - split_time
+        if self.debug:
+            self.log(f"Channel calculation time: {_calc_chnl_time}")
+            self.log(f"Channel convolution time: {_conv_chnl_time}")
 
         self.channel_perf = nbits * nspb / (clock() - start_time)
         split_time = clock()
@@ -270,11 +275,11 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             #    This is partly due to the out of order nature in which we combine the Tx and channel,
             #    and partly due to the fact that we're adding noise to the Tx output.)
             tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
-            tx_h.resize(len(chnl_h))
+            tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
             tx_s = tx_h.cumsum()
         tx_out.resize(len(t))
         temp = tx_h.copy()
-        temp.resize(len(t))
+        temp.resize(len(t), refcheck=False)
         tx_H = fft(temp)
         tx_H *= tx_s[-1] / abs(tx_H[0])
 
@@ -296,7 +301,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         # - Convolve w/ channel.
         tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
         temp = tx_out_h.copy()
-        temp.resize(len(t))
+        temp.resize(len(t), refcheck=False)
         tx_out_H = fft(temp)
         rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
 
@@ -400,14 +405,14 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             else:
                 _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
                 ctle_h = irfft(ctle_H)
-            ctle_h.resize(len(chnl_h))
+            ctle_h.resize(len(chnl_h), refcheck=False)
             ctle_out = convolve(rx_in, ctle_h)
             ctle_out -= mean(ctle_out)  # Force zero mean.
             if self.ctle_mode == "AGC":  # Automatic gain control engaged?
                 ctle_out *= 2.0 * decision_scaler / ctle_out.ptp()
             ctle_s = ctle_h.cumsum()
             ctle_out_h = convolve(tx_out_h, ctle_h)[: len(tx_out_h)]
-        ctle_out.resize(len(t))
+        ctle_out.resize(len(t), refcheck=False)
         ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
         if ctle_out_h_main_lobe.size:
             conv_dly_ix = ctle_out_h_main_lobe[0]
@@ -416,7 +421,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         conv_dly = t[conv_dly_ix]  # Keep this line only.
         ctle_out_s = ctle_out_h.cumsum()
         temp = ctle_out_h.copy()
-        temp.resize(len(t))
+        temp.resize(len(t), refcheck=False)
         ctle_out_H = fft(temp)
         # - Store local variables to class instance.
         # Consider changing this; it could be sensitive to insufficient "front porch" in the CTLE output step response.
@@ -496,9 +501,9 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.bit_errs = len(bit_errs)
 
         dfe_h = array([1.0] + list(zeros(nspb - 1)) + sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))
-        dfe_h.resize(len(ctle_out_h))
+        dfe_h.resize(len(ctle_out_h), refcheck=False)
         temp = dfe_h.copy()
-        temp.resize(len(t))
+        temp.resize(len(t), refcheck=False)
         dfe_H = fft(temp)
         self.dfe_s = dfe_h.cumsum()
         dfe_out_H = ctle_out_H * dfe_H

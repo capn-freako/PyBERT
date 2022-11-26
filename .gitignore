@@ -57,6 +57,7 @@ cover/
 
 # Sphinx documentation
 docs/_build/
+docs/build/
 
 # PyBuilder
 .pybuilder/
@@ -124,4 +125,14 @@ pybert/status_bar_demo.py
 pybert/tags
 *.pybert*
 pybert/doc/build/*
+*~
+tests/htmlcov
+venv
+env
+htmlcov
 pybert.log
+*.PNG
+*.png
+*.sublime-*
+*.gcbench
+misc/*

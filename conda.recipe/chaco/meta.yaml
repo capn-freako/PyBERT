@@ -1,5 +1,5 @@
 {% set name = "chaco" %}
-{% set version = "5.0.0.2" %}
+{% set version = "5.1.0" %}
 {% set enable_version = "5.3.1" %}
 
 package:
@@ -8,9 +8,10 @@ package:
 
 source:
   git_url: https://github.com/enthought/chaco.git
-  git_rev: 5.0.0
+  # git_rev: 5.0.0
+  git_rev: {{ version }}
 build:
-  number: 6
+  number: 1
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
@@ -24,13 +25,13 @@ requirements:
 
   host:
     - python
-    - enable ={{enable_version}}
+    - enable ={{ enable_version }}
     - Cython
     - importlib_resources
     - pyface >=7.4.2
 
   run:
-    - enable ={{enable_version}}
+    - enable ={{ enable_version }}
     - importlib_resources
     - pyface >=7.4.2
 
