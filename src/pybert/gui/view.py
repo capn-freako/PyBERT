@@ -52,7 +52,7 @@ class MyHandler(Handler):
     def do_run_simulation(self, info):
         """Spawn a simulation thread and run with the current settings."""
         the_pybert = info.object
-        if self.run_sim_thread and self.run_sim_thread.isAlive():
+        if self.run_sim_thread and self.run_sim_thread.is_alive():
             pass
         else:
             self.run_sim_thread = RunSimThread()
@@ -61,7 +61,7 @@ class MyHandler(Handler):
 
     def do_stop_simulation(self):
         """Kill the simulation thread."""
-        if self.run_sim_thread and self.run_sim_thread.isAlive():
+        if self.run_sim_thread and self.run_sim_thread.is_alive():
             self.run_sim_thread.stop()
 
     def do_save_cfg(self, info):

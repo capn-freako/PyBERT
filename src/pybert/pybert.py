@@ -330,10 +330,10 @@ class CoOptThread(StoppableThread):
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
         if any([pybert.tx_tap_tuners[i].enabled for i in range(len(pybert.tx_tap_tuners))]):
-            while pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive():
+            while pybert.tx_opt_thread and pybert.tx_opt_thread.is_alive():
                 sleep(0.001)
             pybert._do_opt_tx(update_status=False)
-            while pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive():
+            while pybert.tx_opt_thread and pybert.tx_opt_thread.is_alive():
                 sleep(0.001)
         return pybert.cost
 
@@ -687,7 +687,7 @@ class PyBERT(HasTraits):
     def _btn_opt_tx_fired(self):
         if (
             self.tx_opt_thread
-            and self.tx_opt_thread.isAlive()
+            and self.tx_opt_thread.is_alive()
             or not any([self.tx_tap_tuners[i].enabled for i in range(len(self.tx_tap_tuners))])
         ):
             pass
@@ -701,7 +701,7 @@ class PyBERT(HasTraits):
         self.tx_opt_thread.start()
 
     def _btn_opt_rx_fired(self):
-        if self.rx_opt_thread and self.rx_opt_thread.isAlive() or self.ctle_mode_tune == "Off":
+        if self.rx_opt_thread and self.rx_opt_thread.is_alive() or self.ctle_mode_tune == "Off":
             pass
         else:
             self.rx_opt_thread = RxOptThread()
@@ -709,7 +709,7 @@ class PyBERT(HasTraits):
             self.rx_opt_thread.start()
 
     def _btn_coopt_fired(self):
-        if self.coopt_thread and self.coopt_thread.isAlive():
+        if self.coopt_thread and self.coopt_thread.is_alive():
             pass
         else:
             self.coopt_thread = CoOptThread()
@@ -717,13 +717,13 @@ class PyBERT(HasTraits):
             self.coopt_thread.start()
 
     def _btn_abort_fired(self):
-        if self.coopt_thread and self.coopt_thread.isAlive():
+        if self.coopt_thread and self.coopt_thread.is_alive():
             self.coopt_thread.stop()
             self.coopt_thread.join(10)
-        if self.tx_opt_thread and self.tx_opt_thread.isAlive():
+        if self.tx_opt_thread and self.tx_opt_thread.is_alive():
             self.tx_opt_thread.stop()
             self.tx_opt_thread.join(10)
-        if self.rx_opt_thread and self.rx_opt_thread.isAlive():
+        if self.rx_opt_thread and self.rx_opt_thread.is_alive():
             self.rx_opt_thread.stop()
             self.rx_opt_thread.join(10)
 
