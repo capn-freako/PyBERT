@@ -1,5 +1,7 @@
-General description of *pybert* package.
-----------------------------------------
+===================
+General Description
+===================
 
 .. automodule:: pybert
 
+.. include:: ../../README.md
