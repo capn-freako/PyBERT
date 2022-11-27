@@ -3,12 +3,9 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-=======================================
- *PyBERT* Source Code Developer's Guide
-=======================================
-
-Welcome to the *PyBERT Developer's Guide*!
-==========================================
+===========================
+ *PyBERT* Developer's Guide
+===========================
 
 Note to PyBERT *users*
 ----------------------
@@ -44,26 +41,9 @@ Contents
    intro
    modules
 
-Acknowledgments
----------------
-
-I would like to thank the following individuals for their contributions to the *PyBERT* project:
-
-**Mark Marlett** for first introducing me to Python/NumPy/SciPy, as an
-alternative to MATLAB for numerical computing and signal processing, as
-well as his countless hours of tutelage, regarding the finer points of
-serial communication link simulation technique. Mark is also the one,
-whom insisted that I take a break from development and finally write
-some documentation, so that others could understand what I intended and,
-hopefully, contribute. Thanks, Mark!
-
-**Low Kian Seong** for straightening out my understanding of the real
-purpose of the *description* field in the *setup.py* script.
-
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-

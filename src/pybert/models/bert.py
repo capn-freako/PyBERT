@@ -107,7 +107,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.
         initial_run(Bool): If True, don't update the eye diagrams, since
-            they haven't been created, yet. (Optional; default = False.)
+            they haven't been created, yet.
+            (Optional; default = False.)
         update_plots(Bool): If True, update the plots, after simulation
             completes. This option can be used by larger scripts, which
             import *pybert*, in order to avoid graphical back-end
