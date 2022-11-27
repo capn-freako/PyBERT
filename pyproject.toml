@@ -7,7 +7,7 @@ name = "PyBERT"
 description = "Serial communication link bit error rate tester simulator, written in Python."
 version = "4.0.0"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
-          , {name = "David Patterson"}
+          , {name = "David Patterson", email = ""}
           ]
 urls = { documentation = "https://github.com/capn-freako/PyBERT/wiki"}
 readme = "README.md"
