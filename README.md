@@ -93,7 +93,7 @@ experience for the user.
 alternative to MATLAB for numerical computing and signal processing, as
 well as his countless hours of tutelage, regarding the finer points of
 serial communication link simulation technique. Mark is also the one,
-whom insisted that I take a break from development and finally write
+who insisted that I take a break from development and finally write
 some documentation, so that others could understand what I intended and,
 hopefully, contribute. Thanks, Mark!
 
