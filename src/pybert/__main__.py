@@ -1,4 +1,8 @@
-"""Main entry into the PyBERT GUI."""
+"""Main entry into the PyBERT GUI when called with python -m.
+
+This is now largely for debug or if users want to use the python
+-m option since calling `pybert` will instead point to cli.py.
+"""
 from pybert.gui.view import traits_view
 from pybert.pybert import PyBERT
 

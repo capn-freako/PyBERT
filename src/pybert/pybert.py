@@ -23,10 +23,11 @@ from traits.etsconfig.api import ETSConfig
 # ETSConfig.toolkit = 'wx'           # Crashes on launch.
 # fmt: on
 # isort: on
-
 import platform
+import time
 from datetime import datetime
 from os.path import dirname, join
+from pathlib import Path
 from threading import Event, Thread
 from time import sleep
 
@@ -64,9 +65,11 @@ from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
 from pybert import __date__ as DATE
 from pybert import __version__ as VERSION
+from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots
 from pybert.models.bert import my_run_simulation
+from pybert.results import PyBertData
 from pybert.utility import (
     calc_gamma,
     import_channel,
@@ -327,10 +330,10 @@ class CoOptThread(StoppableThread):
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
         if any([pybert.tx_tap_tuners[i].enabled for i in range(len(pybert.tx_tap_tuners))]):
-            while pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive():
+            while pybert.tx_opt_thread and pybert.tx_opt_thread.is_alive():
                 sleep(0.001)
             pybert._do_opt_tx(update_status=False)
-            while pybert.tx_opt_thread and pybert.tx_opt_thread.isAlive():
+            while pybert.tx_opt_thread and pybert.tx_opt_thread.is_alive():
                 sleep(0.001)
         return pybert.cost
 
@@ -650,10 +653,7 @@ class PyBERT(HasTraits):
             self.log("Debug Mode Enabled.")
 
         if run_simulation:
-            # Running the simulation will fill in the required data structure.
-            my_run_simulation(self, initial_run=True)
-            # Once the required data structure is filled in, we can create the plots.
-            make_plots(self, n_dfe_taps=gNtaps)
+            self.simulate(initial_run=True)
         else:
             self.calc_chnl_h()  # Prevents missing attribute error in _get_ctle_out_h_tune().
 
@@ -687,7 +687,7 @@ class PyBERT(HasTraits):
     def _btn_opt_tx_fired(self):
         if (
             self.tx_opt_thread
-            and self.tx_opt_thread.isAlive()
+            and self.tx_opt_thread.is_alive()
             or not any([self.tx_tap_tuners[i].enabled for i in range(len(self.tx_tap_tuners))])
         ):
             pass
@@ -701,7 +701,7 @@ class PyBERT(HasTraits):
         self.tx_opt_thread.start()
 
     def _btn_opt_rx_fired(self):
-        if self.rx_opt_thread and self.rx_opt_thread.isAlive() or self.ctle_mode_tune == "Off":
+        if self.rx_opt_thread and self.rx_opt_thread.is_alive() or self.ctle_mode_tune == "Off":
             pass
         else:
             self.rx_opt_thread = RxOptThread()
@@ -709,7 +709,7 @@ class PyBERT(HasTraits):
             self.rx_opt_thread.start()
 
     def _btn_coopt_fired(self):
-        if self.coopt_thread and self.coopt_thread.isAlive():
+        if self.coopt_thread and self.coopt_thread.is_alive():
             pass
         else:
             self.coopt_thread = CoOptThread()
@@ -717,13 +717,13 @@ class PyBERT(HasTraits):
             self.coopt_thread.start()
 
     def _btn_abort_fired(self):
-        if self.coopt_thread and self.coopt_thread.isAlive():
+        if self.coopt_thread and self.coopt_thread.is_alive():
             self.coopt_thread.stop()
             self.coopt_thread.join(10)
-        if self.tx_opt_thread and self.tx_opt_thread.isAlive():
+        if self.tx_opt_thread and self.tx_opt_thread.is_alive():
             self.tx_opt_thread.stop()
             self.tx_opt_thread.join(10)
-        if self.rx_opt_thread and self.rx_opt_thread.isAlive():
+        if self.rx_opt_thread and self.rx_opt_thread.is_alive():
             self.rx_opt_thread.stop()
             self.rx_opt_thread.join(10)
 
@@ -1672,6 +1672,73 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.chnl_p = chnl_p
 
         return chnl_h
+
+    def simulate(self, initial_run=False, update_plots=True):
+        """Run all queued simulations."""
+        # Running the simulation will fill in the required data structure.
+        my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
+        # Once the required data structure is filled in, we can create the plots.
+        make_plots(self, n_dfe_taps=gNtaps)
+
+    def load_configuration(self, filepath: Path):
+        """Load in a configuration into pybert.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertCfg.load_from_file(filepath, self)
+            self.cfg_file = filepath
+            self.status = "Loaded configuration."
+        except InvalidFileType:
+            self.log("This filetype is not currently supported.")
+        except Exception as exp:
+            self.log("Failed to load configuration. See the console for more detail.")
+            self.log(str(exp))
+
+    def save_configuration(self, filepath: Path):
+        """Save out a configuration from pybert.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertCfg(self, time.asctime(), VERSION).save(filepath)
+            self.cfg_file = filepath
+            self.status = "Configuration saved."
+        except InvalidFileType:
+            self.log("This filetype is not currently supported. Please try again as a yaml file.")
+        except Exception as exp:
+            self.log("Failed to save current user configuration. See the console for more detail.")
+            self.log(str(exp))
+
+    def load_results(self, filepath: Path):
+        """Load results from a file into pybert.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertData.load_from_file(filepath, self)
+            self.data_file = filepath
+            self.status = "Loaded results."
+        except Exception as exp:
+            self.log("Failed to load results from file. See the console for more detail.")
+            self.log(str(exp))
+
+    def save_results(self, filepath: Path):
+        """Save the existing results to a pickle file.
+
+        Args:
+            filepath: A full filepath include the suffix.
+        """
+        try:
+            PyBertData(self, time.asctime(), VERSION).save(filepath)
+            self.data_file = filepath
+            self.status = "Saved results."
+        except Exception as exp:
+            self.log("Failed to save results to file. See the console for more detail.")
+            self.log(str(exp))
 
     def log_information(self):
         """Log the system information."""

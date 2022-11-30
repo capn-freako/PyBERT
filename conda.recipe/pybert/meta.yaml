@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "3.5.8" %}
+{% set version = "4.0.0" %}
 
 package:
   version: '{{ version }}'
@@ -13,7 +13,7 @@ build:
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
-    - pybert = pybert.__main__:main
+    - pybert = pybert.cli:cli
 
 requirements:
   run:

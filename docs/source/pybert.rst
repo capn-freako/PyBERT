@@ -16,13 +16,13 @@ And all custom threads used in PyBERT are derived from `StoppableThread`, so tha
 
 .. autoclass:: pybert.pybert.StoppableThread
    :members:
-   
+
 .. autoclass:: pybert.pybert.TxOptThread
    :members:
-   
+
 .. autoclass:: pybert.pybert.RxOptThread
    :members:
-   
+
 .. autoclass:: pybert.pybert.CoOptThread
    :members:
 

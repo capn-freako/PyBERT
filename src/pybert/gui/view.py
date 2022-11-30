@@ -6,10 +6,9 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-import pickle
+from pathlib import Path
 from threading import Thread
 
-import yaml
 from pyface.api import OK, FileDialog
 from pyface.image_resource import ImageResource
 from traits.api import Instance
@@ -30,11 +29,9 @@ from traitsui.api import (
 )
 
 from enable.component_editor import ComponentEditor
-from pybert.configuration import PyBertCfg
+from pybert.configuration import CONFIG_LOAD_WILDCARD, CONFIG_SAVE_WILDCARD
 from pybert.models.bert import my_run_sweeps
-from pybert.results import PyBertData
-
-USE_YAML = True  # `true`: yaml; `false`: pickle
+from pybert.results import RESULTS_FILEDIALOG_WILDCARD
 
 
 class RunSimThread(Thread):
@@ -55,7 +52,7 @@ class MyHandler(Handler):
     def do_run_simulation(self, info):
         """Spawn a simulation thread and run with the current settings."""
         the_pybert = info.object
-        if self.run_sim_thread and self.run_sim_thread.isAlive():
+        if self.run_sim_thread and self.run_sim_thread.is_alive():
             pass
         else:
             self.run_sim_thread = RunSimThread()
@@ -64,161 +61,66 @@ class MyHandler(Handler):
 
     def do_stop_simulation(self):
         """Kill the simulation thread."""
-        if self.run_sim_thread and self.run_sim_thread.isAlive():
+        if self.run_sim_thread and self.run_sim_thread.is_alive():
             self.run_sim_thread.stop()
 
     def do_save_cfg(self, info):
-        """Pickle out the current configuration."""
-        the_pybert = info.object
-        if USE_YAML:
-            dlg = FileDialog(action="save as", wildcard="*.yaml", default_path=the_pybert.cfg_file)
-        else:
-            dlg = FileDialog(action="save as", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
-        if dlg.open() == OK:
-            the_PyBertCfg = PyBertCfg(the_pybert)
-            try:
-                # Store all the instance variables from `the_PyBertCfg` into the selected file.
-                if USE_YAML:
-                    with open(dlg.path, "wt") as the_file:
-                        yaml.dump(the_PyBertCfg, the_file)  # David Patterson's suggestion.
-                else:
-                    with open(dlg.path, "wb") as the_file:
-                        pickle.dump(the_PyBertCfg, the_file)
-                the_pybert.cfg_file = dlg.path  # Preserve the user-selected directory/file, for next time.
-                the_pybert.log(f"Configuration saved to {the_pybert.cfg_file}")
-            except Exception as err:
-                error_message = f"The following error occured:\n\t{err}\nThe configuration was NOT saved."
-                the_pybert.log(
-                    "Exception raised by pybert.pybert_view.MyHandler.do_save_cfg().",
-                    exception=RuntimeError(error_message),
-                )
+        """Prompt the user to choose where to save the config and save it.
+
+        Args:
+            info: When an action is clicked, it passes the whole trait instance to this function.
+        """
+        # pylint: disable=no-self-use
+        pybert = info.object
+        dialog = FileDialog(
+            action="save as",
+            wildcard=CONFIG_SAVE_WILDCARD,
+            default_path=pybert.cfg_file,
+        )
+        if dialog.open() == OK:
+            pybert.save_configuration(Path(dialog.path))
 
     def do_load_cfg(self, info):
-        """Read in the pickled configuration."""
-        the_pybert = info.object
-        if USE_YAML:
-            dlg = FileDialog(action="open", wildcard="*.yaml", default_path=the_pybert.cfg_file)
-        else:
-            dlg = FileDialog(action="open", wildcard="*.pybert_cfg", default_path=the_pybert.cfg_file)
-        if dlg.open() == OK:
-            try:
-                if USE_YAML:
-                    with open(dlg.path, "rt") as the_file:
-                        the_PyBertCfg = yaml.load(the_file, Loader=yaml.Loader)
-                else:
-                    with open(dlg.path, "rb") as the_file:
-                        the_PyBertCfg = pickle.load(the_file)
-                if not isinstance(the_PyBertCfg, PyBertCfg):
-                    raise Exception("The data structure read in is NOT of type: PyBertCfg!")
-                for prop, value in vars(the_PyBertCfg).items():
-                    if prop == "tx_taps":
-                        for count, (enabled, val) in enumerate(value):
-                            setattr(the_pybert.tx_taps[count], "enabled", enabled)
-                            setattr(the_pybert.tx_taps[count], "value", val)
-                    elif prop == "tx_tap_tuners":
-                        for count, (enabled, val) in enumerate(value):
-                            setattr(the_pybert.tx_tap_tuners[count], "enabled", enabled)
-                            setattr(the_pybert.tx_tap_tuners[count], "value", val)
-                    else:
-                        setattr(the_pybert, prop, value)
-                the_pybert.cfg_file = dlg.path
-                the_pybert.log(f"Configuration loaded from {the_pybert.cfg_file}")
-            except Exception as err:
-                error_message = f"The following error occured:\n\t{err}\nThe configuration was NOT loaded."
-                the_pybert.log(
-                    "Exception raised by pybert.pybert_view.MyHandler.do_load_cfg().",
-                    exception=RuntimeError(error_message),
-                )
+        """Prompt the user to choose where to load the config from and load it.
+
+        Args:
+            info: When an action is clicked, it passes the whole trait instance to this function.
+        """
+        # pylint: disable=no-self-use
+        pybert = info.object
+        dialog = FileDialog(
+            action="open",
+            wildcard=CONFIG_LOAD_WILDCARD,
+            default_path=pybert.cfg_file,
+        )
+        if dialog.open() == OK:
+            pybert.load_configuration(Path(dialog.path))
 
     def do_save_data(self, info):
-        """Pickle out all the generated data."""
-        the_pybert = info.object
-        dlg = FileDialog(action="save as", wildcard="*.pybert_data", default_path=the_pybert.data_file)
-        if dlg.open() == OK:
-            try:
-                plotdata = PyBertData(the_pybert)
-                with open(dlg.path, "wb") as the_file:
-                    pickle.dump(plotdata, the_file)
-                the_pybert.data_file = dlg.path
-            except Exception as err:
-                error_message = f"The following error occured:\n\t{err}\nThe data was NOT saved."
-                the_pybert.log(
-                    "Exception raised by pybert.pybert_view.MyHandler.do_save_data().",
-                    exception=RuntimeError(error_message),
-                )
+        """Prompt the user to choose where to save the results and save it.
+
+        Args:
+            info: When an action is clicked, it passes the whole trait instance to this function.
+        """
+        # pylint: disable=no-self-use
+        pybert = info.object
+        dialog = FileDialog(action="save as", wildcard=RESULTS_FILEDIALOG_WILDCARD, default_path=pybert.data_file)
+        if dialog.open() == OK:
+            pybert.save_results(Path(dialog.path))
 
     def do_load_data(self, info):
-        """Read in the pickled data.'."""
-        the_pybert = info.object
-        dlg = FileDialog(action="open", wildcard="*.pybert_data", default_path=the_pybert.data_file)
-        if dlg.open() == OK:
-            try:
-                with open(dlg.path, "rb") as the_file:
-                    the_plotdata = pickle.load(the_file)
-                if not isinstance(the_plotdata, PyBertData):
-                    raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
-                for prop, value in the_plotdata.the_data.arrays.items():
-                    the_pybert.plotdata.set_data(prop + "_ref", value)
-                the_pybert.data_file = dlg.path
+        """Prompt the user to choose where to load the results from and load it.
 
-                # Add reference plots, if necessary.
-                # - time domain
-                for (container, suffix, has_both) in [
-                    (the_pybert.plots_h.component_grid.flat, "h", False),
-                    (the_pybert.plots_s.component_grid.flat, "s", True),
-                    (the_pybert.plots_p.component_grid.flat, "p", False),
-                ]:
-                    if "Reference" not in container[0].plots:
-                        (ix, prefix) = (0, "chnl")
-                        item_name = prefix + "_" + suffix + "_ref"
-                        container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkcyan", name="Inc_ref")
-                        for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
-                            item_name = prefix + "_out_" + suffix + "_ref"
-                            container[ix].plot(
-                                ("t_ns_chnl", item_name), type="line", color="darkmagenta", name="Cum_ref"
-                            )
-                        if has_both:
-                            for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
-                                item_name = prefix + "_" + suffix + "_ref"
-                                container[ix].plot(
-                                    ("t_ns_chnl", item_name), type="line", color="darkcyan", name="Inc_ref"
-                                )
+        Pybert will load these as "reference" plots for the responses.
 
-                # - frequency domain
-                for (container, suffix, has_both) in [(the_pybert.plots_H.component_grid.flat, "H", True)]:
-                    if "Reference" not in container[0].plots:
-                        (ix, prefix) = (0, "chnl")
-                        item_name = prefix + "_" + suffix + "_ref"
-                        container[ix].plot(
-                            ("f_GHz", item_name), type="line", color="darkcyan", name="Inc_ref", index_scale="log"
-                        )
-                        for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
-                            item_name = prefix + "_out_" + suffix + "_ref"
-                            container[ix].plot(
-                                ("f_GHz", item_name),
-                                type="line",
-                                color="darkmagenta",
-                                name="Cum_ref",
-                                index_scale="log",
-                            )
-                        if has_both:
-                            for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
-                                item_name = prefix + "_" + suffix + "_ref"
-                                container[ix].plot(
-                                    ("f_GHz", item_name),
-                                    type="line",
-                                    color="darkcyan",
-                                    name="Inc_ref",
-                                    index_scale="log",
-                                )
-
-            except Exception as err:
-                error_message = f"The following error occured while processing item: {item_name}:\n \
-\t{err}\nThe configuration was NOT saved."
-                the_pybert.log(
-                    "Exception raised by pybert.pybert_view.MyHandler.do_load_data().",
-                    exception=RuntimeError(error_message),
-                )
+        Args:
+            info: When an action is clicked, it passes the whole trait instance to this function.
+        """
+        # pylint: disable=no-self-use
+        pybert = info.object
+        dialog = FileDialog(action="open", wildcard=RESULTS_FILEDIALOG_WILDCARD, default_path=pybert.data_file)
+        if dialog.open() == OK:
+            pybert.load_results(Path(dialog.path))
 
 
 # These are the "globally applicable" buttons referred to in pybert.py,

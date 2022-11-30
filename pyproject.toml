@@ -7,7 +7,7 @@ name = "PyBERT"
 description = "Serial communication link bit error rate tester simulator, written in Python."
 version = "4.0.0"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
-          , {name = "David Patterson", email = "dpatter877@gmail.com"}
+          , {name = "David Patterson"}
           ]
 urls = { documentation = "https://github.com/capn-freako/PyBERT/wiki"}
 readme = "README.md"
@@ -52,7 +52,7 @@ classifiers=[
 ]
 
 [project.scripts]
-pybert = "pybert.__main__:main"
+pybert = "pybert.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -62,6 +62,9 @@ line-length = 119
 
 [tool.isort]
 profile = "black"
+
+[tool.docformatter]
+wrap-summaries = 0
 
 [tool.pytest.ini_options]
 minversion = "7.0"
