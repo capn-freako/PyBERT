@@ -1740,6 +1740,24 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             self.log("Failed to save results to file. See the console for more detail.")
             self.log(str(exp))
 
+    def clear_reference_from_plots(self):
+        """If any plots have ref in the name, delete them and then regenerate the plots.
+
+        If we don't actually delete any data, skip regenerating the plots.
+        """
+        atleast_one_reference_removed = False
+
+        for reference_plot in self.plotdata.list_data():
+            if "ref" in reference_plot:
+                try:
+                    atleast_one_reference_removed = True
+                    self.plotdata.del_data(reference_plot)
+                except KeyError:
+                    pass
+
+        if atleast_one_reference_removed:
+            make_plots(self, n_dfe_taps=gNtaps)
+
     def log_information(self):
         """Log the system information."""
         self.log(f"System: {platform.system()} {platform.release()}")

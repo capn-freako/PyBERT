@@ -122,6 +122,16 @@ class MyHandler(Handler):
         if dialog.open() == OK:
             pybert.load_results(Path(dialog.path))
 
+    def do_clear_data(self, info):
+        """If any reference or prior results has been loaded, clear it.
+
+        Args:
+            info: When an action is clicked, it passes the whole trait instance to this function.
+        """
+        # pylint: disable=no-self-use
+        pybert = info.object
+        pybert.clear_reference_from_plots()
+
 
 # These are the "globally applicable" buttons referred to in pybert.py,
 # just above the button definitions (approx. line 580).
@@ -129,6 +139,7 @@ run_sim = Action(name="Run", action="do_run_simulation")
 stop_sim = Action(name="Stop", action="do_stop_simulation")
 save_data = Action(name="Save Results", action="do_save_data")
 load_data = Action(name="Load Results", action="do_load_data")
+clear_data = Action(name="Clear Reference", action="do_clear_data")
 save_cfg = Action(name="Save Config.", action="do_save_cfg")
 load_cfg = Action(name="Load Config.", action="do_load_cfg")
 
@@ -830,7 +841,7 @@ traits_view = View(
     ),
     resizable=True,
     handler=MyHandler(),
-    buttons=[run_sim, save_cfg, load_cfg, save_data, load_data],
+    buttons=[run_sim, save_cfg, load_cfg, save_data, load_data, clear_data],
     statusbar="status_str",
     title="PyBERT",
     # width=0.95,
