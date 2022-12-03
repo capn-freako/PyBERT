@@ -539,15 +539,6 @@ class PyBERT(HasTraits):
 
     # About
     perf_info = Property(String, depends_on=["total_perf"])
-    ident = String(
-        "<H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
-    {}<BR>\n \
-    {}<BR><BR>\n\n \
-    {};<BR>\n \
-    All rights reserved World wide.".format(
-            VERSION, AUTHORS, DATE, COPY
-        )
-    )
 
     # Help
     instructions = help_str
