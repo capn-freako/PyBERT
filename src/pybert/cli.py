@@ -34,9 +34,9 @@ def cli(ctx, config_file, results):
 def sim(config_file, results):
     """Run a simulation without opening the GUI.
 
-    Will load the CONFIG_FILE from the given filepath, run the simulation and
-    then save the results into a file with the same name but a different
-    extension as the configuration file.
+    Will load the CONFIG_FILE from the given filepath, run the
+    simulation and then save the results into a file with the same name
+    but a different extension as the configuration file.
     """
     pybert = PyBERT(run_simulation=False, gui=False)
     pybert.load_configuration(config_file)
