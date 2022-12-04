@@ -866,16 +866,16 @@ traits_view = View(
             label="Jitter",
             id="jitter",
         ),
-        Group(  # Help
+        Group(  # Info
             Group(
                 Item("perf_info", style="readonly", show_label=False),
-                label="About",
+                label="Performance",
             ),
-            Group(Item("instructions", style="readonly", show_label=False), label="Guide"),
+            Group(Item("instructions", style="readonly", show_label=False), label="User's Guide"),
             Group(Item("console_log", style="readonly", show_label=False), label="Console", id="console"),
             layout="tabbed",
-            label="Help",
-            id="help",
+            label="Info",
+            id="info",
         ),
         layout="tabbed",
         springy=True,
