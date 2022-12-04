@@ -606,11 +606,11 @@ class PyBERT(HasTraits):
         """Log a message to the console and, optionally, to terminal and/or
         pop-up dialog."""
         _msg = msg.strip()
-        txt = f"\n[{datetime.now()}]: PyBERT: {_msg}\n"
+        txt = f"[{datetime.now()}]: PyBERT: {_msg}"
         if self.debug:
             ## In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt, flush=True)
-        self.console_log += txt
+        self.console_log += txt + "\n"
         if exception:
             raise exception
         if alert and self.GUI:
