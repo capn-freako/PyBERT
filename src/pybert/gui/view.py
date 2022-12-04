@@ -892,7 +892,8 @@ traits_view = View(
             Action(name="Save Config. As...", action="do_save_cfg_as", accelerator="Ctrl+Shift+S"),
             Action(name="Save Results", action="do_save_data"),
             Separator(),
-            Action(name="&Quit", action="close_app", accelerator="Ctrl+Q"),
+            Action(name="&Quit", action="close_app", accelerator="Ctrl+Q"),  # CloseAction()
+            id="file",
             name="&File",
         ),
         Menu(
@@ -904,15 +905,17 @@ traits_view = View(
                 checked_when="debug == True",
             ),
             Action(
-                name="Clear Loaded Waveform(s)",
+                name="Clear Loaded Waveforms",
                 action="do_clear_data",
             ),
+            id="view",
             name="&View",
         ),
-        Menu(Action(name="Run", action="do_run_simulation", accelerator="Ctrl+R"), name="&Simulation"),
+        Menu(Action(name="Run", action="do_run_simulation", accelerator="Ctrl+R"), id="simulation", name="Simulation"),
         Menu(
             Action(name="Getting Started", action="getting_started_clicked"),
             Action(name="&About", action="show_about_clicked"),
+            id="help",
             name="&Help",
         ),
     ),
