@@ -897,7 +897,7 @@ traits_view = View(
         ),
         Menu(
             Action(
-                name="Toggle Debug Mode",
+                name="Debug Mode",
                 action="toggle_debug_clicked",
                 accelerator="Ctrl+`",
                 style="toggle",
