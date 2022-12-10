@@ -264,6 +264,7 @@ traits_view = View(
                     Item(
                         name="thresh",
                         label="Pj Threshold (sigma)",
+                        tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
                     ),
                     Item(
                         name="impulse_length",
