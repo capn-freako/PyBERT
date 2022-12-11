@@ -13,11 +13,11 @@ from pybert.pybert import PyBERT
 
 
 @pytest.mark.parametrize("filepath_converter", [str, Path])
-def test_save_config_as_yaml(filepath_converter, tmp_path: Path):
+@pytest.mark.usefixtures("dut")
+def test_save_config_as_yaml(dut, filepath_converter, tmp_path: Path):
     """Make sure that pybert can correctly generate a yaml file that can get reloaded."""
-    app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.yaml")
-    app.save_configuration(filepath_converter(save_file))
+    dut.save_configuration(filepath_converter(save_file))
 
     assert save_file.exists()  # File was created.
 
@@ -26,21 +26,21 @@ def test_save_config_as_yaml(filepath_converter, tmp_path: Path):
         assert user_config.version == __version__
 
 
-def test_save_config_as_invalid(tmp_path: Path):
+@pytest.mark.usefixtures("dut")
+def test_save_config_as_invalid(dut, tmp_path: Path):
     """When given an unsupported file suffix, no file should be generated and an message logged."""
-    app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.json")
-    app.save_configuration(save_file)
+    dut.save_configuration(save_file)
 
     assert not save_file.exists()  # File should not have been created.
-    assert "This filetype is not currently supported." in app.console_log
+    assert "This filetype is not currently supported." in dut.console_log
 
 
-def test_save_results_as_pickle(tmp_path: Path):
+@pytest.mark.usefixtures("dut")
+def test_save_results_as_pickle(dut, tmp_path: Path):
     """Make sure that pybert can correctly generate a waveform pickle file that can get reloaded."""
-    app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("results.pybert_data")
-    app.save_results(save_file)
+    dut.save_results(save_file)
 
     assert save_file.exists()  # File was created.
 
@@ -50,11 +50,11 @@ def test_save_results_as_pickle(tmp_path: Path):
 
 
 @pytest.mark.parametrize("filepath_converter", [str, Path])
-def test_load_config_from_yaml(filepath_converter, tmp_path: Path):
+@pytest.mark.usefixtures("dut")
+def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
     """Make sure that pybert can correctly load a yaml file."""
-    app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.yaml")
-    app.save_configuration(save_file)
+    dut.save_configuration(save_file)
 
     # Modify the saved yaml file.
     with open(save_file, "r", encoding="UTF-8") as saved_config_file:
@@ -72,7 +72,7 @@ def test_load_config_from_yaml(filepath_converter, tmp_path: Path):
     with open(save_file, "w", encoding="UTF-8") as saved_config_file:
         yaml.dump(user_config, saved_config_file)
 
-    app.load_configuration(filepath_converter(save_file))
+    dut.load_configuration(filepath_converter(save_file))
 
     # For everything saved in configuration, make sure they match.
     # All items should exist in both, so fail if one isn't found.
@@ -81,15 +81,15 @@ def test_load_config_from_yaml(filepath_converter, tmp_path: Path):
         # These are handled differently so skip them.
         if name not in ["tx_taps", "tx_tap_tuners", "version", "date_created"]:
             # Test the values
-            assert getattr(user_config, name) == getattr(app, name)
+            assert getattr(user_config, name) == getattr(dut, name)
 
 
-def test_load_config_from_pickle(tmp_path: Path):
+@pytest.mark.usefixtures("dut")
+def test_load_config_from_pickle(dut, tmp_path: Path):
     """Make sure that pybert can correctly load a pickle file."""
-    app = PyBERT(run_simulation=False, gui=False)
 
     # Manually save a configuration as pickle
-    config = PyBertCfg(app, "string_time", "test.test.test")
+    config = PyBertCfg(dut, "string_time", "test.test.test")
     save_file = tmp_path.joinpath("config.pybert_cfg")
     with open(save_file, "wb") as out_file:
         pickle.dump(config, out_file)
@@ -102,25 +102,25 @@ def test_load_config_from_pickle(tmp_path: Path):
     with open(save_file, "wb") as saved_config_file:
         pickle.dump(user_config, saved_config_file)
 
-    app.load_configuration(save_file)
-    assert app.pattern_len == TEST_PATTERN_LENGTH
+    dut.load_configuration(save_file)
+    assert dut.pattern_len == TEST_PATTERN_LENGTH
 
 
-def test_load_config_from_invalid(tmp_path: Path):
+@pytest.mark.usefixtures("dut")
+def test_load_config_from_invalid(dut, tmp_path: Path):
     """When given an unsupported file suffix, no file should be read and an message logged."""
-    app = PyBERT(run_simulation=False, gui=False)
     save_file = tmp_path.joinpath("config.json")
     save_file.touch()
-    app.load_configuration(save_file)
+    dut.load_configuration(save_file)
 
-    assert "This filetype is not currently supported." in app.console_log
+    assert "This filetype is not currently supported." in dut.console_log
 
 
-def test_load_results_from_pickle(tmp_path: Path):
+@pytest.mark.usefixtures("dut")
+def test_load_results_from_pickle(dut, tmp_path: Path):
     """Make sure that pybert can correctly load a pickle file."""
-    app = PyBERT(run_simulation=True, gui=False)
     save_file = tmp_path.joinpath("config.pybert_data")
-    app.save_results(save_file)
+    dut.save_results(save_file)
 
     # Modify the saved pickle file.
     with open(save_file, "rb") as saved_results_file:
@@ -129,7 +129,7 @@ def test_load_results_from_pickle(tmp_path: Path):
     with open(save_file, "wb") as saved_results_file:
         pickle.dump(user_results, saved_results_file)
 
-    app.load_results(save_file)
+    dut.load_results(save_file)
     # pybert doesn't directly reload the waveform back into the same plot.
     # instead if creates a reference plot to compare old vs. new.
-    assert app.plotdata.get_data("chnl_h_ref").size == 4
+    assert dut.plotdata.get_data("chnl_h_ref").size == 4

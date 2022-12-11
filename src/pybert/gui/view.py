@@ -6,13 +6,15 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
+import sys
+import webbrowser
 from pathlib import Path
 from threading import Thread
 
-from pyface.api import OK, FileDialog
+from pyface.api import OK, FileDialog, MessageDialog
 from pyface.image_resource import ImageResource
 from traits.api import Instance
-from traitsui.api import (
+from traitsui.api import (  # CloseAction,
     Action,
     CheckListEditor,
     FileEditor,
@@ -20,7 +22,11 @@ from traitsui.api import (
     Handler,
     HGroup,
     Item,
+    Menu,
+    MenuBar,
+    NoButtons,
     ObjectColumn,
+    Separator,
     TableEditor,
     TextEditor,
     VGroup,
@@ -29,6 +35,7 @@ from traitsui.api import (
 )
 
 from enable.component_editor import ComponentEditor
+from pybert import __authors__, __copy__, __date__, __version__
 from pybert.configuration import CONFIG_LOAD_WILDCARD, CONFIG_SAVE_WILDCARD
 from pybert.models.bert import my_run_sweeps
 from pybert.results import RESULTS_FILEDIALOG_WILDCARD
@@ -65,6 +72,22 @@ class MyHandler(Handler):
             self.run_sim_thread.stop()
 
     def do_save_cfg(self, info):
+        """Save the configuration.
+
+        If no config file is set, use the `self.do_save_cfg_as()` method to prompt the user.
+
+        Args:
+            info: When an action is clicked, it passes the whole trait instance to this function.
+        """
+        # pylint: disable=no-self-use
+        pybert = info.object
+        configuration_file = Path(pybert.cfg_file)
+        if pybert.cfg_file and configuration_file.exists():
+            pybert.save_configuration(configuration_file)
+        else:  # A configuration file hasn't been set yet so use the save-as method
+            self.do_save_cfg_as(info)
+
+    def do_save_cfg_as(self, info):
         """Prompt the user to choose where to save the config and save it.
 
         Args:
@@ -122,15 +145,47 @@ class MyHandler(Handler):
         if dialog.open() == OK:
             pybert.load_results(Path(dialog.path))
 
+    def do_clear_data(self, info):
+        """If any reference or prior results has been loaded, clear it.
 
-# These are the "globally applicable" buttons referred to in pybert.py,
-# just above the button definitions (approx. line 580).
-run_sim = Action(name="Run", action="do_run_simulation")
-stop_sim = Action(name="Stop", action="do_stop_simulation")
-save_data = Action(name="Save Results", action="do_save_data")
-load_data = Action(name="Load Results", action="do_load_data")
-save_cfg = Action(name="Save Config.", action="do_save_cfg")
-load_cfg = Action(name="Load Config.", action="do_load_cfg")
+        Args:
+            info: When an action is clicked, it passes the whole trait instance to this function.
+        """
+        # pylint: disable=no-self-use
+        pybert = info.object
+        pybert.clear_reference_from_plots()
+
+    def toggle_debug_clicked(self, info):
+        """Toggle whether debug mode is enabled or not."""
+        # pylint: disable=no-self-use
+        info.object.debug = not info.object.debug
+
+    def getting_started_clicked(self, info):
+        """Open up Pybert's wiki."""
+        # pylint: disable=no-self-use,unused-argument
+        webbrowser.open("https://github.com/capn-freako/PyBERT/wiki")
+
+    def show_about_clicked(self, info):
+        """Open a dialog and show the user the about info."""
+        # pylint: disable=no-self-use,unused-argument
+        dialog = MessageDialog(
+            title="About Pybert",
+            message=f"PyBERT v{__version__} - a serial communication link design tool, written in Python.",
+            informative=(
+                f"{__authors__}<BR>\n" f"{__date__}<BR><BR>\n\n" f"{__copy__};<BR>\n" "All rights reserved World wide."
+            ),
+            severity="information",
+        )
+        dialog.open()
+
+    def close_app(self, info):
+        """Close the app.
+
+        Can't use CloseAction until https://github.com/enthought/traitsui/issues/1442 is resolved.
+        """
+        # pylint: disable=no-self-use,unused-argument
+        sys.exit(0)
+
 
 # Main window layout definition.
 traits_view = View(
@@ -812,17 +867,16 @@ traits_view = View(
             label="Jitter",
             id="jitter",
         ),
-        Group(  # Help
+        Group(  # Info
             Group(
-                Item("ident", style="readonly", show_label=False),
                 Item("perf_info", style="readonly", show_label=False),
-                label="About",
+                label="Performance",
             ),
-            Group(Item("instructions", style="readonly", show_label=False), label="Guide"),
+            Group(Item("instructions", style="readonly", show_label=False), label="User's Guide"),
             Group(Item("console_log", style="readonly", show_label=False), label="Console", id="console"),
             layout="tabbed",
-            label="Help",
-            id="help",
+            label="Info",
+            id="info",
         ),
         layout="tabbed",
         springy=True,
@@ -830,7 +884,43 @@ traits_view = View(
     ),
     resizable=True,
     handler=MyHandler(),
-    buttons=[run_sim, save_cfg, load_cfg, save_data, load_data],
+    menubar=MenuBar(
+        Menu(
+            Action(name="Load Config.", action="do_load_cfg", accelerator="Ctrl+O"),
+            Action(name="Load Results", action="do_load_data"),
+            Separator(),
+            Action(name="Save Config.", action="do_save_cfg", accelerator="Ctrl+S"),
+            Action(name="Save Config. As...", action="do_save_cfg_as", accelerator="Ctrl+Shift+S"),
+            Action(name="Save Results", action="do_save_data"),
+            Separator(),
+            Action(name="&Quit", action="close_app", accelerator="Ctrl+Q"),  # CloseAction()
+            id="file",
+            name="&File",
+        ),
+        Menu(
+            Action(
+                name="Debug Mode",
+                action="toggle_debug_clicked",
+                accelerator="Ctrl+`",
+                style="toggle",
+                checked_when="debug == True",
+            ),
+            Action(
+                name="Clear Loaded Waveforms",
+                action="do_clear_data",
+            ),
+            id="view",
+            name="&View",
+        ),
+        Menu(Action(name="Run", action="do_run_simulation", accelerator="Ctrl+R"), id="simulation", name="Simulation"),
+        Menu(
+            Action(name="Getting Started", action="getting_started_clicked"),
+            Action(name="&About", action="show_about_clicked"),
+            id="help",
+            name="&Help",
+        ),
+    ),
+    buttons=NoButtons,
     statusbar="status_str",
     title="PyBERT",
     # width=0.95,

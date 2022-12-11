@@ -1,5 +1,4 @@
 """Unit test coverage to make sure that the added cli commands function like the gui."""
-import logging
 
 from click.testing import CliRunner
 

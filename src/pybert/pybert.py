@@ -539,15 +539,6 @@ class PyBERT(HasTraits):
 
     # About
     perf_info = Property(String, depends_on=["total_perf"])
-    ident = String(
-        "<H1>PyBERT v{} - a serial communication link design tool, written in Python.</H1>\n\n \
-    {}<BR>\n \
-    {}<BR><BR>\n\n \
-    {};<BR>\n \
-    All rights reserved World wide.".format(
-            VERSION, AUTHORS, DATE, COPY
-        )
-    )
 
     # Help
     instructions = help_str
@@ -615,11 +606,11 @@ class PyBERT(HasTraits):
         """Log a message to the console and, optionally, to terminal and/or
         pop-up dialog."""
         _msg = msg.strip()
-        txt = f"\n[{datetime.now()}]: PyBERT: {_msg}\n"
+        txt = f"[{datetime.now()}]: PyBERT: {_msg}"
         if self.debug:
             ## In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt, flush=True)
-        self.console_log += txt
+        self.console_log += txt + "\n"
         if exception:
             raise exception
         if alert and self.GUI:
@@ -1739,6 +1730,24 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         except Exception as exp:
             self.log("Failed to save results to file. See the console for more detail.")
             self.log(str(exp))
+
+    def clear_reference_from_plots(self):
+        """If any plots have ref in the name, delete them and then regenerate the plots.
+
+        If we don't actually delete any data, skip regenerating the plots.
+        """
+        atleast_one_reference_removed = False
+
+        for reference_plot in self.plotdata.list_data():
+            if "ref" in reference_plot:
+                try:
+                    atleast_one_reference_removed = True
+                    self.plotdata.del_data(reference_plot)
+                except KeyError:
+                    pass
+
+        if atleast_one_reference_removed:
+            make_plots(self, n_dfe_taps=gNtaps)
 
     def log_information(self):
         """Log the system information."""
