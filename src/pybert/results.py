@@ -53,7 +53,6 @@ class PyBertData:
         "ctle_out_H",
         "dfe_out_H",
         "tx_out",
-        "rx_in",
     ]
 
     def __init__(self, the_PyBERT, date_created: str, version: str):
