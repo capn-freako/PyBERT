@@ -18,12 +18,11 @@ requirements:
     - setuptools
     - git
     - cmake
-    - swig =3
+    - swig
     # - {{compiler('c')}}
     # - {{ compiler('cxx') }}
     # - {{ cdt('xorg-x11-devel') }}  # [linux]
-    # - vs2017_win-64
-    - vs2019_win-64
+    # - vs2019_win-64
   host:
     - fonttools
     - numpy
