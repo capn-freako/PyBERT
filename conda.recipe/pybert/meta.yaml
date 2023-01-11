@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "4.0.0" %}
+{% set version = "4.0.4" %}
 
 package:
   version: '{{ version }}'
@@ -17,23 +17,24 @@ build:
 
 requirements:
   run:
-    - python >=3.8 <3.10
     - kiwisolver
-    - chaco =5.0.0.2
-    - pyibis-ami >=3.5.7
-    - scikit-rf
-    - pyside2
+    - numpy x.x
+    - pyibis-ami >=4.0.5
+    - pyside6
+    - python >=3.8
     - pyyaml
-    - importlib_resources
+    - qt =5
+    - scikit-rf >=0.24.1
   build:
-    - python =3.8
-    - setuptools
     - kiwisolver
-    - chaco =5.0.0.2
-    - pyibis-ami >=3.5.7
-    - scikit-rf
-    - pyside2
+    - numpy x.x
+    - pyibis-ami >=4.0.5
+    - pyside6
+    - python >=3.8
     - pyyaml
+    - qt =5
+    - scikit-rf >=0.24.1
+    - setuptools
 
 test:
   imports:
