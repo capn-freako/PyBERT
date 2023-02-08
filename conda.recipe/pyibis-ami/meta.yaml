@@ -1,5 +1,5 @@
 {% set name = "pyibis-ami" %}
-{% set version = "3.5.8" %}
+{% set version = "4.0.5" %}
 
 package:
   version: '{{ version }}'
@@ -19,19 +19,23 @@ build:
 
 requirements:
   run:
-    - python >=3.8
     - chaco  >=5.1.0
     - click
     - empy
     - matplotlib
+    - numpy x.x
     - parsec >=3.13
+    - python >=3.8
     - scipy
 
   build:
-    - python >=3.8
+    - chaco  >=5.1.0
+    - click
     - empy
     - matplotlib
+    - numpy x.x
     - parsec >=3.13
+    - python >=3.8
     - scipy
     - setuptools
 

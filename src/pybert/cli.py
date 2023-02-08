@@ -3,13 +3,14 @@ from pathlib import Path
 
 import click
 
+from pybert import __version__
 from pybert.gui.view import traits_view
 from pybert.pybert import PyBERT
 
 
 @click.group(invoke_without_command=True, context_settings=dict(help_option_names=["-h", "--help"]))
 @click.pass_context
-@click.version_option()
+@click.version_option(version=__version__)
 @click.option("--config-file", "-c", type=click.Path(exists=True), help="Load an existing configuration file.")
 @click.option("--results", "-r", type=click.Path(exists=True), help="Load results from a prior run.")
 def cli(ctx, config_file, results):
