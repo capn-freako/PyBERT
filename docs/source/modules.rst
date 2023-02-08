@@ -8,19 +8,19 @@ pybert - Main *PyBERT* class definition, as well as some helper classes.
 
 .. autoclass:: pybert.pybert.StoppableThread
    :members:
-   
+
 .. autoclass:: pybert.pybert.TxOptThread
    :members:
-   
+
 .. autoclass:: pybert.pybert.RxOptThread
    :members:
-   
+
 .. autoclass:: pybert.pybert.CoOptThread
    :members:
-   
+
 .. autoclass:: pybert.pybert.TxTapTuner
    :members:
-   
+
 .. autoclass:: pybert.pybert.PyBERT
    :members:
 
@@ -40,7 +40,7 @@ pybert_util - Various utilities used by other modules.
 ******************************************************
 
 .. automodule:: pybert.pybert_util
-   :members: moving_average, find_crossing_times, find_crossings, calc_jitter, make_uniform, calc_gamma, calc_G, calc_eye, make_ctle, trim_impulse, import_channel, interp_time, import_time, sdd_21, import_freq, lfsr_bits, safe_log10, pulse_center
+   :members:
 
 pybert_plot - Plot definitions for the *PyBERT* GUI.
 ****************************************************
@@ -75,4 +75,3 @@ cdr - CDR behavioral model.
 
 .. automodule:: pybert.cdr
    :members: CDR
-
