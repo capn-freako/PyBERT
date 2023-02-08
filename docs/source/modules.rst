@@ -1,77 +1,58 @@
-Modules in *pybert* package
----------------------------
+=================
+Top Level Modules
+=================
 
-pybert - Main *PyBERT* class definition, as well as some helper classes.
-************************************************************************
+Main Module (`pybert.pybert`)
+*****************************
 
 .. automodule:: pybert.pybert
 
-.. autoclass:: pybert.pybert.StoppableThread
-   :members:
+.. toctree::
+   :maxdepth: 1
 
-.. autoclass:: pybert.pybert.TxOptThread
-   :members:
+   pybert
 
-.. autoclass:: pybert.pybert.RxOptThread
-   :members:
+Models (`pybert.models`)
+************************
 
-.. autoclass:: pybert.pybert.CoOptThread
-   :members:
+.. automodule:: pybert.models
 
-.. autoclass:: pybert.pybert.TxTapTuner
-   :members:
+.. toctree::
+   :maxdepth: 1
 
-.. autoclass:: pybert.pybert.PyBERT
-   :members:
+   bert
+   dfe
+   cdr
 
-pybert_cntrl - Model control logic.
-***********************************
-
-.. automodule:: pybert.pybert_cntrl
-   :members: my_run_sweeps, my_run_simulation, update_results, update_eyes
-
-pybert_view - Main GUI window layout definition.
-************************************************
-
-.. automodule:: pybert.pybert_view
-   :members: MyHandler, RunSimThread
-
-pybert_util - Various utilities used by other modules.
-******************************************************
-
-.. automodule:: pybert.pybert_util
-   :members:
-
-pybert_plot - Plot definitions for the *PyBERT* GUI.
-****************************************************
-
-.. automodule:: pybert.pybert_plot
-
-pybert_help - Contents of the *Help* tab of the *PyBERT* GUI.
-*************************************************************
-
-.. automodule:: pybert.pybert_help
-
-pybert_cfg - Data structure for saving *PyBERT* configuration.
-**************************************************************
-
-.. automodule:: pybert.pybert_cfg
-   :members:
-
-pybert_data - Data structure for saving *PyBERT* results.
-*********************************************************
-
-.. automodule:: pybert.pybert_data
-   :members:
-
-dfe - DFE behavioral model.
+GUI Elements (`pybert.gui`)
 ***************************
 
-.. automodule:: pybert.dfe
-   :members: LfilterSS, DFE
+.. automodule:: pybert.gui
 
-cdr - CDR behavioral model.
-***************************
+.. toctree::
+   :maxdepth: 1
 
-.. automodule:: pybert.cdr
-   :members: CDR
+   view
+   plot
+   help
+
+Miscellaneous
+*************
+
+pybert.configuration - Data structure for saving *PyBERT* configuration.
+------------------------------------------------------------------------
+
+.. automodule:: pybert.configuration
+   :members:
+
+pybert.results - Data structure for saving *PyBERT* results.
+------------------------------------------------------------
+
+.. automodule:: pybert.results
+   :members:
+
+pybert.utility - Various utilities used by other modules.
+---------------------------------------------------------
+
+.. automodule:: pybert.utility
+   :members:

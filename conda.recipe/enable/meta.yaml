@@ -1,15 +1,13 @@
 {% set name = "enable" %}
-{% set version = "5.2.1.1" %}
+{% set version = "5.3.1" %}
 
 package:
   name: "{{ name|lower }}"
   version: "{{ version }}"
 
 source:
-  # path: ../../enable/
   git_url: https://github.com/enthought/{{name}}.git
-  # git_rev: {{version}}
-  git_rev: 966f062094cb7811db74587d1a7b059ad344f042
+  git_rev: {{version}}
 
 build:
   number: 1
@@ -20,18 +18,17 @@ requirements:
     - setuptools
     - git
     - cmake
-    - swig =3
+    - swig
     # - {{compiler('c')}}
     # - {{ compiler('cxx') }}
     # - {{ cdt('xorg-x11-devel') }}  # [linux]
-    # - vs2017_win-64
     # - vs2019_win-64
   host:
     - fonttools
     - numpy
     - pillow
     - pip
-    - pyface
+    - pyface >=7.4.2
     - pyparsing
     - python
     - six
@@ -41,7 +38,7 @@ requirements:
     - fonttools
     - numpy
     - pillow
-    - pyface
+    - pyface >=7.4.2
     - pyparsing
     - python
     - six

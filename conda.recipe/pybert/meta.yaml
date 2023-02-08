@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "3.5.5" %}
+{% set version = "4.0.4" %}
 
 package:
   version: '{{ version }}'
@@ -7,38 +7,35 @@ package:
 
 source:
   path: ../../
-  # git_url: https://github.com/capn-freako/PyBERT.git
-  # git_rev: {{ version }}
-  # git_depth: 1 # (Defaults to -1/not shallow)
 
 build:
-  # string: a72df0_5
   number: 1
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
-    - pybert = pybert.__main__:main
+    - pybert = pybert.cli:cli
 
 requirements:
   run:
-    - python =3.8
     - kiwisolver
-    - chaco =5.0.0.1
-    - pyibis-ami >=3.5.5
-    - scikit-rf
-    - pyside2
+    - numpy x.x
+    - pyibis-ami >=4.0.5
+    - pyside6
+    - python >=3.8
     - pyyaml
-    - importlib_resources
+    - qt =5
+    - scikit-rf >=0.24.1
   build:
-    - python =3.8
-    - setuptools
     - kiwisolver
-    - chaco =5.0.0.1
-    - pyibis-ami >=3.5.5
-    - scikit-rf
-    - pyside2
+    - numpy x.x
+    - pyibis-ami >=4.0.5
+    - pyside6
+    - python >=3.8
     - pyyaml
-    
+    - qt =5
+    - scikit-rf >=0.24.1
+    - setuptools
+
 test:
   imports:
     - pybert

@@ -1,5 +1,5 @@
 {% set name = "pyibis-ami" %}
-{% set version = "3.5.5" %}
+{% set version = "4.0.5" %}
 
 package:
   version: '{{ version }}'
@@ -13,24 +13,31 @@ source:
 
 build:
   # string: 4961a3_2
-  number: 2
+  number: 1
   # noarch: python
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   run:
-    - python =3.8
+    - chaco  >=5.1.0
+    - click
     - empy
-    - scipy
     - matplotlib
-    - parsec =3.13
+    - numpy x.x
+    - parsec >=3.13
+    - python >=3.8
+    - scipy
+
   build:
-    - python =3.8
-    - setuptools
+    - chaco  >=5.1.0
+    - click
     - empy
-    - scipy
     - matplotlib
-    - parsec =3.13
+    - numpy x.x
+    - parsec >=3.13
+    - python >=3.8
+    - scipy
+    - setuptools
 
 test:
   imports:

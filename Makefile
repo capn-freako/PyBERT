@@ -1,16 +1,21 @@
-.PHONY: tox clean test lint etags conda-build conda-skeleton chaco enable pyibis-ami pybert
+.PHONY: tox format check clean test lint etags conda-build conda-skeleton chaco enable pyibis-ami pybert
 
 tox:
 	tox
 
+format:
+	tox -e format
+
 lint:
 	tox -e pylint
 
+check:
+	tox -e type-check
+
 test:
-	tox -e py37
+	tox -e py38,py39,py310
 
 docs:
-	# Docs doesn't rely on docker but does require tox to be installed via pip.
 	tox -e docs
 
 clean:

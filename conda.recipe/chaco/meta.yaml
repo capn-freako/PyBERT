@@ -1,39 +1,40 @@
 {% set name = "chaco" %}
-{% set version = "5.0.0.1" %}
+{% set version = "5.1.0" %}
+{% set enable_version = "5.3.1" %}
 
 package:
   name: "{{ name|lower }}"
   version: "{{ version }}"
 
 source:
-  # path: ../../chaco/
   git_url: https://github.com/enthought/chaco.git
-  git_rev: 5.0.0
-
+  git_rev: {{ version }}
 build:
-  number: 1
+  number: 2
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
+    - cmake
+    - Cython
+    - enable ={{ enable_version }}
+    - git
+    - importlib_resources
+    - numpy x.x
+    - pyface >=7.4.2
+    - python
     - setuptools
     # - vs2019_win-64        # Uncomment for Windows build only.
     # - {{compiler('c')}}    # Would like to get one of these working, instead of above hack.
     # - {{compiler('cxx')}}
-    - git
-    - cmake
-  
-  host:
-    - python
-    - enable =5.2.1.1
-    - Cython
-    - importlib_resources
 
   run:
-    # - python
-    - enable =5.2.1.1
-    # - cython
+    - Cython
+    - enable ={{ enable_version }}
     - importlib_resources
+    - numpy x.x
+    - pyface >=7.4.2
+    - python
 
 test:
   # Python imports
