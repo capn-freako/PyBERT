@@ -1,5 +1,5 @@
 {% set name = "chaco" %}
-{% set version = "5.1.0" %}
+{% set version = "5.1.1" %}
 {% set enable_version = "5.3.1" %}
 
 package:
@@ -10,7 +10,7 @@ source:
   git_url: https://github.com/enthought/chaco.git
   git_rev: {{ version }}
 build:
-  number: 2
+  number: 1
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
@@ -24,7 +24,7 @@ requirements:
     - pyface >=7.4.2
     - python
     - setuptools
-    # - vs2019_win-64        # Uncomment for Windows build only.
+    - vs2019_win-64        # Uncomment for Windows build only.
     # - {{compiler('c')}}    # Would like to get one of these working, instead of above hack.
     # - {{compiler('cxx')}}
 

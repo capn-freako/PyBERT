@@ -1,5 +1,5 @@
 {% set name = "parsec" %}
-{% set version = "3.13" %}
+{% set version = "3.15" %}
 
 package:
   name: '{{ name|lower }}'

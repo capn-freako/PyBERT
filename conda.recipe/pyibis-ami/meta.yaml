@@ -25,7 +25,7 @@ requirements:
     - matplotlib
     - numpy x.x
     - parsec >=3.13
-    - python >=3.8
+    - python
     - scipy
 
   build:
@@ -35,7 +35,7 @@ requirements:
     - matplotlib
     - numpy x.x
     - parsec >=3.13
-    - python >=3.8
+    - python
     - scipy
     - setuptools
 
