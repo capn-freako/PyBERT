@@ -21,7 +21,7 @@ requirements:
     - numpy x.x
     - pyibis-ami >=4.0.5
     - pyside6
-    - python
+    - python x.x
     - pyyaml
     # - qt >=5
     - scikit-rf >=0.24.1
@@ -30,7 +30,7 @@ requirements:
     - numpy x.x
     - pyibis-ami >=4.0.5
     - pyside6
-    - python
+    - python x.x
     - pyyaml
     # - qt >=5
     - scikit-rf >=0.24.1

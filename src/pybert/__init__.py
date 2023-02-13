@@ -10,7 +10,7 @@ Testing by:      Mark Marlett <mark.marlett@gmail.com>
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-__version__ = "4.0.4"
-__date__ = "November 27, 2022"
+__version__ = "4.0.6"
+__date__ = "February 13, 2023"
 __authors__ = "David Banas & David Patterson"
 __copy__ = "Copyright (c) 2014 David Banas, 2019 David Patterson"
