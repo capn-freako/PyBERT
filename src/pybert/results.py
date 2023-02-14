@@ -109,7 +109,7 @@ class PyBertData:
 
         # Add reference plots, if necessary.
         # - time domain
-        for (container, suffix, has_both) in [
+        for container, suffix, has_both in [
             (pybert.plots_h.component_grid.flat, "h", False),
             (pybert.plots_s.component_grid.flat, "s", True),
             (pybert.plots_p.component_grid.flat, "p", False),
@@ -118,23 +118,23 @@ class PyBertData:
                 (ix, prefix) = (0, "chnl")
                 item_name = prefix + "_" + suffix + "_ref"
                 container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkcyan", name="Inc_ref")
-                for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                for ix, prefix in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
                     item_name = prefix + "_out_" + suffix + "_ref"
                     container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkmagenta", name="Cum_ref")
                 if has_both:
-                    for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                    for ix, prefix in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
                         item_name = prefix + "_" + suffix + "_ref"
                         container[ix].plot(("t_ns_chnl", item_name), type="line", color="darkcyan", name="Inc_ref")
 
         # - frequency domain
-        for (container, suffix, has_both) in [(pybert.plots_H.component_grid.flat, "H", True)]:
+        for container, suffix, has_both in [(pybert.plots_H.component_grid.flat, "H", True)]:
             if "Reference" not in container[0].plots:
                 (ix, prefix) = (0, "chnl")
                 item_name = prefix + "_" + suffix + "_ref"
                 container[ix].plot(
                     ("f_GHz", item_name), type="line", color="darkcyan", name="Inc_ref", index_scale="log"
                 )
-                for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                for ix, prefix in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
                     item_name = prefix + "_out_" + suffix + "_ref"
                     container[ix].plot(
                         ("f_GHz", item_name),
@@ -144,7 +144,7 @@ class PyBertData:
                         index_scale="log",
                     )
                 if has_both:
-                    for (ix, prefix) in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
+                    for ix, prefix in [(1, "tx"), (2, "ctle"), (3, "dfe")]:
                         item_name = prefix + "_" + suffix + "_ref"
                         container[ix].plot(
                             ("f_GHz", item_name),

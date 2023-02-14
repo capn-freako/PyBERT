@@ -8456,15 +8456,15 @@ label {
 }
 /* Flexible box model classes */
 /* Taken from Alex Russell http://infrequently.org/2009/08/css-3-progress/ */
-/* This file is a compatability layer.  It allows the usage of flexible box 
+/* This file is a compatability layer.  It allows the usage of flexible box
 model layouts accross multiple browsers, including older browsers.  The newest,
 universal implementation of the flexible box model is used when available (see
-`Modern browsers` comments below).  Browsers that are known to implement this 
+`Modern browsers` comments below).  Browsers that are known to implement this
 new spec completely include:
 
     Firefox 28.0+
     Chrome 29.0+
-    Internet Explorer 11+ 
+    Internet Explorer 11+
     Opera 17.0+
 
 Browsers not listed, including Safari, are supported via the styling under the
@@ -11214,7 +11214,7 @@ div#pager .ui-resizable-handle {
   background: #f7f7f7;
   border-top: 1px solid #cfcfcf;
   border-bottom: 1px solid #cfcfcf;
-  /* This injects handle bars (a short, wide = symbol) for 
+  /* This injects handle bars (a short, wide = symbol) for
         the resize handle. */
 }
 div#pager .ui-resizable-handle::after {
@@ -11649,7 +11649,7 @@ ul.typeahead-list > li > a {
 .highlight .il { color: #666666 } /* Literal.Number.Integer.Long */
     </style>
 <style type="text/css">
-    
+
 /* Temporary definitions which will become obsolete with Notebook release 5.0 */
 .ansi-black-fg { color: #3E424D; }
 .ansi-black-bg { background-color: #3E424D; }
@@ -11705,14 +11705,14 @@ div#notebook {
   div.cell {
     display: block;
     page-break-inside: avoid;
-  } 
-  div.output_wrapper { 
-    display: block;
-    page-break-inside: avoid; 
   }
-  div.output { 
+  div.output_wrapper {
     display: block;
-    page-break-inside: avoid; 
+    page-break-inside: avoid;
+  }
+  div.output {
+    display: block;
+    page-break-inside: avoid;
   }
 }
 </style>
@@ -11764,7 +11764,7 @@ Original date:   November 30, 2017</p>
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython2"><pre><span></span><span class="o">%</span><span class="k">matplotlib</span> inline 
+<div class=" highlight hl-ipython2"><pre><span></span><span class="o">%</span><span class="k">matplotlib</span> inline
 <span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
 
 <span class="kn">import</span> <span class="nn">skrf</span> <span class="kn">as</span> <span class="nn">rf</span>
@@ -11817,7 +11817,7 @@ Original date:   November 30, 2017</p>
 <span class="sd">      - 1 ==&gt; 2</span>
 <span class="sd">      - 3 ==&gt; 4</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    
+
     <span class="k">return</span> <span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">ntwk</span><span class="o">.</span><span class="n">s21</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s23</span> <span class="o">+</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s43</span> <span class="o">-</span> <span class="n">ntwk</span><span class="o">.</span><span class="n">s41</span><span class="p">)</span>
 
 
@@ -11887,11 +11887,11 @@ Original date:   November 30, 2017</p>
 
 <div class="output_area"><div class="prompt"></div>
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>Channel    Passive   
+<pre>Channel    Passive
 _____________________
-   ch1        True   
-   ch2        True   
-   ch5        True   
+   ch1        True
+   ch2        True
+   ch5        True
 </pre>
 </div>
 </div>
@@ -14008,10 +14008,10 @@ tQ1LriRJkiSpbVhyJUmSJEltw5IrSZIkSWobllxJkiRJUtv4f0Ux7+iR/7U8AAAAAElFTkSuQmCC
     <span class="n">H</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="n">constant_values</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>  <span class="c1"># Presume d.c. value = 1.</span>
     <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">H</span><span class="p">))</span>
     <span class="n">h</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>  <span class="c1"># Equivalent to assuming that step response settles at 1.</span>
-    
+
     <span class="c1"># Form step response from impulse response.</span>
     <span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
-    
+
     <span class="c1"># Form time vector.</span>
     <span class="n">t0</span> <span class="o">=</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.</span> <span class="o">*</span> <span class="n">fmax</span><span class="p">)</span>  <span class="c1"># Sampling interval = 1 / (2 fNyquist).</span>
     <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">n</span> <span class="o">*</span> <span class="n">t0</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">h</span><span class="p">))])</span>

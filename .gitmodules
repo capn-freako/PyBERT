@@ -10,4 +10,3 @@
 [submodule "parsec.py"]
 	path = parsec.py
 	url = https://github.com/capn-freako/parsec.py.git
-

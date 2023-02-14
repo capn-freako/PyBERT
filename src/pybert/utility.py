@@ -650,7 +650,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):
                 break
             interp_fac = (start_time - start_ix * tsamp) // tsamp
             i = 0
-            for (samp1, samp2) in zip(
+            for samp1, samp2 in zip(
                 ys[start_ix : start_ix + 2 * samps_per_ui],
                 ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui],
             ):
@@ -1214,7 +1214,7 @@ def renorm_s2p(ntwk, zs):
         Z.append(inv(I - s).dot(I + s))  # Resultant values are normalized to z0.
     Z = np.array(Z)
     Zn = []
-    for (z, zn) in zip(Z, zt):  # Iterration is over frequency and yields: (2x2 array, 2-element vector).
+    for z, zn in zip(Z, zt):  # Iterration is over frequency and yields: (2x2 array, 2-element vector).
         Zn.append(z.dot(z0 / zn))
     Zn = np.array(Zn)
     Sn = []
