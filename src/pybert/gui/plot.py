@@ -9,6 +9,7 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 
 from chaco.api import ColorMapper, GridPlotContainer, Plot
 from chaco.tools.api import PanTool, ZoomTool
+
 from pybert.models.bert import update_eyes
 
 PLOT_SPACING = 20

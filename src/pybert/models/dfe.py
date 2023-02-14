@@ -315,7 +315,7 @@ class DFE:
         clocks = zeros(len(sample_times))
         clock_times = [next_clock_time]
         bits = []
-        for (t, x) in zip(sample_times, signal):
+        for t, x in zip(sample_times, signal):
             if not ideal:
                 sum_out = summing_filter.step(x - filter_out)
             else:

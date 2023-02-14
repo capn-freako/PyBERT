@@ -33,6 +33,7 @@ from time import sleep
 
 import numpy as np
 import skrf as rf
+from chaco.api import ArrayPlotData, GridPlotContainer
 from numpy import array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
 from numpy.fft import fft, irfft
 from numpy.random import randint
@@ -60,7 +61,6 @@ from traits.api import (
 )
 from traitsui.message import message
 
-from chaco.api import ArrayPlotData, GridPlotContainer
 from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
 from pybert import __date__ as DATE

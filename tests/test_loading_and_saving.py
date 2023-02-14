@@ -77,7 +77,6 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
     # For everything saved in configuration, make sure they match.
     # All items should exist in both, so fail if one isn't found.
     for name in user_config.__dict__.keys():
-
         # These are handled differently so skip them.
         if name not in ["tx_taps", "tx_tap_tuners", "version", "date_created"]:
             # Test the values
