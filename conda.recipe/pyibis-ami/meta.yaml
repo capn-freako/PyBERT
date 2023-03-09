@@ -1,12 +1,14 @@
 {% set name = "pyibis-ami" %}
-{% set version = "4.0.5" %}
+{% set version = "4.0.6" %}
 
 package:
   version: '{{ version }}'
   name: '{{ name|lower }}'
 
 source:
-  path: ../../PyAMI/
+  # path: ../../PyAMI
+  # git_url: ../../PyAMI
+  git_url: ../../PyAMI_pruned
   # git_url: https://github.com/capn-freako/PyAMI.git
   # git_rev: {{ version }}
   # git_depth: 1 # (Defaults to -1/not shallow)
@@ -18,26 +20,35 @@ build:
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
+  build:
+  # host:
+    - chaco  >=5.1.0
+    - click
+    - cmake
+    - Cython
+    - empy
+    - git
+    - importlib_resources
+    - matplotlib
+    - numpy 1.23.*
+    - parsec >=3.13
+    - python
+    - scipy
+    - setuptools
+    - swig
+    - vs2019_win-64        # Uncomment for Windows build only.
+    # - {{ compiler('c') }}    # Would like to get one of these working, instead of above hack.
+    # - {{ compiler('cxx') }}
+
   run:
     - chaco  >=5.1.0
     - click
     - empy
     - matplotlib
-    - numpy x.x
+    - numpy 1.23.*
     - parsec >=3.13
     - python
     - scipy
-
-  build:
-    - chaco  >=5.1.0
-    - click
-    - empy
-    - matplotlib
-    - numpy x.x
-    - parsec >=3.13
-    - python
-    - scipy
-    - setuptools
 
 test:
   imports:
