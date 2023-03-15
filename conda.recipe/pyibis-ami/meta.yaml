@@ -1,14 +1,14 @@
 {% set name = "pyibis-ami" %}
-{% set version = "4.0.6" %}
+{% set version = "4.1.0" %}
 
 package:
   version: '{{ version }}'
   name: '{{ name|lower }}'
 
 source:
-  # path: ../../PyAMI
+  path: ../../PyAMI
   # git_url: ../../PyAMI
-  git_url: ../../PyAMI_pruned
+  # git_url: ../../PyAMI_pruned
   # git_url: https://github.com/capn-freako/PyAMI.git
   # git_rev: {{ version }}
   # git_depth: 1 # (Defaults to -1/not shallow)
@@ -21,34 +21,33 @@ build:
 
 requirements:
   build:
-  # host:
-    - chaco  >=5.1.0
-    - click
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
     - cmake
-    - Cython
-    - empy
     - git
-    - importlib_resources
-    - matplotlib
-    - numpy 1.23.*
-    - parsec >=3.13
-    - python
-    - scipy
-    - setuptools
     - swig
-    - vs2019_win-64        # Uncomment for Windows build only.
-    # - {{ compiler('c') }}    # Would like to get one of these working, instead of above hack.
-    # - {{ compiler('cxx') }}
+  host:
+    - chaco  >=5.1.0
+    - click >=8.1.3
+    - Cython
+    - empy >=3.3.4
+    - importlib_resources
+    - matplotlib >=3.6.1
+    - numpy {{ numpy }}
+    - parsec >=3.15
+    - python {{ python }}
+    - scipy >=1.9
+    - setuptools
 
   run:
     - chaco  >=5.1.0
-    - click
-    - empy
-    - matplotlib
-    - numpy 1.23.*
-    - parsec >=3.13
-    - python
-    - scipy
+    - click >=8.1.3
+    - empy >=3.3.4
+    - matplotlib >=3.6.1
+    - numpy {{ numpy }}
+    - parsec >=3.15
+    - python {{ python }}
+    - scipy >=1.9
 
 test:
   imports:
