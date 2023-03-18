@@ -17,30 +17,38 @@ requirements:
   build:
     - {{ compiler('c')   }}
     - {{ compiler('cxx') }}
-    # - {{ cdt('xorg-x11-devel') }}  # [linux]
-    # - vs2019_win-64  # Uncomment for Windows build only.
+    - {{ cdt('libx11-devel') }}          # [linux]
+    - {{ cdt('xorg-x11-proto-devel') }}  # [linux]
+    - {{ cdt('mesa-libgl-devel') }}      # [linux]
+    - {{ cdt('mesa-dri-drivers') }}      # [linux]
+    - {{ cdt('mesa-dri1-drivers') }}      # [linux]
+    - {{ cdt('libselinux') }}            # [linux]
+    - {{ cdt('libxdamage') }}            # [linux]
+    - {{ cdt('libxxf86vm') }}            # [linux]
+    - {{ cdt('libxext') }}               # [linux]
     - cmake
     - git
     - swig
   host:
     - Cython  # Caused error when in `build:`.
     - fonttools
-    - numpy x.x
+    - numpy {{ numpy }}
     - pillow >=9.4
     - pip
     - pyface >=7.4.2
     - pyparsing
-    - python
+    - python {{ python }}
     - setuptools
     - six
     - traitsui
+    - xorg-libxfixes                     # [linux]
   run:
     - fonttools
-    - numpy x.x
+    - numpy {{ numpy }}
     - pillow >=9.4
     - pyface >=7.4.2
     - pyparsing
-    - python
+    - python {{ python }}
     - six
     - traitsui
 
