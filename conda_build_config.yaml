@@ -1,0 +1,16 @@
+c_compiler:
+  - gcc                        # [linux]
+  - clang                      # [osx]
+  - vs2019                     # [win]
+cxx_compiler:
+  - gxx                        # [linux]
+  - clangxx                    # [osx]
+  - vs2019                     # [win]
+numpy:
+  - 1.23
+python:
+  - 3.9
+channels:
+  - dbanas
+  - defaults
+  - conda-forge

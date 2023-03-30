@@ -11,6 +11,8 @@ from time import perf_counter
 clock = perf_counter
 
 import scipy.signal as sig
+from chaco.api import Plot
+from chaco.tools.api import PanTool, ZoomTool
 from numpy import (
     arange,
     argmax,
@@ -36,8 +38,6 @@ from numpy.random import normal
 from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from scipy.signal import iirfilter, lfilter
 
-from chaco.api import Plot
-from chaco.tools.api import PanTool, ZoomTool
 from pybert.models.dfe import DFE
 from pybert.utility import (
     calc_eye,

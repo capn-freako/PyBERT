@@ -10,34 +10,34 @@ source:
   git_rev: {{version}}
 
 build:
-  number: 1
+  number: 3
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
-    - setuptools
-    - git
-    - cmake
-    - swig
-    # - {{compiler('c')}}
-    # - {{ compiler('cxx') }}
+    - {{ compiler('c')   }}
+    - {{ compiler('cxx') }}
     # - {{ cdt('xorg-x11-devel') }}  # [linux]
-    # - vs2019_win-64
+    # - vs2019_win-64  # Uncomment for Windows build only.
+    - cmake
+    - git
+    - swig
   host:
+    - Cython  # Caused error when in `build:`.
     - fonttools
-    - numpy
-    - pillow
+    - numpy x.x
+    - pillow >=9.4
     - pip
     - pyface >=7.4.2
     - pyparsing
     - python
+    - setuptools
     - six
     - traitsui
-    - Cython
   run:
     - fonttools
-    - numpy
-    - pillow
+    - numpy x.x
+    - pillow >=9.4
     - pyface >=7.4.2
     - pyparsing
     - python

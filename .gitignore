@@ -136,7 +136,6 @@ htmlcov
 pybert.log
 *.PNG
 *.png
-*.sublime-*
+*.sublime-workspace
 *.gcbench
 misc/*
-

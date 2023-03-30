@@ -1,5 +1,5 @@
 {% set name = "pybert" %}
-{% set version = "4.0.5" %}
+{% set version = "4.1.0" %}
 
 package:
   version: '{{ version }}'
@@ -9,32 +9,40 @@ source:
   path: ../../
 
 build:
-  number: 1
-  noarch: "python"
+  number: 5
+  # noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
     - pybert = pybert.cli:cli
 
 requirements:
+  build:
+    - {{ compiler('c')   }}
+    - {{ compiler('cxx') }}
+    - cmake
+    - git
+    - swig
+  host:
+    - kiwisolver
+    - numpy x.x
+    - pyibis-ami >=4.1
+    # - pyside6  # Not available in Anaconda, yet.
+    - pyside2
+    - python
+    - pyyaml
+    - qt >=5
+    - scikit-rf >=0.24.1
+    - setuptools
   run:
     - kiwisolver
     - numpy x.x
-    - pyibis-ami >=4.0.5
-    - pyside6
+    - pyibis-ami >=4.1
+    # - pyside6  # Not available in Anaconda, yet.
+    - pyside2
     - python
     - pyyaml
-    # - qt >=5
+    - qt >=5
     - scikit-rf >=0.24.1
-  build:
-    - kiwisolver
-    - numpy x.x
-    - pyibis-ami >=4.0.5
-    - pyside6
-    - python
-    - pyyaml
-    # - qt >=5
-    - scikit-rf >=0.24.1
-    - setuptools
 
 test:
   imports:

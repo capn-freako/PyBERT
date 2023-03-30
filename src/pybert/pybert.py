@@ -13,16 +13,6 @@ can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-# fmt: off
-# isort: off
-from traits.etsconfig.api import ETSConfig
-# ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
-# ETSConfig.toolkit = 'qt4.celiagg'   # Yields unacceptably small font sizes in plot axis labels.
-# ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
-# ETSConfig.toolkit = 'qt.image'     # Program runs, but very small fonts in plot titles and axis labels.
-# ETSConfig.toolkit = 'wx'           # Crashes on launch.
-# fmt: on
-# isort: on
 import platform
 import time
 from datetime import datetime
@@ -33,6 +23,7 @@ from time import sleep
 
 import numpy as np
 import skrf as rf
+from chaco.api import ArrayPlotData, GridPlotContainer
 from numpy import array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
 from numpy.fft import fft, irfft
 from numpy.random import randint
@@ -60,7 +51,6 @@ from traits.api import (
 )
 from traitsui.message import message
 
-from chaco.api import ArrayPlotData, GridPlotContainer
 from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
 from pybert import __date__ as DATE
@@ -1751,6 +1741,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
 
     def log_information(self):
         """Log the system information."""
+        from traits.etsconfig.api import ETSConfig
         self.log(f"System: {platform.system()} {platform.release()}")
         self.log(f"Python Version: {platform.python_version()}")
         self.log(f"PyBERT Version: {VERSION}")
