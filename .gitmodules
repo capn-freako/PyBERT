@@ -1,12 +1,6 @@
 [submodule "PyAMI"]
 	path = PyAMI
 	url = https://github.com/capn-freako/PyAMI.git
-[submodule "enable"]
-	path = enable
-	url = https://github.com/enthought/enable.git
-[submodule "chaco"]
-	path = chaco
-	url = https://github.com/enthought/chaco.git
 [submodule "parsec.py"]
 	path = parsec.py
 	url = https://github.com/capn-freako/parsec.py.git
