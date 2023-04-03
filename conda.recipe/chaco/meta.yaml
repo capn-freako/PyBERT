@@ -24,7 +24,7 @@ requirements:
     - pyface >=7.4.2
     - python
     - setuptools
-    - vs2019_win-64        # Uncomment for Windows build only.
+    # - vs2019_win-64        # Uncomment for Windows build only.
     # - {{compiler('c')}}    # Would like to get one of these working, instead of above hack.
     # - {{compiler('cxx')}}
 
