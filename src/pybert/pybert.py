@@ -1742,6 +1742,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
     def log_information(self):
         """Log the system information."""
         from traits.etsconfig.api import ETSConfig
+
         self.log(f"System: {platform.system()} {platform.release()}")
         self.log(f"Python Version: {platform.python_version()}")
         self.log(f"PyBERT Version: {VERSION}")
