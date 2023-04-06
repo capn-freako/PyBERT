@@ -1,5 +1,6 @@
 {% set name = "pybert" %}
-{% set version = "4.1.0" %}
+{% set pyproject = load_file_data('../../pyproject.toml', from_recipe_dir=true, recipe_dir="conda.recipe/pybert") %}
+{% set version = pyproject.get('project', {}).get('version') %}
 
 package:
   version: '{{ version }}'
@@ -9,8 +10,7 @@ source:
   path: ../../
 
 build:
-  number: 5
-  # noarch: "python"
+  number: 1
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
     - pybert = pybert.cli:cli
@@ -24,22 +24,22 @@ requirements:
     - swig
   host:
     - kiwisolver
-    - numpy x.x
+    - numpy {{ numpy }}
     - pyibis-ami >=4.1
     # - pyside6  # Not available in Anaconda, yet.
     - pyside2
-    - python
+    - python {{ python }}
     - pyyaml
     - qt >=5
     - scikit-rf >=0.24.1
     - setuptools
   run:
     - kiwisolver
-    - numpy x.x
+    - numpy {{ numpy }}
     - pyibis-ami >=4.1
     # - pyside6  # Not available in Anaconda, yet.
     - pyside2
-    - python
+    - python {{ python }}
     - pyyaml
     - qt >=5
     - scikit-rf >=0.24.1
