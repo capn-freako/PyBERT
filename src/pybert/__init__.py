@@ -10,8 +10,11 @@ Testing by:      Mark Marlett <mark.marlett@gmail.com>
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-__version__ = "4.1.0"
-__date__ = "March 15, 2023"
+from importlib.metadata import version as _get_version
+
+# Set PEP396 version attribute
+__version__ = _get_version("PipBERT")  # PyPi "PyBERT" package name got stollen. :(
+__date__ = "April 6, 2023"
 __authors__ = "David Banas & David Patterson"
 __copy__ = "Copyright (c) 2014 David Banas, 2019 David Patterson"
 
