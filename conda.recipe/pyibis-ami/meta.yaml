@@ -1,5 +1,6 @@
 {% set name = "pyibis-ami" %}
-{% set version = "4.1.0" %}
+{% set pyproject = load_file_data('../../PyAMI/pyproject.toml', from_recipe_dir=true, recipe_dir="conda.recipe/pyibis-ami") %}
+{% set version = pyproject.get('project', {}).get('version') %}
 
 package:
   version: '{{ version }}'
@@ -14,9 +15,7 @@ source:
   # git_depth: 1 # (Defaults to -1/not shallow)
 
 build:
-  # string: 4961a3_2
-  number: 1
-  # noarch: python
+  number: 0
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
@@ -27,7 +26,7 @@ requirements:
     - git
     - swig
   host:
-    - chaco  >=5.1.0
+    - chaco  >=5.1.1
     - click >=8.1.3
     - Cython
     - empy >=3.3.4
@@ -40,7 +39,7 @@ requirements:
     - setuptools
 
   run:
-    - chaco  >=5.1.0
+    - chaco  >=5.1.1
     - click >=8.1.3
     - empy >=3.3.4
     - matplotlib >=3.6.1
