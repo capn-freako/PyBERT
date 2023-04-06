@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "PipBERT"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "4.1.0"
+version = "4.1.1"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           , {name = "David Patterson"}
           ]
@@ -17,7 +17,7 @@ dependencies = [
         "PyIBIS-AMI>=4.1",
         "pyside2",
         "pyyaml>=6",
-        "scikit-rf>=0.24",
+        "scikit-rf>=0.24.1",
 ]
 keywords=["bert", "communication", "simulator"]
 classifiers=[
