@@ -1,6 +1,7 @@
 {% set name = "pybert" %}
-{% set pyproject = load_file_data('../../pyproject.toml', from_recipe_dir=true, recipe_dir="conda.recipe/pybert") %}
+{% set pyproject = load_file_data('../../pyproject.toml', from_recipe_dir=true, recipe_dir="conda.recipe/{{ name }}") %}
 {% set version = pyproject.get('project', {}).get('version') %}
+{% set deps = pyproject.get('project', {}).get('dependencies', []) %}
 
 package:
   version: '{{ version }}'
@@ -10,7 +11,7 @@ source:
   path: ../../
 
 build:
-  number: 1
+  number: 2
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
     - pybert = pybert.cli:cli
@@ -23,26 +24,18 @@ requirements:
     - git
     - swig
   host:
-    - kiwisolver
     - numpy {{ numpy }}
-    - pyibis-ami >=4.1
-    # - pyside6  # Not available in Anaconda, yet.
-    - pyside2
     - python {{ python }}
-    - pyyaml
-    - qt >=5
-    - scikit-rf >=0.24.1
     - setuptools
+    {% for dep in deps %}
+    - {{ dep }}
+    {% endfor %} 
   run:
-    - kiwisolver
-    - numpy {{ numpy }}
-    - pyibis-ami >=4.1
-    # - pyside6  # Not available in Anaconda, yet.
-    - pyside2
-    - python {{ python }}
-    - pyyaml
-    - qt >=5
-    - scikit-rf >=0.24.1
+    - {{ pin_compatible('numpy') }}
+    - python
+    {% for dep in deps %}
+    - {{ dep }}
+    {% endfor %} 
 
 test:
   imports:

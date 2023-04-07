@@ -10,7 +10,7 @@ source:
   git_rev: {{version}}
 
 build:
-  number: 3
+  number: 4
   script: " {{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   script_env:
     - CFLAGS=-Wno-c++11-narrowing
@@ -47,11 +47,11 @@ requirements:
     - xorg-libxfixes                     # [linux]
   run:
     - fonttools
-    - numpy {{ numpy }}
+    - {{ pin_compatible('numpy') }}
     - pillow >=9.4
     - pyface >=7.4.2
     - pyparsing
-    - python {{ python }}
+    - python
     - six
     - traitsui
 
@@ -63,7 +63,6 @@ test:
     - enable.layout
     - enable.null
     - enable.primitives
-    # - enable.pyglet_backend
     - enable.qt4
     - enable.savage
     - enable.savage.compliance
@@ -83,7 +82,6 @@ test:
     - enable.tests.primitives
     - enable.tests.qt4
     - enable.tests.tools
-    # - enable.tests.tools.apptools
     - enable.tests.wx
     - enable.tools
     - enable.tools.apptools
@@ -93,7 +91,6 @@ test:
     - enable.trait_defs.ui
     - enable.trait_defs.ui.qt4
     - enable.trait_defs.ui.wx
-    # - enable.vtk_backend
     - enable.wx
     - kiva
     - kiva.agg

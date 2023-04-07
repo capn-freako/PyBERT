@@ -9,30 +9,42 @@ package:
 source:
   git_url: https://github.com/enthought/chaco.git
   git_rev: {{ version }}
+
 build:
-  number: 1
+  number: 2
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
+  script_env:
+    - ETS_QT4_IMPORTS=1
 
 requirements:
   build:
+    - {{ compiler('c')   }}
+    - {{ compiler('cxx') }}
+    - {{ cdt('libx11-devel') }}          # [linux]
+    - {{ cdt('xorg-x11-proto-devel') }}  # [linux]
+    - {{ cdt('mesa-libgl-devel') }}      # [linux]
+    - {{ cdt('mesa-libglu-devel') }}     # [linux]
+    - {{ cdt('mesa-dri-drivers') }}      # [linux]
+    - {{ cdt('mesa-dri1-drivers') }}     # [linux]
+    - {{ cdt('libselinux') }}            # [linux]
+    - {{ cdt('libxdamage') }}            # [linux]
+    - {{ cdt('libxxf86vm') }}            # [linux]
+    - {{ cdt('libxext') }}               # [linux]
     - cmake
-    - Cython
-    - enable ={{ enable_version }}
     - git
-    - importlib_resources
-    - numpy x.x
-    - pyface >=7.4.2
-    - python
-    - setuptools
-    # - vs2019_win-64        # Uncomment for Windows build only.
-    # - {{compiler('c')}}    # Would like to get one of these working, instead of above hack.
-    # - {{compiler('cxx')}}
-
-  run:
+    - swig
+  host:
     - Cython
     - enable ={{ enable_version }}
     - importlib_resources
-    - numpy x.x
+    - numpy {{ numpy }}
+    - pyface >=7.4.2
+    - python {{ python }}
+    - setuptools
+  run:
+    - enable ={{ enable_version }}
+    - importlib_resources
+    - {{ pin_compatible('numpy') }}
     - pyface >=7.4.2
     - python
 
@@ -41,19 +53,6 @@ test:
   imports:
     - chaco
     - chaco.api
-    # - chaco.contour
-    # - chaco.downsample
-    # - chaco.downsample.tests
-    # - chaco.layers
-    # - chaco.overlays
-    # - chaco.plugin
-    # - chaco.scales
-    # - chaco.scales.tests
-    # - chaco.shell
-    # - chaco.tests
-    # - chaco.tools
-    # - chaco.tools.tests
-    # - chaco.tools.toolbars
     - chaco.ui
 
   # commands:
