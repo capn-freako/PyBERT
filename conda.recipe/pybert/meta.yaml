@@ -29,13 +29,13 @@ requirements:
     - setuptools
     {% for dep in deps %}
     - {{ dep }}
-    {% endfor %} 
+    {% endfor %}
   run:
     - {{ pin_compatible('numpy') }}
     - python
     {% for dep in deps %}
     - {{ dep }}
-    {% endfor %} 
+    {% endfor %}
 
 test:
   imports:

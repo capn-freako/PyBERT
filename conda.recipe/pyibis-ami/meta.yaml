@@ -29,7 +29,7 @@ requirements:
     - swig
     {% for req in build_reqs %}
     - {{ req }}
-    {% endfor %} 
+    {% endfor %}
   host:
     - Cython
     - numpy {{ numpy }}
@@ -37,7 +37,7 @@ requirements:
     - setuptools
     {% for dep in deps %}
     - {{ dep }}
-    {% endfor %} 
+    {% endfor %}
   run:
     - {{ pin_compatible('numpy') }}
     - python
