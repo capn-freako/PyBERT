@@ -1,6 +1,8 @@
 {% set name = "pyibis-ami" %}
-{% set pyproject = load_file_data('../../PyAMI/pyproject.toml', from_recipe_dir=true, recipe_dir="conda.recipe/pyibis-ami") %}
+{% set pyproject = load_file_data('../../PyAMI/pyproject.toml', from_recipe_dir=true, recipe_dir="conda.recipe/{{ name }}") %}
 {% set version = pyproject.get('project', {}).get('version') %}
+{% set deps = pyproject.get('project', {}).get('dependencies', []) %}
+{% set build_reqs = pyproject.get('build-system', {}).get('requires', []) %}
 
 package:
   version: '{{ version }}'
@@ -15,7 +17,7 @@ source:
   # git_depth: 1 # (Defaults to -1/not shallow)
 
 build:
-  number: 0
+  number: 2
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
@@ -25,28 +27,23 @@ requirements:
     - cmake
     - git
     - swig
+    {% for req in build_reqs %}
+    - {{ req }}
+    {% endfor %}
   host:
-    - chaco  >=5.1.1
-    - click >=8.1.3
     - Cython
-    - empy >=3.3.4
-    - importlib_resources
-    - matplotlib >=3.6.1
     - numpy {{ numpy }}
-    - parsec >=3.15
     - python {{ python }}
-    - scipy >=1.9
     - setuptools
-
+    {% for dep in deps %}
+    - {{ dep }}
+    {% endfor %}
   run:
-    - chaco  >=5.1.1
-    - click >=8.1.3
-    - empy >=3.3.4
-    - matplotlib >=3.6.1
-    - numpy {{ numpy }}
-    - parsec >=3.15
-    - python {{ python }}
-    - scipy >=1.9
+    - {{ pin_compatible('numpy') }}
+    - python
+    {% for dep in deps %}
+    - {{ dep }}
+    {% endfor %}
 
 test:
   imports:
