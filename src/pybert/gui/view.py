@@ -9,7 +9,6 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 import sys
 import webbrowser
 from pathlib import Path
-from threading import Thread
 
 from enable.component_editor import ComponentEditor
 from pyface.api import OK, FileDialog, MessageDialog
@@ -37,17 +36,10 @@ from traitsui.api import (  # CloseAction,
 
 from pybert import __authors__, __copy__, __date__, __version__
 from pybert.configuration import CONFIG_LOAD_WILDCARD, CONFIG_SAVE_WILDCARD
-from pybert.models.bert import my_run_sweeps
 from pybert.results import RESULTS_FILEDIALOG_WILDCARD
+from pybert.threads.sim import RunSimThread
 
 
-class RunSimThread(Thread):
-    """Used to run the simulation in its own thread, in order to preserve GUI
-    responsiveness."""
-
-    def run(self):
-        """Run the simulation(s)."""
-        my_run_sweeps(self.the_pybert)
 
 
 class MyHandler(Handler):
