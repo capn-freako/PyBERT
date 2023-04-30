@@ -10,29 +10,9 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from enable.component_editor import ComponentEditor
 from pyface.api import OK, FileDialog, MessageDialog
-from pyface.image_resource import ImageResource
 from traits.api import Instance
-from traitsui.api import (  # CloseAction,
-    Action,
-    CheckListEditor,
-    FileEditor,
-    Group,
-    Handler,
-    HGroup,
-    Item,
-    Menu,
-    MenuBar,
-    NoButtons,
-    ObjectColumn,
-    Separator,
-    TableEditor,
-    TextEditor,
-    VGroup,
-    View,
-    spring,
-)
+from traitsui.api import Handler
 
 from pybert import __authors__, __copy__, __date__, __version__
 from pybert.configuration import CONFIG_LOAD_WILDCARD, CONFIG_SAVE_WILDCARD

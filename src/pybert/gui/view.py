@@ -6,20 +6,14 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
-import sys
-import webbrowser
-from pathlib import Path
 
 from enable.component_editor import ComponentEditor
-from pyface.api import OK, FileDialog, MessageDialog
 from pyface.image_resource import ImageResource
-from traits.api import Instance
 from traitsui.api import (  # CloseAction,
     Action,
     CheckListEditor,
     FileEditor,
     Group,
-    Handler,
     HGroup,
     Item,
     Menu,
@@ -34,7 +28,6 @@ from traitsui.api import (  # CloseAction,
     spring,
 )
 
-from pybert import __authors__, __copy__, __date__, __version__
 from pybert.gui.handler import MyHandler
 
 # Main window layout definition.

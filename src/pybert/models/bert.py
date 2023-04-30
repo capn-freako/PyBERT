@@ -35,7 +35,6 @@ from numpy import (
 )
 from numpy.fft import fft, irfft
 from numpy.random import normal
-from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from scipy.signal import iirfilter, lfilter
 
 from pybert.models.dfe import DFE
@@ -49,6 +48,7 @@ from pybert.utility import (
     safe_log10,
     trim_impulse,
 )
+from pyibisami.ami.model import AMIModel, AMIModelInitializer
 
 DEBUG = False
 MIN_BATHTUB_VAL = 1.0e-18
