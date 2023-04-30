@@ -755,7 +755,12 @@ traits_view = View(
             id="view",
             name="&View",
         ),
-        Menu(Action(name="Run", action="do_run_simulation", accelerator="Ctrl+R"), id="simulation", name="Simulation"),
+        Menu(
+            Action(name="Run", action="do_run_simulation", accelerator="Ctrl+R"),
+            Action(name="Abort", action="do_stop_simulation"),
+            id="simulation",
+            name="Simulation",
+        ),
         Menu(
             Action(name="Getting Started", action="getting_started_clicked"),
             Action(name="&About", action="show_about_clicked"),
