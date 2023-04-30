@@ -6,6 +6,10 @@ class RunSimThread(StoppableThread):
     """Used to run the simulation in its own thread, in order to preserve GUI
     responsiveness."""
 
+    def __init__(self):
+        super().__init__()
+        self.the_pybert = None
+
     def run(self):
         """Run the simulation(s)."""
         try:
