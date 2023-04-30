@@ -7,6 +7,7 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 from time import perf_counter
+from typing import Callable, Optional
 
 clock = perf_counter
 
@@ -56,12 +57,18 @@ MIN_BATHTUB_VAL = 1.0e-18
 gFc = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
 
 
-def my_run_sweeps(self):
+def my_run_sweeps(self, thread_is_stopped: Optional[Callable[[], bool]] = None):
     """Runs the simulation sweeps.
 
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.
+        thread_is_stopped: a function that is used to tell the simulation to stop or not.
     """
+
+    def check_sim_status():
+        if thread_is_stopped and thread_is_stopped():
+            self.status = "Aborted Simulation"
+            raise RuntimeError("Optimization aborted.")
 
     sweep_aves = self.sweep_aves
     do_sweep = self.do_sweep
@@ -92,6 +99,7 @@ def my_run_sweeps(self):
             bit_errs = []
             for i in range(sweep_aves):
                 self.sweep_num = sweep_num
+                check_sim_status()
                 my_run_simulation(self, update_plots=False)
                 bit_errs.append(self.bit_errs)
                 sweep_num += 1

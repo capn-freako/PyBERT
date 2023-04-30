@@ -8,4 +8,7 @@ class RunSimThread(StoppableThread):
 
     def run(self):
         """Run the simulation(s)."""
-        my_run_sweeps(self.the_pybert)
+        try:
+            my_run_sweeps(self.the_pybert, self.stopped)
+        except RuntimeError:
+            pass
