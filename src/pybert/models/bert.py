@@ -7,6 +7,7 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 from time import perf_counter
+from typing import Callable, Optional
 
 clock = perf_counter
 
@@ -35,7 +36,6 @@ from numpy import (
 )
 from numpy.fft import fft, irfft
 from numpy.random import normal
-from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from scipy.signal import iirfilter, lfilter
 
 from pybert.models.dfe import DFE
@@ -49,6 +49,7 @@ from pybert.utility import (
     safe_log10,
     trim_impulse,
 )
+from pyibisami.ami.model import AMIModel, AMIModelInitializer
 
 DEBUG = False
 MIN_BATHTUB_VAL = 1.0e-18
@@ -56,11 +57,13 @@ MIN_BATHTUB_VAL = 1.0e-18
 gFc = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
 
 
-def my_run_sweeps(self):
+def my_run_sweeps(self, is_thread_stopped: Optional[Callable[[], bool]] = None):
     """Runs the simulation sweeps.
 
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.
+        is_thread_stopped: a function that is used to tell the simulation that the user
+          has requested to stop/abort the simulation by setting the thread stop event.
     """
 
     sweep_aves = self.sweep_aves
@@ -92,16 +95,16 @@ def my_run_sweeps(self):
             bit_errs = []
             for i in range(sweep_aves):
                 self.sweep_num = sweep_num
-                my_run_simulation(self, update_plots=False)
+                my_run_simulation(self, update_plots=False, aborted_sim=is_thread_stopped)
                 bit_errs.append(self.bit_errs)
                 sweep_num += 1
             sweep_results.append((sweep, mean(bit_errs), std(bit_errs)))
         self.sweep_results = sweep_results
     else:
-        my_run_simulation(self)
+        my_run_simulation(self, aborted_sim=is_thread_stopped)
 
 
-def my_run_simulation(self, initial_run=False, update_plots=True):
+def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: Optional[Callable[[], bool]] = None):
     """Runs the simulation.
 
     Args:
@@ -114,7 +117,16 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
             import *pybert*, in order to avoid graphical back-end
             conflicts and speed up this function's execution time.
             (Optional; default = True.)
+        aborted_sim: a function that is used to tell the simulation that the user
+          has requested to stop/abort the simulation.
     """
+
+    def _check_sim_status():
+        """Checks the status of the simulation thread and if this simulation needs to stop."""
+        if aborted_sim and aborted_sim():
+            self.status = "Aborted Simulation"
+            raise RuntimeError("Simulation aborted by User.")
+
     num_sweeps = self.num_sweeps
     sweep_num = self.sweep_num
 
@@ -205,6 +217,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True):
 
     self.chnl_out = chnl_out
     self.chnl_out_H = fft(chnl_out)
+
+    _check_sim_status()
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
     try:
@@ -322,6 +336,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
     except Exception:
         self.status = "Exception: Tx"
         raise
+
+    _check_sim_status()
 
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
     try:
@@ -444,6 +460,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.status = "Exception: Rx"
         raise
 
+    _check_sim_status()
+
     # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
     try:
         if self.use_dfe:
@@ -524,6 +542,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
     except Exception:
         self.status = "Exception: DFE"
         raise
+
+    _check_sim_status()
 
     # Save local variables to class instance for state preservation, performing unit conversion where necessary.
     self.adaptation = tap_weights
@@ -698,6 +718,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.status = "Exception: jitter"
         raise
 
+    _check_sim_status()
     # Update plots.
     try:
         if update_plots:

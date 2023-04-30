@@ -55,6 +55,8 @@ line-length = 119
 
 [tool.isort]
 profile = "black"
+known_first_party = ["pybert", "pyibisami"]
+known_third_party = ["enable", "chaco"]
 
 [tool.docformatter]
 wrap-summaries = 0
