@@ -27,10 +27,6 @@ from chaco.api import ArrayPlotData, GridPlotContainer
 from numpy import array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
 from numpy.fft import fft, irfft
 from numpy.random import randint
-from pyibisami import __version__ as PyAMI_VERSION
-from pyibisami.ami.model import AMIModel
-from pyibisami.ami.parser import AMIParamConfigurator
-from pyibisami.ibis.file import IBISModel
 from traits.api import (
     Array,
     Bool,
@@ -60,7 +56,7 @@ from pybert.gui.plot import make_plots
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
 from pybert.results import PyBertData
-from pybert.threads.optimization import TxOptThread, RxOptThread, CoOptThread
+from pybert.threads.optimization import CoOptThread, RxOptThread, TxOptThread
 from pybert.utility import (
     calc_gamma,
     import_channel,
@@ -72,6 +68,10 @@ from pybert.utility import (
     sdd_21,
     trim_impulse,
 )
+from pyibisami import __version__ as PyAMI_VERSION
+from pyibisami.ami.model import AMIModel
+from pyibisami.ami.parser import AMIParamConfigurator
+from pyibisami.ibis.file import IBISModel
 
 gDebugStatus = False
 gMaxCTLEPeak = 20.0  # max. allowed CTLE peaking (dB) (when optimizing, only)

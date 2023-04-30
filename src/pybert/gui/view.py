@@ -40,8 +40,6 @@ from pybert.results import RESULTS_FILEDIALOG_WILDCARD
 from pybert.threads.sim import RunSimThread
 
 
-
-
 class MyHandler(Handler):
     """This handler is instantiated by the View and handles user button
     clicks."""
