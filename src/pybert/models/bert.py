@@ -304,10 +304,13 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         pn_samps = int(pn_period / Ts + 0.5)
         pn = zeros(pn_samps)
         pn[pn_samps // 2 :] = pn_mag
+        self.pn_period = pn_period
+        self.pn_samps = pn_samps
         pn = resize(pn, len(tx_out))
         #   - High pass filter it. (Simulating capacitive coupling.)
         (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
         pn = lfilter(b, a, pn)[: len(pn)]
+        self.pn = pn
 
         # - Add the uncorrelated periodic and random noise to the Tx output.
         tx_out += pn
@@ -575,22 +578,41 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
     #  - in the duo-binary case, the XOR pre-coding can invert every other pattern rep., and
     #  - in the PAM-4 case, the bits are taken in pairs to form the symbols and we start w/ an odd # of bits.
     # So, while it isn't strictly necessary, doubling it in the NRZ case as well provides a certain consistency.
+    pattern_len = (pow(2, max(pattern)) - 1) * 2
+    len_x_m1    = len(x) - 1
+    xing_min_t  = (nui - eye_uis) * ui
+
+    def eye_xings(xings, ofst=0):
+        """
+        Return crossings from that portion of the signal used to generate the eye.
+
+        Args:
+            xings([float]): List of crossings.
+
+        KeywordArgs:
+            ofst(float): Time offset to be subtracted from all crossings.
+
+        Returns:
+            [float]: Selected crossings, offset and eye-start corrected.
+        """
+        _xings = array(xings) - ofst
+        return _xings[where(_xings > xing_min_t)] - xing_min_t
+
     try:
-        pattern_len = (pow(2, max(pattern)) - 1) * 2
+        # - ideal
+        ideal_xings_jit  = eye_xings(ideal_xings)
 
         # - channel output
-        len_x_m1 = len(x) - 1
-        actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
-        ofst = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
-        (
-            _,
+        ofst             = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
+        actual_xings     = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
+        (   tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            _,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -598,7 +620,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
         self.t_jitter = t_jitter
         self.isi_chnl = isi
         self.dcd_chnl = dcd
@@ -611,19 +633,21 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.jitter_spectrum_chnl = jitter_spectrum
         self.jitter_ind_spectrum_chnl = jitter_ind_spectrum
         self.f_MHz = array(spectrum_freqs) * 1.0e-6
+        self.ofst_chnl = ofst
+        self.tie_chnl = tie
+        self.tie_ind_chnl = tie_ind
 
         # - Tx output
-        actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
-        ofst = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
-        (
-            _,
+        ofst             = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
+        actual_xings     = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
+        (   tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            _,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -631,7 +655,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self)
         self.isi_tx = isi
         self.dcd_tx = dcd
         self.pj_tx = pj
@@ -639,21 +663,26 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.thresh_tx = thresh
         self.jitter_tx = hist
         self.jitter_ext_tx = hist_synth
+        self.jitter_centers_tx = bin_centers
         self.jitter_spectrum_tx = jitter_spectrum
         self.jitter_ind_spectrum_tx = jitter_ind_spectrum
+        self.jitter_freqs_tx = spectrum_freqs
+        self.t_jitter_tx = t_jitter
+        self.tie_tx = tie
+        self.tie_ind_tx = tie_ind
 
         # - CTLE output
-        actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
-        ofst = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
+        ofst             = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
+        actual_xings     = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
         (
-            jitter,
+            tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            jitter_ext,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -661,7 +690,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
         self.isi_ctle = isi
         self.dcd_ctle = dcd
         self.pj_ctle = pj
@@ -671,24 +700,21 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.jitter_ext_ctle = hist_synth
         self.jitter_spectrum_ctle = jitter_spectrum
         self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
+        self.tie_ctle = tie
+        self.tie_ind_ctle = tie_ind
 
         # - DFE output
-        ignore_until = (nui - eye_uis) * ui
-        ideal_xings = array(list(filter(lambda x: x >= ignore_until, ideal_xings)))
-        ideal_xings -= ignore_until
-        actual_xings = find_crossings(t, dfe_out, decision_scaler, mod_type=mod_type)
-        ofst = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
-        actual_xings = array(list(filter(lambda x: x >= ignore_until, actual_xings)))
-        actual_xings -= ignore_until
+        ofst             = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
+        actual_xings     = find_crossings(t, dfe_out, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
         (
-            jitter,
+            tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            jitter_ext,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -696,7 +722,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings, actual_xings, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
         self.isi_dfe = isi
         self.dcd_dfe = dcd
         self.pj_dfe = pj
@@ -706,6 +732,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.jitter_ext_dfe = hist_synth
         self.jitter_spectrum_dfe = jitter_spectrum
         self.jitter_ind_spectrum_dfe = jitter_ind_spectrum
+        self.tie_dfe = tie
+        self.tie_ind_dfe = tie_ind
         self.f_MHz_dfe = array(spectrum_freqs) * 1.0e-6
         dfe_spec = self.jitter_spectrum_dfe
         self.jitter_rejection_ratio = zeros(len(dfe_spec))

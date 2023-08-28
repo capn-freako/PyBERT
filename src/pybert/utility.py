@@ -38,7 +38,9 @@ from numpy import (
     zeros,
 )
 from numpy.fft import fft, ifft
+from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.linalg import inv
+from scipy.optimize import curve_fit
 from scipy.signal import freqs, invres
 from scipy.stats import norm
 
@@ -52,8 +54,8 @@ def moving_average(a, n=3):
 
     Args:
         a([float]): Input vector to be averaged.
-        n(int): Width of averaging window, in vector samples. (Optional;
-            default = 3.)
+        n(int): Width of averaging window, in vector samples.
+            (Optional; default = 3.)
 
     Returns:
         [float]: the moving average of the input vector, leaving the input
@@ -62,7 +64,7 @@ def moving_average(a, n=3):
 
     ret = cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return insert(ret[n - 1 :], 0, ret[n - 1] * ones(n - 1)) / n
+    return np.pad(ret[n:], (n//2, n//2), constant_values=(ret[n], ret[-1])) / n
 
 
 def find_crossing_times(
@@ -236,12 +238,21 @@ def find_crossings(
     return sort(concatenate(xings))
 
 
-def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True):
+def gaus_pdf(x, mu, sigma):
+    """
+    Gaussian probability density function.
+    """
+    sqrt_2pi = np.sqrt(2 * np.pi)
+    return np.exp(-0.5 * ((x - mu)/sigma)**2)/(sigma * sqrt_2pi)
+
+
+def calc_jitter( ui, nui, pattern_len, ideal_xings, actual_xings
+               , rel_thresh=6, num_bins=99, zero_mean=True
+               , dbg_obj=None ):
     """Calculate the jitter in a set of actual zero crossings, given the ideal
     crossings and unit interval.
 
-    Inputs:
-
+    Args:
       - ui               : The nominal unit interval.
       - nui              : The number of unit intervals spanned by the input signal.
       - pattern_len      : The number of unit intervals, before input symbol stream repeats.
@@ -250,6 +261,7 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
       - rel_thresh       : (optional) The threshold for determining periodic jitter spectral components (sigma).
       - num_bins         : (optional) The number of bins to use, when forming histograms.
       - zero_mean        : (optional) Force the mean jitter to zero, when True.
+      - dbg_obj          : (optional) Object for stashing debugging info.
 
     Outputs:
 
@@ -323,12 +335,12 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         if i == len(actual_xings):  # We've exhausted the list of actual crossings; we're done.
             break
         if actual_xings[i] > max_t:  # Means the xing we're looking for didn't occur, in the actual signal.
-            jitter.append(3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.
+            jitter.append(3.0 * ui / 4.0)   # Pad the jitter w/ alternating +/- 3UI/4.
             jitter.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
-            skip_next_ideal_xing = True  # If we missed one, we missed two.
-        else:  # Noise may produce several crossings.
+            skip_next_ideal_xing = True     # If we missed one, we missed two.
+        else:           # Noise may produce several crossings.
             xings = []  # We find all those within the interval [-UI/2, +UI/2]
-            j = i  # centered around the ideal crossing, and take the average.
+            j = i       # centered around the ideal crossing, and take the average.
             while j < len(actual_xings) and actual_xings[j] <= max_t:
                 xings.append(actual_xings[j])
                 j += 1
@@ -346,16 +358,16 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
 
     # Do the jitter decomposition.
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    tie_risings = jitter.take(list(range(0, len(jitter), 2)))
+    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))
     tie_fallings = jitter.take(list(range(1, len(jitter), 2)))
     tie_risings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
     tie_fallings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
-    tie_risings = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))
+    tie_risings  = reshape(tie_risings,  (num_patterns, xings_per_pattern // 2))
     tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
 
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
     try:
-        tie_risings_ave = tie_risings.mean(axis=0)
+        tie_risings_ave  = tie_risings.mean(axis=0)
         tie_fallings_ave = tie_fallings.mean(axis=0)
         isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
     except:
@@ -366,51 +378,95 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
 
     # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
-    tie_ave = sum(list(zip(tie_risings_ave, tie_fallings_ave)), ())
-    tie_ave = resize(tie_ave, len(jitter))
+    _jitter = jitter.copy()
+    _jitter.resize(num_patterns * xings_per_pattern)
+    tie_ave = resize(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
     tie_ind = jitter - tie_ave
 
-    # - Use spectral analysis to help isolate the periodic components of the data independent jitter.
+    # - Use spectral analysis to isolate the periodic components of the data independent jitter.
+    # -- Calculate the relevant time/frequency vectors.
+    osf = 1                                                               # oversampling factor
+    t0  = ui / osf                                                        # sampling period
+    t   = np.array([n*t0 for n in range(nui*osf)])                        # time vector
+    f0  = 1.0 / (ui * nui)                                                # fundamental frequency
+    f   = [n*f0 for n in range(len(t)//2)]                                # [0:f0:fNyquist)
+    f   = np.array(f + [1/(2*t0)] + list(-1 * np.flip(np.array(f[1:]))))  # [0:f0:fN) ++ [fN:-f0:0)
+    assert len(f) == len(t), f"Lengths of `f` ({len(f)}) and `t` ({len(t)}) do not match!"
+    half_len = len(f) // 2
+
     # -- Calculate the total jitter spectrum, for display purposes only.
-    # --- Make vector uniformly sampled in time, via zero padding where necessary.
-    # --- (It's necessary to keep track of those elements in the resultant vector, which aren't paddings; hence, 'valid_ix'.)
-    x, valid_ix = make_uniform(t_jitter, jitter, ui, nui)
-    y = fft(x)
-    jitter_spectrum = abs(y[: len(y) // 2]) / sqrt(len(jitter))  # Normalized, in order to make power correct.
-    f0 = 1.0 / (ui * nui)
-    spectrum_freqs = [i * f0 for i in range(len(y) // 2)]
+    # --- Make vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
+    #spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
+    spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
+    x   = spl(t)
+    y   = fft(x)
+    jitter_spectrum = abs(y[:half_len])
+    jitter_freqs    = f[:half_len]
 
-    # -- Use the data independent jitter spectrum for our calculations.
-    tie_ind_uniform, valid_ix = make_uniform(t_jitter, tie_ind, ui, nui)
-
-    # --- Normalized, in order to make power correct, since we grab Rj from the freq. domain.
-    # --- (I'm using the length of the vector before zero padding, because zero padding doesn't add energy.)
-    # --- (This has the effect of making our final Rj estimate more conservative.)
-    y = fft(tie_ind_uniform) / sqrt(len(tie_ind))
+    # -- Use the data independent jitter spectrum for our calculations of Pj and Rj.
+    # --- Initialize the new spline and use it to interpolate a uniformly spaced sample set.
+    spl   = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
+    x     = spl(t)
+    y     = fft(x)
     y_mag = abs(y)
-    y_mean = moving_average(y_mag, n=len(y_mag) // 10)
-    y_var = moving_average((y_mag - y_mean) ** 2, n=len(y_mag) // 10)
-    y_sigma = sqrt(y_var)
-    thresh = y_mean + rel_thresh * y_sigma
-    y_per = where(y_mag > thresh, y, zeros(len(y)))  # Periodic components are those lying above the threshold.
-    y_rnd = where(y_mag > thresh, zeros(len(y)), y)  # Random components are those lying below.
-    y_rnd = abs(y_rnd)
-    rj = sqrt(mean((y_rnd - mean(y_rnd)) ** 2))
-    tie_per = real(ifft(y_per)).take(valid_ix) * sqrt(len(tie_ind))  # Restoring shape of vector to its original,
-    pj = tie_per.ptp()  # non-uniformly sampled state.
+    # --- Using a threshold based on a moving average, identify the periodic components.
+    #win_width = len(y_mag) // 10
+    win_width = 100
+    y_mean    = moving_average(y_mag,                 n=win_width)
+    y_var     = moving_average((y_mag - y_mean) ** 2, n=win_width)
+    y_sigma   = sqrt(y_var)
+    thresh    = y_mean + rel_thresh * y_sigma
+    y_per     = where(y_mag >= thresh, y, zeros(len(y)))  # Periodic components are those lying above the threshold.
+    y_rnd     = where(y_mag > thresh,  zeros(len(y)), y)  # Random components are those lying below.
+    tie_per   = real(ifft(y_per))
+    pj        = tie_per.ptp()
+    tie_rnd   = real(ifft(y_rnd))
+    # --- Calculate Rj histograms and fit to dual-Dirac.
+    hist, edges = histogram(tie_rnd, bins=100)
+    centers     = (edges[:-1] + edges[1:]) / 2
+    hist_pos    = hist[where(centers >= 0)]
+    centers_pos = centers[where(centers >= 0)]
+    hist_neg    = hist[where(centers < 0)]
+    centers_neg = centers[where(centers < 0)]
+    # Have to work in ps when curve fitting, or `curve_fit()` blows up.
+    dx         = (edges[1] - edges[0]) * 1e12
+    popt, pcov = curve_fit(gaus_pdf, centers_pos*1e12, 0.5*hist_pos/hist_pos.sum()/dx)
+    mu_pos, sigma_pos = popt
+    mu_pos    *= 1e-12
+    sigma_pos *= 1e-12
+    err_pos    = np.sqrt(np.diag(pcov)) * 1e-12
+    popt, pcov = curve_fit(gaus_pdf, centers_neg*1e12, 0.5*hist_neg/hist_neg.sum()/dx)
+    mu_neg, sigma_neg = popt
+    mu_neg    *= 1e-12
+    sigma_neg *= 1e-12
+    err_neg    = np.sqrt(np.diag(pcov)) * 1e-12
+    rj = (sigma_pos + sigma_neg)/2
+
+    # --- Stash debugging info if an object was provided.
+    if dbg_obj:
+        dbg_obj.pj_freq    = f
+        dbg_obj.pj_spec    = y_per
+        dbg_obj.pj_tie     = tie_per
+        dbg_obj.rj_hist    = hist
+        dbg_obj.rj_centers = centers
+        dbg_obj.y_rnd      = y_rnd
+        dbg_obj.tie_rnd    = tie_rnd
+        dbg_obj.tie_ind    = x
+        dbg_obj.dd_soltn   = (mu_pos, sigma_pos, err_pos, mu_neg, sigma_neg, err_neg)
 
     # --- Save the spectrum, for display purposes.
-    tie_ind_spectrum = y_mag[: len(y_mag) // 2]
+    tie_ind_spectrum = y_mag[:half_len]
 
     # - Reassemble the jitter, excluding the Rj.
     # -- Here, we see why it was necessary to keep track of the non-padded elements with 'valid_ix':
     # -- It was so that we could add the average and periodic components back together,
     # -- maintaining correct alignment between them.
-    if len(tie_per) > len(tie_ave):
-        tie_per = tie_per[: len(tie_ave)]
-    if len(tie_per) < len(tie_ave):
-        tie_ave = tie_ave[: len(tie_per)]
-    jitter_synth = tie_ave + tie_per
+    # if len(tie_per) > len(tie_ave):
+    #     tie_per = tie_per[: len(tie_ave)]
+    # if len(tie_per) < len(tie_ave):
+    #     tie_ave = tie_ave[: len(tie_per)]
+    # jitter_synth = tie_ave + tie_per
+    jitter_synth = jitter  # ToDo: What to do here?
 
     # - Calculate the histogram of original, for comparison.
     hist, bin_centers = my_hist(jitter)
@@ -438,10 +494,11 @@ def calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, n
         pj,
         rj,
         tie_ind,
-        thresh[: len(thresh) // 2],
+        thresh[:half_len],
         jitter_spectrum,
         tie_ind_spectrum,
-        spectrum_freqs,
+        #f,
+        jitter_freqs,
         hist,
         hist_synth,
         bin_centers,

@@ -2,7 +2,13 @@
 	"folders":
 	[
 		{
-			"path": "."
-		}
+			"path": ".",
+		},
+		{
+			"path": "/Users/dbanas/Documents/gitit",
+		},
+		{
+			"path": "/Users/dbanas/prj/gitit"
+		},
 	],
 }
