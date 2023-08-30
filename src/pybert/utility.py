@@ -16,6 +16,7 @@ from functools import reduce
 import numpy as np
 import skrf as rf
 from numpy import (
+    argmax,
     array,
     concatenate,
     convolve,
@@ -383,88 +384,87 @@ def calc_jitter( ui, nui, pattern_len, ideal_xings, actual_xings
     tie_ave = resize(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
     tie_ind = jitter - tie_ave
 
-    # - Use spectral analysis to isolate the periodic components of the data independent jitter.
+    # - Calculate the total and data-independent jitter spectrums, for display purposes only.
     # -- Calculate the relevant time/frequency vectors.
-    osf = 1                                                               # oversampling factor
-    t0  = ui / osf                                                        # sampling period
-    t   = np.array([n*t0 for n in range(nui*osf)])                        # time vector
-    f0  = 1.0 / (ui * nui)                                                # fundamental frequency
+    osf = 1                                                               # jitter oversampling factor
+    t0  = ui / osf                                                        # jitter sampling period
+    t   = np.array([n*t0 for n in range(nui*osf)])                        # jitter samples time vector
+    f0  = 1.0 / (ui * nui)                                                # jitter samples fundamental frequency
     f   = [n*f0 for n in range(len(t)//2)]                                # [0:f0:fNyquist)
     f   = np.array(f + [1/(2*t0)] + list(-1 * np.flip(np.array(f[1:]))))  # [0:f0:fN) ++ [fN:-f0:0)
     assert len(f) == len(t), f"Lengths of `f` ({len(f)}) and `t` ({len(t)}) do not match!"
-    half_len = len(f) // 2
+    half_len = len(f) // 2                                                # for spectrum plotting convenience
 
-    # -- Calculate the total jitter spectrum, for display purposes only.
-    # --- Make vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
+    # -- Make TIE vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
     #spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
     spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
-    x   = spl(t)
-    y   = fft(x)
+    tie_interp      = spl(t)
+    y               = fft(tie_interp)
     jitter_spectrum = abs(y[:half_len])
     jitter_freqs    = f[:half_len]
 
-    # -- Use the data independent jitter spectrum for our calculations of Pj and Rj.
-    # --- Initialize the new spline and use it to interpolate a uniformly spaced sample set.
-    spl   = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
-    x     = spl(t)
-    y     = fft(x)
-    y_mag = abs(y)
-    # --- Using a threshold based on a moving average, identify the periodic components.
-    #win_width = len(y_mag) // 10
-    win_width = 100
-    y_mean    = moving_average(y_mag,                 n=win_width)
-    y_var     = moving_average((y_mag - y_mean) ** 2, n=win_width)
-    y_sigma   = sqrt(y_var)
-    thresh    = y_mean + rel_thresh * y_sigma
-    y_per     = where(y_mag >= thresh, y, zeros(len(y)))  # Periodic components are those lying above the threshold.
-    y_rnd     = where(y_mag > thresh,  zeros(len(y)), y)  # Random components are those lying below.
-    tie_per   = real(ifft(y_per))
-    pj        = tie_per.ptp()
-    tie_rnd   = real(ifft(y_rnd))
-    # --- Calculate Rj histograms and fit to dual-Dirac.
-    hist, edges = histogram(tie_rnd, bins=100)
-    centers     = (edges[:-1] + edges[1:]) / 2
-    hist_pos    = hist[where(centers >= 0)]
-    centers_pos = centers[where(centers >= 0)]
-    hist_neg    = hist[where(centers < 0)]
-    centers_neg = centers[where(centers < 0)]
-    # Have to work in ps when curve fitting, or `curve_fit()` blows up.
-    dx         = (edges[1] - edges[0]) * 1e12
-    popt, pcov = curve_fit(gaus_pdf, centers_pos*1e12, 0.5*hist_pos/hist_pos.sum()/dx)
+    # -- Repeat for data-independent jitter.
+    spl = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
+    tie_ind_interp   = spl(t)
+    y                = fft(tie_ind_interp)
+    y_mag            = abs(y)
+    tie_ind_spectrum = y_mag[:half_len]
+
+    # -- Do dual Dirac fitting of the data-independent jitter histogram, to determine Pj/Rj.
+    # --- Generate a smoothed version of the TIE histogram, for better peak identification.
+    # --- (Have to work in ps when curve fitting, or `curve_fit()` blows up.)
+    hist, edges  = histogram(tie_ind*1e12, bins=100, density=True)
+    centers      = (edges[:-1] + edges[1:]) / 2
+    hist_smooth  = moving_average(hist, n=10)
+    neg_peak_loc = argmax(hist_smooth[where(centers < 0)])
+    pos_peak_loc = argmax(hist_smooth[where(centers > 0)]) + where(centers >= 0)[0][0]
+    pj = (centers[pos_peak_loc] - centers[neg_peak_loc])*1e-12  # back to (s)
+
+    # --- Stash debugging info if an object was provided.
+    if dbg_obj:
+        dbg_obj.hist_smooth = hist_smooth
+        dbg_obj.centers     = centers
+        dbg_obj.hist        = hist
+
+    # --- Fit the tails and average the results, to determine Rj.
+    pos_max = hist_smooth[pos_peak_loc]
+    neg_max = hist_smooth[neg_peak_loc]
+    pos_tail_ix = where(hist[pos_peak_loc:] < pos_max/2)[0] + pos_peak_loc
+    neg_tail_ix = where(hist[:neg_peak_loc] < neg_max/2)[0]
+    try:
+        popt, pcov = curve_fit( gaus_pdf
+                              , centers[pos_tail_ix]*1e12
+                              , hist[pos_tail_ix] )
+    except:
+        print(f"centers: {centers}")
+        print(f"hist: {hist}")
+        print(f"pos_tail_ix: {pos_tail_ix}")
+        raise
     mu_pos, sigma_pos = popt
-    mu_pos    *= 1e-12
+    mu_pos    *= 1e-12  # back to (s)
     sigma_pos *= 1e-12
     err_pos    = np.sqrt(np.diag(pcov)) * 1e-12
-    popt, pcov = curve_fit(gaus_pdf, centers_neg*1e12, 0.5*hist_neg/hist_neg.sum()/dx)
+    try:
+        popt, pcov = curve_fit( gaus_pdf
+                              , centers[neg_tail_ix]
+                              , hist[neg_tail_ix] )
+    except:
+        print(f"centers: {centers}")
+        print(f"hist: {hist}")
+        print(f"neg_tail_ix: {neg_tail_ix}")
+        print(f"neg_peak_loc: {neg_peak_loc}")
+        print(f"neg_max: {neg_max}")
+        raise
     mu_neg, sigma_neg = popt
-    mu_neg    *= 1e-12
+    mu_neg    *= 1e-12  # back to (s)
     sigma_neg *= 1e-12
     err_neg    = np.sqrt(np.diag(pcov)) * 1e-12
     rj = (sigma_pos + sigma_neg)/2
 
     # --- Stash debugging info if an object was provided.
     if dbg_obj:
-        dbg_obj.pj_freq    = f
-        dbg_obj.pj_spec    = y_per
-        dbg_obj.pj_tie     = tie_per
-        dbg_obj.rj_hist    = hist
-        dbg_obj.rj_centers = centers
-        dbg_obj.y_rnd      = y_rnd
-        dbg_obj.tie_rnd    = tie_rnd
-        dbg_obj.tie_ind    = x
-        dbg_obj.dd_soltn   = (mu_pos, sigma_pos, err_pos, mu_neg, sigma_neg, err_neg)
+        dbg_obj.dd_soltn    = (mu_pos, sigma_pos, err_pos, mu_neg, sigma_neg, err_neg)
 
-    # --- Save the spectrum, for display purposes.
-    tie_ind_spectrum = y_mag[:half_len]
-
-    # - Reassemble the jitter, excluding the Rj.
-    # -- Here, we see why it was necessary to keep track of the non-padded elements with 'valid_ix':
-    # -- It was so that we could add the average and periodic components back together,
-    # -- maintaining correct alignment between them.
-    # if len(tie_per) > len(tie_ave):
-    #     tie_per = tie_per[: len(tie_ave)]
-    # if len(tie_per) < len(tie_ave):
-    #     tie_ave = tie_ave[: len(tie_per)]
     # jitter_synth = tie_ave + tie_per
     jitter_synth = jitter  # ToDo: What to do here?
 
@@ -494,10 +494,10 @@ def calc_jitter( ui, nui, pattern_len, ideal_xings, actual_xings
         pj,
         rj,
         tie_ind,
-        thresh[:half_len],
+        #thresh[:half_len],
+        zeros(half_len),
         jitter_spectrum,
         tie_ind_spectrum,
-        #f,
         jitter_freqs,
         hist,
         hist_synth,
