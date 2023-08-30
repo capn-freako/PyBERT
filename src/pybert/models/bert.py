@@ -579,8 +579,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
     #  - in the PAM-4 case, the bits are taken in pairs to form the symbols and we start w/ an odd # of bits.
     # So, while it isn't strictly necessary, doubling it in the NRZ case as well provides a certain consistency.
     pattern_len = (pow(2, max(pattern)) - 1) * 2
-    len_x_m1    = len(x) - 1
-    xing_min_t  = (nui - eye_uis) * ui
+    len_x_m1 = len(x) - 1
+    xing_min_t = (nui - eye_uis) * ui
 
     def eye_xings(xings, ofst=0):
         """
@@ -600,13 +600,14 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
     try:
         # - ideal
-        ideal_xings_jit  = eye_xings(ideal_xings)
+        ideal_xings_jit = eye_xings(ideal_xings)
 
         # - channel output
-        ofst             = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
-        actual_xings     = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
+        actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
         actual_xings_jit = eye_xings(actual_xings, ofst)
-        (   tie,
+        (
+            tie,
             t_jitter,
             isi,
             dcd,
@@ -638,10 +639,11 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.tie_ind_chnl = tie_ind
 
         # - Tx output
-        ofst             = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
-        actual_xings     = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
+        actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
         actual_xings_jit = eye_xings(actual_xings, ofst)
-        (   tie,
+        (
+            tie,
             t_jitter,
             isi,
             dcd,
@@ -672,8 +674,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.tie_ind_tx = tie_ind
 
         # - CTLE output
-        ofst             = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
-        actual_xings     = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
+        actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
         actual_xings_jit = eye_xings(actual_xings, ofst)
         (
             tie,
@@ -704,8 +706,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.tie_ind_ctle = tie_ind
 
         # - DFE output
-        ofst             = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
-        actual_xings     = find_crossings(t, dfe_out, decision_scaler, mod_type=mod_type)
+        ofst = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
+        actual_xings = find_crossings(t, dfe_out, decision_scaler, mod_type=mod_type)
         actual_xings_jit = eye_xings(actual_xings, ofst)
         (
             tie,
