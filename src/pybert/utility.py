@@ -53,19 +53,32 @@ gMaxCTLEPeak = 20  # max. allowed CTLE peaking (dB) (when optimizing, only)
 def moving_average(a, n=3):
     """Calculates a sliding average over the input vector.
 
+    Uses a weighted averaging kernel, to preserve singularity
+    of peak location in input data.
+
     Args:
         a([float]): Input vector to be averaged.
         n(int): Width of averaging window, in vector samples.
+            Odd numbers work best.
             (Optional; default = 3.)
 
     Returns:
         [float]: the moving average of the input vector, leaving the input
             vector unchanged.
-    """
 
-    ret = cumsum(a, dtype=float)
-    ret[n:] = ret[n:] - ret[:-n]
-    return np.pad(ret[n:], (n // 2, n // 2), constant_values=(ret[n], ret[-1])) / n
+    Notes:
+        1. The odd code is intended to "protect" the first/last elements
+           of the input vector from the averaging process.
+           In PyBERT those elements "collect" the missed edges when
+           assembling the TIE.
+           Because of this non-standard use, those bins shouldn't be
+           included in averaging.
+    """
+    rect = ones((n+1)//2)
+    krnl = convolve(rect, rect)
+    krnl = krnl / krnl.sum()
+    res  = convolve(a[1:-1], krnl, mode='same')
+    return array([a[0]] + list(res) + [a[-1]])
 
 
 def find_crossing_times(
@@ -248,59 +261,59 @@ def gaus_pdf(x, mu, sigma):
 
 
 def calc_jitter(
-    ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh=6, num_bins=99, zero_mean=True, dbg_obj=None
+    ui, nui, pattern_len, ideal_xings, actual_xings,
+    rel_thresh=6, num_bins=100, zero_mean=True, dbg_obj=None, smooth_width=5
 ):
-    """Calculate the jitter in a set of actual zero crossings, given the ideal
-    crossings and unit interval.
+    """
+    Calculate the jitter in a set of actual zero crossings,
+    given the ideal crossings and unit interval.
 
     Args:
-      - ui               : The nominal unit interval.
-      - nui              : The number of unit intervals spanned by the input signal.
-      - pattern_len      : The number of unit intervals, before input symbol stream repeats.
-      - ideal_xings      : The ideal zero crossing locations of the edges.
-      - actual_xings     : The actual zero crossing locations of the edges.
-      - rel_thresh       : (optional) The threshold for determining periodic jitter spectral components (sigma).
-      - num_bins         : (optional) The number of bins to use, when forming histograms.
-      - zero_mean        : (optional) Force the mean jitter to zero, when True.
-      - dbg_obj          : (optional) Object for stashing debugging info.
+        ui(float): The nominal unit interval.
+        nui(int): The number of unit intervals spanned by the input signal.
+        pattern_len(int): The number of unit intervals, before input symbol stream repeats.
+        ideal_xings([float]): The ideal zero crossing locations of the edges.
+        actual_xings([float]): The actual zero crossing locations of the edges.
 
-    Outputs:
+    KeywordArgs:
+        rel_thresh(float): The threshold for determining periodic jitter spectral components (sigma).
+            No longer used, since the move to dual Dirac based Pj/Rj separation,
+            but may be used in the future for Sj from Pj extraction.
+            (Default: 6)
+        num_bins(int): The number of bins to use, when forming histograms.
+            (Default: 99)
+        zero_mean(bool): Force the mean jitter to zero, when True.
+            (Default: True)
+        dbg_obj(object): Object for stashing debugging info.
+            (Default: None)
+        smooth_width(int): Width of smoothing window to use when calculating moving averages.
+            (Default: 5)
 
-      - jitter   : The total jitter.
-      - t_jitter : The times (taken from 'ideal_xings') corresponding to the returned jitter values.
-      - isi      : The peak to peak jitter due to intersymbol interference.
-      - dcd      : The peak to peak jitter due to duty cycle distortion.
-      - pj       : The peak to peak jitter due to uncorrelated periodic sources.
-      - rj       : The standard deviation of the jitter due to uncorrelated unbounded random sources.
-      - tie_ind  : The data independent jitter.
-      - thresh   : Threshold for determining periodic components.
-      - jitter_spectrum  : The spectral magnitude of the total jitter.
-      - tie_ind_spectrum : The spectral magnitude of the data independent jitter.
-      - spectrum_freqs   : The frequencies corresponding to the spectrum components.
-      - hist        : The histogram of the actual jitter.
-      - hist_synth  : The histogram of the extrapolated jitter.
-      - bin_centers : The bin center values for both histograms.
+    Returns:
+        ( [real]: The total jitter.
+        , [real]: The times (taken from 'ideal_xings') corresponding to the returned jitter values.
+        , real: The peak to peak jitter due to intersymbol interference (ISI).
+        , real: The peak to peak jitter due to duty cycle distortion (DCD).
+        , real: The peak to peak jitter due to uncorrelated periodic sources (Pj).
+        , real: The standard deviation of the jitter due to uncorrelated unbounded random sources (Rj).
+        , [real]: The data independent jitter.
+        , [real]: Threshold for determining periodic components.
+        , [real]: The spectral magnitude of the total jitter.
+        , [real]: The spectral magnitude of the data independent jitter.
+        , [real]: The frequencies corresponding to the spectrum components.
+        , [real]: The smoothed histogram of the total jitter.
+        , [real]: The smoothed histogram of the data-independent jitter.
+        , [real]: The bin center values for both histograms.
+        )
+
+    Raises:
+        ValueError: If input checking fails, or curve fitting goes awry.
+        AssertionError: If less than one full pattern given as input, or an odd number of crossings per pattern was detected.
 
     Notes:
         1. The actual crossings should arrive pre-aligned to the ideal crossings.
         And both should start near zero time.
     """
-
-    def my_hist(x):
-        """Calculates the probability mass function (PMF) of the input vector,
-        enforcing an output range of [-UI/2, +UI/2], sweeping everything in.
-
-        [-UI, -UI/2] into the first bin, and everything in [UI/2, UI]
-        into the last bin.
-        """
-        hist, bin_edges = histogram(
-            x, [-ui] + [-ui / 2.0 + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui]
-        )
-        bin_centers = (
-            [-ui / 2.0] + [mean([bin_edges[i + 1], bin_edges[i + 2]]) for i in range(len(bin_edges) - 3)] + [ui / 2.0]
-        )
-
-        return (array(list(map(float, hist))) / sum(hist), bin_centers)
 
     # Check inputs.
     if not ideal_xings.all():
@@ -367,14 +380,9 @@ def calc_jitter(
     tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
 
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
-    try:
-        tie_risings_ave = tie_risings.mean(axis=0)
-        tie_fallings_ave = tie_fallings.mean(axis=0)
-        isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
-    except:
-        print("xings_per_pattern:", xings_per_pattern)
-        print("len(ideal_xings):", len(ideal_xings))
-        raise
+    tie_risings_ave = tie_risings.mean(axis=0)
+    tie_fallings_ave = tie_fallings.mean(axis=0)
+    isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
     isi = min(isi, ui)  # Cap the ISI at the unit interval.
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
 
@@ -383,6 +391,8 @@ def calc_jitter(
     _jitter.resize(num_patterns * xings_per_pattern)
     tie_ave = resize(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
     tie_ind = jitter - tie_ave
+    if zero_mean:
+        tie_ind -= mean(tie_ind)
 
     # - Calculate the total and data-independent jitter spectrums, for display purposes only.
     # -- Calculate the relevant time/frequency vectors.
@@ -392,7 +402,6 @@ def calc_jitter(
     f0 = 1.0 / (ui * nui)  # jitter samples fundamental frequency
     f = [n * f0 for n in range(len(t) // 2)]  # [0:f0:fNyquist)
     f = np.array(f + [1 / (2 * t0)] + list(-1 * np.flip(np.array(f[1:]))))  # [0:f0:fN) ++ [fN:-f0:0)
-    assert len(f) == len(t), f"Lengths of `f` ({len(f)}) and `t` ({len(t)}) do not match!"
     half_len = len(f) // 2  # for spectrum plotting convenience
 
     # -- Make TIE vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
@@ -413,74 +422,104 @@ def calc_jitter(
     # -- Do dual Dirac fitting of the data-independent jitter histogram, to determine Pj/Rj.
     # --- Generate a smoothed version of the TIE histogram, for better peak identification.
     # --- (Have to work in ps when curve fitting, or `curve_fit()` blows up.)
-    hist, edges = histogram(tie_ind * 1e12, bins=100, density=True)
-    centers = (edges[:-1] + edges[1:]) / 2
-    hist_smooth = moving_average(hist, n=10)
-    neg_peak_loc = argmax(hist_smooth[where(centers < 0)])
-    pos_peak_loc = argmax(hist_smooth[where(centers > 0)]) + where(centers >= 0)[0][0]
-    pj = (centers[pos_peak_loc] - centers[neg_peak_loc]) * 1e-12  # back to (s)
+    use_my_hist = True  # False will yield misleading jitter distribution plots!
+
+    def my_hist(x, density=False):
+        """
+        Calculates the probability *mass* function (PMF) of the input vector
+        (or, the probability *density* function (PDF) if so directed),
+        enforcing an output range of [-UI/2, +UI/2], sweeping everything in
+        [-UI, -UI/2] into the first bin, and everything in [UI/2, UI]
+        into the last bin.
+        """
+        bin_edges = array([-ui] + [-ui / 2.0 + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui])
+        bin_centers = [-ui/2] + list((bin_edges[1:-2] + bin_edges[2:-1]) / 2) + [ui/2]
+        hist, _ = histogram(x, bin_edges)
+        hist = hist / hist.sum()  # PMF
+        if density:
+            hist /= diff(bin_edges)
+        return (hist, bin_centers)
+
+    if use_my_hist:
+        hist_ind, centers = my_hist(tie_ind, density=True)
+        centers = array(centers)
+    else:
+        hist_ind, edges = histogram(tie_ind, bins=num_bins, density=True)
+        centers         = (edges[:-1] + edges[1:]) / 2
+    hist_ind_smooth = array(moving_average(hist_ind, n=smooth_width))
+    # Trying to avoid any residual peak at zero, which can confuse the algorithm:
+    center_ix = (num_bins-1)/2  # May be fractional.
+    peak_ixs = array(list(filter( lambda x: abs(x - center_ix) > 1
+                                , where(diff(sign(diff(hist_ind_smooth))) < 0)[0] + 1 )))
+    neg_peak_ixs = list(filter(lambda x: x < center_ix, peak_ixs))
+    if len(neg_peak_ixs):
+        neg_peak_loc = max(neg_peak_ixs)
+    else:
+        neg_peak_loc = int(center_ix)
+    pos_peak_ixs = list(filter(lambda x: x > center_ix, peak_ixs))
+    if len(pos_peak_ixs):
+        pos_peak_loc = min(pos_peak_ixs)
+    else:
+        pos_peak_loc = int(center_ix)
+    pj = (centers[pos_peak_loc] - centers[neg_peak_loc])
 
     # --- Stash debugging info if an object was provided.
     if dbg_obj:
-        dbg_obj.hist_smooth = hist_smooth
+        dbg_obj.hist_ind_smooth = hist_ind_smooth
         dbg_obj.centers = centers
-        dbg_obj.hist = hist
+        dbg_obj.hist_ind = hist_ind
+        dbg_obj.peak_ixs = peak_ixs
+        dbg_obj.neg_peak_ixs = neg_peak_ixs
+        dbg_obj.pos_peak_ixs = pos_peak_ixs
 
     # --- Fit the tails and average the results, to determine Rj.
-    pos_max = hist_smooth[pos_peak_loc]
-    neg_max = hist_smooth[neg_peak_loc]
-    pos_tail_ix = where(hist[pos_peak_loc:] < pos_max / 2)[0] + pos_peak_loc
-    neg_tail_ix = where(hist[:neg_peak_loc] < neg_max / 2)[0]
+    pos_max = hist_ind_smooth[pos_peak_loc]
+    neg_max = hist_ind_smooth[neg_peak_loc]
+    pos_tail_ix = where(hist_ind_smooth[pos_peak_loc:] < pos_max / 2)[0] + pos_peak_loc
+    neg_tail_ix = where(hist_ind_smooth[:neg_peak_loc] < neg_max / 2)[0]
     try:
-        popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix] * 1e12, hist[pos_tail_ix])
+        popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix]*1e12, hist_ind_smooth[pos_tail_ix]*1e-12)
+        mu_pos, sigma_pos = popt
+        mu_pos *= 1e-12  # back to (s)
+        sigma_pos *= 1e-12
+        err_pos = np.sqrt(np.diag(pcov)) * 1e-12
     except:
-        print(f"centers: {centers}")
-        print(f"hist: {hist}")
-        print(f"pos_tail_ix: {pos_tail_ix}")
-        raise
-    mu_pos, sigma_pos = popt
-    mu_pos *= 1e-12  # back to (s)
-    sigma_pos *= 1e-12
-    err_pos = np.sqrt(np.diag(pcov)) * 1e-12
+        sigma_pos = 0
     try:
-        popt, pcov = curve_fit(gaus_pdf, centers[neg_tail_ix], hist[neg_tail_ix])
+        popt, pcov = curve_fit(gaus_pdf, centers[neg_tail_ix]*1e12, hist_ind_smooth[neg_tail_ix]*1e-12)
+        mu_neg, sigma_neg = popt
+        mu_neg *= 1e-12  # back to (s)
+        sigma_neg *= 1e-12
+        err_neg = np.sqrt(np.diag(pcov)) * 1e-12
     except:
-        print(f"centers: {centers}")
-        print(f"hist: {hist}")
-        print(f"neg_tail_ix: {neg_tail_ix}")
-        print(f"neg_peak_loc: {neg_peak_loc}")
-        print(f"neg_max: {neg_max}")
-        raise
-    mu_neg, sigma_neg = popt
-    mu_neg *= 1e-12  # back to (s)
-    sigma_neg *= 1e-12
-    err_neg = np.sqrt(np.diag(pcov)) * 1e-12
+        sigma_neg = 0
     rj = (sigma_pos + sigma_neg) / 2
 
-    # --- Stash debugging info if an object was provided.
-    if dbg_obj:
-        dbg_obj.dd_soltn = (mu_pos, sigma_pos, err_pos, mu_neg, sigma_neg, err_neg)
-
-    # jitter_synth = tie_ave + tie_per
-    jitter_synth = jitter  # ToDo: What to do here?
-
     # - Calculate the histogram of original, for comparison.
-    hist, bin_centers = my_hist(jitter)
+    if use_my_hist:
+        hist_tot, bin_centers = my_hist(jitter, density=True)
+    else:
+        hist_tot, edges = histogram(jitter, bins=num_bins, density=True)
+        bin_centers = (edges[:-1] + edges[1:]) / 2
+    hist_tot_smooth = moving_average(hist_tot, n=smooth_width)
 
-    # - Calculate the histogram of everything, except Rj.
-    hist_synth, bin_centers = my_hist(jitter_synth)
-
-    # - Extrapolate the tails by convolving w/ complete Gaussian.
-    rv = norm(loc=0.0, scale=rj)
-    rj_pdf = rv.pdf(bin_centers)
-    rj_pmf = rj_pdf / sum(rj_pdf)
-    hist_synth = convolve(hist_synth, rj_pmf)
-    tail_len = (len(bin_centers) - 1) // 2
-    hist_synth = (
-        [sum(hist_synth[: tail_len + 1])]
-        + list(hist_synth[tail_len + 1 : len(hist_synth) - tail_len - 1])
-        + [sum(hist_synth[len(hist_synth) - tail_len - 1 :])]
-    )
+    # - Extrapolate the tails using Gaussian.
+    # rv_neg = norm(loc=mu_neg, scale=sigma_neg)
+    # rv_pos = norm(loc=mu_pos, scale=sigma_pos)
+    # rj_pdf_neg = rv_neg.pdf(bin_centers)
+    # rj_pdf_pos = rv_pos.pdf(bin_centers)
+    # hist_tot_smooth[neg_tail_ix] = where( hist_tot_smooth[neg_tail_ix]
+    #                                     , hist_tot_smooth[neg_tail_ix]
+    #                                     , rj_pdf_neg[neg_tail_ix])
+    # hist_tot_smooth[pos_tail_ix] = where( hist_tot_smooth[pos_tail_ix]
+    #                                     , hist_tot_smooth[pos_tail_ix]
+    #                                     , rj_pdf_pos[pos_tail_ix])
+    # hist_ind_smooth[neg_tail_ix] = where( hist_ind_smooth[neg_tail_ix]
+    #                                     , hist_ind_smooth[neg_tail_ix]
+    #                                     , rj_pdf_neg[neg_tail_ix])
+    # hist_ind_smooth[pos_tail_ix] = where( hist_ind_smooth[pos_tail_ix]
+    #                                     , hist_ind_smooth[pos_tail_ix]
+    #                                     , rj_pdf_pos[pos_tail_ix])
 
     return (
         jitter,
@@ -490,14 +529,15 @@ def calc_jitter(
         pj,
         rj,
         tie_ind,
-        # thresh[:half_len],
         zeros(half_len),
         jitter_spectrum,
         tie_ind_spectrum,
         jitter_freqs,
-        hist,
-        hist_synth,
-        bin_centers,
+        # hist_tot,
+        hist_tot_smooth,
+        # hist_ind,
+        hist_ind_smooth,
+        bin_centers,  # Returning just one requires `use_my_hist` True.
     )
 
 

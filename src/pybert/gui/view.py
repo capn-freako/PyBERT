@@ -78,7 +78,6 @@ traits_view = View(
                                     name="pattern",
                                     label="Pattern",
                                     tooltip="pattern to use to construct bit stream",
-                                    # editor=TextEditor(auto_set=False, enter_set=True, evaluate=int),
                                 ),
                                 Item(
                                     name="seed",
@@ -104,11 +103,6 @@ traits_view = View(
                     show_border=True,
                 ),
                 VGroup(
-                    Item(
-                        name="thresh",
-                        label="Pj Threshold (sigma)",
-                        tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
-                    ),
                     Item(
                         name="impulse_length",
                         label="Impulse Response Length (ns)",
@@ -181,8 +175,6 @@ traits_view = View(
                                     label="Use file",
                                 ),
                                 spring,
-                                # Item(name="padded",   label="Zero-padded", enabled_when="use_ch_file == True"),
-                                # Item(name="windowed", label="Windowed",    enabled_when="use_ch_file == True"),
                             ),
                         ),
                         HGroup(
@@ -356,7 +348,6 @@ traits_view = View(
                                 reorderable=False,
                                 sortable=False,
                                 selection_mode="cell",
-                                # auto_size=True,
                                 rows=4,
                             ),
                             show_label=False,
@@ -771,7 +762,5 @@ traits_view = View(
     buttons=NoButtons,
     statusbar="status_str",
     title="PyBERT",
-    # width=0.95,
-    # height=0.9,
     icon=ImageResource("icon.png"),
 )

@@ -169,7 +169,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
     rel_lock_tol = self.rel_lock_tol
     lock_sustain = self.lock_sustain
     bandwidth = self.sum_bw * 1.0e9
-    rel_thresh = self.thresh
+    rel_thresh = 0
     mod_type = self.mod_type[0]
 
     try:
@@ -465,42 +465,17 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
     _check_sim_status()
 
-    # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
+    # DFE output and incremental/cumulative impulse/step/frequency responses.
     try:
         if self.use_dfe:
-            dfe = DFE(
-                n_taps,
-                gain,
-                delta_t,
-                alpha,
-                ui,
-                nspui,
-                decision_scaler,
-                mod_type,
-                n_ave=n_ave,
-                n_lock_ave=n_lock_ave,
-                rel_lock_tol=rel_lock_tol,
-                lock_sustain=lock_sustain,
-                bandwidth=bandwidth,
-                ideal=self.sum_ideal,
-            )
+            _gain = gain
+            _ideal=self.sum_ideal
         else:
-            dfe = DFE(
-                n_taps,
-                0.0,
-                delta_t,
-                alpha,
-                ui,
-                nspui,
-                decision_scaler,
-                mod_type,
-                n_ave=n_ave,
-                n_lock_ave=n_lock_ave,
-                rel_lock_tol=rel_lock_tol,
-                lock_sustain=lock_sustain,
-                bandwidth=bandwidth,
-                ideal=True,
-            )
+            _gain = 0.0
+            _ideal=True
+        dfe = DFE( n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type
+                 , n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol
+                 , lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal )
         (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
         dfe_out = array(dfe_out)
         dfe_out.resize(len(t))
@@ -895,14 +870,14 @@ def update_results(self):
     jitter_ext_ctle = self.jitter_ext_ctle
     jitter_ext_dfe = self.jitter_ext_dfe
     self.plotdata.set_data("jitter_bins", array(self.jitter_bins) * 1.0e12)
-    self.plotdata.set_data("jitter_chnl", self.jitter_chnl)
-    self.plotdata.set_data("jitter_ext_chnl", jitter_ext_chnl)
-    self.plotdata.set_data("jitter_tx", self.jitter_tx)
-    self.plotdata.set_data("jitter_ext_tx", jitter_ext_tx)
-    self.plotdata.set_data("jitter_ctle", self.jitter_ctle)
-    self.plotdata.set_data("jitter_ext_ctle", jitter_ext_ctle)
-    self.plotdata.set_data("jitter_dfe", self.jitter_dfe)
-    self.plotdata.set_data("jitter_ext_dfe", jitter_ext_dfe)
+    self.plotdata.set_data("jitter_chnl", self.jitter_chnl * 1e-12)  # PDF (/ps)
+    self.plotdata.set_data("jitter_ext_chnl", jitter_ext_chnl * 1e-12)
+    self.plotdata.set_data("jitter_tx", self.jitter_tx * 1e-12)
+    self.plotdata.set_data("jitter_ext_tx", jitter_ext_tx * 1e-12)
+    self.plotdata.set_data("jitter_ctle", self.jitter_ctle * 1e-12)
+    self.plotdata.set_data("jitter_ext_ctle", jitter_ext_ctle * 1e-12)
+    self.plotdata.set_data("jitter_dfe", self.jitter_dfe * 1e-12)
+    self.plotdata.set_data("jitter_ext_dfe", jitter_ext_dfe * 1e-12)
 
     # Jitter spectrums
     log10_ui = safe_log10(ui)

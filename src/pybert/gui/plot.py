@@ -420,38 +420,38 @@ def make_plots(self, n_dfe_taps):
 
     # - Jitter Distributions tab
     plot_jitter_dist_chnl = Plot(plotdata, padding_left=75)
-    plot_jitter_dist_chnl.plot(("jitter_bins", "jitter_chnl"), type="line", color="blue", name="Measured")
-    plot_jitter_dist_chnl.plot(("jitter_bins", "jitter_ext_chnl"), type="line", color="red", name="Extrapolated")
+    plot_jitter_dist_chnl.plot(("jitter_bins", "jitter_chnl"), type="line", color="blue", name="Total")
+    plot_jitter_dist_chnl.plot(("jitter_bins", "jitter_ext_chnl"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_chnl.title = post_chnl_str
     plot_jitter_dist_chnl.index_axis.title = "Time (ps)"
-    plot_jitter_dist_chnl.value_axis.title = "Count"
+    plot_jitter_dist_chnl.value_axis.title = "PDF"
     plot_jitter_dist_chnl.legend.visible = True
     plot_jitter_dist_chnl.legend.align = "ur"
 
     plot_jitter_dist_tx = Plot(plotdata, padding_left=75)
-    plot_jitter_dist_tx.plot(("jitter_bins", "jitter_tx"), type="line", color="blue", name="Measured")
-    plot_jitter_dist_tx.plot(("jitter_bins", "jitter_ext_tx"), type="line", color="red", name="Extrapolated")
+    plot_jitter_dist_tx.plot(("jitter_bins", "jitter_tx"), type="line", color="blue", name="Total")
+    plot_jitter_dist_tx.plot(("jitter_bins", "jitter_ext_tx"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_tx.title = post_tx_str
     plot_jitter_dist_tx.index_axis.title = "Time (ps)"
-    plot_jitter_dist_tx.value_axis.title = "Count"
+    plot_jitter_dist_tx.value_axis.title = "PDF"
     plot_jitter_dist_tx.legend.visible = True
     plot_jitter_dist_tx.legend.align = "ur"
 
     plot_jitter_dist_ctle = Plot(plotdata, padding_left=75)
-    plot_jitter_dist_ctle.plot(("jitter_bins", "jitter_ctle"), type="line", color="blue", name="Measured")
-    plot_jitter_dist_ctle.plot(("jitter_bins", "jitter_ext_ctle"), type="line", color="red", name="Extrapolated")
+    plot_jitter_dist_ctle.plot(("jitter_bins", "jitter_ctle"), type="line", color="blue", name="Total")
+    plot_jitter_dist_ctle.plot(("jitter_bins", "jitter_ext_ctle"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_ctle.title = post_ctle_str
     plot_jitter_dist_ctle.index_axis.title = "Time (ps)"
-    plot_jitter_dist_ctle.value_axis.title = "Count"
+    plot_jitter_dist_ctle.value_axis.title = "PDF"
     plot_jitter_dist_ctle.legend.visible = True
     plot_jitter_dist_ctle.legend.align = "ur"
 
     plot_jitter_dist_dfe = Plot(plotdata, padding_left=75)
-    plot_jitter_dist_dfe.plot(("jitter_bins", "jitter_dfe"), type="line", color="blue", name="Measured")
-    plot_jitter_dist_dfe.plot(("jitter_bins", "jitter_ext_dfe"), type="line", color="red", name="Extrapolated")
+    plot_jitter_dist_dfe.plot(("jitter_bins", "jitter_dfe"), type="line", color="blue", name="Total")
+    plot_jitter_dist_dfe.plot(("jitter_bins", "jitter_ext_dfe"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_dfe.title = post_dfe_str
     plot_jitter_dist_dfe.index_axis.title = "Time (ps)"
-    plot_jitter_dist_dfe.value_axis.title = "Count"
+    plot_jitter_dist_dfe.value_axis.title = "PDF"
     plot_jitter_dist_dfe.legend.visible = True
     plot_jitter_dist_dfe.legend.align = "ur"
 
@@ -465,10 +465,7 @@ def make_plots(self, n_dfe_taps):
     # - Jitter Spectrums tab
     plot_jitter_spec_chnl = Plot(plotdata)
     plot_jitter_spec_chnl.plot(("f_MHz", "jitter_spectrum_chnl"), type="line", color="blue", name="Total")
-    plot_jitter_spec_chnl.plot(
-        ("f_MHz", "jitter_ind_spectrum_chnl"), type="line", color="red", name="Data Independent"
-    )
-    plot_jitter_spec_chnl.plot(("f_MHz", "thresh_chnl"), type="line", color="magenta", name="Pj Threshold")
+    plot_jitter_spec_chnl.plot(("f_MHz", "jitter_ind_spectrum_chnl"), type="line", color="red", name="Data Independent")
     plot_jitter_spec_chnl.title = post_chnl_str
     plot_jitter_spec_chnl.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_chnl.value_axis.title = "|FFT(TIE)| (dBui)"
@@ -483,7 +480,6 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_tx = Plot(plotdata)
     plot_jitter_spec_tx.plot(("f_MHz", "jitter_spectrum_tx"), type="line", color="blue", name="Total")
     plot_jitter_spec_tx.plot(("f_MHz", "jitter_ind_spectrum_tx"), type="line", color="red", name="Data Independent")
-    plot_jitter_spec_tx.plot(("f_MHz", "thresh_tx"), type="line", color="magenta", name="Pj Threshold")
     plot_jitter_spec_tx.title = post_tx_str
     plot_jitter_spec_tx.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_tx.value_axis.title = "|FFT(TIE)| (dBui)"
@@ -496,10 +492,7 @@ def make_plots(self, n_dfe_taps):
 
     plot_jitter_spec_ctle = Plot(plotdata)
     plot_jitter_spec_ctle.plot(("f_MHz", "jitter_spectrum_ctle"), type="line", color="blue", name="Total")
-    plot_jitter_spec_ctle.plot(
-        ("f_MHz", "jitter_ind_spectrum_ctle"), type="line", color="red", name="Data Independent"
-    )
-    plot_jitter_spec_ctle.plot(("f_MHz", "thresh_ctle"), type="line", color="magenta", name="Pj Threshold")
+    plot_jitter_spec_ctle.plot(("f_MHz", "jitter_ind_spectrum_ctle"), type="line", color="red", name="Data Independent")
     plot_jitter_spec_ctle.title = post_ctle_str
     plot_jitter_spec_ctle.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_ctle.value_axis.title = "|FFT(TIE)| (dBui)"
@@ -510,10 +503,7 @@ def make_plots(self, n_dfe_taps):
 
     plot_jitter_spec_dfe = Plot(plotdata)
     plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_spectrum_dfe"), type="line", color="blue", name="Total")
-    plot_jitter_spec_dfe.plot(
-        ("f_MHz_dfe", "jitter_ind_spectrum_dfe"), type="line", color="red", name="Data Independent"
-    )
-    plot_jitter_spec_dfe.plot(("f_MHz_dfe", "thresh_dfe"), type="line", color="magenta", name="Pj Threshold")
+    plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_ind_spectrum_dfe"), type="line", color="red", name="Data Independent")
     plot_jitter_spec_dfe.title = post_dfe_str
     plot_jitter_spec_dfe.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_dfe.value_axis.title = "|FFT(TIE)| (dBui)"
