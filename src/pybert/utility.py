@@ -349,7 +349,7 @@ def calc_jitter(
         if i == len(actual_xings):  # We've exhausted the list of actual crossings; we're done.
             break
         if actual_xings[i] > max_t:  # Means the xing we're looking for didn't occur, in the actual signal.
-            jitter.append(3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.
+            jitter.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.
             jitter.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
             skip_next_ideal_xing = True  # If we missed one, we missed two.
         else:  # Noise may produce several crossings.
@@ -372,15 +372,15 @@ def calc_jitter(
 
     # Do the jitter decomposition.
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    tie_risings = jitter.take(list(range(0, len(jitter), 2)))
+    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))
     tie_fallings = jitter.take(list(range(1, len(jitter), 2)))
     tie_risings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
     tie_fallings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
-    tie_risings = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))
+    tie_risings  = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))
     tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
 
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
-    tie_risings_ave = tie_risings.mean(axis=0)
+    tie_risings_ave  = tie_risings.mean(axis=0)
     tie_fallings_ave = tie_fallings.mean(axis=0)
     isi = max(tie_risings_ave.ptp(), tie_fallings_ave.ptp())
     isi = min(isi, ui)  # Cap the ISI at the unit interval.
@@ -396,13 +396,13 @@ def calc_jitter(
 
     # - Calculate the total and data-independent jitter spectrums, for display purposes only.
     # -- Calculate the relevant time/frequency vectors.
-    osf = 1  # jitter oversampling factor
-    t0 = ui / osf  # jitter sampling period
-    t = np.array([n * t0 for n in range(nui * osf)])  # jitter samples time vector
-    f0 = 1.0 / (ui * nui)  # jitter samples fundamental frequency
-    f = [n * f0 for n in range(len(t) // 2)]  # [0:f0:fNyquist)
-    f = np.array(f + [1 / (2 * t0)] + list(-1 * np.flip(np.array(f[1:]))))  # [0:f0:fN) ++ [fN:-f0:0)
-    half_len = len(f) // 2  # for spectrum plotting convenience
+    osf = 1                                             # jitter oversampling factor
+    t0  = ui / osf                                      # jitter sampling period
+    t   = np.array([n * t0 for n in range(nui * osf)])  # jitter samples time vector
+    f0  = 1.0 / (ui * nui)                              # jitter samples fundamental frequency
+    f   = [n * f0 for n in range(len(t) // 2)]          # [0:f0:fNyquist)
+    f   = np.array(f + [1 / (2 * t0)] + list(-1 * np.flip(np.array(f[1:]))))  # [0:f0:fN) ++ [fN:-f0:0)
+    half_len = len(f) // 2                              # for spectrum plotting convenience
 
     # -- Make TIE vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
     # spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
@@ -410,7 +410,7 @@ def calc_jitter(
     tie_interp = spl(t)
     y = fft(tie_interp)
     jitter_spectrum = abs(y[:half_len])
-    jitter_freqs = f[:half_len]
+    jitter_freqs    = f[:half_len]
 
     # -- Repeat for data-independent jitter.
     spl = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
@@ -432,33 +432,33 @@ def calc_jitter(
         [-UI, -UI/2] into the first bin, and everything in [UI/2, UI]
         into the last bin.
         """
-        bin_edges = array([-ui] + [-ui / 2.0 + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui])
+        bin_edges   = array([-ui] + [-ui / 2.0 + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui])
         bin_centers = [-ui/2] + list((bin_edges[1:-2] + bin_edges[2:-1]) / 2) + [ui/2]
-        hist, _ = histogram(x, bin_edges)
-        hist = hist / hist.sum()  # PMF
+        hist, _     = histogram(x, bin_edges)
+        hist        = hist / hist.sum()  # PMF
         if density:
             hist /= diff(bin_edges)
         return (hist, bin_centers)
 
     if use_my_hist:
         hist_ind, centers = my_hist(tie_ind, density=True)
-        centers = array(centers)
+        centers           = array(centers)
     else:
         hist_ind, edges = histogram(tie_ind, bins=num_bins, density=True)
         centers         = (edges[:-1] + edges[1:]) / 2
     hist_ind_smooth = array(moving_average(hist_ind, n=smooth_width))
     # Trying to avoid any residual peak at zero, which can confuse the algorithm:
     center_ix = (num_bins-1)/2  # May be fractional.
-    peak_ixs = array(list(filter( lambda x: abs(x - center_ix) > 1
+    peak_ixs  = array(list(filter( lambda x: abs(x - center_ix) > 1
                                 , where(diff(sign(diff(hist_ind_smooth))) < 0)[0] + 1 )))
     neg_peak_ixs = list(filter(lambda x: x < center_ix, peak_ixs))
     if len(neg_peak_ixs):
-        neg_peak_loc = max(neg_peak_ixs)
+        neg_peak_loc = neg_peak_ixs[argmax(hist_ind_smooth[neg_peak_ixs])]
     else:
         neg_peak_loc = int(center_ix)
     pos_peak_ixs = list(filter(lambda x: x > center_ix, peak_ixs))
     if len(pos_peak_ixs):
-        pos_peak_loc = min(pos_peak_ixs)
+        pos_peak_loc = pos_peak_ixs[argmax(hist_ind_smooth[pos_peak_ixs])]
     else:
         pos_peak_loc = int(center_ix)
     pj = (centers[pos_peak_loc] - centers[neg_peak_loc])
@@ -466,60 +466,47 @@ def calc_jitter(
     # --- Stash debugging info if an object was provided.
     if dbg_obj:
         dbg_obj.hist_ind_smooth = hist_ind_smooth
-        dbg_obj.centers = centers
-        dbg_obj.hist_ind = hist_ind
-        dbg_obj.peak_ixs = peak_ixs
-        dbg_obj.neg_peak_ixs = neg_peak_ixs
-        dbg_obj.pos_peak_ixs = pos_peak_ixs
+        dbg_obj.centers         = centers
+        dbg_obj.hist_ind        = hist_ind
+        dbg_obj.peak_ixs        = peak_ixs
+        dbg_obj.neg_peak_ixs    = neg_peak_ixs
+        dbg_obj.pos_peak_ixs    = pos_peak_ixs
 
     # --- Fit the tails and average the results, to determine Rj.
-    pos_max = hist_ind_smooth[pos_peak_loc]
-    neg_max = hist_ind_smooth[neg_peak_loc]
+    pos_max     = hist_ind_smooth[pos_peak_loc]
+    neg_max     = hist_ind_smooth[neg_peak_loc]
     pos_tail_ix = where(hist_ind_smooth[pos_peak_loc:] < pos_max / 2)[0] + pos_peak_loc
     neg_tail_ix = where(hist_ind_smooth[:neg_peak_loc] < neg_max / 2)[0]
+    dd_soltn    = []
     try:
         popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix]*1e12, hist_ind_smooth[pos_tail_ix]*1e-12)
         mu_pos, sigma_pos = popt
-        mu_pos *= 1e-12  # back to (s)
+        mu_pos    *= 1e-12  # back to (s)
         sigma_pos *= 1e-12
-        err_pos = np.sqrt(np.diag(pcov)) * 1e-12
+        err_pos    = np.sqrt(np.diag(pcov)) * 1e-12
+        dd_soltn   = [mu_pos, sigma_pos, err_pos]
     except:
         sigma_pos = 0
     try:
         popt, pcov = curve_fit(gaus_pdf, centers[neg_tail_ix]*1e12, hist_ind_smooth[neg_tail_ix]*1e-12)
         mu_neg, sigma_neg = popt
-        mu_neg *= 1e-12  # back to (s)
+        mu_neg    *= 1e-12  # back to (s)
         sigma_neg *= 1e-12
-        err_neg = np.sqrt(np.diag(pcov)) * 1e-12
+        err_neg    = np.sqrt(np.diag(pcov)) * 1e-12
+        dd_soltn  += [mu_neg, sigma_neg, err_neg]
     except:
         sigma_neg = 0
     rj = (sigma_pos + sigma_neg) / 2
+    if dbg_obj:
+        dbg_obj.dd_soltn = dd_soltn
 
     # - Calculate the histogram of original, for comparison.
     if use_my_hist:
         hist_tot, bin_centers = my_hist(jitter, density=True)
     else:
         hist_tot, edges = histogram(jitter, bins=num_bins, density=True)
-        bin_centers = (edges[:-1] + edges[1:]) / 2
+        bin_centers     = (edges[:-1] + edges[1:]) / 2
     hist_tot_smooth = moving_average(hist_tot, n=smooth_width)
-
-    # - Extrapolate the tails using Gaussian.
-    # rv_neg = norm(loc=mu_neg, scale=sigma_neg)
-    # rv_pos = norm(loc=mu_pos, scale=sigma_pos)
-    # rj_pdf_neg = rv_neg.pdf(bin_centers)
-    # rj_pdf_pos = rv_pos.pdf(bin_centers)
-    # hist_tot_smooth[neg_tail_ix] = where( hist_tot_smooth[neg_tail_ix]
-    #                                     , hist_tot_smooth[neg_tail_ix]
-    #                                     , rj_pdf_neg[neg_tail_ix])
-    # hist_tot_smooth[pos_tail_ix] = where( hist_tot_smooth[pos_tail_ix]
-    #                                     , hist_tot_smooth[pos_tail_ix]
-    #                                     , rj_pdf_pos[pos_tail_ix])
-    # hist_ind_smooth[neg_tail_ix] = where( hist_ind_smooth[neg_tail_ix]
-    #                                     , hist_ind_smooth[neg_tail_ix]
-    #                                     , rj_pdf_neg[neg_tail_ix])
-    # hist_ind_smooth[pos_tail_ix] = where( hist_ind_smooth[pos_tail_ix]
-    #                                     , hist_ind_smooth[pos_tail_ix]
-    #                                     , rj_pdf_pos[pos_tail_ix])
 
     return (
         jitter,
