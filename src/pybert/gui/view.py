@@ -108,6 +108,11 @@ traits_view = View(
                         label="Impulse Response Length (ns)",
                         tooltip="Manual impulse response length override",
                     ),
+                    Item(
+                        name="rel_thresh",
+                        label="Pj Threshold (sigma)",
+                        tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
+                    ),
                     Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
                     label="Analysis Parameters",
                     show_border=True,

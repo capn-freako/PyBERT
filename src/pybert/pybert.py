@@ -74,13 +74,12 @@ from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
 gDebugStatus = False
-gMaxCTLEPeak = 20.0  # max. allowed CTLE peaking (dB) (when optimizing, only)
-gNbits = 8000  # number of bits to run
-gUseDfe = True  # Include DFE when running simulation.
-gPeakFreq = 5.0  # CTLE peaking frequency (GHz)
-gPeakMag = 1.7  # CTLE peaking magnitude (dB)
-gCTLEOffset = 0.0  # CTLE d.c. offset (dB)
-gNtaps = 5
+gUseDfe      = True     # Include DFE when running simulation.
+gMaxCTLEPeak =    20.0  # max. allowed CTLE peaking (dB) (when optimizing, only)
+gPeakFreq    =     5.0  # CTLE peaking frequency (GHz)
+gPeakMag     =     1.7  # CTLE peaking magnitude (dB)
+gCTLEOffset  =     0.0  # CTLE d.c. offset (dB)
+gNtaps       =     5
 
 
 class PyBERT(HasTraits):
@@ -94,8 +93,9 @@ class PyBERT(HasTraits):
     # Independent variables
 
     # - Simulation Control
-    bit_rate = Range(low=0.1, high=120.0, value=10.0)  #: (Gbps)
-    nbits = Range(low=1000, high=10000000, value=gNbits)  #: Number of bits to simulate.
+    bit_rate = Range(low=0.1, high=120.0, value=10.0)    #: (Gbps)
+    nbits = Range(low=1000, high=10000000, value=15000)  #: Number of bits to simulate.
+    eye_bits = Int(10160)                                #: Number of bits used to form eye.
     pattern = Map(
         {
             "PRBS-7": [7, 6],
@@ -106,13 +106,13 @@ class PyBERT(HasTraits):
     )
     seed = Int(1)  # LFSR seed. 0 means regenerate bits, using a new random seed, each run.
     nspb = Range(low=2, high=256, value=32)  #: Signal vector samples per bit.
-    eye_bits = Int(gNbits // 5)  #: # of bits used to form eye. (Default = last 20%)
-    mod_type = List([0])  #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
-    num_sweeps = Int(1)  #: Number of sweeps to run.
-    sweep_num = Int(1)
+    mod_type   = List([0])                   #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    num_sweeps = Int(1)                      #: Number of sweeps to run.
+    sweep_num  = Int(1)
     sweep_aves = Int(1)
-    do_sweep = Bool(False)  #: Run sweeps? (Default = False)
-    debug = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
+    do_sweep   = Bool(False)  #: Run sweeps? (Default = False)
+    debug      = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
+    rel_thresh = Float(3.0)   #: Spectral threshold for identifying periodic components (sigma). (Default = 3.0)
 
     # - Channel Control
     ch_file = File(
@@ -932,24 +932,26 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (
+        status_str = "%-20s | Perf. (Msmpls./min.): %4.1f" % (
             self.status,
             self.total_perf * 60.0e-6,
         )
-        dly_str = f"         | ChnlDly (ns):    {self.chnl_dly * 1000000000.0:5.3f}"
-        err_str = f"         | BitErrs: {int(self.bit_errs)}"
-        pwr_str = f"         | TxPwr (W): {self.rel_power:4.2f}"
+        dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
+        err_str = f"    | BitErrs: {int(self.bit_errs)}"
+        pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
 
         try:
-            jit_str = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % (
+            jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (
                 self.isi_dfe * 1.0e12,
                 self.dcd_dfe * 1.0e12,
                 self.pj_dfe * 1.0e12,
+                self.pjDD_dfe * 1.0e12,
                 self.rj_dfe * 1.0e12,
+                self.rjDD_dfe * 1.0e12,
             )
         except:
-            jit_str = "         | (Jitter not available.)"
+            jit_str = "    | (Jitter not available.)"
 
         status_str += jit_str
 

@@ -464,8 +464,9 @@ def make_plots(self, n_dfe_taps):
 
     # - Jitter Spectrums tab
     plot_jitter_spec_chnl = Plot(plotdata)
-    plot_jitter_spec_chnl.plot(("f_MHz", "jitter_spectrum_chnl"), type="line", color="blue", name="Total")
-    plot_jitter_spec_chnl.plot(("f_MHz", "jitter_ind_spectrum_chnl"), type="line", color="red", name="Data Independent")
+    plot_jitter_spec_chnl.plot(("f_MHz", "jitter_spectrum_chnl"),     type="line", color="blue",    name="Total")
+    plot_jitter_spec_chnl.plot(("f_MHz", "jitter_ind_spectrum_chnl"), type="line", color="red",     name="Data Independent")
+    plot_jitter_spec_chnl.plot(("f_MHz", "thresh_chnl"),              type="line", color="magenta", name="Pj Threshold")
     plot_jitter_spec_chnl.title = post_chnl_str
     plot_jitter_spec_chnl.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_chnl.value_axis.title = "|FFT(TIE)| (dBui)"
@@ -478,8 +479,9 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_chnl.legend.align = "lr"
 
     plot_jitter_spec_tx = Plot(plotdata)
-    plot_jitter_spec_tx.plot(("f_MHz", "jitter_spectrum_tx"), type="line", color="blue", name="Total")
-    plot_jitter_spec_tx.plot(("f_MHz", "jitter_ind_spectrum_tx"), type="line", color="red", name="Data Independent")
+    plot_jitter_spec_tx.plot(("f_MHz", "jitter_spectrum_tx"),     type="line", color="blue",    name="Total")
+    plot_jitter_spec_tx.plot(("f_MHz", "jitter_ind_spectrum_tx"), type="line", color="red",     name="Data Independent")
+    plot_jitter_spec_tx.plot(("f_MHz", "thresh_tx"),              type="line", color="magenta", name="Pj Threshold")
     plot_jitter_spec_tx.title = post_tx_str
     plot_jitter_spec_tx.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_tx.value_axis.title = "|FFT(TIE)| (dBui)"
@@ -491,8 +493,9 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_chnl.value_range = plot_jitter_spec_tx.value_range
 
     plot_jitter_spec_ctle = Plot(plotdata)
-    plot_jitter_spec_ctle.plot(("f_MHz", "jitter_spectrum_ctle"), type="line", color="blue", name="Total")
-    plot_jitter_spec_ctle.plot(("f_MHz", "jitter_ind_spectrum_ctle"), type="line", color="red", name="Data Independent")
+    plot_jitter_spec_ctle.plot(("f_MHz", "jitter_spectrum_ctle"),     type="line", color="blue",    name="Total")
+    plot_jitter_spec_ctle.plot(("f_MHz", "jitter_ind_spectrum_ctle"), type="line", color="red",     name="Data Independent")
+    plot_jitter_spec_ctle.plot(("f_MHz", "thresh_ctle"),              type="line", color="magenta", name="Pj Threshold")
     plot_jitter_spec_ctle.title = post_ctle_str
     plot_jitter_spec_ctle.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_ctle.value_axis.title = "|FFT(TIE)| (dBui)"
@@ -502,8 +505,9 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_ctle.value_range = plot_jitter_spec_tx.value_range
 
     plot_jitter_spec_dfe = Plot(plotdata)
-    plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_spectrum_dfe"), type="line", color="blue", name="Total")
-    plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_ind_spectrum_dfe"), type="line", color="red", name="Data Independent")
+    plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_spectrum_dfe"),     type="line", color="blue",    name="Total")
+    plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_ind_spectrum_dfe"), type="line", color="red",     name="Data Independent")
+    plot_jitter_spec_dfe.plot(("f_MHz_dfe", "thresh_dfe"),              type="line", color="magenta", name="Pj Threshold")
     plot_jitter_spec_dfe.title = post_dfe_str
     plot_jitter_spec_dfe.index_axis.title = "Frequency (MHz)"
     plot_jitter_spec_dfe.value_axis.title = "|FFT(TIE)| (dBui)"
