@@ -255,10 +255,14 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
             tx_model_init.bit_time = ui
             tx_model = AMIModel(self.tx_dll_file)
             tx_model.initialize(tx_model_init)
+            if tx_model.ami_params_out:
+                _params_out = tx_model.ami_params_out.decode("utf-8")
+            else:
+                _params_out = ""
             self.log(
                 "Tx IBIS-AMI model initialization results:\nInput parameters: {}\nOutput parameters: {}\nMessage: {}".format(
                     tx_model.ami_params_in.decode("utf-8"),
-                    tx_model.ami_params_out.decode("utf-8"),
+                    _params_out,
                     tx_model.msg.decode("utf-8"),
                 )
             )
@@ -359,11 +363,15 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             rx_model_init.bit_time = ui
             rx_model = AMIModel(self.rx_dll_file)
             rx_model.initialize(rx_model_init)
+            if rx_model.ami_params_out:
+                _params_out = rx_model.ami_params_out.decode("utf-8")
+            else:
+                _params_out = ""
             self.log(
                 "Rx IBIS-AMI model initialization results:\nInput parameters: {}\nMessage: {}\nOutput parameters: {}".format(
                     rx_model.ami_params_in.decode("utf-8"),
                     rx_model.msg.decode("utf-8"),
-                    rx_model.ami_params_out.decode("utf-8"),
+                    _params_out,
                 )
             )
             if rx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
