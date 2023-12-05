@@ -804,7 +804,7 @@ def update_results(self):
     for tap_weight in tap_weights:
         self.plotdata.set_data(f"tap{i}_weights", tap_weight)
         i += 1
-    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weights[0]))))
+    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))
     if self._old_n_taps != n_taps:
         new_plot = Plot(
             self.plotdata,
