@@ -794,9 +794,9 @@ def update_results(self):
     tap_weights = transpose(array(self.adaptation))
     i = 1
     for tap_weight in tap_weights:
-        self.plotdata.set_data("tap%d_weights" % i, tap_weight)
+        self.plotdata.set_data(f"tap{i}_weights", tap_weight)
         i += 1
-    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weights))))
+    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weights[0]))))
     if self._old_n_taps != n_taps:
         new_plot = Plot(
             self.plotdata,
