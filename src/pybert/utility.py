@@ -294,7 +294,6 @@ def calc_jitter(
         1. The actual crossings should arrive pre-aligned to the ideal crossings.
         And both should start near zero time.
     """
-
     # Check inputs.
     if not ideal_xings.all():
         raise ValueError("calc_jitter(): zero length ideal crossings vector received!")

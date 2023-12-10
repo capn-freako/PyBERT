@@ -112,7 +112,7 @@ class PyBERT(HasTraits):
     sweep_aves = Int(1)
     do_sweep   = Bool(False)  #: Run sweeps? (Default = False)
     debug      = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
-    rel_thresh = Float(3.0)   #: Spectral threshold for identifying periodic components (sigma). (Default = 3.0)
+    thresh     = Float(3.0)   #: Spectral threshold for identifying periodic components (sigma). (Default = 3.0)
 
     # - Channel Control
     ch_file = File(

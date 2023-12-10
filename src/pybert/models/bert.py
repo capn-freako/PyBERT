@@ -169,7 +169,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
     rel_lock_tol = self.rel_lock_tol
     lock_sustain = self.lock_sustain
     bandwidth = self.sum_bw * 1.0e9
-    rel_thresh = self.rel_thresh
+    rel_thresh = self.thresh
     mod_type = self.mod_type[0]
 
     try:
