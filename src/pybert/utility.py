@@ -1152,19 +1152,15 @@ def interp_s2p(ntwk, f):
     assert rs == cs, "Non-square Touchstone file S-matrix!"
     assert rs == 2, "Touchstone file must have 2 ports!"
 
-    extrap = ntwk.interpolate(f / 1e9, fill_value="extrapolate", coords="polar", assume_sorted=True)
+    extrap = ntwk.interpolate(f, fill_value="extrapolate", coords="polar", assume_sorted=True)
     s11 = cap_mag(extrap.s[:, 0, 0])
     s22 = cap_mag(extrap.s[:, 1, 1])
-    s12 = ntwk.s12.interpolate(
-        f / 1e9, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True
-    ).s.flatten()
-    s21 = ntwk.s21.interpolate(
-        f / 1e9, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True
-    ).s.flatten()
+    s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
+    s21 = ntwk.s21.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
     s = np.array(list(zip(zip(s11, s12), zip(s21, s22))))
     if ntwk.name is None:
         ntwk.name = "s2p"
-    return rf.Network(f=f / 1e9, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"))
+    return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"))
 
 
 def renorm_s2p(ntwk, zs):
