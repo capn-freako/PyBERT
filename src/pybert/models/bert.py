@@ -45,16 +45,16 @@ from pybert.utility import (
     find_crossings,
     getwave_step_resp,
     import_channel,
+    make_bathtub,
     make_ctle,
     safe_log10,
     trim_impulse,
 )
 from pyibisami.ami.model import AMIModel, AMIModelInitializer
 
-DEBUG = False
+DEBUG           = False
 MIN_BATHTUB_VAL = 1.0e-18
-
-gFc = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
+gFc             = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
 
 
 def my_run_sweeps(self, is_thread_stopped: Optional[Callable[[], bool]] = None):
@@ -193,6 +193,20 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
         ideal_xings = find_crossings(t, x, decision_scaler, mod_type=mod_type)
         self.ideal_xings = ideal_xings
 
+        # - Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
+        #   - Generate the ideal rectangular aggressor waveform.
+        pn_period = 1.0 / pn_freq
+        pn_samps = int(pn_period / Ts + 0.5)
+        pn = zeros(pn_samps)
+        pn[pn_samps // 2 :] = pn_mag
+        self.pn_period = pn_period
+        self.pn_samps = pn_samps
+        pn = resize(pn, len(x))
+        #   - High pass filter it. (Simulating capacitive coupling.)
+        (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
+        pn = lfilter(b, a, pn)[: len(pn)]
+        self.pn = pn
+
         # Calculate the channel output.
         #
         # Note: We're not using 'self.ideal_signal', because we rely on the system response to
@@ -202,7 +216,11 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
         chnl_h = self.calc_chnl_h()
         _calc_chnl_time = clock() - split_time
         split_time = clock()
-        chnl_out = convolve(self.x, chnl_h)[: len(t)]
+        # - Add the uncorrelated periodic and random noise to the Tx output.
+        x  = self.x
+        x += pn
+        x += normal(scale=rn, size=(len(x),))
+        chnl_out = convolve(x, chnl_h)[: len(t)]
         _conv_chnl_time = clock() - split_time
         if self.debug:
             self.log(f"Channel calculation time: {_calc_chnl_time}")
@@ -301,17 +319,6 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         temp.resize(len(t), refcheck=False)
         tx_H = fft(temp)
         tx_H *= tx_s[-1] / abs(tx_H[0])
-
-        # - Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
-        #   - Generate the ideal rectangular aggressor waveform.
-        pn_period = 1.0 / pn_freq
-        pn_samps = int(pn_period / Ts + 0.5)
-        pn = zeros(pn_samps)
-        pn[pn_samps // 2 :] = pn_mag
-        pn = resize(pn, len(tx_out))
-        #   - High pass filter it. (Simulating capacitive coupling.)
-        (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
-        pn = lfilter(b, a, pn)[: len(pn)]
 
         # - Add the uncorrelated periodic and random noise to the Tx output.
         tx_out += pn
@@ -470,42 +477,17 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
     _check_sim_status()
 
-    # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the DFE.
+    # DFE output and incremental/cumulative impulse/step/frequency responses.
     try:
         if self.use_dfe:
-            dfe = DFE(
-                n_taps,
-                gain,
-                delta_t,
-                alpha,
-                ui,
-                nspui,
-                decision_scaler,
-                mod_type,
-                n_ave=n_ave,
-                n_lock_ave=n_lock_ave,
-                rel_lock_tol=rel_lock_tol,
-                lock_sustain=lock_sustain,
-                bandwidth=bandwidth,
-                ideal=self.sum_ideal,
-            )
+            _gain = gain
+            _ideal=self.sum_ideal
         else:
-            dfe = DFE(
-                n_taps,
-                0.0,
-                delta_t,
-                alpha,
-                ui,
-                nspui,
-                decision_scaler,
-                mod_type,
-                n_ave=n_ave,
-                n_lock_ave=n_lock_ave,
-                rel_lock_tol=rel_lock_tol,
-                lock_sustain=lock_sustain,
-                bandwidth=bandwidth,
-                ideal=True,
-            )
+            _gain = 0.0
+            _ideal=True
+        dfe = DFE( n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type
+                 , n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol
+                 , lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal )
         (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
         dfe_out = array(dfe_out)
         dfe_out.resize(len(t))
@@ -583,22 +565,44 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
     #  - in the duo-binary case, the XOR pre-coding can invert every other pattern rep., and
     #  - in the PAM-4 case, the bits are taken in pairs to form the symbols and we start w/ an odd # of bits.
     # So, while it isn't strictly necessary, doubling it in the NRZ case as well provides a certain consistency.
+    pattern_len = (pow(2, max(pattern)) - 1) * 2
+    len_x_m1 = len(x) - 1
+    xing_min_t = (nui - eye_uis) * ui
+
+    def eye_xings(xings, ofst=0):
+        """
+        Return crossings from that portion of the signal used to generate the eye.
+
+        Args:
+            xings([float]): List of crossings.
+
+        KeywordArgs:
+            ofst(float): Time offset to be subtracted from all crossings.
+
+        Returns:
+            [float]: Selected crossings, offset and eye-start corrected.
+        """
+        _xings = array(xings) - ofst
+        return _xings[where(_xings > xing_min_t)] - xing_min_t
+
     try:
-        pattern_len = (pow(2, max(pattern)) - 1) * 2
+        # - ideal
+        ideal_xings_jit = eye_xings(ideal_xings)
 
         # - channel output
-        len_x_m1 = len(x) - 1
-        actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
         ofst = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
+        actual_xings = find_crossings(t, chnl_out, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
         (
-            _,
+            tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            _,
+            pjDD,
+            rjDD,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -606,12 +610,14 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
-        self.t_jitter = t_jitter
-        self.isi_chnl = isi
-        self.dcd_chnl = dcd
-        self.pj_chnl = pj
-        self.rj_chnl = rj
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+        self.t_jitter  = t_jitter
+        self.isi_chnl  = isi
+        self.dcd_chnl  = dcd
+        self.pj_chnl   = pj
+        self.rj_chnl   = rj
+        self.pjDD_chnl = pjDD
+        self.rjDD_chnl = rjDD
         self.thresh_chnl = thresh
         self.jitter_chnl = hist
         self.jitter_ext_chnl = hist_synth
@@ -619,19 +625,24 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.jitter_spectrum_chnl = jitter_spectrum
         self.jitter_ind_spectrum_chnl = jitter_ind_spectrum
         self.f_MHz = array(spectrum_freqs) * 1.0e-6
+        self.ofst_chnl = ofst
+        self.tie_chnl = tie
+        self.tie_ind_chnl = tie_ind
 
         # - Tx output
-        actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
         ofst = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
+        actual_xings = find_crossings(t, rx_in, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
         (
-            _,
+            tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            _,
+            pjDD,
+            rjDD,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -639,29 +650,38 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
-        self.isi_tx = isi
-        self.dcd_tx = dcd
-        self.pj_tx = pj
-        self.rj_tx = rj
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self)
+        self.isi_tx  = isi
+        self.dcd_tx  = dcd
+        self.pj_tx   = pj
+        self.rj_tx   = rj
+        self.pjDD_tx = pjDD
+        self.rjDD_tx = rjDD
         self.thresh_tx = thresh
         self.jitter_tx = hist
         self.jitter_ext_tx = hist_synth
+        self.jitter_centers_tx = bin_centers
         self.jitter_spectrum_tx = jitter_spectrum
         self.jitter_ind_spectrum_tx = jitter_ind_spectrum
+        self.jitter_freqs_tx = spectrum_freqs
+        self.t_jitter_tx = t_jitter
+        self.tie_tx = tie
+        self.tie_ind_tx = tie_ind
 
         # - CTLE output
-        actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
         ofst = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
+        actual_xings = find_crossings(t, ctle_out, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
         (
-            jitter,
+            tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            jitter_ext,
+            pjDD,
+            rjDD,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -669,34 +689,35 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, nui, pattern_len, ideal_xings, actual_xings, rel_thresh)
-        self.isi_ctle = isi
-        self.dcd_ctle = dcd
-        self.pj_ctle = pj
-        self.rj_ctle = rj
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+        self.isi_ctle  = isi
+        self.dcd_ctle  = dcd
+        self.pj_ctle   = pj
+        self.rj_ctle   = rj
+        self.pjDD_ctle = pjDD
+        self.rjDD_ctle = rjDD
         self.thresh_ctle = thresh
         self.jitter_ctle = hist
         self.jitter_ext_ctle = hist_synth
         self.jitter_spectrum_ctle = jitter_spectrum
         self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
+        self.tie_ctle = tie
+        self.tie_ind_ctle = tie_ind
 
         # - DFE output
-        ignore_until = (nui - eye_uis) * ui
-        ideal_xings = array(list(filter(lambda x: x >= ignore_until, ideal_xings)))
-        ideal_xings -= ignore_until
-        actual_xings = find_crossings(t, dfe_out, decision_scaler, mod_type=mod_type)
         ofst = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
-        actual_xings -= ofst
-        actual_xings = array(list(filter(lambda x: x >= ignore_until, actual_xings)))
-        actual_xings -= ignore_until
+        actual_xings = find_crossings(t, dfe_out, decision_scaler, mod_type=mod_type)
+        actual_xings_jit = eye_xings(actual_xings, ofst)
         (
-            jitter,
+            tie,
             t_jitter,
             isi,
             dcd,
             pj,
             rj,
-            jitter_ext,
+            pjDD,
+            rjDD,
+            tie_ind,
             thresh,
             jitter_spectrum,
             jitter_ind_spectrum,
@@ -704,16 +725,20 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings, actual_xings, rel_thresh)
-        self.isi_dfe = isi
-        self.dcd_dfe = dcd
-        self.pj_dfe = pj
-        self.rj_dfe = rj
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+        self.isi_dfe  = isi
+        self.dcd_dfe  = dcd
+        self.pj_dfe   = pj
+        self.rj_dfe   = rj
+        self.pjDD_dfe = pjDD
+        self.rjDD_dfe = rjDD
         self.thresh_dfe = thresh
         self.jitter_dfe = hist
         self.jitter_ext_dfe = hist_synth
         self.jitter_spectrum_dfe = jitter_spectrum
         self.jitter_ind_spectrum_dfe = jitter_ind_spectrum
+        self.tie_dfe = tie
+        self.tie_ind_dfe = tie_ind
         self.f_MHz_dfe = array(spectrum_freqs) * 1.0e-6
         dfe_spec = self.jitter_spectrum_dfe
         self.jitter_rejection_ratio = zeros(len(dfe_spec))
@@ -777,7 +802,7 @@ def update_results(self):
     tap_weights = transpose(array(self.adaptation))
     i = 1
     for tap_weight in tap_weights:
-        self.plotdata.set_data("tap%d_weights" % i, tap_weight)
+        self.plotdata.set_data(f"tap{i}_weights", tap_weight)
         i += 1
     self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))
     if self._old_n_taps != n_taps:
@@ -868,36 +893,34 @@ def update_results(self):
     self.plotdata.set_data("dfe_out_H", 20.0 * safe_log10(abs(self.dfe_out_H[1:len_f_GHz])))
 
     # Jitter distributions
-    jitter_ext_chnl = self.jitter_ext_chnl  # These are used, again, in bathtub curve generation, below.
-    jitter_ext_tx = self.jitter_ext_tx
-    jitter_ext_ctle = self.jitter_ext_ctle
-    jitter_ext_dfe = self.jitter_ext_dfe
-    self.plotdata.set_data("jitter_bins", array(self.jitter_bins) * 1.0e12)
-    self.plotdata.set_data("jitter_chnl", self.jitter_chnl)
-    self.plotdata.set_data("jitter_ext_chnl", jitter_ext_chnl)
-    self.plotdata.set_data("jitter_tx", self.jitter_tx)
-    self.plotdata.set_data("jitter_ext_tx", jitter_ext_tx)
-    self.plotdata.set_data("jitter_ctle", self.jitter_ctle)
-    self.plotdata.set_data("jitter_ext_ctle", jitter_ext_ctle)
-    self.plotdata.set_data("jitter_dfe", self.jitter_dfe)
-    self.plotdata.set_data("jitter_ext_dfe", jitter_ext_dfe)
+    jitter_chnl = self.jitter_chnl  # These are used again in bathtub curve generation, below.
+    jitter_tx   = self.jitter_tx
+    jitter_ctle = self.jitter_ctle
+    jitter_dfe  = self.jitter_dfe
+    jitter_bins = self.jitter_bins
+    jitter_dt   = jitter_bins[1] - jitter_bins[0]
+    self.plotdata.set_data("jitter_bins", array(self.jitter_bins)  * 1e12)
+    self.plotdata.set_data("jitter_chnl",     jitter_chnl          * 1e-12)  # PDF (/ps)
+    self.plotdata.set_data("jitter_ext_chnl", self.jitter_ext_chnl * 1e-12)
+    self.plotdata.set_data("jitter_tx",       jitter_tx            * 1e-12)
+    self.plotdata.set_data("jitter_ext_tx",   self.jitter_ext_tx   * 1e-12)
+    self.plotdata.set_data("jitter_ctle",     jitter_ctle          * 1e-12)
+    self.plotdata.set_data("jitter_ext_ctle", self.jitter_ext_ctle * 1e-12)
+    self.plotdata.set_data("jitter_dfe",      jitter_dfe           * 1e-12)
+    self.plotdata.set_data("jitter_ext_dfe",  self.jitter_ext_dfe  * 1e-12)
 
     # Jitter spectrums
     log10_ui = safe_log10(ui)
     self.plotdata.set_data("f_MHz", self.f_MHz[1:])
     self.plotdata.set_data("f_MHz_dfe", self.f_MHz_dfe[1:])
     self.plotdata.set_data("jitter_spectrum_chnl", 10.0 * (safe_log10(self.jitter_spectrum_chnl[1:]) - log10_ui))
-    self.plotdata.set_data(
-        "jitter_ind_spectrum_chnl", 10.0 * (safe_log10(self.jitter_ind_spectrum_chnl[1:]) - log10_ui)
-    )
+    self.plotdata.set_data("jitter_ind_spectrum_chnl", 10.0 * (safe_log10(self.jitter_ind_spectrum_chnl[1:]) - log10_ui))
     self.plotdata.set_data("thresh_chnl", 10.0 * (safe_log10(self.thresh_chnl[1:]) - log10_ui))
     self.plotdata.set_data("jitter_spectrum_tx", 10.0 * (safe_log10(self.jitter_spectrum_tx[1:]) - log10_ui))
     self.plotdata.set_data("jitter_ind_spectrum_tx", 10.0 * (safe_log10(self.jitter_ind_spectrum_tx[1:]) - log10_ui))
     self.plotdata.set_data("thresh_tx", 10.0 * (safe_log10(self.thresh_tx[1:]) - log10_ui))
     self.plotdata.set_data("jitter_spectrum_ctle", 10.0 * (safe_log10(self.jitter_spectrum_ctle[1:]) - log10_ui))
-    self.plotdata.set_data(
-        "jitter_ind_spectrum_ctle", 10.0 * (safe_log10(self.jitter_ind_spectrum_ctle[1:]) - log10_ui)
-    )
+    self.plotdata.set_data("jitter_ind_spectrum_ctle", 10.0 * (safe_log10(self.jitter_ind_spectrum_ctle[1:]) - log10_ui))
     self.plotdata.set_data("thresh_ctle", 10.0 * (safe_log10(self.thresh_ctle[1:]) - log10_ui))
     self.plotdata.set_data("jitter_spectrum_dfe", 10.0 * (safe_log10(self.jitter_spectrum_dfe[1:]) - log10_ui))
     self.plotdata.set_data("jitter_ind_spectrum_dfe", 10.0 * (safe_log10(self.jitter_ind_spectrum_dfe[1:]) - log10_ui))
@@ -905,43 +928,22 @@ def update_results(self):
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
     # Bathtubs
-    half_len = len(jitter_ext_chnl) // 2
-    #  - Channel
-    bathtub_chnl = list(cumsum(jitter_ext_chnl[-1 : -(half_len + 1) : -1]))
-    bathtub_chnl.reverse()
-    bathtub_chnl = array(bathtub_chnl + list(cumsum(jitter_ext_chnl[: half_len + 1])))
-    bathtub_chnl = where(
-        bathtub_chnl < MIN_BATHTUB_VAL,
-        0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_chnl)),
-        bathtub_chnl,
-    )  # To avoid Chaco log scale plot wierdness.
+    bathtub_chnl, (ext_start_chnl, ext_end_chnl) = make_bathtub(
+        jitter_bins, jitter_chnl, min_val=0.1*MIN_BATHTUB_VAL,
+        rj=self.rj_chnl, extrap=True)
+    bathtub_tx,   (ext_start_tx,  ext_end_tx)    = make_bathtub(
+        jitter_bins, jitter_tx,   min_val=0.1*MIN_BATHTUB_VAL,
+        rj=self.rj_tx,   extrap=True)
+    bathtub_ctle, (ext_start_ctle, ext_end_ctle) = make_bathtub(
+        jitter_bins, jitter_ctle, min_val=0.1*MIN_BATHTUB_VAL,
+        rj=self.rj_ctle, extrap=True)
+    bathtub_dfe,  (ext_start_dfe,  ext_end_dfe)  = make_bathtub(
+        jitter_bins, jitter_dfe,  min_val=0.1*MIN_BATHTUB_VAL,
+        rj=self.rj_dfe,  extrap=True)
     self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))
-    #  - Tx
-    bathtub_tx = list(cumsum(jitter_ext_tx[-1 : -(half_len + 1) : -1]))
-    bathtub_tx.reverse()
-    bathtub_tx = array(bathtub_tx + list(cumsum(jitter_ext_tx[: half_len + 1])))
-    bathtub_tx = where(
-        bathtub_tx < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_tx)), bathtub_tx
-    )  # To avoid Chaco log scale plot wierdness.
-    self.plotdata.set_data("bathtub_tx", safe_log10(bathtub_tx))
-    #  - CTLE
-    bathtub_ctle = list(cumsum(jitter_ext_ctle[-1 : -(half_len + 1) : -1]))
-    bathtub_ctle.reverse()
-    bathtub_ctle = array(bathtub_ctle + list(cumsum(jitter_ext_ctle[: half_len + 1])))
-    bathtub_ctle = where(
-        bathtub_ctle < MIN_BATHTUB_VAL,
-        0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_ctle)),
-        bathtub_ctle,
-    )  # To avoid Chaco log scale plot wierdness.
+    self.plotdata.set_data("bathtub_tx",   safe_log10(bathtub_tx))
     self.plotdata.set_data("bathtub_ctle", safe_log10(bathtub_ctle))
-    #  - DFE
-    bathtub_dfe = list(cumsum(jitter_ext_dfe[-1 : -(half_len + 1) : -1]))
-    bathtub_dfe.reverse()
-    bathtub_dfe = array(bathtub_dfe + list(cumsum(jitter_ext_dfe[: half_len + 1])))
-    bathtub_dfe = where(
-        bathtub_dfe < MIN_BATHTUB_VAL, 0.1 * MIN_BATHTUB_VAL * ones(len(bathtub_dfe)), bathtub_dfe
-    )  # To avoid Chaco log scale plot wierdness.
-    self.plotdata.set_data("bathtub_dfe", safe_log10(bathtub_dfe))
+    self.plotdata.set_data("bathtub_dfe",  safe_log10(bathtub_dfe))
 
     # Eyes
     width = 2 * samps_per_ui

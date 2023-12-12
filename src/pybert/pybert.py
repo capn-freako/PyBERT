@@ -74,60 +74,12 @@ from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
 gDebugStatus = False
-gMaxCTLEPeak = 20.0  # max. allowed CTLE peaking (dB) (when optimizing, only)
-gMaxCTLEFreq = 20.0  # max. allowed CTLE peak frequency (GHz) (when optimizing, only)
-
-# Default model parameters - Modify these to customize the default simulation.
-# - Simulation Control
-gBitRate = 10  # (Gbps)
-gNbits = 8000  # number of bits to run
-gPatLen = 127  # repeating bit pattern length
-gNspb = 32  # samples per bit
-gNumAve = 1  # Number of bit error samples to average, when sweeping.
-# - Channel Control
-#     - parameters for Howard Johnson's "Metallic Transmission Model"
-#     - (See "High Speed Signal Propagation", Sec. 3.1.)
-#     - ToDo: These are the values for 24 guage twisted copper pair; need to add other options.
-gRdc = 0.1876  # Ohms/m
-gw0 = 10.0e6  # 10 MHz is recommended in Ch. 8 of his second book, in which UTP is described in detail.
-gR0 = 1.452  # skin-effect resistance (Ohms/m)log
-gTheta0 = 0.02  # loss tangent
-gZ0 = 100.0  # characteristic impedance in LC region (Ohms)
-gv0 = 0.67  # relative propagation velocity (c)
-gl_ch = 1.0  # cable length (m)
-gRn = (
-    0.001  # standard deviation of Gaussian random noise (V) (Applied at end of channel, so as to appear white to Rx.)
-)
-# - Tx
-gVod = 1.0  # output drive strength (Vp)
-gRs = 100  # differential source impedance (Ohms)
-gCout = 0.50  # parasitic output capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
-gPnMag = 0.001  # magnitude of periodic noise (V)
-gPnFreq = 0.437  # frequency of periodic noise (MHz)
-# - Rx
-gRin = 100  # differential input resistance
-gCin = 0.50  # parasitic input capacitance (pF) (Assumed to exist at both 'P' and 'N' nodes.)
-gCac = 1.0  # a.c. coupling capacitance (uF) (Assumed to exist at both 'P' and 'N' nodes.)
-gBW = 12.0  # Rx signal path bandwidth, assuming no CTLE action. (GHz)
-gUseDfe = True  # Include DFE when running simulation.
-gDfeIdeal = True  # DFE ideal summing node selector
-gPeakFreq = 5.0  # CTLE peaking frequency (GHz)
-gPeakMag = 1.7  # CTLE peaking magnitude (dB)
-gCTLEOffset = 0.0  # CTLE d.c. offset (dB)
-# - DFE
-gDecisionScaler = 0.5
-gNtaps = 5
-gGain = 0.5
-gNave = 100
-gDfeBW = 12.0  # DFE summing node bandwidth (GHz)
-# - CDR
-gDeltaT = 0.1  # (ps)
-gAlpha = 0.01
-gNLockAve = 500  # number of UI used to average CDR locked status.
-gRelLockTol = 0.1  # relative lock tolerance of CDR.
-gLockSustain = 500
-# - Analysis
-gThresh = 6  # threshold for identifying periodic jitter spectral elements (sigma)
+gUseDfe      = True     # Include DFE when running simulation.
+gMaxCTLEPeak =    20.0  # max. allowed CTLE peaking (dB) (when optimizing, only)
+gPeakFreq    =     5.0  # CTLE peaking frequency (GHz)
+gPeakMag     =     1.7  # CTLE peaking magnitude (dB)
+gCTLEOffset  =     0.0  # CTLE d.c. offset (dB)
+gNtaps       =     5
 
 
 class PyBERT(HasTraits):
@@ -141,8 +93,9 @@ class PyBERT(HasTraits):
     # Independent variables
 
     # - Simulation Control
-    bit_rate = Range(low=0.1, high=120.0, value=gBitRate)  #: (Gbps)
-    nbits = Range(low=1000, high=10000000, value=gNbits)  #: Number of bits to simulate.
+    bit_rate = Range(low=0.1, high=120.0, value=10.0)    #: (Gbps)
+    nbits = Range(low=1000, high=10000000, value=15000)  #: Number of bits to simulate.
+    eye_bits = Int(10160)                                #: Number of bits used to form eye.
     pattern = Map(
         {
             "PRBS-7": [7, 6],
@@ -152,14 +105,14 @@ class PyBERT(HasTraits):
         default_value="PRBS-7",
     )
     seed = Int(1)  # LFSR seed. 0 means regenerate bits, using a new random seed, each run.
-    nspb = Range(low=2, high=256, value=gNspb)  #: Signal vector samples per bit.
-    eye_bits = Int(gNbits // 5)  #: # of bits used to form eye. (Default = last 20%)
-    mod_type = List([0])  #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
-    num_sweeps = Int(1)  #: Number of sweeps to run.
-    sweep_num = Int(1)
-    sweep_aves = Int(gNumAve)
-    do_sweep = Bool(False)  #: Run sweeps? (Default = False)
-    debug = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
+    nspb = Range(low=2, high=256, value=32)  #: Signal vector samples per bit.
+    mod_type   = List([0])                   #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    num_sweeps = Int(1)                      #: Number of sweeps to run.
+    sweep_num  = Int(1)
+    sweep_aves = Int(1)
+    do_sweep   = Bool(False)  #: Run sweeps? (Default = False)
+    debug      = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
+    thresh     = Float(3.0)   #: Spectral threshold for identifying periodic components (sigma). (Default = 3.0)
 
     # - Channel Control
     ch_file = File(
@@ -168,13 +121,13 @@ class PyBERT(HasTraits):
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
-    Rdc = Float(gRdc)  #: Channel d.c. resistance (Ohms/m).
-    w0 = Float(gw0)  #: Channel transition frequency (rads./s).
-    R0 = Float(gR0)  #: Channel skin effect resistance (Ohms/m).
-    Theta0 = Float(gTheta0)  #: Channel loss tangent (unitless).
-    Z0 = Float(gZ0)  #: Channel characteristic impedance, in LC region (Ohms).
-    v0 = Float(gv0)  #: Channel relative propagation velocity (c).
-    l_ch = Float(gl_ch)  #: Channel length (m).
+    Rdc = Float(0.1876)  #: Channel d.c. resistance (Ohms/m).
+    w0 = Float(10e6)  #: Channel transition frequency (rads./s).
+    R0 = Float(1.452)  #: Channel skin effect resistance (Ohms/m).
+    Theta0 = Float(0.02)  #: Channel loss tangent (unitless).
+    Z0 = Float(100)  #: Channel characteristic impedance, in LC region (Ohms).
+    v0 = Float(0.67)  #: Channel relative propagation velocity (c).
+    l_ch = Float(0.5)  #: Channel length (m).
 
     # - EQ Tune
     tx_tap_tuners = List(
@@ -185,7 +138,7 @@ class PyBERT(HasTraits):
             TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
         ]
     )  #: EQ optimizer list of TxTapTuner objects.
-    rx_bw_tune = Float(gBW)  #: EQ optimizer CTLE bandwidth (GHz).
+    rx_bw_tune = Float(12.0)  #: EQ optimizer CTLE bandwidth (GHz).
     peak_freq_tune = Float(gPeakFreq)  #: EQ optimizer CTLE peaking freq. (GHz).
     peak_mag_tune = Float(gPeakMag)  #: EQ optimizer CTLE peaking mag. (dB).
     max_mag_tune = Float(20)  #: EQ optimizer CTLE peaking mag. (dB).
@@ -199,12 +152,12 @@ class PyBERT(HasTraits):
     coopt_thread = Instance(CoOptThread)  #: EQ co-optimization thread.
 
     # - Tx
-    vod = Float(gVod)  #: Tx differential output voltage (V)
-    rs = Float(gRs)  #: Tx source impedance (Ohms)
-    cout = Range(low=0.001, high=1000, value=gCout)  #: Tx parasitic output capacitance (pF)
-    pn_mag = Float(gPnMag)  #: Periodic noise magnitude (V).
-    pn_freq = Float(gPnFreq)  #: Periodic noise frequency (MHz).
-    rn = Float(gRn)  #: Standard deviation of Gaussian random noise (V).
+    vod = Float(1.0)  #: Tx differential output voltage (V)
+    rs = Float(100)  #: Tx source impedance (Ohms)
+    cout = Range(low=0.001, high=1000, value=0.5)  #: Tx parasitic output capacitance (pF)
+    pn_mag = Float(0.1)  #: Periodic noise magnitude (V).
+    pn_freq = Float(11)  #: Periodic noise frequency (MHz).
+    rn = Float(0.1)  #: Standard deviation of Gaussian random noise (V).
     tx_taps = List(
         [
             TxTapTuner(name="Pre-tap", enabled=True, min_val=-0.2, max_val=0.2, value=-0.066),
@@ -234,12 +187,12 @@ class PyBERT(HasTraits):
     tx_use_ibis = Bool(False)  #: (Bool)
 
     # - Rx
-    rin = Float(gRin)  #: Rx input impedance (Ohm)
-    cin = Float(gCin)  #: Rx parasitic input capacitance (pF)
-    cac = Float(gCac)  #: Rx a.c. coupling capacitance (uF)
+    rin = Float(100)  #: Rx input impedance (Ohm)
+    cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
+    cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
     ctle_file = File("", entries=5, filter=["*.csv"])  #: CTLE response file (when use_ctle_file = True).
-    rx_bw = Float(gBW)  #: CTLE bandwidth (GHz).
+    rx_bw = Float(12.0)  #: CTLE bandwidth (GHz).
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
     ctle_offset = Float(gCTLEOffset)  #: CTLE d.c. offset (dB)
@@ -260,23 +213,20 @@ class PyBERT(HasTraits):
 
     # - DFE
     use_dfe = Bool(gUseDfe)  #: True = use a DFE (Bool).
-    sum_ideal = Bool(gDfeIdeal)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
-    decision_scaler = Float(gDecisionScaler)  #: DFE slicer output voltage (V).
-    gain = Float(gGain)  #: DFE error gain (unitless).
-    n_ave = Float(gNave)  #: DFE # of averages to take, before making tap corrections.
+    sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
+    decision_scaler = Float(0.5)  #: DFE slicer output voltage (V).
+    gain = Float(0.5)  #: DFE error gain (unitless).
+    n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     n_taps = Int(gNtaps)  #: DFE # of taps.
     _old_n_taps = n_taps
-    sum_bw = Float(gDfeBW)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
+    sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
 
     # - CDR
-    delta_t = Float(gDeltaT)  #: CDR proportional branch magnitude (ps).
-    alpha = Float(gAlpha)  #: CDR integral branch magnitude (unitless).
-    n_lock_ave = Int(gNLockAve)  #: CDR # of averages to take in determining lock.
-    rel_lock_tol = Float(gRelLockTol)  #: CDR relative tolerance to use in determining lock.
-    lock_sustain = Int(gLockSustain)  #: CDR hysteresis to use in determining lock.
-
-    # - Analysis
-    thresh = Int(gThresh)  #: Threshold for identifying periodic jitter components (sigma).
+    delta_t = Float(0.1)  #: CDR proportional branch magnitude (ps).
+    alpha = Float(0.01)  #: CDR integral branch magnitude (unitless).
+    n_lock_ave = Int(500)  #: CDR # of averages to take in determining lock.
+    rel_lock_tol = Float(0.1)  #: CDR relative tolerance to use in determining lock.
+    lock_sustain = Int(500)  #: CDR hysteresis to use in determining lock.
 
     # Misc.
     cfg_file = File("", entries=5, filter=["*.pybert_cfg"])  #: PyBERT configuration data storage file (File).
@@ -974,12 +924,6 @@ class PyBERT(HasTraits):
         for item in sweep_results:
             info_str += '    <TR align="center">\n'
             info_str += str(item)
-            # info_str += "      <TD>%+06.3f</TD><TD>%+06.3f</TD><TD>%d</TD><TD>%d</TD>\n" % (
-            #     item[0],
-            #     item[1],
-            #     item[2],
-            #     item[3],
-            # )
             info_str += "    </TR>\n"
 
         info_str += "  </TABLE>\n"
@@ -988,24 +932,26 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_status_str(self):
-        status_str = "%-20s | Perf. (Msmpls./min.):  %4.1f" % (
+        status_str = "%-20s | Perf. (Msmpls./min.): %4.1f" % (
             self.status,
             self.total_perf * 60.0e-6,
         )
-        dly_str = f"         | ChnlDly (ns):    {self.chnl_dly * 1000000000.0:5.3f}"
-        err_str = f"         | BitErrs: {int(self.bit_errs)}"
-        pwr_str = f"         | TxPwr (W): {self.rel_power:4.2f}"
+        dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
+        err_str = f"    | BitErrs: {int(self.bit_errs)}"
+        pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
 
         try:
-            jit_str = "         | Jitter (ps):    ISI=%6.3f    DCD=%6.3f    Pj=%6.3f    Rj=%6.3f" % (
+            jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (
                 self.isi_dfe * 1.0e12,
                 self.dcd_dfe * 1.0e12,
                 self.pj_dfe * 1.0e12,
+                self.pjDD_dfe * 1.0e12,
                 self.rj_dfe * 1.0e12,
+                self.rjDD_dfe * 1.0e12,
             )
         except:
-            jit_str = "         | (Jitter not available.)"
+            jit_str = "    | (Jitter not available.)"
 
         status_str += jit_str
 
