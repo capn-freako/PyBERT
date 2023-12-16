@@ -11,6 +11,8 @@ numpy:
 python:
   - 3.9
 channels:
+  - local
   - dbanas
-  - defaults
   - conda-forge
+  - defaults
+  - labscript-suite

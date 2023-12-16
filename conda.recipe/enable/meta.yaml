@@ -1,5 +1,5 @@
 {% set name = "enable" %}
-{% set version = "5.3.1" %}
+{% set version = "6.0.0" %}
 
 package:
   name: "{{ name|lower }}"
@@ -10,10 +10,10 @@ source:
   git_rev: {{version}}
 
 build:
-  number: 5
+  number: 1
   script: " {{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   script_env:
-    - CFLAGS=-Wno-c++11-narrowing
+    - CFLAGS=-Wno-c++11-narrowing -Wno-register -Wno-incompatible-function-pointer-types
 
 requirements:
   build:
@@ -30,32 +30,33 @@ requirements:
     - {{ cdt('libxxf86vm') }}            # [linux]
     - {{ cdt('libxext') }}               # [linux]
     - cmake
+    - Cython <3
     - git
+    - pip <23
+    - python {{ python }}
     - swig
   host:
-    - Cython  # Caused error when in `build:`.
+    - Cython <3
     - fonttools
     - numpy {{ numpy }}
-    - pillow >=9.4
-    - pip
-    - pyface >=7.4.2
+    - pillow >=10.1
+    - pip <23
+    - pyface >=8
     - pyparsing
+    - pyside6 >=6.6.1
     - python {{ python }}
-    - qt >=5
     - setuptools
-    - six
-    - traitsui
+    - traitsui >=8
     - xorg-libxfixes                     # [linux]
   run:
     - fonttools
     - {{ pin_compatible('numpy') }}
-    - pillow >=9.4
-    - pyface >=7.4.2
+    - pillow >=10.1
+    - pyface >=8
     - pyparsing
+    - pyside6 >=6.6.1
     - python
-    - qt >=5
-    - six
-    - traitsui
+    - traitsui >=8
 
 test:
   imports:
@@ -65,7 +66,7 @@ test:
     - enable.layout
     - enable.null
     - enable.primitives
-    - enable.qt4
+    - enable.qt
     - enable.savage
     - enable.savage.compliance
     - enable.savage.svg
@@ -78,11 +79,11 @@ test:
     - enable.savage.svg.tests.css
     - enable.savage.trait_defs
     - enable.savage.trait_defs.ui
-    - enable.savage.trait_defs.ui.qt4
+    - enable.savage.trait_defs.ui.qt
     - enable.savage.trait_defs.ui.wx
     - enable.tests
     - enable.tests.primitives
-    - enable.tests.qt4
+    - enable.tests.qt
     - enable.tests.tools
     - enable.tests.wx
     - enable.tools
@@ -91,7 +92,7 @@ test:
     - enable.tools.toolbars
     - enable.trait_defs
     - enable.trait_defs.ui
-    - enable.trait_defs.ui.qt4
+    - enable.trait_defs.ui.qt
     - enable.trait_defs.ui.wx
     - enable.wx
     - kiva
