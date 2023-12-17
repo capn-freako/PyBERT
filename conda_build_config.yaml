@@ -7,9 +7,9 @@ cxx_compiler:
   - clangxx                    # [osx]
   - vs2019                     # [win]
 numpy:
-  - 1.23
+  - 1.25  # 1.26 breaks the Chaco build.
 python:
-  - 3.9
+  - 3.11
 channels:
   - local
   - dbanas
