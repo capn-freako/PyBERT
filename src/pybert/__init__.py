@@ -27,8 +27,8 @@ __copy__ = "Copyright (c) 2014 David Banas, 2019 David Patterson"
 # You should only have one of the "ETSConfig.toolkit = ..." lines uncommented.
 # fmt: off
 # isort: off
-from traits.etsconfig.api import ETSConfig
-ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
+# from traits.etsconfig.api import ETSConfig
+# ETSConfig.toolkit = 'qt4'  # Yields unacceptably small font sizes in plot axis labels.
 # ETSConfig.toolkit = 'qt4.celiagg'   # Yields unacceptably small font sizes in plot axis labels.
 # ETSConfig.toolkit = 'qt.qpainter'  # Was causing crash on Mac.
 # ETSConfig.toolkit = 'qt.image'     # Program runs, but very small fonts in plot titles and axis labels.
