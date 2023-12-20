@@ -9,17 +9,17 @@ source:
   path: ../../parsec.py
 
 build:
-  number: 1
+  number: 2
   noarch: "python"
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
 
 requirements:
   build:
-    - python >=3.6,<3.10
+    - python >=3.6,<3.12
     - setuptools
 
   run:
-    - python >=3.6,<3.10
+    - python >=3.6,<3.12
 
 test:
   # Python imports

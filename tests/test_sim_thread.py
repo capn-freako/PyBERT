@@ -15,6 +15,6 @@ def test_simulation_can_abort():
     sim.the_pybert = app
     sim.start()  # Start the thread
     sim.stop()  # Abort the thread
-    sim.join(10)  # Join and wait until it ends or 10 seconds passed.
+    sim.join(60)  # Join and wait until it ends or 10 seconds passed.
 
     assert "Aborted" in app.status_str

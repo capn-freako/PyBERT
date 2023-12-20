@@ -11,7 +11,7 @@ source:
   path: ../../
 
 build:
-  number: 3
+  number: 1
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
   entry_points:
     - pybert = pybert.cli:cli
@@ -22,9 +22,12 @@ requirements:
     - {{ compiler('cxx') }}
     - cmake
     - git
+    - pip <23
+    - python {{ python }}
     - swig
   host:
     - numpy {{ numpy }}
+    - pip <23
     - python {{ python }}
     - setuptools
     {% for dep in deps %}
@@ -39,7 +42,23 @@ requirements:
 
 test:
   imports:
-    - pybert
+    - pybert.cli
+    - pybert.configuration
+    - pybert.pybert
+    - pybert.results
+    - pybert.utility
+    - pybert.gui.handler
+    - pybert.gui.help
+    - pybert.gui.plot
+    - pybert.gui.view
+    - pybert.models.bert
+    - pybert.models.cdr
+    - pybert.models.dfe
+    - pybert.models.tx_tap
+    - pybert.parsers.hspice
+    - pybert.threads.optimization
+    - pybert.threads.sim
+    - pybert.threads.stoppable
 
 about:
   dev_url: ''

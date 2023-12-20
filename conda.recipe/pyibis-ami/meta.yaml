@@ -25,14 +25,18 @@ requirements:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
     - cmake
+    - Cython <3
     - git
+    - pip <23
+    - python {{ python }}
     - swig
     {% for req in build_reqs %}
     - {{ req }}
     {% endfor %}
   host:
-    - Cython
+    - Cython <3
     - numpy {{ numpy }}
+    - pip <23
     - python {{ python }}
     - setuptools
     {% for dep in deps %}

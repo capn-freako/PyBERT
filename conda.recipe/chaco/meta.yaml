@@ -1,6 +1,6 @@
 {% set name = "chaco" %}
-{% set version = "5.1.1" %}
-{% set enable_version = "5.3.1" %}
+{% set version = "6.0.0" %}
+{% set enable_version = "6.0.0" %}
 
 package:
   name: "{{ name|lower }}"
@@ -11,10 +11,10 @@ source:
   git_rev: {{ version }}
 
 build:
-  number: 3
+  number: 1
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
-  script_env:
-    - ETS_QT4_IMPORTS=1
+  # script_env:
+  #   - ETS_QT4_IMPORTS=1
 
 requirements:
   build:
@@ -31,21 +31,23 @@ requirements:
     - {{ cdt('libxxf86vm') }}            # [linux]
     - {{ cdt('libxext') }}               # [linux]
     - cmake
+    - Cython <3
     - git
+    - pip <23
+    - python {{ python }}
     - swig
   host:
-    - Cython
+    - Cython <3
     - enable ={{ enable_version }}
     - importlib_resources
     - numpy {{ numpy }}
-    - pyface >=7.4.2
+    - pip <23
     - python {{ python }}
     - setuptools
   run:
     - enable ={{ enable_version }}
     - importlib_resources
     - {{ pin_compatible('numpy') }}
-    - pyface >=7.4.2
     - python
 
 test:
