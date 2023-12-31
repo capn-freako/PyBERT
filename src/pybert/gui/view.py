@@ -8,7 +8,8 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 from enable.component_editor import ComponentEditor
-from pyface.image_resource import ImageResource
+from numpy                   import log10
+from pyface.image_resource   import ImageResource
 from traitsui.api import (  # CloseAction,
     Action,
     CheckListEditor,
@@ -27,13 +28,13 @@ from traitsui.api import (  # CloseAction,
     View,
     spring,
 )
-
+from traitsui.ui_editors.array_view_editor import ArrayViewEditor
 from pybert.gui.handler import MyHandler
 
 # Main window layout definition.
 traits_view = View(
-    Group(
-        VGroup(
+    Group(  # Members correspond to top-level tabs.
+        VGroup(  # "Config." tab
             HGroup(
                 VGroup(
                     HGroup(  # Simulation Control
@@ -118,29 +119,29 @@ traits_view = View(
                     show_border=True,
                 ),
             ),
-            HGroup(
-                VGroup(
+            HGroup(  # Channel
+                VGroup(  # Tx
                     VGroup(
-                        HGroup(
-                            Item(
-                                name="tx_ibis_file",
-                                label="File",
-                                springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
-                            ),
-                            Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        Item(
+                            name="tx_ibis_file",
+                            label="File",
+                            springy=True,
+                            editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
                         ),
+                        Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         HGroup(
                             Item(name="tx_use_ibis", label="Use IBIS"),
                             Item(name="btn_sel_tx", show_label=False),
                             Item(name="btn_view_tx", show_label=False),
-                            Item(
-                                name="tx_use_ts4",
-                                label="Use on-die S-parameters.",
-                                enabled_when="tx_use_ibis and tx_has_ts4",
-                            ),
+                            spring,
                             enabled_when="tx_ibis_valid == True",
                         ),
+                        Item(
+                            name="tx_use_ts4",
+                            label="Use on-die S-parameters.",
+                            enabled_when="tx_ibis_valid == True and tx_use_ibis and tx_has_ts4",
+                        ),
+                        spring,
                         label="IBIS",
                         show_border=True,
                     ),
@@ -160,6 +161,7 @@ traits_view = View(
                         show_border=True,
                         enabled_when="tx_use_ibis == False",
                     ),
+                    spring,
                     label="Tx",
                     show_border=True,
                 ),
@@ -170,7 +172,7 @@ traits_view = View(
                                 Item(
                                     name="ch_file",
                                     label="File",
-                                    springy=True,
+                                    # springy=True,
                                     editor=FileEditor(dialog_style="open"),
                                 ),
                             ),
@@ -194,75 +196,72 @@ traits_view = View(
                         label="From File",
                         show_border=True,
                     ),
-                    HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
-                        VGroup(
-                            Item(
-                                name="l_ch",
-                                label="Length (m)",
-                                tooltip="interconnect length",
-                            ),
-                            Item(
-                                name="Theta0",
-                                label="Loss Tan.",
-                                tooltip="dielectric loss tangent",
-                            ),
-                            Item(
-                                name="Z0",
-                                label="Z0 (Ohms)",
-                                tooltip="characteristic differential impedance",
-                            ),
-                            Item(
-                                name="v0",
-                                label="v_rel (c)",
-                                tooltip="normalized propagation velocity",
-                            ),
+                    VGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
+                        Item(
+                            name="l_ch",
+                            label="Length (m)",
+                            tooltip="interconnect length",
                         ),
-                        VGroup(
-                            Item(
-                                name="Rdc",
-                                label="Rdc (Ohms)",
-                                tooltip="d.c. resistance",
-                            ),
-                            Item(
-                                name="w0",
-                                label="w0 (rads./s)",
-                                tooltip="transition frequency",
-                            ),
-                            Item(
-                                name="R0",
-                                label="R0 (Ohms)",
-                                tooltip="skin effect resistance",
-                            ),
+                        Item(
+                            name="Theta0",
+                            label="Loss Tan.",
+                            tooltip="dielectric loss tangent",
+                        ),
+                        Item(
+                            name="Z0",
+                            label="Z0 (Ohms)",
+                            tooltip="characteristic differential impedance",
+                        ),
+                        Item(
+                            name="v0",
+                            label="v_rel (c)",
+                            tooltip="normalized propagation velocity",
+                        ),
+                        Item(
+                            name="Rdc",
+                            label="Rdc (Ohms)",
+                            tooltip="d.c. resistance",
+                        ),
+                        Item(
+                            name="w0",
+                            label="w0 (rads./s)",
+                            tooltip="transition frequency",
+                        ),
+                        Item(
+                            name="R0",
+                            label="R0 (Ohms)",
+                            tooltip="skin effect resistance",
                         ),
                         label="Native",
                         show_border=True,
                         enabled_when="use_ch_file == False",
+                        layout="normal",
                     ),
                     label="Interconnect",
                     show_border=True,
                 ),
                 VGroup(
                     VGroup(
-                        HGroup(
-                            Item(
-                                name="rx_ibis_file",
-                                label="File",
-                                springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
-                            ),
-                            Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        Item(
+                            name="rx_ibis_file",
+                            label="File",
+                            springy=True,
+                            editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
                         ),
+                        Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         HGroup(
                             Item(name="rx_use_ibis", label="Use IBIS"),
                             Item(name="btn_sel_rx", show_label=False),
                             Item(name="btn_view_rx", show_label=False),
-                            Item(
-                                name="rx_use_ts4",
-                                label="Use on-die S-parameters.",
-                                enabled_when="rx_use_ibis and rx_has_ts4",
-                            ),
+                            spring,
                             enabled_when="rx_ibis_valid == True",
                         ),
+                        Item(
+                            name="rx_use_ts4",
+                            label="Use on-die S-parameters.",
+                            enabled_when="rx_ibis_valid == True and rx_use_ibis and rx_has_ts4",
+                        ),
+                        spring,
                         label="IBIS",
                         show_border=True,
                     ),
@@ -287,6 +286,7 @@ traits_view = View(
                         show_border=True,
                         enabled_when="rx_use_ibis == False",
                     ),
+                    spring,
                     label="Rx",
                     show_border=True,
                 ),
@@ -298,7 +298,7 @@ traits_view = View(
             id="config",
         ),
         # "Equalization" tab.
-        VGroup(  # Channel Parameters
+        VGroup(
             HGroup(
                 VGroup(
                     VGroup(
@@ -638,6 +638,73 @@ traits_view = View(
             ),
             label="Optimizer",
             id="eq_tune",
+        ),
+        # "COM" tab.
+        HGroup(
+            VGroup(
+                VGroup(  # COM parameters
+                    Item("standard", label="Standard"),
+                    HGroup(
+                        Item("com_ser",     label="DER0",  format_str="%7.1e",
+                            tooltip="Symbol error rate for COM calculation."),
+                        Item("com_nTx",     label="N FFE",
+                            tooltip="Number of Tx FFE filter taps."),
+                        Item("com_nDFE",     label="N DFE",
+                            tooltip="Number of Rx DFE filter taps."),
+                    ),
+                    HGroup(
+                        Item("com_Add",     label="Add (UI)",      format_str="%5.3f",
+                            tooltip="Deterministic jitter induced voltage noise amplitude (UI)."),
+                        Item("com_sigRj",   label="Sigma_Rj (UI)", format_str="%5.3f",
+                            tooltip="Standard deviation of random noise."),
+                    ),
+                    HGroup(
+                        Item("com_TxSNR",   label="Tx SNR (dB)",   format_str="%5.1f",
+                            tooltip="Variance of Tx voltage noise (dB)."),
+                        Item("com_eta0",    label="Eta0 (V^2/GHz)", format_str="%9.3e",
+                            tooltip="One sided noise spectral density (V^2/GHz)."),
+                    ),
+                    HGroup(
+                        Item("com_z",       label="Z",  format_str="%5.2f",
+                            tooltip="Zero of CTLE response (GHz)."),
+                        Item("com_p1",      label="P1", format_str="%5.2f",
+                            tooltip="First pole of CTLE response (GHz)."),
+                        Item("com_p2",      label="P2", format_str="%5.2f",
+                            tooltip="Second pole of CTLE response (GHz)."),
+                    ),
+                    Item("com_tx_min",  label="FFE min.",
+                        tooltip="Minimum values of Tx FFE filter taps."),
+                    Item("com_tx_max",  label="FFE max.",
+                        tooltip="Maximum values of Tx FFE filter taps."),
+                    HGroup(
+                        Item("com_dfe_min",  label="DFE min.",
+                            editor=ArrayViewEditor(transpose=True, show_index=False),
+                            tooltip="Minimum values of Rx DFE filter taps."),
+                        Item("com_dfe_max",  label="DFE max.",
+                            editor=ArrayViewEditor(transpose=True, show_index=False),
+                            tooltip="Maximum values of Rx DFE filter taps."),
+                    ),
+                    label="Input Parameters",
+                    show_border=True,
+                    id="com_params",
+                ),
+                VGroup(  # COM result
+                    Item("com",           label="COM (dB)",  format_str="%4.1f"),
+                    Item("com_loc",       label="CMF > SER @"),
+                    Item("com_tx_taps",   label="Tx Taps",   format_str="%5.3f"),
+                    Item("com_ctle_gain", label="CTLE Gain (dB)", format_func=(lambda x: f"{-20*log10(x):4.1f}")),
+                    Item("com_dfe_taps",  label="DFE Taps",  format_str="%5.3f",
+                        editor=ArrayViewEditor(transpose=True, show_index=False),),
+                    label="Results",
+                    show_border=True,
+                    id="com_results",
+                ),
+                Item("btn_com", show_label=False, tooltip="Calculate COM."),
+            ),
+            Item("plots_com", editor=ComponentEditor(high_resolution=False), show_label=False,
+                    resizable=True, springy=True),
+            label="COM",
+            id="com",
         ),
         Group(  # Responses
             Group(

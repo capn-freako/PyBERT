@@ -15,15 +15,15 @@ import skrf  as rf
 from cmath     import phase, rect
 from functools import reduce
 from numpy     import (
-    append,    argmax, array,  concatenate, convolve, cumsum, diff,
-    histogram, insert, log,    log10,       maximum,  mean,   ones,
-    pi,        power,  real,        reshape,  resize, sign,
-    sort,      sqrt,   where,       zeros,
+    append, argmax, array, concatenate, convolve, cumsum, diff, exp,
+    histogram, insert, linspace, log, log10, maximum, mean, ones,
+    pad, pi, power, real, reshape, resize, sign,
+    sort, sqrt, where, zeros,
 )
-from numpy.fft         import fft, ifft, fftshift
+from numpy.fft         import fft, ifft, fftshift, irfft, rfft
 from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.linalg      import inv
-from scipy.optimize    import curve_fit
+from scipy.optimize    import curve_fit, minimize
 from scipy.signal      import freqs, invres
 from scipy.stats       import norm
 
@@ -815,6 +815,36 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
     return (w, H)
 
 
+def make_ctle_gen(z, p1, p2):
+    """Make a CTLE generator, from two poles and one zero.
+
+    Args:
+        z(complex): Zero of the frequency response.
+        p1(complex): First pole of the frequency response.
+        p2(complex): Second pole of the frequency response.
+
+    Returns:
+        function: The returned function takes the d.c. gain and angular frequencies of interest
+            as arguments, and returns the frequency response.
+    """
+    A = -p1*p2/z
+
+    def ctle_gen(gdc, w):
+        """CTLE generator, made at runtime.
+
+        Args:
+            gdc(real): D.c. response.
+            w([real]): Angular frequencies of interest (rad./s).
+
+        Returns:
+            [complex]: CTLE frequency response at `w`.
+        """
+        s = 1j*w
+        return A*(s - gdc*z) / ((s-p1)*(s-p2))
+
+    return ctle_gen
+
+
 def trim_impulse(g, min_len=0, max_len=1000000):
     """Trim impulse response, for more useful display, by:
 
@@ -1345,9 +1375,11 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):
     half_len  = len(jit_pdf) // 2
     dt        = centers[1] - centers[0]  # Bins assumed to be uniformly spaced!
     zero_locs = where(fftshift(jit_pdf) == 0)[0]
-    ext_first = min(zero_locs)
-    ext_last  = max(zero_locs)
-    if extrap:
+    ext_first = 0
+    ext_last  = len(jit_pdf)
+    if (extrap and len(zero_locs)):
+        ext_first = min(zero_locs)
+        ext_last  = max(zero_locs)
         sqrt_2pi = sqrt(2*pi)
         ix_r = ext_first + half_len - 1
         mu_r = centers[ix_r] - sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_r]))
@@ -1361,3 +1393,227 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):
     bathtub  = array(bathtub + list(cumsum(jit_pdf[: half_len+1]))) * 2*dt
     bathtub  = where(bathtub < min_val, min_val * ones(len(bathtub)), bathtub)
     return (bathtub, (ext_first,ext_last))
+
+def calc_com(ui, sbr, osf, ser, z, p1, p2, nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
+    Add, TxSNR, eta0, sigRj, mod=0):
+    """Calculate the Channel Operating Margin (COM) for pre-optimized single bit response (SBR).
+
+    Args:
+        ui(real): unit interval (s).
+        sbr([[real]]): Single bit response, uniformly spaced samples, dimmensions KxN, where:
+            K is 1 + the number of aggressors (victim occupies first row), and
+            N is the length of the response to be considered here.
+        osf(int): Oversampling factor (i.e. - samples per UI).
+        ser(real): Target symbol error rate.
+        z(complex): Zero in CTLE response (Hz).
+        p1(complex): First pole in CTLE response (Hz).
+        p2(complex): Second pole in CTLE response (Hz).
+        nTx(int): Number of Tx FFE taps.
+        tx_min([real]): Minimum Tx FFE weights. (Should have `nTx` elements.)
+        tx_max([real]): Maximum Tx FFE weights. (Should have `nTx` elements.)
+        nDFE(int): Number of DFE taps.
+        dfe_min([real]): Minimum DFE tap weights. (Should have `nDFE` elements.)
+        dfe_max([real]): Maximum DFE tap weights. (Should have `nDFE` elements.)
+        Add(real): Peak-to-peak dual-Dirac model DJ (UI).
+        TxSNR(real): Tx signal-to-noise ratio (dB).
+        eta0(real): One sided noise spectral density (V^2/Hz).
+        sigRj(real): Random jitter standard deviation (UI) (from dual-Dirac).
+
+    KeywordArgs:
+        mod(int): Modulation type (0=NRZ, 1=PAM4).
+            Default: 0 (NRZ)
+
+    Returns:
+        (real, real, [real], [real], int, [real], [real], real, [real]): A tuple consisting of:
+            - Asig: Main cursor signal amplitude.
+            - Anoise_xtalk: Eye closure, due to noise & crosstalk.
+            - pmf: Probability mass function of noise & crosstalk.
+            - cmf: Cumulative mass function of noise & crosstalk.
+            - loc: Index at which `cmf` rises above desired SER.
+            - sbr_eq: Equalized single bit response.
+            - tx_taps: Optimized Tx FFE tap weights.
+            - ctle_G: Optimized d.c. gain of CTLE respone.
+            - dfe_taps: Optimized Rx DFE tap weights.
+    """
+    # Perform any unit conversion required both here and in `com_opt()`.
+    Add  *= ui
+    varRj = (sigRj*ui)**2
+    # Determine set of possible signal levels, based on modulation scheme.
+    if mod:
+        levels = [-1, -0.3333, 0.3333, 1]
+    else:
+        levels = [-1, 1]
+    # Find optimal equalization scheme.
+    tx_taps, ctle_gain, dfe_taps, opt_rslts = com_opt(sbr, ui, osf, z, p1, p2, nTx, tx_min, tx_max,
+        nDFE, dfe_min, dfe_max, Add, TxSNR, varRj, eta0, mod)
+    sbr_opt   = opt_rslts['sbr_eq']
+    cur_ix    = opt_rslts['cur_ix']
+    Asig      = opt_rslts['Asig']
+    varTx     = opt_rslts['varTx']
+    varISI    = opt_rslts['varISI']
+    mu_n      = opt_rslts['mu_n']
+    varJ      = opt_rslts['varJ']
+    varSpec   = opt_rslts['varSpec']
+    dISI_n    = opt_rslts['dISI']
+    # Make final calculations of distributions and noises.
+    dj_noises = Add * mu_n
+    if len(sbr) > 1:
+        levels = [ level*Asig + dj_noise + dISI + xtalk
+                     for level    in levels
+                     for dj_noise in dj_noises
+                     for dISI     in dISI_n
+                     for xtalk    in concatenate([agg[cur_ix::osf] for agg in sbr[1:]])
+                 ]
+    else:       
+        levels = [ level*Asig + dj_noise + dISI
+                     for level    in levels
+                     for dj_noise in dj_noises
+                     for dISI     in dISI_n
+                 ]
+    varG = varTx + varSpec + sum(varRj * mu_n)
+    pmf = array( [ sum( [exp(-((y-level)**2/(2*varG))) for level in levels] )
+                     for y in linspace(-0.5, 0.5, num=1001) ] )
+    pmf = pmf / sum(pmf)
+    cmf = cumsum(pmf)
+    try:
+        if mod:
+            ix = where(cmf > ser/4)[0][0]
+        else:
+            ix = where(cmf > ser/2)[0][0]
+    except:
+        print(pmf)
+        ix = 190
+    Anoise_xtalk = -Asig - (ix - 500) * 0.001
+    if Anoise_xtalk == 0:
+        print(f"Asig: {Asig}, varG: {varG}, min(levels): {min(levels)}, max(levels): {max(levels)}\ndISI_n: {dISI_n}")
+
+    return (Asig, Anoise_xtalk, pmf, cmf, ix, sbr_opt, tx_taps, ctle_gain, dfe_taps, opt_rslts)
+
+def com_opt(sbr, ui, osf, z, p1, p2, nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
+    Add, TxSNR, varRj, eta0, mod=0, max_iter=50):
+    """Optimize EQ for COM calculation.
+    
+    Args:
+        sbr([[real]]): Single bit response, uniformly spaced samples, dimmensions KxN, where:
+            K is 1 + the number of aggressors (victim occupies first row), and
+            N is the length of the response to be considered here.
+        ui(real): unit interval (s).
+        osf(int): Oversampling factor (i.e. - samples per UI).
+        z(complex): Zero in CTLE response (Hz).
+        p1(complex): First pole in CTLE response (Hz).
+        p2(complex): Second pole in CTLE response (Hz).
+        nTx(int): Number of Tx FFE taps.
+        tx_min([real]): Minimum Tx FFE weights. (Should have `nTx` elements.)
+        tx_max([real]): Maximum Tx FFE weights. (Should have `nTx` elements.)
+        nDFE(int): Number of DFE taps.
+        dfe_min([real]): Minimum DFE tap weights. (Should have `nDFE` elements.)
+        dfe_max([real]): Maximum DFE tap weights. (Should have `nDFE` elements.)
+        Add(real): Peak-to-peak dual-Dirac model DJ (s).
+        TxSNR(real): Tx signal-to-noise ratio (dB).
+        varRj(real): Random jitter variance (from dual-Dirac).
+        eta0(real): One sided noise spectral density (V^2/Hz).
+
+    KeywordArgs:
+        mod(int): Modulation type (0=NRZ, 1=PAM4).
+            Default: 0 (NRZ)
+        max_iter(int): Maximum optimization iterations.
+            Default: 10
+
+    Returns:
+        ([real], real, [real], {}): Tuple consisting of:
+            - optimum Tx FFE tap weights,
+            - optimum CTLE gain,
+            - optimum DFE tap weights, and
+            - a dictionary of certain internal optimization results.
+    """
+    # Construct apropos time/frequency vectors.
+    ts = ui / osf                # sampling interval
+    n_samps = len(sbr[0])        # number of samples in victim SBR
+    f0 = 1 / (ts * len(sbr[0]))  # fundamental frequency
+    # "+1" because `irfft()` expects the Nyquist component tacked onto the end of its input vector.
+    f  = array([n*f0 for n in range(n_samps//2 + 1)])
+    w  = 2*pi*f
+    s  = 1j*w
+    # Construct null filter of proper delay, to establish main pulse sampling time.
+    r  = s / (0.75/ui)  # As per COM, f_cutoff = 0.75 f_symb.
+    Hrx = 105 / (r**4 + 10*r**3 + 45*r**2 + 105*r + 105)  # 4th-order Bessel-Thomson LP
+    ctle_gen = make_ctle_gen(z, p1, p2)
+    tx_ffe_h = append(array([0, 1]), zeros(nTx - 2)).repeat(osf)
+    ctle_H   = ctle_gen(1, w) * Hrx
+    ctle_h   = irfft(ctle_H)
+    ctle_s   = cumsum(ctle_h)  # Use step response to scale impulse response,
+    ctle_h  *= 1 / ctle_s[-1]  # since we know our desired d.c. gain.
+    sbr_eq   = convolve(convolve(sbr[0], tx_ffe_h), ctle_h)[:len(sbr[0])]
+    cur_ix, ui_height = pulse_center(sbr_eq, osf)
+    # Calculate Xtalk variance.
+    varXtalk = sum([sum(agg[cur_ix::osf]**2) for agg in sbr[1:]])
+    if mod:
+        varXtalk *= 5/9
+
+    opt_rslts = {}
+    def fom(args):
+        """Objective function to be optimized.
+        """
+        tx_taps   = args[:nTx]
+        ctle_gain = args[nTx]
+        dfe_taps  = args[nTx+1:]
+        tx_ffe_h  = tx_taps.repeat(osf) / osf
+        tx_ffe_H  = rfft(tx_ffe_h, n=n_samps)
+        tx_ffe_H *= sum(tx_taps) / abs(tx_ffe_H[0])
+        ctle_H    = ctle_gen(ctle_gain, w) * Hrx
+        ctle_h    = irfft(ctle_H)
+        ctle_s    = cumsum(ctle_h)          # Use step response to scale impulse response,
+        ctle_h   *= ctle_gain / ctle_s[-1]  # since we know our desired d.c. gain.
+        sbr_eq    = convolve(convolve(sbr[0], tx_ffe_h), ctle_h)[:len(sbr[0])]
+        cur_ix, ui_height = pulse_center(sbr_eq, osf)
+        sbr_tail  = sbr_eq[cur_ix+osf::osf]
+        Asig      = sbr_eq[cur_ix]
+        try:
+            dISI     = sbr_tail - pad(dfe_taps*Asig, (0, len(sbr_tail) - len(dfe_taps)),
+                                        mode='constant', constant_values=0)
+        except:
+            print(cur_ix, ui_height)
+            dISI = sbr_tail
+        if mod:
+            Asig *= 1/3
+        varTx    = (Asig / pow(10, TxSNR/20))**2
+        varISI   = sum(dISI**2)
+        if mod:
+            varISI *= 5/9
+        mu_n     = diff(sbr_eq)[cur_ix+osf-1::osf]
+        varJ     = sum((Add**2 + varRj) * mu_n**2)
+        if mod:
+            varJ *= 5/9
+        varSpec  = sum(abs(ctle_H)**2) * eta0
+
+        opt_rslts['sbr_eq']  = sbr_eq
+        opt_rslts['cur_ix']  = cur_ix
+        opt_rslts['Asig']    = Asig
+        opt_rslts['varTx']   = varTx
+        opt_rslts['varISI']  = varISI
+        opt_rslts['mu_n']    = mu_n
+        opt_rslts['varJ']    = varJ
+        opt_rslts['varSpec'] = varSpec
+        opt_rslts['dISI']    = dISI
+        opt_rslts['tx_ffe_h'] = tx_ffe_h
+        opt_rslts['tx_ffe_H'] = tx_ffe_H
+        opt_rslts['ctle_h']   = ctle_h
+        opt_rslts['ctle_H']   = ctle_H
+
+        # Returned result is inverted, because `scipy.optimize` only offers a `minimize()` function.
+        return (varTx + varISI + varJ + varXtalk + varSpec) / Asig**2
+
+    bounds = list(zip(tx_min, tx_max)) + [(0, 1)] + list(zip(dfe_min, dfe_max))
+    cons   = {"type": "ineq", "fun": lambda x: 1 - sum(abs(x[:nTx]))}
+    res = minimize(fom, append(append(append(array([0, 1,]), zeros(nTx - 2)), 1), zeros(nDFE)),
+        bounds=bounds,
+        constraints=cons,
+        options={"disp": False, "maxiter": max_iter},
+    )
+    if not res.success:
+        raise RuntimeError(res.message)
+    tx_taps   = res.x[:nTx]
+    ctle_gain = res.x[nTx]
+    dfe_taps  = res.x[nTx+1:]
+
+    return (tx_taps, ctle_gain, dfe_taps, opt_rslts)

@@ -162,7 +162,7 @@ class CoOptThread(StoppableThread):
                 pybert.status = f"Optimization failed: {res['message']}"
 
         except Exception as err:
-            pybert.status = err
+            pybert.status = err.message
 
     def do_coopt(self, peak_mag):
         """Run the Tx and Rx Co-Optimization."""

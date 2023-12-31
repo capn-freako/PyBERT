@@ -7,7 +7,8 @@ Original date:   February 21, 2015 (Copied from pybert.py, as part of a major co
 Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
 
-from chaco.api import ColorMapper, GridPlotContainer, Plot
+from chaco.api import (ColorMapper, Plot, PlotAxis,
+    GridPlotContainer, OverlayPlotContainer, VPlotContainer)
 from chaco.tools.api import PanTool, ZoomTool
 
 from pybert.models.bert import update_eyes
@@ -75,7 +76,6 @@ def make_plots(self, n_dfe_taps):
     self._dfe_plot = plot9
 
     # - EQ Tune tab
-    # plot_h_tune = Plot(plotdata, padding_left=75)
     plot_h_tune = Plot(plotdata, padding_bottom=75)
     plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="blue")
     plot_h_tune.plot(("t_ns_chnl", "clocks_tune"), type="line", color="gray")
@@ -84,7 +84,38 @@ def make_plots(self, n_dfe_taps):
     plot_h_tune.y_axis.title = "Pulse Response (V)"
     zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis="index", always_on=False)
     plot_h_tune.overlays.append(zoom_tune)
-    self.plot_h_tune = plot_h_tune
+
+    container_h_tune = GridPlotContainer(shape=(1, 1), spacing=(PLOT_SPACING, PLOT_SPACING))
+    container_h_tune.add(plot_h_tune)
+    self.plot_h_tune = container_h_tune
+
+    # - COM tab
+    plot_com = Plot(plotdata, padding_bottom=75)
+    plot_com.plot(("t_ns_chnl", "com_sbr"),    type="line", color="blue", name="Opt. EQ")
+    plot_com.plot(("t_ns_chnl", "chnl_p"),     type="line", color="gray", name="No EQ")
+    plot_com.plot(("t_ns_chnl", "com_tx_ffe_h"), type="line", line_style="dash", color="cyan",    name="Tx FFE h(t)")
+    plot_com.plot(("t_ns_chnl", "com_ctle_h"),   type="line", line_style="dash", color="magenta", name="CTLE h(t)")
+    plot_com.title = "COM Single Bit Responses (SBR)"
+    plot_com.index_axis.title = "Time (ns)"
+    plot_com.y_axis.title = "SBR"
+    plot_com.legend.visible = True
+    plot_com.legend.align = "ur"
+
+    plot_com_pmf = Plot(plotdata, padding_bottom=75)
+    plot_com_pmf.plot(("com_bins", "com_pmf"),  type="line", color="blue", name="PMF")
+    plot_com_pmf.plot(("com_bins", "com_cmf"),  type="line", color="red",  name="CMF")
+    plot_com_pmf.title = "COM Noise & Crosstalk Distributions"
+    plot_com_pmf.index_axis.title = "Amplitude"
+    plot_com_pmf.y_axis.title = "CMF"
+    plot_com_pmf.legend.visible = True
+    plot_com_pmf.legend.align = "ul"
+    zoom_com = ZoomTool(plot_com_pmf, tool_mode="range", axis="index", always_on=False)
+    plot_com_pmf.overlays.append(zoom_com)
+
+    container_com = VPlotContainer(stack_order="top_to_bottom")
+    container_com.add(plot_com)
+    container_com.add(plot_com_pmf)
+    self.plots_com = container_com
 
     # - Impulse Responses tab
     plot_h_chnl = Plot(plotdata, padding_left=75)

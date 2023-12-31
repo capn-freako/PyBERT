@@ -24,7 +24,7 @@ from time import sleep
 import numpy as np
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
-from numpy import array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
+from numpy import array, convolve, cos, exp, linspace, log10, ones, pad, pi, sinc, where, zeros
 from numpy.fft import fft, irfft
 from numpy.random import randint
 from traits.api import (
@@ -67,6 +67,8 @@ from pybert.utility import (
     safe_log10,
     sdd_21,
     trim_impulse,
+    calc_com,
+    com_opt,
 )
 from pyibisami import __version__ as PyAMI_VERSION
 from pyibisami.ami.model import AMIModel
@@ -263,6 +265,54 @@ class PyBERT(HasTraits):
     # Console
     console_log = String("PyBERT Console Log\n\n")
 
+    # COM
+    standard = Map(
+        {
+            "IEEE-802.3ck": {
+                "ser": 1e-4,
+                "Add": 0.02,  # (UI)
+                "TxSNR": 33,  # (dB)
+                "eta0": 8.20E-09,  # (V^2/GHz)
+                "sigma_Rj": 0.01,  # (UI)
+                "R_LM": 0.95,
+                "z": 21.25,  # (GHz)
+                "p1": 21.25,  # (GHz)
+                "p2": 53.125,  # (GHz)
+                "nTx": 5,
+                "tx_min": [-0.06, 0, -0.34, 0.54, -0.2],
+                "tx_max": [0, 0.12, 0, 1, 0],
+                "nDFE": 12,
+                "dfe_min": [0.3, 0.05] + [-0.03]*10,
+                "dfe_max": [0.85, 0.3] + [0.2]*10,
+            },
+        },
+        default_value="IEEE-802.3ck",
+    )
+    com     = Float(0)
+    com_loc = Int(0)
+    plotdata.set_data("com_bins", linspace(-0.5, 0.5, 1001))
+    plotdata.set_data("com_pmf",  zeros(1001))
+    plotdata.set_data("com_cmf",  zeros(1001))
+    com_ser     = Float(1e-4)
+    com_Add     = Float(0.02)      # (UI)
+    com_TxSNR   = Float(33)        # (dB)
+    com_eta0    = Float(8.2e-9)    # (V^2/GHz)
+    com_sigRj   = Float(0.01)
+    com_z       = Float(-21.25)    # (GHz)
+    com_p1      = Float(-21.25)
+    com_p2      = Float(-53.125)
+    nTx         = 5
+    com_nTx     = Int(nTx)
+    com_tx_min  = Array(shape=(1, nTx), dtype=float, value=[[-0.06, 0, -0.34, 0.54, -0.2],])
+    com_tx_max  = Array(shape=(1, nTx), dtype=float, value=[[0, 0.12, 0, 1, 0],])
+    nDFE        = 12
+    com_nDFE    = Int(nDFE)
+    com_dfe_min = Array(shape=(1, nDFE), dtype=float, value=[[0.3, 0.05] + [-0.03]*10,])
+    com_dfe_max = Array(shape=(1, nDFE), dtype=float, value=[[0.85, 0.3] + [0.2]*10,])
+    com_tx_taps   = Array(shape=(1, nTx), dtype=float, value=[[0]*(nTx-2) + [1, 0],])
+    com_ctle_gain = Float(1)
+    com_dfe_taps  = Array(shape=(1, nDFE), dtype=float, value=[zeros(nDFE),])
+
     # Dependent variables
     # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
     #
@@ -302,6 +352,8 @@ class PyBERT(HasTraits):
     eye_uis = Property(Int, depends_on=["eye_bits", "mod_type"])
     dfe_out_p = Array()
     przf_err = Property(Float, depends_on=["dfe_out_p"])
+    gamma = Property(Array, depends_on=["R0", "w0", "Rdc", "Z0", "v0", "Theta0", "w"])
+    H = Property(Array, depends_on=["R0", "w0", "Rdc", "Z0", "v0", "Theta0", "w", "l_ch"])
 
     # Custom buttons, which we'll use in particular tabs.
     # (Globally applicable buttons, such as "Run" and "Ok", are handled more simply, in the View.)
@@ -317,6 +369,7 @@ class PyBERT(HasTraits):
     btn_sel_rx = Button(label="Select")
     btn_view_tx = Button(label="View")  # View IBIS model.
     btn_view_rx = Button(label="View")
+    btn_com = Button(label="Recalculate COM")
 
     # Logger & Pop-up
     def log(self, msg, alert=False, exception=None):
@@ -364,6 +417,7 @@ class PyBERT(HasTraits):
             self.simulate(initial_run=True)
         else:
             self.calc_chnl_h()  # Prevents missing attribute error in _get_ctle_out_h_tune().
+        self._standard_changed("IEEE-802.3ck")  # Populates needed COM fields.
 
     # Custom button handlers
     def _btn_rst_eq_fired(self):
@@ -464,6 +518,27 @@ class PyBERT(HasTraits):
 
     def _btn_view_rx_fired(self):
         self._rx_ibis.model()
+
+    def _btn_com_fired(self):
+        self.calc_chnl_h()
+        sbr = [self.chnl_p,]
+        (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, dfe_taps, opt_rslts) = calc_com(
+            self.ui, sbr, self.nspb, self.com_ser, self.com_z*1e9, self.com_p1*1e9, self.com_p2*1e9,
+            self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
+            self.com_nDFE, self.com_dfe_min.flatten(), self.com_dfe_max.flatten(),
+            self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj)
+        self.com = 20 * log10(Asig/Anoise_xtalk)
+        self.com_pmf = pmf
+        self.com_cmf = cmf
+        self.com_loc = loc
+        self.com_tx_taps   = tx_taps.reshape((1, self.com_nTx))
+        self.com_ctle_gain = ctle_gain
+        self.com_dfe_taps  = dfe_taps.reshape((1, self.com_nDFE))
+        self.plotdata.set_data("com_pmf",      pmf/max(pmf))  # for better plot visibility
+        self.plotdata.set_data("com_cmf",      cmf)
+        self.plotdata.set_data("com_sbr",      sbr_opt)
+        self.plotdata.set_data("com_tx_ffe_h", opt_rslts['tx_ffe_h'] * self.nspb)
+        self.plotdata.set_data("com_ctle_h",   opt_rslts['ctle_h']   * self.nspb)
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
@@ -1065,6 +1140,18 @@ class PyBERT(HasTraits):
 
         return err / p[clock_pos] ** 2
 
+    @cached_property
+    def _get_gamma(self):
+        v0 = self.v0 * 3.0e8
+        gamma, Zc = calc_gamma(self.R0, self.w0, self.Rdc, self.Z0, v0, self.Theta0, self.w)
+        self.Zc = Zc
+        return gamma
+
+    @cached_property
+    def _get_H(self):
+        gamma = self.gamma
+        return exp(-self.l_ch * gamma)
+
     # Changed property handlers.
     def _status_str_changed(self):
         if gDebugStatus:
@@ -1226,6 +1313,28 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
     def _nbits_changed(self, new_value):
         self.check_pat_len()
 
+    def _standard_changed(self, new_value):
+        param_vals = self.standard_
+        self.com_ser     = param_vals["ser"]
+        self.com_Add     = param_vals["Add"]
+        self.com_TxSNR   = param_vals["TxSNR"]
+        self.com_eta0    = param_vals["eta0"]
+        self.com_sigRj   = param_vals["sigma_Rj"]
+        self.com_z       = param_vals["z"]
+        self.com_p1      = param_vals["p1"]
+        self.com_p2      = param_vals["p2"]
+        nTx              = param_vals["nTx"]
+        self.com_nTx     = nTx
+        self.com_tx_min  = [param_vals["tx_min"],]
+        self.com_tx_max  = [param_vals["tx_max"],]
+        nDFE             = param_vals["nDFE"]
+        self.com_nDFE    = nDFE
+        self.com_dfe_min = [param_vals["dfe_min"],]
+        self.com_dfe_max = [param_vals["dfe_max"],]
+        self.com_tx_taps   = [[0]*(nTx-2) + [1, 0],]
+        self.com_ctle_gain = 1
+        self.com_dfe_taps  = [zeros(nDFE),]
+
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
@@ -1253,13 +1362,13 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
         Rs = self.rs
-        Cs = self.cout * 1.0e-12
+        Cs = self.cout * 1.0e-12  # ToDo: Unused!
         RL = self.rin
         Cp = self.cin * 1.0e-12
-        CL = self.cac * 1.0e-6
+        CL = self.cac * 1.0e-6    # ToDo: Unused!
 
         ts = t[1]
-        len_t = len(t)
+        # len_t = len(t)
         len_f = len(f)
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
@@ -1268,18 +1377,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
-            l_ch = self.l_ch
-            v0 = self.v0 * 3.0e8
-            R0 = self.R0
-            w0 = self.w0
-            Rdc = self.Rdc
-            Z0 = self.Z0
-            Theta0 = self.Theta0
-            # - Calculate propagation constant, characteristic impedance, and transfer function.
-            gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-            self.Zc = Zc
-            H = exp(-l_ch * gamma)
-            self.H = H
+            H  = self.H  # Must be requested before `self.Zc`!
+            Zc = self.Zc
             # - Use the transfer function and characteristic impedance to form "perfectly matched" network.
             tmp = np.array(list(zip(zip(zeros(len_f), H), zip(H, zeros(len_f)))))
             ch_s2p_pre = rf.Network(s=tmp, f=f / 1e9, z0=Zc)
