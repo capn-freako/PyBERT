@@ -17,7 +17,7 @@ from functools import reduce
 from numpy     import (
     append, argmax, array, concatenate, convolve, cumsum, diff, exp,
     histogram, insert, linspace, log, log10, maximum, mean, ones,
-    pad, pi, power, real, reshape, resize, sign,
+    pad, pi, power, real, reshape, resize, roll, sign,
     sort, sqrt, where, zeros,
 )
 from numpy.fft         import fft, ifft, fftshift, irfft, rfft
@@ -1445,7 +1445,7 @@ def calc_com(ui, sbr, osf, ser, z, p1, p2, nTx, tx_min, tx_max, nDFE, dfe_min, d
         levels = [-1, 1]
     # Find optimal equalization scheme.
     tx_taps, ctle_gain, dfe_taps, opt_rslts = com_opt(sbr, ui, osf, z, p1, p2, nTx, tx_min, tx_max,
-        nDFE, dfe_min, dfe_max, Add, TxSNR, varRj, eta0, mod)
+        nDFE, dfe_min, dfe_max, Add, TxSNR, varRj, eta0, mod=mod, max_iter=5000)
     sbr_opt   = opt_rslts['sbr_eq']
     cur_ix    = opt_rslts['cur_ix']
     Asig      = opt_rslts['Asig']
@@ -1517,7 +1517,7 @@ def com_opt(sbr, ui, osf, z, p1, p2, nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max
         mod(int): Modulation type (0=NRZ, 1=PAM4).
             Default: 0 (NRZ)
         max_iter(int): Maximum optimization iterations.
-            Default: 10
+            Default: 50
 
     Returns:
         ([real], real, [real], {}): Tuple consisting of:
@@ -1534,17 +1534,11 @@ def com_opt(sbr, ui, osf, z, p1, p2, nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max
     f  = array([n*f0 for n in range(n_samps//2 + 1)])
     w  = 2*pi*f
     s  = 1j*w
-    # Construct null filter of proper delay, to establish main pulse sampling time.
-    r  = s / (0.75/ui)  # As per COM, f_cutoff = 0.75 f_symb.
+    # Construct Rx input filter.
+    r   = s / (2*pi * 0.75/ui)                            # As per COM, f_cutoff = 0.75 f_symb.
     Hrx = 105 / (r**4 + 10*r**3 + 45*r**2 + 105*r + 105)  # 4th-order Bessel-Thomson LP
+    # Construct CTLE generator.
     ctle_gen = make_ctle_gen(z, p1, p2)
-    tx_ffe_h = append(array([0, 1]), zeros(nTx - 2)).repeat(osf)
-    ctle_H   = ctle_gen(1, w) * Hrx
-    ctle_h   = irfft(ctle_H)
-    ctle_s   = cumsum(ctle_h)  # Use step response to scale impulse response,
-    ctle_h  *= 1 / ctle_s[-1]  # since we know our desired d.c. gain.
-    sbr_eq   = convolve(convolve(sbr[0], tx_ffe_h), ctle_h)[:len(sbr[0])]
-    cur_ix, ui_height = pulse_center(sbr_eq, osf)
     # Calculate Xtalk variance.
     varXtalk = sum([sum(agg[cur_ix::osf]**2) for agg in sbr[1:]])
     if mod:
@@ -1562,18 +1556,15 @@ def com_opt(sbr, ui, osf, z, p1, p2, nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max
         tx_ffe_H *= sum(tx_taps) / abs(tx_ffe_H[0])
         ctle_H    = ctle_gen(ctle_gain, w) * Hrx
         ctle_h    = irfft(ctle_H)
+        # ctle_h    = roll(ctle_h, 5*osf)     # Tends to come out non-causal.
         ctle_s    = cumsum(ctle_h)          # Use step response to scale impulse response,
         ctle_h   *= ctle_gain / ctle_s[-1]  # since we know our desired d.c. gain.
         sbr_eq    = convolve(convolve(sbr[0], tx_ffe_h), ctle_h)[:len(sbr[0])]
         cur_ix, ui_height = pulse_center(sbr_eq, osf)
-        sbr_tail  = sbr_eq[cur_ix+osf::osf]
         Asig      = sbr_eq[cur_ix]
-        try:
-            dISI     = sbr_tail - pad(dfe_taps*Asig, (0, len(sbr_tail) - len(dfe_taps)),
-                                        mode='constant', constant_values=0)
-        except:
-            print(cur_ix, ui_height)
-            dISI = sbr_tail
+        sbr_tail  = sbr_eq[cur_ix+osf::osf]
+        dISI      = sbr_tail - pad(dfe_taps*Asig, (0, len(sbr_tail) - len(dfe_taps)),
+                                     mode='constant', constant_values=0)
         if mod:
             Asig *= 1/3
         varTx    = (Asig / pow(10, TxSNR/20))**2
@@ -1600,18 +1591,20 @@ def com_opt(sbr, ui, osf, z, p1, p2, nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max
         opt_rslts['ctle_h']   = ctle_h
         opt_rslts['ctle_H']   = ctle_H
 
-        # Returned result is inverted, because `scipy.optimize` only offers a `minimize()` function.
-        return (varTx + varISI + varJ + varXtalk + varSpec) / Asig**2
+        # Returned result is negated, because `scipy.optimize` only offers a `minimize()` function.
+        return -Asig**2 / (varTx + varISI + varJ + varXtalk + varSpec)
 
     bounds = list(zip(tx_min, tx_max)) + [(0, 1)] + list(zip(dfe_min, dfe_max))
     cons   = {"type": "ineq", "fun": lambda x: 1 - sum(abs(x[:nTx]))}
-    res = minimize(fom, append(append(append(array([0, 1,]), zeros(nTx - 2)), 1), zeros(nDFE)),
+    res = minimize(fom, append(append(append(zeros(nTx - 2), array([1, 0])), 1), zeros(nDFE)),
         bounds=bounds,
         constraints=cons,
-        options={"disp": False, "maxiter": max_iter},
+        method="trust-constr",
+        options={"disp": True, "maxiter": max_iter},
     )
     if not res.success:
-        raise RuntimeError(res.message)
+        # raise RuntimeError(res.message)
+        print(f"Optimizer failed with: {res.message}")
     tx_taps   = res.x[:nTx]
     ctle_gain = res.x[nTx]
     dfe_taps  = res.x[nTx+1:]

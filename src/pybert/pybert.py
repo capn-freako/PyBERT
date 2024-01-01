@@ -523,7 +523,7 @@ class PyBERT(HasTraits):
         self.calc_chnl_h()
         sbr = [self.chnl_p,]
         (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, dfe_taps, opt_rslts) = calc_com(
-            self.ui, sbr, self.nspb, self.com_ser, self.com_z*1e9, self.com_p1*1e9, self.com_p2*1e9,
+            self.ui, sbr, self.nspb, self.com_ser, -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
             self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
             self.com_nDFE, self.com_dfe_min.flatten(), self.com_dfe_max.flatten(),
             self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj)
