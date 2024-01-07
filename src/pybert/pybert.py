@@ -269,21 +269,37 @@ class PyBERT(HasTraits):
     standard = Map(
         {
             "IEEE-802.3ck": {
+                # General
                 "ser": 1e-4,
+                "R_LM": 0.95,
+                # Noise
                 "Add": 0.02,  # (UI)
                 "TxSNR": 33,  # (dB)
                 "eta0": 8.20E-09,  # (V^2/GHz)
                 "sigma_Rj": 0.01,  # (UI)
-                "R_LM": 0.95,
-                "z": 21.25,  # (GHz)
-                "p1": 21.25,  # (GHz)
+                # CTLE
+                "z":  21.250,  # (GHz)
+                "p1": 21.250,  # (GHz)
                 "p2": 53.125,  # (GHz)
+                "fHP": 0.6640625,  # (GHz)
+                "gDC_min": -20, # (dB)
+                "gDC_max":   0, # (dB)
+                "gHP_min":  -6, # (dB)
+                "gHP_max":   0, # (dB)
+                # Tx FFE
                 "nTx": 5,
                 "tx_min": [-0.06, 0, -0.34, 0.54, -0.2],
                 "tx_max": [0, 0.12, 0, 1, 0],
+                # Rx DFE
                 "nDFE": 12,
                 "dfe_min": [0.3, 0.05] + [-0.03]*10,
                 "dfe_max": [0.85, 0.3] + [0.2]*10,
+                # Die & Package
+                "Rd": 55,     # (Ohms)
+                "Cd": 0.120,  # (pF)
+                "Cb": 0.030,  # (pF)
+                "Cp": 0.087,  # (pF)
+                "Ls": 0.120,  # (nH)
             },
         },
         default_value="IEEE-802.3ck",
@@ -294,6 +310,7 @@ class PyBERT(HasTraits):
     plotdata.set_data("com_pmf",  zeros(1001))
     plotdata.set_data("com_cmf",  zeros(1001))
     com_ser     = Float(1e-4)
+    com_rlm     = Float(0.95)
     com_Add     = Float(0.02)      # (UI)
     com_TxSNR   = Float(33)        # (dB)
     com_eta0    = Float(8.2e-9)    # (V^2/GHz)
@@ -301,6 +318,11 @@ class PyBERT(HasTraits):
     com_z       = Float(-21.25)    # (GHz)
     com_p1      = Float(-21.25)
     com_p2      = Float(-53.125)
+    com_fHP     = Float(0.6640625) # (GHz)
+    com_gDC_min = Float(-20)
+    com_gDC_max = Float(0)
+    com_gHP_min = Float(-6)
+    com_gHP_max = Float(0)
     nTx         = 5
     com_nTx     = Int(nTx)
     com_tx_min  = Array(shape=(1, nTx), dtype=float, value=[[-0.06, 0, -0.34, 0.54, -0.2],])
@@ -311,6 +333,7 @@ class PyBERT(HasTraits):
     com_dfe_max = Array(shape=(1, nDFE), dtype=float, value=[[0.85, 0.3] + [0.2]*10,])
     com_tx_taps   = Array(shape=(1, nTx), dtype=float, value=[[0]*(nTx-2) + [1, 0],])
     com_ctle_gain = Float(1)
+    com_hp_gain   = Float(1)
     com_dfe_taps  = Array(shape=(1, nDFE), dtype=float, value=[zeros(nDFE),])
 
     # Dependent variables
@@ -522,8 +545,10 @@ class PyBERT(HasTraits):
     def _btn_com_fired(self):
         self.calc_chnl_h()
         sbr = [self.chnl_p,]
-        (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, dfe_taps, opt_rslts) = calc_com(
-            self.ui, sbr, self.nspb, self.com_ser, -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
+        (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts) = calc_com(
+            self.ui, sbr, self.nspb, self.com_ser, self.com_rlm, 
+            -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
+            self.com_gDC_min, self.com_gDC_max, self.com_fHP*1e9, self.com_gHP_min, self.com_gHP_max,
             self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
             self.com_nDFE, self.com_dfe_min.flatten(), self.com_dfe_max.flatten(),
             self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj)
@@ -533,6 +558,7 @@ class PyBERT(HasTraits):
         self.com_loc = loc
         self.com_tx_taps   = tx_taps.reshape((1, self.com_nTx))
         self.com_ctle_gain = ctle_gain
+        self.com_hp_gain   = hp_gain
         self.com_dfe_taps  = dfe_taps.reshape((1, self.com_nDFE))
         self.plotdata.set_data("com_pmf",      pmf/max(pmf))  # for better plot visibility
         self.plotdata.set_data("com_cmf",      cmf)
