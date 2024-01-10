@@ -24,7 +24,9 @@ from time import sleep
 import numpy as np
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
-from numpy import array, convolve, cos, exp, linspace, log10, ones, pad, pi, sinc, where, zeros
+from numpy import (
+    append, array, convolve, cos, exp, linspace, logspace,
+    log10, ones, pad, pi, sinc, where, zeros)
 from numpy.fft import fft, irfft
 from numpy.random import randint
 from traits.api import (
@@ -300,26 +302,60 @@ class PyBERT(HasTraits):
                 "Cb": 0.030,  # (pF)
                 "Cp": 0.087,  # (pF)
                 "Ls": 0.120,  # (nH)
+                "Zc": 78,     # (Ohms)
+                "td": 60,     # (ps)
+            },
+            "IEEE-802.3ck_NoTxFFE": {
+                # General
+                "ser": 1e-4,
+                "R_LM": 0.95,
+                # Noise
+                "Add": 0.02,  # (UI)
+                "TxSNR": 33,  # (dB)
+                "eta0": 8.20E-09,  # (V^2/GHz)
+                "sigma_Rj": 0.01,  # (UI)
+                # CTLE
+                "z":  21.250,  # (GHz)
+                "p1": 21.250,  # (GHz)
+                "p2": 53.125,  # (GHz)
+                "fHP": 0.6640625,  # (GHz)
+                "gDC_min": -20, # (dB)
+                "gDC_max":   0, # (dB)
+                "gHP_min":  -6, # (dB)
+                "gHP_max":   0, # (dB)
+                # Tx FFE
+                "nTx": 5,
+                "tx_min": [0,0,0,1,0],
+                "tx_max": [0,0,0,1,0],
+                # Rx DFE
+                "nDFE": 12,
+                "dfe_min": [0.3, 0.05] + [-0.03]*10,
+                "dfe_max": [0.85, 0.3] + [0.2]*10,
+                # Die & Package
+                "Rd": 55,     # (Ohms)
+                "Cd": 0.120,  # (pF)
+                "Cb": 0.030,  # (pF)
+                "Cp": 0.087,  # (pF)
+                "Ls": 0.120,  # (nH)
+                "Zc": 78,     # (Ohms)
+                "td": 60,     # (ps)
             },
         },
         default_value="IEEE-802.3ck",
     )
     com     = Float(0)
     com_loc = Int(0)
-    plotdata.set_data("com_bins", linspace(-0.5, 0.5, 1001))
-    plotdata.set_data("com_pmf",  zeros(1001))
-    plotdata.set_data("com_cmf",  zeros(1001))
     com_ser     = Float(1e-4)
     com_rlm     = Float(0.95)
     com_Add     = Float(0.02)      # (UI)
     com_TxSNR   = Float(33)        # (dB)
     com_eta0    = Float(8.2e-9)    # (V^2/GHz)
     com_sigRj   = Float(0.01)
-    com_z       = Float(-21.25)    # (GHz)
-    com_p1      = Float(-21.25)
-    com_p2      = Float(-53.125)
+    com_z       = Float(21.25)    # (GHz)
+    com_p1      = Float(21.25)
+    com_p2      = Float(53.125)
     com_fHP     = Float(0.6640625) # (GHz)
-    com_gDC_min = Float(-20)
+    com_gDC_min = Float(-20)       # (dB)
     com_gDC_max = Float(0)
     com_gHP_min = Float(-6)
     com_gHP_max = Float(0)
@@ -335,6 +371,27 @@ class PyBERT(HasTraits):
     com_ctle_gain = Float(1)
     com_hp_gain   = Float(1)
     com_dfe_taps  = Array(shape=(1, nDFE), dtype=float, value=[zeros(nDFE),])
+    com_Rd        = Float(55)     # (Ohms)
+    com_Cd        = Float(0.120)  # (pF)
+    com_Cb        = Float(0.030)  # (pF)
+    com_Cp        = Float(0.087)  # (pF)
+    com_Ls        = Float(0.120)  # (nH)
+    com_Zc        = Float(78)     # (Ohms)
+    com_td        = Float(60)     # (ps)
+    # Dummy plot initialization is unfortunate, but necessary.
+    plotdata.set_data("com_bins",     linspace(-0.5, 0.5, 1001))
+    plotdata.set_data("com_pmf",      zeros(1001))
+    plotdata.set_data("com_cmf",      zeros(1001))
+    plotdata.set_data("com_tns",      linspace(0., 10., 100))
+    plotdata.set_data("com_sbr",      zeros(100))
+    plotdata.set_data("com_tx_ffe_h", zeros(100))
+    plotdata.set_data("com_ctle_h",   zeros(100))
+    plotdata.set_data("com_fGHz",     linspace(0, 100, 100))
+    plotdata.set_data("com_Hrx",      zeros(100))
+    plotdata.set_data("com_Hpkg",     zeros(100))
+    plotdata.set_data("com_Hffe",     zeros(100))
+    plotdata.set_data("com_Hctle",    zeros(100))
+    plotdata.set_data("com_Htot",     zeros(100))
 
     # Dependent variables
     # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
@@ -440,7 +497,6 @@ class PyBERT(HasTraits):
             self.simulate(initial_run=True)
         else:
             self.calc_chnl_h()  # Prevents missing attribute error in _get_ctle_out_h_tune().
-        self._standard_changed("IEEE-802.3ck")  # Populates needed COM fields.
 
     # Custom button handlers
     def _btn_rst_eq_fired(self):
@@ -543,15 +599,19 @@ class PyBERT(HasTraits):
         self._rx_ibis.model()
 
     def _btn_com_fired(self):
-        self.calc_chnl_h()
-        sbr = [self.chnl_p,]
+        # self.calc_chnl_h()  # Doesn't do what we intend, due to multi-threading. User must run the sim. first.
+        sbr = [self.chnl_p,]  # ToDo: Add xtalk.
+        nspb = self.nspb
         (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts) = calc_com(
-            self.ui, sbr, self.nspb, self.com_ser, self.com_rlm, 
+            self.ui, sbr, nspb, self.com_ser, self.com_rlm, 
             -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
             self.com_gDC_min, self.com_gDC_max, self.com_fHP*1e9, self.com_gHP_min, self.com_gHP_max,
             self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
             self.com_nDFE, self.com_dfe_min.flatten(), self.com_dfe_max.flatten(),
-            self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj)
+            self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj,
+            self.com_Rd, self.com_Cd, self.com_Cb, self.com_Cp, self.com_Ls,
+            self.com_Zc, self.com_td,
+            self.mod_type)
         self.com = 20 * log10(Asig/Anoise_xtalk)
         self.com_pmf = pmf
         self.com_cmf = cmf
@@ -560,11 +620,18 @@ class PyBERT(HasTraits):
         self.com_ctle_gain = ctle_gain
         self.com_hp_gain   = hp_gain
         self.com_dfe_taps  = dfe_taps.reshape((1, self.com_nDFE))
+        self.plotdata.set_data("com_tns",      self.t_ns_chnl)
         self.plotdata.set_data("com_pmf",      pmf/max(pmf))  # for better plot visibility
         self.plotdata.set_data("com_cmf",      cmf)
         self.plotdata.set_data("com_sbr",      sbr_opt)
-        self.plotdata.set_data("com_tx_ffe_h", opt_rslts['tx_ffe_h'] * self.nspb)
-        self.plotdata.set_data("com_ctle_h",   opt_rslts['ctle_h']   * self.nspb)
+        self.plotdata.set_data("com_tx_ffe_h", opt_rslts['tx_ffe_h'])
+        self.plotdata.set_data("com_ctle_h",   opt_rslts['ctle_h'])
+        self.plotdata.set_data("com_fGHz",  opt_rslts['f'] / 1e9)
+        self.plotdata.set_data("com_Hrx",   20.0 * safe_log10(abs(opt_rslts['Hrx'])))
+        self.plotdata.set_data("com_Hpkg",  20.0 * safe_log10(abs(opt_rslts['Hpkg'])))
+        self.plotdata.set_data("com_Hffe",  20.0 * safe_log10(abs(opt_rslts['tx_ffe_H'])))
+        self.plotdata.set_data("com_Hctle", 20.0 * safe_log10(abs(opt_rslts['ctle_H'])))
+        self.plotdata.set_data("com_Htot",  20.0 * safe_log10(abs(opt_rslts['Htot'])))
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
@@ -1360,6 +1427,19 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.com_tx_taps   = [[0]*(nTx-2) + [1, 0],]
         self.com_ctle_gain = 1
         self.com_dfe_taps  = [zeros(nDFE),]
+        self.com_rlm       = param_vals["R_LM"]
+        self.com_fHP       = param_vals["fHP"]
+        self.com_gDC_min   = param_vals["gDC_min"]
+        self.com_gDC_max   = param_vals["gDC_max"]
+        self.com_gHP_min   = param_vals["gHP_min"]
+        self.com_gHP_max   = param_vals["gHP_max"]
+        self.com_Rd        = param_vals["Rd"]
+        self.com_Cd        = param_vals["Cd"]
+        self.com_Cb        = param_vals["Cb"]
+        self.com_Cp        = param_vals["Cp"]
+        self.com_Ls        = param_vals["Ls"]
+        self.com_Zc        = param_vals["Zc"]
+        self.com_td        = param_vals["td"]
 
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and

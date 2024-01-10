@@ -816,32 +816,33 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
 
 
 def make_ctle_gen(z, p1, p2, fHP):
-    """Make a CTLE generator, from two poles and one zero.
+    """Make a CTLE generator, from two poles, one zero, and a low-frequency pole/zero pair.
 
     Args:
-        z(complex): Zero of the frequency response.
-        p1(complex): First pole of the frequency response.
-        p2(complex): Second pole of the frequency response.
-        fHP(real): Frequency of 2nd stage pole/zero.
+        z(complex): Zero of the frequency response (Hz).
+        p1(complex): First pole of the frequency response (Hz).
+        p2(complex): Second pole of the frequency response (Hz).
+        fHP(real): Frequency of 2nd stage pole/zero  (Hz).
 
     Returns:
         function: The returned function takes the d.c. gains and angular frequencies of interest
             as arguments, and returns the frequency response.
     """
-    A = -p1*p2/z
+    A = -2*pi*p1*p2/z
 
     def ctle_gen(gdc, ghp, w):
         """CTLE generator, made at runtime.
 
         Args:
             gdc(real): D.c. response.
+            ghp(real): D.c. response (low-f).
             w([real]): Angular frequencies of interest (rad./s).
 
         Returns:
             [complex]: CTLE frequency response at `w`.
         """
         s = 1j*w
-        return A*(s - gdc*z)*(s - ghp*fHP) / ((s-p1)*(s-p2)*(s-fHP))
+        return A*(s - gdc*2*pi*z)*(s - ghp*2*pi*fHP) / ((s-2*pi*p1)*(s-2*pi*p2)*(s-2*pi*fHP))
 
     return ctle_gen
 
@@ -1395,9 +1396,26 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):
     bathtub  = where(bathtub < min_val, min_val * ones(len(bathtub)), bathtub)
     return (bathtub, (ext_first,ext_last))
 
-def calc_com(ui, sbr, osf, ser, rlm, z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, gHP_max,
-    nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max, Add, TxSNR, eta0, sigRj, mod=0):
-    """Calculate the Channel Operating Margin (COM) for pre-optimized single bit response (SBR).
+def parZ(Z1, Z2):
+    """Calculate the parallel combination of two impedances.
+    """
+    return (Z1 * Z2) / (Z1 + Z2)
+
+def Zcap(w, C):
+    """Calculate the impedance of a capacitor, guarding against /0.
+    """
+    if w[0] == 0:
+        return append(array([1e15]), -1j / (w[1:] * C))
+    else:
+        return -1j / (w * C)
+
+def calc_com(ui, sbr, osf, ser, rlm,
+    z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, gHP_max,
+    nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
+    Add, TxSNR, eta0, sigRj,
+    Rd, Cd, Cb, Cp, Ls, Zc, td,
+    mod=0):
+    """Calculate the Channel Operating Margin (COM), given single bit response (SBR).
 
     Args:
         ui(real): unit interval (s).
@@ -1425,13 +1443,20 @@ def calc_com(ui, sbr, osf, ser, rlm, z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, 
         TxSNR(real): Tx signal-to-noise ratio (dB).
         eta0(real): One sided noise spectral density (V^2/Hz).
         sigRj(real): Random jitter standard deviation (UI) (from dual-Dirac).
+        Rd(real): Die source/term. resistance (Ohms).
+        Cd(real): Die parasitic capacitance (pF).
+        Cb(real): Bump parasitic capacitance (pF).
+        Cp(real): Ball parasitic capacitance (pF).
+        Ls(real): Series (between Cd and Cb) inductance (nH).
+        Zc(real): Characteristic impedance of package TL (Ohms).
+        td(real): One way propagation delay of package TL (ps).
 
     KeywordArgs:
         mod(int): Modulation type (0=NRZ, 1=PAM4).
             Default: 0 (NRZ)
 
     Returns:
-        (real, real, [real], [real], int, [real], [real], real, [real]): A tuple consisting of:
+        (real, real, [real], [real], int, [real], [real], real, [real], {}): A tuple consisting of:
             - Asig: Main cursor signal amplitude.
             - Anoise_xtalk: Eye closure, due to noise & crosstalk.
             - pmf: Probability mass function of noise & crosstalk.
@@ -1441,6 +1466,7 @@ def calc_com(ui, sbr, osf, ser, rlm, z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, 
             - tx_taps: Optimized Tx FFE tap weights.
             - ctle_G: Optimized d.c. gain of CTLE respone.
             - dfe_taps: Optimized Rx DFE tap weights.
+            - opt_rslts: Dictionary containing various post-optimization results.
     """
     # Perform any unit conversion required both here and in `com_opt()`.
     Add  *= ui
@@ -1452,8 +1478,28 @@ def calc_com(ui, sbr, osf, ser, rlm, z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, 
         levels = [-1, 1]
     # Construct CTLE generator.
     ctle_gen = make_ctle_gen(z, p1, p2, fHP)
+    # Construct apropos time/frequency vectors.
+    ts = ui / osf            # sampling interval
+    n_samps = len(sbr[0])    # number of samples in victim SBR
+    f0 = 1 / (ts * n_samps)  # fundamental frequency
+    # "+1" because `irfft()` expects the Nyquist component tacked onto the end of its input vector.
+    f  = array([n*f0 for n in range(n_samps//2 + 1)])
+    w  = 2*pi*f
+    s  = 1j*w
+    # Construct Rx input filter.
+    r   = s / (2*pi * 0.75/ui)                            # As per COM, f_cutoff = 0.75 f_symb.
+    Hrx = 105 / (r**4 + 10*r**3 + 45*r**2 + 105*r + 105)  # 4th-order Bessel-Thomson LP
+    # Calculate package response.
+    Zchnl = 100  # Do we have this after a PyBERT run?
+    # Parallel combination of ball parasitic capacitance and channel input impedance.
+    Zload = parZ(Zcap(w, Cp*1e-12/2), Zchnl)    
+    Rout  = (Zload - Zc)/(Zload + Zc)           # Reflection coefficient exiting the TL.
+    Rout_dly = Rout*exp(-2j*w*td*1e-12)         # Above plus one round-trip phase delay.
+    Zin   = Zc * (1 + Rout_dly)/(1 - Rout_dly)  # Impedance looking into the TL.
+    Ztot  = 2*Rd + parZ(Zcap(w, Cd*1e-12/2), 1j*w*2*Ls*1e-9 + parZ(Zcap(w, Cb*1e-12/2), Zin))
+    Hpkg  = Zload / Ztot
     # Find optimal equalization scheme.
-    tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts = com_opt(sbr, ui, osf, rlm,
+    tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts = com_opt(w, sbr, ui, osf, rlm, Hrx * Hpkg**2,
         ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
         nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
         Add, TxSNR, varRj, eta0, mod=mod, max_iter=5000)
@@ -1466,6 +1512,10 @@ def calc_com(ui, sbr, osf, ser, rlm, z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, 
     varJ      = opt_rslts['varJ']
     varSpec   = opt_rslts['varSpec']
     dISI_n    = opt_rslts['dISI']
+    # Stash some intermediate results that get plotted.
+    opt_rslts['Hrx']  = Hrx
+    opt_rslts['Hpkg'] = Hpkg
+    opt_rslts['f']    = f
     # Make final calculations of distributions and noises.
     dj_noises = Add * mu_n
     if len(sbr) > 1:
@@ -1500,18 +1550,20 @@ def calc_com(ui, sbr, osf, ser, rlm, z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, 
 
     return (Asig, Anoise_xtalk, pmf, cmf, ix, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts)
 
-def com_opt(sbr, ui, osf, rlm, ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
+def com_opt(w, sbr, ui, osf, rlm, Hdev, ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
     nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
     Add, TxSNR, varRj, eta0, mod=0, max_iter=50):
     """Optimize EQ for COM calculation.
     
     Args:
+        w([real]): Angular frequencies of interest.
         sbr([[real]]): Single bit response, uniformly spaced samples, dimmensions KxN, where:
             K is 1 + the number of aggressors (victim occupies first row), and
             N is the length of the response to be considered here.
         ui(real): unit interval (s).
         osf(int): Oversampling factor (i.e. - samples per UI).
         rlm(real): Relative level mismatch (for PAM4).
+        Hdev([complex]): Combined frequency response of Rx input and two packages.
         ctle_gen(function): CTLE generator (See `make_ctle_gen()`.).
         gDC_min(real): Minimum d.c. gain of CTLE peaking filter.
         gDC_max(real): Maximum d.c. gain of CTLE peaking filter.
@@ -1541,36 +1593,31 @@ def com_opt(sbr, ui, osf, rlm, ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
             - optimum DFE tap weights, and
             - a dictionary of certain internal optimization results.
     """
-    # Construct apropos time/frequency vectors.
-    ts = ui / osf                # sampling interval
-    n_samps = len(sbr[0])        # number of samples in victim SBR
-    f0 = 1 / (ts * len(sbr[0]))  # fundamental frequency
-    # "+1" because `irfft()` expects the Nyquist component tacked onto the end of its input vector.
-    f  = array([n*f0 for n in range(n_samps//2 + 1)])
-    w  = 2*pi*f
-    s  = 1j*w
-    # Construct Rx input filter.
-    r   = s / (2*pi * 0.75/ui)                            # As per COM, f_cutoff = 0.75 f_symb.
-    Hrx = 105 / (r**4 + 10*r**3 + 45*r**2 + 105*r + 105)  # 4th-order Bessel-Thomson LP
-
+    n_samps = len(sbr[0])
     opt_rslts = {}
     def fom(args):
-        """Objective function to be optimized.
+        """Objective function to be optimized. (See COM spec.)
         """
         tx_taps   = args[:nTx]
         ctle_gain = args[nTx]
         hp_gain   = args[nTx+1]
         dfe_taps  = args[nTx+2:]
-        tx_ffe_h  = tx_taps.repeat(osf) / osf
+        tx_ffe_h  = np.zeros(osf*nTx, dtype=tx_taps.dtype)
+        tx_ffe_h[::osf] = tx_taps
         tx_ffe_H  = rfft(tx_ffe_h, n=n_samps)
         tx_ffe_H *= sum(tx_taps) / abs(tx_ffe_H[0])
-        ctle_H    = ctle_gen(ctle_gain, hp_gain, w) * Hrx
+        ctle_H    = ctle_gen(ctle_gain, hp_gain, w)
         ctle_h    = irfft(ctle_H)
-        ctle_s    = cumsum(ctle_h)          # Use step response to scale impulse response,
-        ctle_h   *= ctle_gain / ctle_s[-1]  # since we know our desired d.c. gain.
-        sbr_eq    = convolve(convolve(sbr[0], tx_ffe_h), ctle_h)[:len(sbr[0])]
+        ctle_h    = roll(ctle_h, (nTx-2)*osf)       # Line up w/ Tx FFE main tap.
+        ctle_s    = cumsum(ctle_h)                  # Use step response to scale impulse response,
+        ctle_h   *= abs(ctle_H[0]) / ctle_s[-1]     # since we know our desired d.c. gain.
+        Heq       = Hdev * tx_ffe_H * ctle_H        # Complete freq. resp. of Tx/Rx pair.
+        heq       = irfft(Heq)
+        seq       = cumsum(heq)                     # Use step response to scale impulse response,
+        heq      *= abs(Heq[0]) / seq[-1]           # since we know our desired d.c. gain.
+        sbr_eq    = convolve(sbr[0], heq)[:n_samps]
         cur_ix, ui_height = pulse_center(sbr_eq, osf)
-        Asig      = sbr_eq[cur_ix]
+        Asig      = sbr_eq[cur_ix]  # ToDo: Do we need to scale this?
         sbr_tail  = sbr_eq[cur_ix+osf::osf]
         dISI      = sbr_tail - pad(dfe_taps*Asig, (0, len(sbr_tail) - len(dfe_taps)),
                                      mode='constant', constant_values=0)
@@ -1602,6 +1649,7 @@ def com_opt(sbr, ui, osf, rlm, ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
         opt_rslts['tx_ffe_H'] = tx_ffe_H
         opt_rslts['ctle_h']   = ctle_h
         opt_rslts['ctle_H']   = ctle_H
+        opt_rslts['Htot']     = Heq
 
         # Returned result is negated, because `scipy.optimize` only offers a `minimize()` function.
         return -Asig**2 / (varTx + varISI + varJ + varXtalk + varSpec)
