@@ -797,9 +797,6 @@ def update_results(self):
     self.plotdata.set_data("f_GHz",        f_GHz[1:])
     self.plotdata.set_data("t_ns",         t_ns)
     self.plotdata.set_data("t_ns_chnl",    t_ns_chnl)
-    self.plotdata.set_data("com_sbr",      zeros(len(t_ns_chnl)))
-    self.plotdata.set_data("com_tx_ffe_h", zeros(len(t_ns_chnl)))
-    self.plotdata.set_data("com_ctle_h",   zeros(len(t_ns_chnl)))
 
     # DFE.
     tap_weights = transpose(array(self.adaptation))

@@ -704,8 +704,10 @@ traits_view = View(
                 VGroup(  # COM result
                     Item("com",           label="COM (dB)",           format_str="%4.1f"),
                     Item("com_tx_taps",   label="Tx Taps",            format_str="%5.3f"),
-                    Item("com_ctle_gain", label="CTLE Gain 1st (dB)", format_func=(lambda x: f"{-20*log10(x):6.3f}")),
-                    Item("com_hp_gain",   label="CTLE Gain 2nd (dB)", format_func=(lambda x: f"{-20*log10(x):6.3f}")),
+                    HGroup(
+                        Item("com_ctle_gain", label="CTLE Gain 1st (dB)", format_func=(lambda x: f"{-20*log10(x):6.3f}")),
+                        Item("com_hp_gain",   label="CTLE Gain 2nd (dB)", format_func=(lambda x: f"{-20*log10(x):6.3f}")),
+                    ),
                     Item("com_dfe_taps",  label="DFE Taps",           format_str="%5.3f",
                         editor=ArrayViewEditor(transpose=True, show_index=False),),
                     label="Results",

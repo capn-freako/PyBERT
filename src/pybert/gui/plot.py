@@ -90,16 +90,36 @@ def make_plots(self, n_dfe_taps):
     self.plot_h_tune = container_h_tune
 
     # - COM tab
-    plot_com = Plot(plotdata, padding_bottom=75)
-    plot_com.plot(("t_ns_chnl", "com_sbr"),    type="line", color="blue", name="Opt. EQ")
-    plot_com.plot(("t_ns_chnl", "chnl_p"),     type="line", color="gray", name="No EQ")
-    plot_com.plot(("t_ns_chnl", "com_tx_ffe_h"), type="line", line_style="dash", color="cyan",    name="Tx FFE h(t)")
-    plot_com.plot(("t_ns_chnl", "com_ctle_h"),   type="line", line_style="dash", color="magenta", name="CTLE h(t)")
-    plot_com.title = "COM Single Bit Responses (SBR)"
-    plot_com.index_axis.title = "Time (ns)"
-    plot_com.y_axis.title = "SBR"
-    plot_com.legend.visible = True
-    plot_com.legend.align = "ur"
+    plot_com_sbr = Plot(plotdata, padding_bottom=75)
+    plot_com_sbr.plot(("com_tns", "com_sbr"),      type="line", color="blue", name="Opt. EQ")
+    plot_com_sbr.plot(("com_tns", "chnl_p"),       type="line", color="gray", name="No EQ")
+    plot_com_sbr.plot(("com_tns", "com_tx_ffe_h"), type="line", line_style="dash", color="cyan",    name="Tx FFE h(t)")
+    plot_com_sbr.plot(("com_tns", "com_ctle_h"),   type="line", line_style="dash", color="magenta", name="CTLE h(t)")
+    plot_com_sbr.title = "COM Single Bit Responses (SBR)"
+    plot_com_sbr.index_axis.title = "Time (ns)"
+    plot_com_sbr.y_axis.title = "SBR"
+    plot_com_sbr.legend.visible = True
+    plot_com_sbr.legend.align = "ur"
+    plot_com_sbr.legend.labels = ["No EQ", "Opt. EQ", "Tx FFE h(t)", "CTLE h(t)"]
+    zoom_com_sbr = ZoomTool(plot_com_sbr, tool_mode="box")
+    plot_com_sbr.overlays.append(zoom_com_sbr)
+
+    plot_com_H = Plot(plotdata, padding_bottom=75)
+    plot_com_H.plot(("com_fGHz", "com_Hrx"),   type="line", color="violet", name="Rx AFE",)
+    plot_com_H.plot(("com_fGHz", "com_Hpkg"),  type="line", color="blue",   name="Package",)
+    plot_com_H.plot(("com_fGHz", "com_Hffe"),  type="line", color="green",  name="Tx FFE",)
+    plot_com_H.plot(("com_fGHz", "com_Hctle"), type="line", color="orange", name="Rx CTLE",)
+    plot_com_H.plot(("com_fGHz", "com_Htot"),  type="line", color="red",    name="TOTAL",)
+    plot_com_H.title = "COM Frequency Responses"
+    plot_com_H.index_axis.title = "Frequency (GHz)"
+    plot_com_H.y_axis.title = "|H(f)| (dB)"
+    plot_com_H.range2d.x_range.low  = 0
+    plot_com_H.range2d.x_range.high = 100
+    plot_com_H.range2d.y_range.low  = -40
+    plot_com_H.range2d.y_range.high = 0
+    plot_com_H.legend.visible = True
+    plot_com_H.legend.align = "ll"
+    plot_com_H.legend.labels = ["Rx AFE", "Package", "Tx FFE", "Rx CTLE", "TOTAL"]
 
     plot_com_pmf = Plot(plotdata, padding_bottom=75)
     plot_com_pmf.plot(("com_bins", "com_pmf"),  type="line", color="blue", name="PMF")
@@ -109,12 +129,20 @@ def make_plots(self, n_dfe_taps):
     plot_com_pmf.y_axis.title = "CMF"
     plot_com_pmf.legend.visible = True
     plot_com_pmf.legend.align = "ul"
-    zoom_com = ZoomTool(plot_com_pmf, tool_mode="range", axis="index", always_on=False)
-    plot_com_pmf.overlays.append(zoom_com)
+    plot_com_pmf.legend.labels = ["PMF", "CMF"]
+    zoom_com_pmf = ZoomTool(plot_com_pmf, tool_mode="range", axis="index", always_on=False)
+    plot_com_pmf.overlays.append(zoom_com_pmf)
 
-    container_com = VPlotContainer(stack_order="top_to_bottom")
-    container_com.add(plot_com)
+    plot_com_bathtub = Plot(plotdata, padding_bottom=75)
+    plot_com_bathtub.title = "COM Bathtubs"
+    plot_com_bathtub.index_axis.title = "Sampling Time (ps)"
+    plot_com_bathtub.y_axis.title = "P[error]"
+
+    container_com = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
+    container_com.add(plot_com_sbr)
+    container_com.add(plot_com_H)
     container_com.add(plot_com_pmf)
+    container_com.add(plot_com_bathtub)
     self.plots_com = container_com
 
     # - Impulse Responses tab
