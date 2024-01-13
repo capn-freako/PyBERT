@@ -1109,7 +1109,7 @@ def import_freq(filename):
     ntwk = rf.Network(filename, f_unit="Hz")
     (fs, rs, cs) = ntwk.s.shape
     assert rs == cs, "Non-square Touchstone file S-matrix!"
-    assert rs in (1, 2, 4), "Touchstone file must have 1, 2, or 4 ports!"
+    assert rs in (1, 2, 4), f"Touchstone file must have 1, 2, or 4 ports!\n{ntwk}"
 
     # Convert to a 2-port network.
     if rs == 4:  # 4-port Touchstone files are assumed single-ended!

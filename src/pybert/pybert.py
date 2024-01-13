@@ -14,9 +14,10 @@ can be used to explore the concepts of serial communication link design.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 import platform
+import re
 import time
 from datetime import datetime
-from os.path import dirname, join
+from os.path import dirname, join, splitext
 from pathlib import Path
 from threading import Event, Thread
 from time import sleep
@@ -120,9 +121,14 @@ class PyBERT(HasTraits):
 
     # - Channel Control
     ch_file = File(
-        "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
+        "", entries=5, filter=[ "*.s4p", "*.S4P", "*.s32p", "*.S32P"  # Touchstone
+                              , "*.csv", "*.CSV", "*.txt", "*.TXT"    # impulse response
+                              , "*.*"                                 # ?
+                              ]
     )  #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
+    do_xtalk    = Bool(False)  #: Include crosstalk, for s32p file?     (Default = False)
+    ch_is_s32p  = Bool(False)  #: Is channel Touchstone file 32-port?   (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(0.1876)  #: Channel d.c. resistance (Ohms/m).
@@ -1441,6 +1447,14 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.com_Zc        = param_vals["Zc"]
         self.com_td        = param_vals["td"]
 
+    def _ch_file_changed(self, new_value):
+        extension = splitext(new_value)[1][1:]
+        res = re.match(r"^s(\d+)p$", extension, re.ASCII | re.IGNORECASE)
+        self.ch_is_s32p = False
+        if res:
+            if int(res.group(1)) == 32:
+                self.ch_is_s32p = True
+
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
@@ -1478,7 +1492,13 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
         if self.use_ch_file:
-            ch_s2p_pre = import_channel(self.ch_file, ts, f)
+            if self.ch_is_s32p:
+                ntwk32 = rf.Network(self.ch_file)
+                # ch_s2p_pre = interp_s2p(sdd_21(rf.subnetwork(ntwk32, [0,1,2,3])), f)
+                ch_s2p_pre = interp_s2p(sdd_21(rf.subnetwork(ntwk32, [0,16,1,17])), f)
+                # if self.do_xtalk:
+            else:
+                ch_s2p_pre = import_channel(self.ch_file, ts, f)
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.

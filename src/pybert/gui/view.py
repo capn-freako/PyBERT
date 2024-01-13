@@ -168,18 +168,22 @@ traits_view = View(
                 VGroup(  # Interconnect
                     VGroup(  # From File
                         VGroup(
-                            HGroup(
+                            # HGroup(
                                 Item(
                                     name="ch_file",
                                     label="File",
-                                    # springy=True,
                                     editor=FileEditor(dialog_style="open"),
                                 ),
-                            ),
+                            # ),
                             HGroup(
                                 Item(
                                     name="use_ch_file",
                                     label="Use file",
+                                ),
+                                Item(
+                                    name="do_xtalk",
+                                    label="Include crosstalk",
+                                    enabled_when="use_ch_file == True and ch_is_s32p",
                                 ),
                                 spring,
                             ),
