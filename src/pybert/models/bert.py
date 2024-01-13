@@ -748,6 +748,10 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         split_time = clock()
         self.status = "Updating plots...(sweep %d of %d)" % (sweep_num, num_sweeps)
     except Exception:
+        if update_plots:
+            update_results(self)
+            if not initial_run:
+                update_eyes(self)
         self.status = "Exception: jitter"
         raise
 
