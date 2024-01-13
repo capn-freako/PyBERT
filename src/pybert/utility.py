@@ -926,8 +926,8 @@ def import_channel(filename, sample_per, fs, zref=100):
 
     Args:
         filename(str): Name of file from which to import channel description.
-        sample_per(real): Sample period of system signal vector.
-        fs([real]): (Positive only) frequency values being used by caller.
+        sample_per(real): Sample period of system signal vector (s).
+        fs([real]): (Positive only) frequency values being used by caller (Hz).
 
     KeywordArgs:
         zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
@@ -1029,7 +1029,7 @@ def sdd_21(ntwk, norm=0.5):
         skrf.Network: Sdd (2-port).
     """
     mm = se2mm(ntwk)
-    return rf.Network(frequency=ntwk.f / 1e9, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
+    return rf.Network(frequency=ntwk.f, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
 
 
 def se2mm(ntwk, norm=0.5):
@@ -1085,7 +1085,7 @@ def se2mm(ntwk, norm=0.5):
     z[:, 2] = (ntwk.z0[:, 0] + ntwk.z0[:, 2]) / 2
     z[:, 3] = (ntwk.z0[:, 1] + ntwk.z0[:, 3]) / 2
 
-    return rf.Network(frequency=f / 1e9, s=s, z0=z)
+    return rf.Network(frequency=f, s=s, z0=z)
 
 
 def import_freq(filename):
@@ -1106,7 +1106,7 @@ def import_freq(filename):
         and the "DD" quadrant of its mixed-mode equivalent gets returned.
     """
     # Import and sanity check the Touchstone file.
-    ntwk = rf.Network(filename)
+    ntwk = rf.Network(filename, f_unit="Hz")
     (fs, rs, cs) = ntwk.s.shape
     assert rs == cs, "Non-square Touchstone file S-matrix!"
     assert rs in (1, 2, 4), "Touchstone file must have 1, 2, or 4 ports!"
@@ -1243,7 +1243,7 @@ def interp_s2p(ntwk, f):
 
     Args:
         ntwk(skrf.Network): The 2-port network to be interpolated.
-        f([real]): The list of new frequency sampling points.
+        f([real]): The list of new frequency sampling points (Hz).
 
     Returns:
         skrf.Network: The interpolated/extrapolated 2-port network.

@@ -1474,12 +1474,11 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         CL = self.cac * 1.0e-6    # ToDo: Unused!
 
         ts = t[1]
-        # len_t = len(t)
         len_f = len(f)
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
         if self.use_ch_file:
-            ch_s2p_pre = import_channel(self.ch_file, ts, self.f)
+            ch_s2p_pre = import_channel(self.ch_file, ts, f)
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
