@@ -168,21 +168,24 @@ traits_view = View(
                 VGroup(  # Interconnect
                     VGroup(  # From File
                         VGroup(
-                            # HGroup(
-                                Item(
-                                    name="ch_file",
-                                    label="File",
-                                    editor=FileEditor(dialog_style="open"),
-                                ),
-                            # ),
+                            Item(
+                                name="ch_file",
+                                label="File",
+                                editor=FileEditor(dialog_style="open"),
+                            ),
                             HGroup(
                                 Item(
                                     name="use_ch_file",
-                                    label="Use file",
+                                    label="Use File",
+                                ),
+                                Item(
+                                    name="victim_chnl",
+                                    label="Victim Channel",
+                                    enabled_when="use_ch_file == True and ch_is_s32p",
                                 ),
                                 Item(
                                     name="do_xtalk",
-                                    label="Include crosstalk",
+                                    label="Include Crosstalk",
                                     enabled_when="use_ch_file == True and ch_is_s32p",
                                 ),
                                 spring,
@@ -734,22 +737,22 @@ traits_view = View(
         Group(  # Responses
             Group(
                 Item("plots_h", editor=ComponentEditor(high_resolution=False), show_label=False),
-                label="Impulses",
+                label="Impulse",
                 id="plots_h",
             ),
             Group(
                 Item("plots_s", editor=ComponentEditor(high_resolution=False), show_label=False),
-                label="Steps",
+                label="Step",
                 id="plots_s",
             ),
             Group(
                 Item("plots_p", editor=ComponentEditor(high_resolution=False), show_label=False),
-                label="Pulses",
+                label="Pulse (SBR)",
                 id="plots_p",
             ),
             Group(
                 Item("plots_H", editor=ComponentEditor(high_resolution=False), show_label=False),
-                label="Freq. Resp.",
+                label="Frequency",
                 id="plots_H",
             ),
             layout="tabbed",

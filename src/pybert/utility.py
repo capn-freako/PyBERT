@@ -921,7 +921,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     return rf.Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_channel(filename, sample_per, fs, zref=100):
+def import_channel(filename, sample_per, fs, zref=100, vic_chnl=1):
     """Read in a channel description file.
 
     Args:
@@ -931,9 +931,12 @@ def import_channel(filename, sample_per, fs, zref=100):
 
     KeywordArgs:
         zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
+        vic_chnl(int): Victim channel number (from 1). (Default = 1)
 
     Returns:
-        skrf.Network: 2-port network description of channel.
+        (skrf.Network, [skrf.Network]): Pair consisting of:
+            - a 2-port network description of main channel (i.e. - "victim"), and
+            - a list of 2-port network descriptions of aggressors.
 
     Notes:
         1. When a time domain (i.e. - impulse or step response) file is being imported,
@@ -947,10 +950,22 @@ def import_channel(filename, sample_per, fs, zref=100):
             2. The user should take care to ensure that the reference impedance value
             in the GUI is equal to the nominal characteristic impedance of the channel
             being imported when using time domain channel description files.
+
+        2. In the case where a non-empty list of aggressors is returned,
+        port 2 of all returned networks corresponds to the same physical node,
+        typically, the Rx input node.
     """
+    aggs = []
     extension = os.path.splitext(filename)[1][1:]
-    if re.search(r"^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
-        ts2N = interp_s2p(import_freq(filename), fs)
+    tstone_ext = re.match(r"^s(\d+)p$", extension, re.ASCII | re.IGNORECASE)
+    if tstone_ext:  # Touchstone file?
+        n_ports = int(tstone_ext.group(1))
+        if n_ports == 32:
+            chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), import_s32p(filename)))
+            ts2N  = chnls[0]
+            aggs  = chnls[1:]
+        else:
+            ts2N = interp_s2p(import_freq(filename), fs)
     else:  # simple 2-column time domain description (impulse or step).
         h = import_time(filename, sample_per)
         # Fixme: an a.c. coupled channel breaks this naive approach!
@@ -960,7 +975,7 @@ def import_channel(filename, sample_per, fs, zref=100):
         h.resize(2 * Nf)
         H = fft(h * sample_per)[:Nf]  # Keep the positive frequencies only.
         ts2N = H_2_s2p(H, zref * ones(len(H)), fs, Zref=zref)
-    return ts2N
+    return (ts2N, aggs)
 
 
 def interp_time(ts, xs, sample_per):
@@ -1054,7 +1069,8 @@ def se2mm(ntwk, norm=0.5):
     assert rs == 4, "Touchstone file must have 4 ports!"
 
     # Detect/correct "1 => 3" port numbering.
-    ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
+    # ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
+    ix = 1
     if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
         ntwk.renumber((1, 2), (2, 1))
 
@@ -1117,6 +1133,65 @@ def import_freq(filename):
     if rs == 2:
         return ntwk
     return rf.network.one_port_2_two_port(ntwk)
+
+
+def import_s32p(filename, vic_chnl=1):
+    """Read in a 32-port Touchstone file, and return an equivalent list
+    of 16 2-port networks: a single victim through channel and
+    15 crosstalk aggressors.
+
+    Args:
+        filename(str): Name of Touchstone file to read in.
+
+    KeywordArgs:
+        vic_chnl(int): Victim channel number (from 1). (Default = 1)
+
+    Returns:
+        [skrf.Network]: List of 16 2-port network.
+            (First element is the victim.)
+
+    Raises:
+        ValueError: If Touchstone file is not 32-port.
+
+    Notes:
+        1. Input Touchstone file is assumed single-ended.
+        2. The differential through and xtalk channels are returned.
+        3. Port 2 of all returned channels correspond to the same
+        physical circuit node, typically, the Rx input node.
+    """
+    # Import and sanity check the Touchstone file.
+    ntwk = rf.Network(filename)
+    (fs, rs, cs) = ntwk.s.shape
+    assert rs == cs, "Non-square Touchstone file S-matrix!"
+    assert rs == 32, f"Touchstone file must have 32 ports!\n\t{ntwk}"
+    # Check for needed port renumbering.
+    if abs(ntwk.s[0,16,0]) > abs(ntwk.s[0,1,0]):  # |S[17,1]| > |S[2,1]|?
+        ntwk.renumber( [  0, 16,  1, 17,  2, 18,  3, 19,  4, 20,  5, 21,  6, 22,  7, 23
+                       ,  8, 24,  9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31
+                       ]
+                     , [  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15
+                       , 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+                       ]
+                     )
+    # Extract the victim and aggressors.
+    def ports_from_chnls(left, right):
+        """Return list of 4 ports corresponding to a particular left and right
+        channel ID (from 1), assuming "1=>2/3=>4" convention.
+
+        Args:
+            left(int): Left side channel number (from 1).
+            right(int): Right side channel number (from 1).
+
+        Returns:
+            [int]: List of ports (from 0) for desired channel.
+        """
+        return [(left-1)*4, (right-1)*4 + 1, (left-1)*4 + 2, (right-1)*4 + 3]
+
+    vic = sdd_21(rf.subnetwork(ntwk, ports_from_chnls(vic_chnl, vic_chnl)))
+    agg_chnls = list(array(range(8)) + 1)
+    agg_chnls.remove(vic_chnl)
+    aggs = list(map(sdd_21, [rf.subnetwork(ntwk, ports_from_chnls(chnl, vic_chnl)) for chnl in agg_chnls]))
+    return [vic] + aggs
 
 
 def lfsr_bits(taps, seed):
