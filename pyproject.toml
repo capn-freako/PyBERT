@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "PipBERT"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "5.2.0alpha"
+version = "5.2.0rc1"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           , {name = "David Patterson"}
           ]
@@ -16,9 +16,7 @@ license = {text = "BSD"}
 dependencies = [
         "kiwisolver",
         "PyIBIS-AMI>=5.1.0rc1",
-        # "pyside2",
         "pyyaml>=6",
-        # "qt>=5",
         "scikit-rf>=0.29",
 ]
 keywords=["bert", "communication", "simulator"]
@@ -32,9 +30,9 @@ classifiers=[
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
     "Topic :: Adaptive Technologies",
     "Topic :: Scientific/Engineering",
@@ -55,7 +53,7 @@ where = ["src"]
 line-length = 119
 
 [tool.isort]
-profile = "black"
+# profile = "black"
 known_first_party = ["pybert", "pyibisami"]
 known_third_party = ["enable", "chaco"]
 
