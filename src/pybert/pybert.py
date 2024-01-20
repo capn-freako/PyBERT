@@ -61,17 +61,20 @@ from pybert.models.tx_tap import TxTapTuner
 from pybert.results import PyBertData
 from pybert.threads.optimization import CoOptThread, RxOptThread, TxOptThread
 from pybert.utility import (
+    calc_com,
     calc_gamma,
+    calc_s2p_resp,
+    calc_sbr,
+    com_opt,
     import_channel,
     interp_s2p,
+    interp_time,
     lfsr_bits,
     make_ctle,
     pulse_center,
     safe_log10,
     sdd_21,
     trim_impulse,
-    calc_com,
-    com_opt,
 )
 from pyibisami import __version__ as PyAMI_VERSION
 from pyibisami.ami.model import AMIModel
@@ -607,10 +610,18 @@ class PyBERT(HasTraits):
 
     def _btn_com_fired(self):
         # self.calc_chnl_h()  # Doesn't do what we intend, due to multi-threading. User must run the sim. first.
-        sbr = [self.chnl_p,]  # ToDo: Add xtalk.
+        ui = self.ui
         nspb = self.nspb
+        chnl_p = self.chnl_p
+        t = self.t[:len(chnl_p)]
+        Ts = t[1] - t[0]
+        if self.do_xtalk:
+            agg_sbrs = [calc_sbr(agg, ui) for agg in self.aggressors]
+            sbr = [chnl_p] + [interp_time(t, x, Ts, n_max=len(chnl_p)) for (t,x) in agg_sbrs]
+        else:
+            sbr = [chnl_p]
         (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts) = calc_com(
-            self.ui, sbr, nspb, self.com_ser, self.com_rlm, 
+            ui, sbr, nspb, self.com_ser, self.com_rlm, 
             -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
             self.com_gDC_min, self.com_gDC_max, self.com_fHP*1e9, self.com_gHP_min, self.com_gHP_max,
             self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
@@ -619,7 +630,7 @@ class PyBERT(HasTraits):
             self.com_Rd, self.com_Cd, self.com_Cb, self.com_Cp, self.com_Ls,
             self.com_Zc, self.com_td,
             self.mod_type)
-        self.com = 20 * log10(Asig/Anoise_xtalk)
+        self.com = 20 * log10(abs(Asig/Anoise_xtalk))
         self.com_pmf = pmf
         self.com_cmf = cmf
         self.com_loc = loc
@@ -680,7 +691,7 @@ class PyBERT(HasTraits):
         npts = len(t)
         f0 = 1.0 / (t[1] * npts)
         half_npts = npts // 2
-        return array([i * f0 for i in range(half_npts)])
+        return array([i * f0 for i in range(half_npts + 1)])
 
     @cached_property
     def _get_w(self):
@@ -1494,13 +1505,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         # Form the pre-on-die S-parameter 2-port network for the channel.
         if self.use_ch_file:
             ch_s2p_pre, aggressors = import_channel(self.ch_file, ts, f, vic_chnl=self.victim_chnl)
-            # if self.ch_is_s32p:
-            #     ntwk32 = rf.Network(self.ch_file)
-            #     # ch_s2p_pre = interp_s2p(sdd_21(rf.subnetwork(ntwk32, [0,1,2,3])), f)
-            #     ch_s2p_pre = interp_s2p(sdd_21(rf.subnetwork(ntwk32, [0,16,1,17])), f)
-            #     # if self.do_xtalk:
-            # else:
-            #     ch_s2p_pre = import_channel(self.ch_file, ts, f)
+            self.aggressors = aggressors
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
@@ -1567,16 +1572,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
 
         # Calculate channel impulse response.
         Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
-        ch_s2p_term = ch_s2p.copy()
-        ch_s2p_term_z0 = ch_s2p.z0.copy()
-        ch_s2p_term_z0[:, 1] = Zt
-        ch_s2p_term.renormalize(ch_s2p_term_z0)
-        ch_s2p_term.name = "ch_s2p_term"
-        self.ch_s2p_term = ch_s2p_term
-        # We take the transfer function, H, to be a ratio of voltages.
-        # So, we must normalize our (now generalized) S-parameters.
-        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])
-        chnl_h = irfft(chnl_H)
+        chnl_h, chnl_H = calc_s2p_resp(ch_s2p, Zt)
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
 
         min_len = 20 * nspui

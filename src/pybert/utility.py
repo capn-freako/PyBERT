@@ -904,6 +904,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     Returns:
         skrf.Network: 2-port network representing the channel to which `H` and `Zc` pertain.
     """
+    # ToDo: Fix this code.
     ws = 2 * pi * fs
     G = calc_G(H, Zref, 0, Zc, Zref, 0, ws)  # See `calc_G()` docstring.
     R1 = (Zc - Zref) / (Zc + Zref)  # reflection coefficient looking into medium from port
@@ -961,8 +962,11 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl=1):
     if tstone_ext:  # Touchstone file?
         n_ports = int(tstone_ext.group(1))
         if n_ports == 32:
-            chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), import_s32p(filename)))
+            ntwks = import_s32p(filename)
+            assert ntwks[0].f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tntwks[0] = {ntwks[0]}"
+            chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), ntwks))
             ts2N  = chnls[0]
+            assert ts2N.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tts2N = {ts2N}"
             aggs  = chnls[1:]
         else:
             ts2N = interp_s2p(import_freq(filename), fs)
@@ -978,13 +982,17 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl=1):
     return (ts2N, aggs)
 
 
-def interp_time(ts, xs, sample_per):
+def interp_time(ts, xs, sample_per, n_max=100_000_000):
     """Resample time domain data, using linear interpolation.
 
     Args:
         ts([float]): Original time values.
         xs([float]): Original signal values.
         sample_per(float): System sample period.
+
+    KeywordArgs:
+        n_max(int): Maximum number of elements allowed in resultant vector.
+            (Default: 100,000,000)
 
     Returns:
         [float]: Resampled waveform.
@@ -993,7 +1001,7 @@ def interp_time(ts, xs, sample_per):
     res = []
     t = 0.0
     i = 0
-    while t < tmax:
+    while t < tmax and i < n_max:
         while ts[i] <= t:
             i = i + 1
         res.append(xs[i - 1] + (xs[i] - xs[i - 1]) * (t - ts[i - 1]) / (ts[i] - ts[i - 1]))
@@ -1030,6 +1038,7 @@ def import_time(filename, sample_per):
     return interp_time(ts, xs, sample_per)
 
 
+# ToDo: Are there SciKit-RF alternatives to these next two functions?
 def sdd_21(ntwk, norm=0.5):
     """Given a 4-port single-ended network, return its differential 2-port
     network.
@@ -1331,6 +1340,7 @@ def interp_s2p(ntwk, f):
     assert rs == 2, "Touchstone file must have 2 ports!"
 
     extrap = ntwk.interpolate(f, fill_value="extrapolate", coords="polar", assume_sorted=True)
+    assert extrap.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tf: {f}\n\textrap: {extrap}"
     s11 = cap_mag(extrap.s[:, 0, 0])
     s22 = cap_mag(extrap.s[:, 1, 1])
     s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
@@ -1338,9 +1348,10 @@ def interp_s2p(ntwk, f):
     s = np.array(list(zip(zip(s11, s12), zip(s21, s22))))
     if ntwk.name is None:
         ntwk.name = "s2p"
-    return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"))
+    return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
 
 
+# ToDo: Are there any uses of this function remaining? Can we eliminate them?
 def renorm_s2p(ntwk, zs):
     """Renormalize a simple 2-port network to a new set of port impedances.
 
@@ -1740,7 +1751,6 @@ def com_opt(w, sbr, ui, osf, rlm, Hdev, ctle_gen, gDC_min, gDC_max, gHP_min, gHP
         options={"disp": False, "maxiter": max_iter},
     )
     if not res.success:
-        # raise RuntimeError(res.message)
         print(f"Optimizer failed with: {res.message}")
     tx_taps   = res.x[:nTx]
     ctle_gain = res.x[nTx]
@@ -1748,3 +1758,76 @@ def com_opt(w, sbr, ui, osf, rlm, Hdev, ctle_gen, gDC_min, gDC_max, gHP_min, gHP
     dfe_taps  = res.x[nTx+2:]
 
     return (tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts)
+
+
+# ToDo: Finish this and use it throughout.
+#
+# t_and_f_from_ntwk(..., fstep=None) instead? (Would accommodate non-uniform frequency vector.)
+def t_from_f(f):
+    """Calculate time vector
+    """
+    raise RuntimeError("Not yet implemented.")
+
+
+def calc_sbr(s2p, ui, Zt=None):
+    """Calculate the single bit response of a 2-port network.
+
+    Args:
+        s2p(skrf.Network): 2-port network to convert.
+        ui(real): Unit interval (s).
+
+    KeywordArgs:
+        Zt(complex or [complex]): Termination impedance, either scalar or as function of frequency.
+            (Default: None)
+
+    Returns:
+        ([real], [real]): Pair consisting of:
+            t: Time vector associated w/ calculated SBR (s), and
+            sbr: Single bit response (SBR) (a.k.a. - pulse response) of network.
+
+    Notes:
+        1. It is assumed that the caller knows the proper equivalent time vector
+        with which to index the returned SBR.
+    """
+    # This yields `NaN`s in `t`:
+    t, s = rf.network.Network.step_response(s2p.s21.extrapolate_to_dc())
+    # ts = 1/(2 * s2p.f[-1])  # Sampling frequency = twice Nyquist.
+    # t = array([n*ts for n in range(2 * (len(s2p.f) - 1))])  # `f` carries an extra element, for Nyquist.
+    # dt = t[1] - t[0]
+    # dn = round(ui/dt)
+    # h, H = calc_s2p_resp(s2p, Zt)
+    # s = cumsum(h)
+    # assert dn < len(s), f"dn ({dn}) is too large!"
+    dn = where(t >= ui)[0][0]
+    s_shift = pad(s[:-dn], (dn, 0), mode="constant", constant_values=0)
+    return (t, s - s_shift)
+
+
+def calc_s2p_resp(s2p, Zt=None):
+    """Calculate the impulse and frequency response of an arbitrarily terminated 2-port network.
+
+    Args:
+        s2p(skrf.Network): 2-port network representing the channel.
+
+    KeywordArgs:
+        Zt(complex or [complex]): Termination impedance, either scalar or as function of frequency.
+
+    Returns:
+        ([real], [complex]): A pair consisting of:
+            h: impulse response, and
+            H: frequency response.
+    """
+    s2p_term = s2p.copy()
+    if Zt is not None:
+        assert len(Zt) == 1 or len(Zt) == len(s2p.f), \
+            "Zt must be a scalar or have the same length as network frequency vector!"
+        s2p_term_z0 = s2p.z0.copy()
+        s2p_term_z0[:, 1] = Zt
+        s2p_term.renormalize(s2p_term_z0)
+    # We take the transfer function, H, to be a ratio of voltages.
+    # So, we must normalize our (now generalized) S-parameters.
+    H = s2p_term.s21.s.flatten() * np.sqrt(s2p_term.z0[:, 1] / s2p_term.z0[:, 0])
+    h = irfft(H)
+    s = cumsum(h)
+    h *= abs(H[0]) / s[-1]  # Scale for proper d.c. value.
+    return (h, H)

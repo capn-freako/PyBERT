@@ -492,10 +492,13 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         dfe_out = array(dfe_out)
         dfe_out.resize(len(t))
         bits_out = array(bits_out)
+        start_ix = len(bits_out) - eye_bits
+        assert start_ix >= 0, "`start_ix` is negative!"
+        end_ix = len(bits_out)
         auto_corr = (
             1.0
-            * correlate(bits_out[(nbits - eye_bits) :], bits[(nbits - eye_bits) :], mode="same")
-            / sum(bits[(nbits - eye_bits) :])
+            * correlate(bits_out[start_ix : end_ix], bits[start_ix : end_ix], mode="same")
+            / sum(bits[start_ix : end_ix])
         )
         auto_corr = auto_corr[len(auto_corr) // 2 :]
         self.auto_corr = auto_corr
@@ -531,6 +534,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.status = "Analyzing jitter...(sweep %d of %d)" % (sweep_num, num_sweeps)
     except Exception:
         self.status = "Exception: DFE"
+        print(f"len(bits_out): {len(bits_out)}\nnbits: {nbits}\neye_bits: {eye_bits}")
+        print(f"len(t): {len(t)}, len(ctle_out): {len(ctle_out)}")
         raise
 
     _check_sim_status()
