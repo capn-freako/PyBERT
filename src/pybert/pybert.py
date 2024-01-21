@@ -133,7 +133,7 @@ class PyBERT(HasTraits):
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     do_xtalk    = Bool(False)  #: Include crosstalk, for s32p file?     (Default = False)
     ch_is_s32p  = Bool(False)  #: Is channel Touchstone file 32-port?   (Default = False)
-    victim_chnl_ix = Range(low=1, high=16, value=1)  #: Victim channel # when s32p given. (Default = 1)
+    victim_chnl_ix = Range(low=1, high=8, value=1)  #: Victim channel # when s32p given. (Default = 1)
     f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(0.1876)  #: Channel d.c. resistance (Ohms/m).

@@ -937,7 +937,8 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl_ix=1):
     Returns:
         (skrf.Network, [skrf.Network]): Pair consisting of:
             - a 2-port network description of main channel (i.e. - "victim"), and
-            - a list of 2-port network descriptions of aggressors.
+            - a list of 2-port network descriptions of aggressors,
+                following VITA 68.2 convention and taking `vic_chnl_ix` into account.
 
     Notes:
         1. When a time domain (i.e. - impulse or step response) file is being imported,
@@ -954,9 +955,9 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl_ix=1):
 
         2. In the case where a non-empty list of aggressors is returned,
         port 2 of all returned networks corresponds to the same physical node,
-        typically, the Rx input node.
+        the victim Rx node.
     """
-    vic_ix = vic_chnl_ix - 1
+    vic_ix = vic_chnl_ix - 1  # `vic_ix` is 0-based.
     assert vic_ix >= 0 and vic_ix < 8, f"Victim index ({vic_ix}) out of range!"
     aggs = []
     extension = os.path.splitext(filename)[1][1:]
@@ -964,14 +965,16 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl_ix=1):
     if tstone_ext:  # Touchstone file?
         n_ports = int(tstone_ext.group(1))
         if n_ports == 32:
-            ntwks = import_s32p(filename)
+            ntwks = import_s32p(filename, vic_chnl_ix)
             assert ntwks[0].f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tntwks[0] = {ntwks[0]}"
             chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), ntwks))
-            ts2N  = chnls[vic_ix]
+            # ts2N  = chnls[vic_ix]
+            ts2N  = chnls[0]
             assert ts2N.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tts2N = {ts2N}"
-            ixs = list(range(8))
-            ixs.remove(vic_ix)
-            aggs = [chnls[ix] for ix in ixs]
+            # ixs = list(range(8))
+            # ixs.remove(vic_ix)
+            # aggs = [chnls[ix] for ix in ixs]
+            aggs = chnls[1:]
         else:
             ts2N = interp_s2p(import_freq(filename), fs)
     else:  # simple 2-column time domain description (impulse or step).
@@ -1151,8 +1154,8 @@ def import_freq(filename):
 
 def import_s32p(filename, vic_chnl=1):
     """Read in a 32-port Touchstone file, and return an equivalent list
-    of 16 2-port networks: a single victim through channel and
-    15 crosstalk aggressors.
+    of 8 2-port differential networks: a single victim through channel and
+    7 crosstalk aggressors, according to the VITA 68.2 convention.
 
     Args:
         filename(str): Name of Touchstone file to read in.
@@ -1161,7 +1164,7 @@ def import_s32p(filename, vic_chnl=1):
         vic_chnl(int): Victim channel number (from 1). (Default = 1)
 
     Returns:
-        [skrf.Network]: List of 16 2-port network.
+        [skrf.Network]: List of 8 2-port network.
             (First element is the victim.)
 
     Raises:
@@ -1201,10 +1204,22 @@ def import_s32p(filename, vic_chnl=1):
         """
         return [(left-1)*4, (right-1)*4 + 1, (left-1)*4 + 2, (right-1)*4 + 3]
 
-    vic = sdd_21(rf.subnetwork(ntwk, ports_from_chnls(vic_chnl, vic_chnl)))
+    vic_ports = ports_from_chnls(vic_chnl, vic_chnl)
+    vic = sdd_21(rf.subnetwork(ntwk, vic_ports))
+    if vic_chnl % 2:  # odd?
+        vic_rx_ports = [vic_ports[n] for n in [0,2]]
+    else:
+        vic_rx_ports = [vic_ports[n] for n in [1,3]]
     agg_chnls = list(array(range(8)) + 1)
     agg_chnls.remove(vic_chnl)
-    aggs = list(map(sdd_21, [rf.subnetwork(ntwk, ports_from_chnls(chnl, vic_chnl)) for chnl in agg_chnls]))
+    aggs = []
+    for agg_chnl in agg_chnls:
+        agg_ports = ports_from_chnls(agg_chnl, agg_chnl)
+        if agg_chnl % 2:  # odd?
+            agg_tx_ports = [agg_ports[n] for n in [1,3]]
+        else:
+            agg_tx_ports = [agg_ports[n] for n in [0,2]]
+        aggs.append(sdd_21(rf.subnetwork(ntwk, concatenate(list(zip(agg_tx_ports, vic_rx_ports))))))
     return [vic] + aggs
 
 
