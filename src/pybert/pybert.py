@@ -30,6 +30,7 @@ from numpy import (
     log10, ones, pad, pi, sinc, where, zeros)
 from numpy.fft import fft, irfft
 from numpy.random import randint
+from scipy.interpolate import interp1d
 from traits.api import (
     Array,
     Bool,
@@ -132,7 +133,7 @@ class PyBERT(HasTraits):
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     do_xtalk    = Bool(False)  #: Include crosstalk, for s32p file?     (Default = False)
     ch_is_s32p  = Bool(False)  #: Is channel Touchstone file 32-port?   (Default = False)
-    victim_chnl = Range(low=1, high=16, value=1)  #: Victim channel # when s32p given. (Default = 1)
+    victim_chnl_ix = Range(low=1, high=16, value=1)  #: Victim channel # when s32p given. (Default = 1)
     f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(0.1876)  #: Channel d.c. resistance (Ohms/m).
@@ -616,10 +617,10 @@ class PyBERT(HasTraits):
         t = self.t[:len(chnl_p)]
         Ts = t[1] - t[0]
         if self.do_xtalk:
-            agg_sbrs = [calc_sbr(agg, ui) for agg in self.aggressors]
-            sbr = [chnl_p] + [interp_time(t, x, Ts, n_max=len(chnl_p)) for (t,x) in agg_sbrs]
+            sbr = [chnl_p] + self.agg_ps
         else:
             sbr = [chnl_p]
+        self.sbr = sbr  # for debugging
         (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts) = calc_com(
             ui, sbr, nspb, self.com_ser, self.com_rlm, 
             -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
@@ -629,7 +630,7 @@ class PyBERT(HasTraits):
             self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj,
             self.com_Rd, self.com_Cd, self.com_Cb, self.com_Cp, self.com_Ls,
             self.com_Zc, self.com_td,
-            self.mod_type)
+            self.mod_type[0])
         self.com = 20 * log10(abs(Asig/Anoise_xtalk))
         self.com_pmf = pmf
         self.com_cmf = cmf
@@ -638,6 +639,7 @@ class PyBERT(HasTraits):
         self.com_ctle_gain = ctle_gain
         self.com_hp_gain   = hp_gain
         self.com_dfe_taps  = dfe_taps.reshape((1, self.com_nDFE))
+        self.opt_rslts = opt_rslts
         self.plotdata.set_data("com_tns",      self.t_ns_chnl)
         self.plotdata.set_data("com_pmf",      pmf/max(pmf))  # for better plot visibility
         self.plotdata.set_data("com_cmf",      cmf)
@@ -1503,9 +1505,10 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         len_f = len(f)
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
+        self.aggressors = []
         if self.use_ch_file:
-            ch_s2p_pre, aggressors = import_channel(self.ch_file, ts, f, vic_chnl=self.victim_chnl)
-            self.aggressors = aggressors
+            ch_s2p_pre, self.aggressors = import_channel(
+                self.ch_file, ts, f, vic_chnl_ix=self.victim_chnl_ix)
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
@@ -1552,6 +1555,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             if self.tx_use_ts4:
                 fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"])[0])
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
+                self.aggressors, _, _ = zip *[add_ondie_s(agg, fname) for agg in self.aggressors]
                 self.ts4N = ts4N
                 self.ntwk = ntwk
         if self.rx_use_ibis:
@@ -1567,6 +1571,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
                 self.ts4N = ts4N
                 self.ntwk = ntwk
+                self.aggressors, _, _ = zip *[add_ondie_s(agg, fname, isRx=True) for agg in self.aggressors]
         ch_s2p.name = "ch_s2p"
         self.ch_s2p = ch_s2p
 
@@ -1574,18 +1579,25 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
         chnl_h, chnl_H = calc_s2p_resp(ch_s2p, Zt)
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
-
         min_len = 20 * nspui
         max_len = 100 * nspui
         if impulse_length:
             min_len = max_len = impulse_length / ts
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
+        end_ix = start_ix + len(chnl_h)  # For properly sizing aggressor responses, below.
         temp = chnl_h.copy()
         temp.resize(len(t), refcheck=False)
         chnl_trimmed_H = fft(temp)
 
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
+
+        if self.aggressors:
+            self.agg_hs, self.agg_Hs = list(zip(*[calc_s2p_resp(agg, Zt) for agg in self.aggressors]))
+            self.agg_hs = [ h[start_ix : end_ix] for h in self.agg_hs]
+            self.agg_ss = [h.cumsum() for h in self.agg_hs]
+            self.agg_ps = [ s - pad( s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
+                            for s in self.agg_ss ]
 
         self.chnl_h = chnl_h
         self.len_h = len(chnl_h)

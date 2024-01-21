@@ -922,7 +922,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     return rf.Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_channel(filename, sample_per, fs, zref=100, vic_chnl=1):
+def import_channel(filename, sample_per, fs, zref=100, vic_chnl_ix=1):
     """Read in a channel description file.
 
     Args:
@@ -932,7 +932,7 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl=1):
 
     KeywordArgs:
         zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
-        vic_chnl(int): Victim channel number (from 1). (Default = 1)
+        vic_chnl_ix(int): Victim channel number (from 1). (Default = 1)
 
     Returns:
         (skrf.Network, [skrf.Network]): Pair consisting of:
@@ -956,6 +956,8 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl=1):
         port 2 of all returned networks corresponds to the same physical node,
         typically, the Rx input node.
     """
+    vic_ix = vic_chnl_ix - 1
+    assert vic_ix >= 0 and vic_ix < 8, f"Victim index ({vic_ix}) out of range!"
     aggs = []
     extension = os.path.splitext(filename)[1][1:]
     tstone_ext = re.match(r"^s(\d+)p$", extension, re.ASCII | re.IGNORECASE)
@@ -965,9 +967,11 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl=1):
             ntwks = import_s32p(filename)
             assert ntwks[0].f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tntwks[0] = {ntwks[0]}"
             chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), ntwks))
-            ts2N  = chnls[0]
+            ts2N  = chnls[vic_ix]
             assert ts2N.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tts2N = {ts2N}"
-            aggs  = chnls[1:]
+            ixs = list(range(8))
+            ixs.remove(vic_ix)
+            aggs = [chnls[ix] for ix in ixs]
         else:
             ts2N = interp_s2p(import_freq(filename), fs)
     else:  # simple 2-column time domain description (impulse or step).
@@ -1006,7 +1010,8 @@ def interp_time(ts, xs, sample_per, n_max=100_000_000):
             i = i + 1
         res.append(xs[i - 1] + (xs[i] - xs[i - 1]) * (t - ts[i - 1]) / (ts[i] - ts[i - 1]))
         t += sample_per
-
+    if len(res) > n_max:
+        res = res[:n_max]
     return array(res)
 
 
@@ -1576,7 +1581,7 @@ def calc_com(ui, sbr, osf, ser, rlm,
     r   = s / (2*pi * 0.75/ui)                            # As per COM, f_cutoff = 0.75 f_symb.
     Hrx = 105 / (r**4 + 10*r**3 + 45*r**2 + 105*r + 105)  # 4th-order Bessel-Thomson LP
     # Calculate package response.
-    Zchnl = 100  # Do we have this after a PyBERT run?
+    Zchnl = 100  # ToDo: Do we have this after a PyBERT run?
     # Parallel combination of ball parasitic capacitance and channel input impedance.
     Zload = parZ(Zcap(w, Cp*1e-12/2), Zchnl)    
     Rout  = (Zload - Zc)/(Zload + Zc)           # Reflection coefficient exiting the TL.
@@ -1585,7 +1590,8 @@ def calc_com(ui, sbr, osf, ser, rlm,
     Ztot  = 2*Rd + parZ(Zcap(w, Cd*1e-12/2), 1j*w*2*Ls*1e-9 + parZ(Zcap(w, Cb*1e-12/2), Zin))
     Hpkg  = Zload / Ztot
     # Find optimal equalization scheme.
-    tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts = com_opt(w, sbr, ui, osf, rlm, Hrx * Hpkg**2,
+    tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts = com_opt(
+        w, sbr, ui, osf, rlm, Hrx * Hpkg**2,
         ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
         nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
         Add, TxSNR, varRj, eta0, mod=mod, max_iter=5000)
@@ -1604,35 +1610,45 @@ def calc_com(ui, sbr, osf, ser, rlm,
     opt_rslts['f']    = f
     # Make final calculations of distributions and noises.
     dj_noises = Add * mu_n
+    opt_rslts['dj_noises'] = dj_noises
     if len(sbr) > 1:
-        levels = [ level*Asig + dj_noise + dISI + xtalk
+        deltas = [ level*Asig + dj_noise + dISI + xtalk
                      for level    in levels
                      for dj_noise in dj_noises
                      for dISI     in dISI_n
                      for xtalk    in concatenate([agg[cur_ix::osf] for agg in sbr[1:]])
                  ]
     else:       
-        levels = [ level*Asig + dj_noise + dISI
+        deltas = [ level*Asig + dj_noise + dISI
                      for level    in levels
                      for dj_noise in dj_noises
                      for dISI     in dISI_n
                  ]
     varG = varTx + varSpec + sum(varRj * mu_n)
-    pmf = array( [ sum( [exp(-((y-level)**2/(2*varG))) for level in levels] )
-                     for y in linspace(-0.5, 0.5, num=1001) ] )
+    opt_rslts['deltas'] = deltas
+    opt_rslts['varG']   = varG
+    gaus = array([exp(-(y**2 / varG)) for y in linspace(-0.5, 0.5, num=1001)])
+    pmf = array(sum([np.roll(gaus, int(delta*1000)) for delta in deltas]))
     pmf = pmf / sum(pmf)
     cmf = cumsum(pmf)
     try:
-        if mod:
-            ix = where(cmf > ser/4)[0][0]
+        if mod:  # PAM4
+            _cmf = abs(cmf*4 - 2)
+        else:    # NRZ
+            _cmf = abs(cmf*2 - 1)
+        open_ixs = where(_cmf < ser)[0]
+        left_ix  = open_ixs[0]
+        right_ix = open_ixs[-1]
+        if (right_ix - 500) < (500 - left_ix):
+            ix = right_ix
         else:
-            ix = where(cmf > ser/2)[0][0]
+            ix = left_ix
     except:
         print(pmf)
         ix = 190
-    Anoise_xtalk = -Asig - (ix - 500) * 0.001
+    Anoise_xtalk = Asig - abs(ix - 500) * 0.001
     if Anoise_xtalk == 0:
-        print(f"Asig: {Asig}, varG: {varG}, min(levels): {min(levels)}, max(levels): {max(levels)}\ndISI_n: {dISI_n}")
+        print(f"Asig: {Asig}, varG: {varG}, min(deltas): {min(deltas)}, max(deltas): {max(deltas)}\ndISI_n: {dISI_n}")
 
     return (Asig, Anoise_xtalk, pmf, cmf, ix, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts)
 
@@ -1782,23 +1798,17 @@ def calc_sbr(s2p, ui, Zt=None):
 
     Returns:
         ([real], [real]): Pair consisting of:
-            t: Time vector associated w/ calculated SBR (s), and
+            t: Time vector associated w/ calculated SBR (s).
             sbr: Single bit response (SBR) (a.k.a. - pulse response) of network.
-
-    Notes:
-        1. It is assumed that the caller knows the proper equivalent time vector
-        with which to index the returned SBR.
     """
-    # This yields `NaN`s in `t`:
-    t, s = rf.network.Network.step_response(s2p.s21.extrapolate_to_dc())
-    # ts = 1/(2 * s2p.f[-1])  # Sampling frequency = twice Nyquist.
-    # t = array([n*ts for n in range(2 * (len(s2p.f) - 1))])  # `f` carries an extra element, for Nyquist.
-    # dt = t[1] - t[0]
-    # dn = round(ui/dt)
-    # h, H = calc_s2p_resp(s2p, Zt)
-    # s = cumsum(h)
-    # assert dn < len(s), f"dn ({dn}) is too large!"
-    dn = where(t >= ui)[0][0]
+    ts = 1/(2 * s2p.f[-1])  # Sampling frequency = twice Nyquist.
+    t = array([n*ts for n in range(2 * (len(s2p.f) - 1))])  # `f` carries an extra element, for Nyquist.
+    dt = t[1] - t[0]
+    dn = round(ui/dt)
+    h, H = calc_s2p_resp(s2p, Zt)
+    s = cumsum(h)
+    assert dn < len(s), f"dn ({dn}) is too large!"
+
     s_shift = pad(s[:-dn], (dn, 0), mode="constant", constant_values=0)
     return (t, s - s_shift)
 
