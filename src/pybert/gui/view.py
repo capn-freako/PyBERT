@@ -8,7 +8,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
 from enable.component_editor import ComponentEditor
-from numpy                   import log10
+from numpy                   import log10, array
 from pyface.image_resource   import ImageResource
 from traitsui.api import (  # CloseAction,
     Action,
@@ -21,6 +21,7 @@ from traitsui.api import (  # CloseAction,
     MenuBar,
     NoButtons,
     ObjectColumn,
+    RangeEditor,
     Separator,
     TableEditor,
     TextEditor,
@@ -175,12 +176,29 @@ traits_view = View(
                             ),
                             HGroup(
                                 Item(
-                                    name="use_ch_file",
-                                    label="Use File",
+                                    name="ch_file_valid",
+                                    label="Valid",
+                                    style="simple",
+                                    enabled_when="False",
                                 ),
                                 Item(
-                                    name="victim_chnl",
+                                    name="use_ch_file",
+                                    label="Use File",
+                                    enabled_when="ch_file_valid == True",
+                                ),
+                                Item(
+                                    name="f_step",
+                                    label="f_step",
+                                    tooltip="Frequency step to use in generating H(f).",
+                                    enabled_when="use_ch_file == True",
+                                ),
+                                Item(label="MHz"),
+                            ),
+                            HGroup(
+                                Item(
+                                    name="victim_chnl_ix",
                                     label="Victim Channel",
+                                    style="custom",
                                     enabled_when="use_ch_file == True and ch_is_s32p",
                                 ),
                                 Item(
@@ -188,56 +206,52 @@ traits_view = View(
                                     label="Include Crosstalk",
                                     enabled_when="use_ch_file == True and ch_is_s32p",
                                 ),
-                                spring,
+                                label="COM",
+                                show_border=True,
                             ),
-                        ),
-                        HGroup(
-                            Item(
-                                name="f_step",
-                                label="f_step",
-                                tooltip="Frequency step to use in generating H(f).",
-                            ),
-                            Item(label="MHz"),
-                            enabled_when="use_ch_file == True",
                         ),
                         label="From File",
                         show_border=True,
                     ),
-                    VGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
-                        Item(
-                            name="l_ch",
-                            label="Length (m)",
-                            tooltip="interconnect length",
+                    HGroup(
+                        VGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
+                            Item(
+                                name="l_ch",
+                                label="Length (m)",
+                                tooltip="interconnect length",
+                            ),
+                            Item(
+                                name="Theta0",
+                                label="Loss Tan.",
+                                tooltip="dielectric loss tangent",
+                            ),
+                            Item(
+                                name="Z0",
+                                label="Z0 (Ohms)",
+                                tooltip="characteristic differential impedance",
+                            ),
+                            Item(
+                                name="v0",
+                                label="v_rel (c)",
+                                tooltip="normalized propagation velocity",
+                            ),
                         ),
-                        Item(
-                            name="Theta0",
-                            label="Loss Tan.",
-                            tooltip="dielectric loss tangent",
-                        ),
-                        Item(
-                            name="Z0",
-                            label="Z0 (Ohms)",
-                            tooltip="characteristic differential impedance",
-                        ),
-                        Item(
-                            name="v0",
-                            label="v_rel (c)",
-                            tooltip="normalized propagation velocity",
-                        ),
-                        Item(
-                            name="Rdc",
-                            label="Rdc (Ohms)",
-                            tooltip="d.c. resistance",
-                        ),
-                        Item(
-                            name="w0",
-                            label="w0 (rads./s)",
-                            tooltip="transition frequency",
-                        ),
-                        Item(
-                            name="R0",
-                            label="R0 (Ohms)",
-                            tooltip="skin effect resistance",
+                        VGroup(
+                            Item(
+                                name="Rdc",
+                                label="Rdc (Ohms)",
+                                tooltip="d.c. resistance",
+                            ),
+                            Item(
+                                name="w0",
+                                label="w0 (rads./s)",
+                                tooltip="transition frequency",
+                            ),
+                            Item(
+                                name="R0",
+                                label="R0 (Ohms)",
+                                tooltip="skin effect resistance",
+                            ),
                         ),
                         label="Native",
                         show_border=True,
@@ -696,12 +710,11 @@ traits_view = View(
                     Item("com_tx_max",  label="FFE max.",
                         tooltip="Maximum values of Tx FFE filter taps."),
                     HGroup(
-                        Item("com_dfe_min",  label="DFE min.",
-                            editor=ArrayViewEditor(transpose=True, show_index=False),
-                            tooltip="Minimum values of Rx DFE filter taps."),
-                        Item("com_dfe_max",  label="DFE max.",
-                            editor=ArrayViewEditor(transpose=True, show_index=False),
-                            tooltip="Maximum values of Rx DFE filter taps."),
+                        Item("com_dfe_lim",  label="DFE Tap Limits",
+                            editor=ArrayViewEditor(
+                                transpose=True, show_index=False, format="%6.3f",
+                                titles=["Tap Number", "Tap Minimum", "Tap Maximum", "(n/a)"]),
+                            tooltip="Limits of Rx DFE filter taps."),
                     ),
                     Item("btn_com", show_label=False, tooltip="Calculate COM."),
                     label="Input Parameters",
@@ -709,14 +722,19 @@ traits_view = View(
                     id="com_params",
                 ),
                 VGroup(  # COM result
-                    Item("com",           label="COM (dB)",           format_str="%4.1f"),
+                    HGroup(
+                        Item("com",      label="COM (dB)",  format_str="%4.1f"),
+                        Item("com_Asig", label="Asig (mV)", format_func=(lambda x: f"{x*1e3:4.0f}")),
+                    ),
                     Item("com_tx_taps",   label="Tx Taps",            format_str="%5.3f"),
                     HGroup(
                         Item("com_ctle_gain", label="CTLE Gain 1st (dB)", format_func=(lambda x: f"{-20*log10(x):6.3f}")),
                         Item("com_hp_gain",   label="CTLE Gain 2nd (dB)", format_func=(lambda x: f"{-20*log10(x):6.3f}")),
                     ),
-                    Item("com_dfe_taps",  label="DFE Taps",           format_str="%5.3f",
-                        editor=ArrayViewEditor(transpose=True, show_index=False),),
+                    Item("com_dfe_taps",  label="DFE Taps",
+                        editor=ArrayViewEditor(transpose=True, show_index=False, format="%6.3f",
+                            titles=["Tap Number", "Tap Value", "(n/a)"]),
+                        tooltip="Final values of DFE taps."),
                     label="Results",
                     show_border=True,
                     id="com_results",

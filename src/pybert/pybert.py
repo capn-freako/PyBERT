@@ -130,6 +130,7 @@ class PyBERT(HasTraits):
                               , "*.*"                                 # ?
                               ]
     )  #: Channel file name.
+    ch_file_valid = Bool(False)
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     do_xtalk    = Bool(False)  #: Include crosstalk, for s32p file?     (Default = False)
     ch_is_s32p  = Bool(False)  #: Is channel Touchstone file 32-port?   (Default = False)
@@ -354,8 +355,9 @@ class PyBERT(HasTraits):
         },
         default_value="IEEE-802.3ck",
     )
-    com     = Float(0)
-    com_loc = Int(0)
+    com         = Float(0)
+    com_Asig    = Float(0)
+    com_loc     = Int(0)
     com_ser     = Float(1e-4)
     com_rlm     = Float(0.95)
     com_Add     = Float(0.02)      # (UI)
@@ -376,12 +378,22 @@ class PyBERT(HasTraits):
     com_tx_max  = Array(shape=(1, nTx), dtype=float, value=[[0, 0.12, 0, 1, 0],])
     nDFE        = 12
     com_nDFE    = Int(nDFE)
-    com_dfe_min = Array(shape=(1, nDFE), dtype=float, value=[[0.3, 0.05] + [-0.03]*10,])
-    com_dfe_max = Array(shape=(1, nDFE), dtype=float, value=[[0.85, 0.3] + [0.2]*10,])
+    com_dfe_lim = Array( shape=(4, nDFE), dtype=float
+                       , value=[ array(range(nDFE)) + 1     # tap #
+                               , [0.30, 0.05] + [-0.03]*10  # allowed minimums
+                               , [0.85, 0.30] + [ 0.20]*10  # allowed maximums
+                               , ones(nDFE)                 # dummy row, due to GUI weirdness
+                               ]
+                       )
     com_tx_taps   = Array(shape=(1, nTx), dtype=float, value=[[0]*(nTx-2) + [1, 0],])
     com_ctle_gain = Float(1)
     com_hp_gain   = Float(1)
-    com_dfe_taps  = Array(shape=(1, nDFE), dtype=float, value=[zeros(nDFE),])
+    com_dfe_taps  = Array( shape=(3, nDFE), dtype=float
+                         , value=[ array(range(nDFE)) + 1  # tap #
+                                 , zeros(nDFE)             # final tap values
+                                 , ones(nDFE)              # dummy row, due to GUI weirdness
+                                 ]
+                         )
     com_Rd        = Float(55)     # (Ohms)
     com_Cd        = Float(0.120)  # (pF)
     com_Cb        = Float(0.030)  # (pF)
@@ -610,7 +622,7 @@ class PyBERT(HasTraits):
         self._rx_ibis.model()
 
     def _btn_com_fired(self):
-        # self.calc_chnl_h()  # Doesn't do what we intend, due to multi-threading. User must run the sim. first.
+        self.calc_chnl_h()
         ui = self.ui
         nspb = self.nspb
         chnl_p = self.chnl_p
@@ -626,11 +638,12 @@ class PyBERT(HasTraits):
             -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
             self.com_gDC_min, self.com_gDC_max, self.com_fHP*1e9, self.com_gHP_min, self.com_gHP_max,
             self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
-            self.com_nDFE, self.com_dfe_min.flatten(), self.com_dfe_max.flatten(),
+            self.com_nDFE, self.com_dfe_lim[1].flatten(), self.com_dfe_lim[2].flatten(),
             self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj,
             self.com_Rd, self.com_Cd, self.com_Cb, self.com_Cp, self.com_Ls,
             self.com_Zc, self.com_td,
             self.mod_type[0])
+        self.com_Asig = Asig
         self.com = 20 * log10(abs(Asig/Anoise_xtalk))
         self.com_pmf = pmf
         self.com_cmf = cmf
@@ -638,7 +651,7 @@ class PyBERT(HasTraits):
         self.com_tx_taps   = tx_taps.reshape((1, self.com_nTx))
         self.com_ctle_gain = ctle_gain
         self.com_hp_gain   = hp_gain
-        self.com_dfe_taps  = dfe_taps.reshape((1, self.com_nDFE))
+        self.com_dfe_taps[1]  = dfe_taps.reshape((1, self.com_nDFE))
         self.opt_rslts = opt_rslts
         self.plotdata.set_data("com_tns",      self.t_ns_chnl)
         self.plotdata.set_data("com_pmf",      pmf/max(pmf))  # for better plot visibility
@@ -1442,11 +1455,23 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.com_tx_max  = [param_vals["tx_max"],]
         nDFE             = param_vals["nDFE"]
         self.com_nDFE    = nDFE
-        self.com_dfe_min = [param_vals["dfe_min"],]
-        self.com_dfe_max = [param_vals["dfe_max"],]
+        self.com_dfe_lim = [ array(range(nDFE)) + 1
+                           , param_vals["dfe_min"]
+                           , param_vals["dfe_max"]
+                           , ones(nDFE)
+                           ]
         self.com_tx_taps   = [[0]*(nTx-2) + [1, 0],]
         self.com_ctle_gain = 1
-        self.com_dfe_taps  = [zeros(nDFE),]
+        # self.com_dfe_taps  = Array( shape=(3, nDFE), dtype=float
+        #                           , value=[ array(range(nDFE)) + 1
+        #                                   , zeros(nDFE)
+        #                                   , ones(nDFE)
+        #                                   ]
+        #                           )
+        self.com_dfe_taps  = [ array(range(nDFE)) + 1
+                             , zeros(nDFE)
+                             , ones(nDFE)
+                             ]
         self.com_rlm       = param_vals["R_LM"]
         self.com_fHP       = param_vals["fHP"]
         self.com_gDC_min   = param_vals["gDC_min"]
@@ -1466,6 +1491,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         res = re.match(r"^s(\d+)p$", extension, re.ASCII | re.IGNORECASE)
         self.ch_is_s32p = False
         if res:
+            self.ch_file_valid = True
             if int(res.group(1)) == 32:
                 self.ch_is_s32p = True
 
