@@ -15,12 +15,13 @@ import skrf  as rf
 from cmath     import phase, rect
 from functools import reduce
 from numpy     import (
-    append, argmax, array, concatenate, convolve, cumsum, diff, exp,
+    append, arange, argmax, array, concatenate, convolve, cos, cumsum, diff, exp,
     histogram, insert, linspace, log, log10, maximum, mean, ones,
     pad, pi, power, real, reshape, resize, roll, sign,
     sort, sqrt, where, zeros,
 )
 from numpy.fft         import fft, ifft, fftshift, irfft, rfft
+from numpy.random      import uniform
 from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.linalg      import inv
 from scipy.optimize    import curve_fit, minimize
@@ -847,47 +848,73 @@ def make_ctle_gen(z, p1, p2, fHP):
     return ctle_gen
 
 
-def trim_impulse(g, min_len=0, max_len=1000000):
+def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):
     """Trim impulse response, for more useful display, by:
 
-      - clipping off the tail, after 99.8% of the total power has been
-        captured (Using 99.9% was causing problems; I don't know why.), and
-      - setting the "front porch" length equal to 20% of the total length.
+        - clipping off the tail, after 99.8% of the total power has been
+            captured (Using 99.9% was causing problems; I don't know why.), and
+        - setting the "front porch" length equal to 20% of the total length.
 
-    Inputs:
+    Args:
+        g([real]): Response to trim.
 
-      - g         impulse response
+    KeywordArgs:
+        min_len(int): Minimum length of returned vector.
+            Default: 0
+        max_len(int): Maximum length of returned vector.
+            Default: 1000000
+        front_porch(bool): Adjust "front porch" when True.
+            Set to False if accurate delay is required.
+            Default: True
 
-      - min_len   (optional) minimum length of returned vector
-
-      - max_len   (optional) maximum length of returned vector
-
-    Outputs:
-
-      - g_trim    trimmed impulse response
-
-      - start_ix  index of first returned sample
+    Returns:
+        ([real], int): A pair consisting of:
+            - the trimmed response, and
+            - the index of the chosen starting position.
     """
 
-    # Trim off potential FFT artifacts from the end and capture peak location.
-    g = array(g[: int(0.9 * len(g))])
-    max_ix = np.argmax(g)
+    # Move main lobe to center, in case of any non-causality.
+    half_len = len(g) // 2
+    _g = roll(g, half_len)
+    max_ix = np.argmax(_g)
+    len_g = len(_g)
 
-    # Capture 99.8% of the total energy.
-    Pt = 0.998 * sum(g**2)
-    i = 0
+    # Capture 99.9% of the total energy.
+    Ptot = sum(_g**2)
+    Pbeg = 0.0005 * Ptot
+    Pend = 0.9995 * Ptot
+    ix_beg = 0
+    ix_end = 0
     P = 0
-    while P < Pt:
-        P += g[i] ** 2
-        i += 1
-    stop_ix = min(max_ix + max_len, max(i, max_ix + min_len))
+    while P < Pbeg:
+        P      += _g[ix_beg]**2
+        ix_beg += 1
+    ix_end = ix_beg
+    while P < Pend and ix_end < len_g:
+        P      += _g[ix_end]**2
+        ix_end += 1
 
-    # Set "front/back porch" to 20%, doing appropriate bounds checking.
-    length = stop_ix - max_ix
-    porch = length // 3
-    start_ix = max(0, max_ix - porch)
-    stop_ix = min(len(g), stop_ix + porch)
-    return (g[start_ix:stop_ix].copy(), start_ix)
+    # Return trimmed original if no front porch requested.
+    if not front_porch:
+        res = g[:ix_end - half_len].copy()
+        start_ix = 0
+    else:
+        # Bound end index accordingly.
+        back_porch_len = int(0.8*max_len)  # max. back porch length
+        stop_ix = max_ix + back_porch_len  # This is our max. bound.
+        stop_ix = min(stop_ix, ix_end)
+
+        # Set "front porch" to 20%, doing appropriate bounds checking.
+        start_ix = int(max_ix - (stop_ix - max_ix)*0.25)
+        start_ix = max(0, min(ix_beg, start_ix))
+        res = _g[start_ix:stop_ix].copy()
+        start_ix -= half_len
+
+    if len(res) < min_len:
+        res.resize(min_len)
+    if len(res) > max_len:
+        res.resize(max_len)
+    return (res, start_ix)
 
 
 def H_2_s2p(H, Zc, fs, Zref=50):
@@ -922,7 +949,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     return rf.Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_channel(filename, sample_per, fs, zref=100, vic_chnl_ix=1):
+def import_channel(filename, sample_per, fs, Av, Afe, Ane, zref=100, vic_chnl_ix=1):
     """Read in a channel description file.
 
     Args:
@@ -957,24 +984,21 @@ def import_channel(filename, sample_per, fs, zref=100, vic_chnl_ix=1):
         port 2 of all returned networks corresponds to the same physical node,
         the victim Rx node.
     """
-    vic_ix = vic_chnl_ix - 1  # `vic_ix` is 0-based.
-    assert vic_ix >= 0 and vic_ix < 8, f"Victim index ({vic_ix}) out of range!"
+    assert vic_chnl_ix > 0 and vic_chnl_ix <= 8, f"Victim index ({vic_chnl_ix}) out of range!"
     aggs = []
     extension = os.path.splitext(filename)[1][1:]
     tstone_ext = re.match(r"^s(\d+)p$", extension, re.ASCII | re.IGNORECASE)
     if tstone_ext:  # Touchstone file?
         n_ports = int(tstone_ext.group(1))
         if n_ports == 32:
-            ntwks = import_s32p(filename, vic_chnl_ix)
+            ntwks = import_s32p(filename, Av, Afe, Ane, vic_chnl_ix)
             assert ntwks[0].f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tntwks[0] = {ntwks[0]}"
-            chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), ntwks))
-            # ts2N  = chnls[vic_ix]
-            ts2N  = chnls[0]
+            # chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), ntwks))
+            # ts2N  = chnls[0]
+            ts2N  = ntwks[0]
             assert ts2N.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tts2N = {ts2N}"
-            # ixs = list(range(8))
-            # ixs.remove(vic_ix)
-            # aggs = [chnls[ix] for ix in ixs]
-            aggs = chnls[1:]
+            # aggs = chnls[1:]
+            aggs = ntwks[1:]
         else:
             ts2N = interp_s2p(import_freq(filename), fs)
     else:  # simple 2-column time domain description (impulse or step).
@@ -1047,7 +1071,7 @@ def import_time(filename, sample_per):
 
 
 # ToDo: Are there SciKit-RF alternatives to these next two functions?
-def sdd_21(ntwk, norm=0.5):
+def sdd_21(ntwk, norm=0.5, renumber=False):
     """Given a 4-port single-ended network, return its differential 2-port
     network.
 
@@ -1056,15 +1080,21 @@ def sdd_21(ntwk, norm=0.5):
 
     KeywordArgs:
         norm(real): Normalization factor. (Default = 0.5)
+        renumber(bool): Automatically detect correct through path when True.
+            Default: False
 
     Returns:
         skrf.Network: Sdd (2-port).
+
+    Notes:
+        1. A "1->2/3->4" port ordering convention is assumed when `renumber` is False.
+        2. Automatic renumbering should not be used unless a solid d.c. thru path exists.
     """
-    mm = se2mm(ntwk)
+    mm = se2mm(ntwk, norm=norm, renumber=renumber)
     return rf.Network(frequency=ntwk.f, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
 
 
-def se2mm(ntwk, norm=0.5):
+def se2mm(ntwk, norm=0.5, renumber=False):
     """Given a 4-port single-ended network, return its mixed mode equivalent.
 
     Args:
@@ -1072,6 +1102,8 @@ def se2mm(ntwk, norm=0.5):
 
     KeywordArgs:
         norm(real): Normalization factor. (Default = 0.5)
+        renumber(bool): Automatically detect correct through path when True.
+            Default: False
 
     Returns:
         skrf.Network: Mixed mode equivalent network, in the following format:
@@ -1079,17 +1111,22 @@ def se2mm(ntwk, norm=0.5):
             Sdd21  Sdd22  Sdc21  Sdc22
             Scd11  Scd12  Scc11  Scc12
             Scd21  Scd22  Scc21  Scc22
+
+    Notes:
+        1. A "1->2/3->4" port ordering convention is assumed when `renumber` is False.
+        2. Automatic renumbering should not be used unless a solid d.c. thru path exists.
     """
     # Confirm correct network dimmensions.
     (fs, rs, cs) = ntwk.s.shape
     assert rs == cs, "Non-square Touchstone file S-matrix!"
     assert rs == 4, "Touchstone file must have 4 ports!"
 
-    # Detect/correct "1 => 3" port numbering.
+    # Detect/correct "1 => 3" port numbering if requested.
     # ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
-    ix = 1
-    if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
-        ntwk.renumber((1, 2), (2, 1))
+    if renumber:
+        ix = 1
+        if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
+            ntwk.renumber((1, 2), (2, 1))
 
     # Convert S-parameter data.
     s = np.zeros(ntwk.s.shape, dtype=complex)
@@ -1152,13 +1189,16 @@ def import_freq(filename):
     return rf.network.one_port_2_two_port(ntwk)
 
 
-def import_s32p(filename, vic_chnl=1):
+def import_s32p(filename, Av, Afe, Ane, vic_chnl=1):
     """Read in a 32-port Touchstone file, and return an equivalent list
     of 8 2-port differential networks: a single victim through channel and
     7 crosstalk aggressors, according to the VITA 68.2 convention.
 
     Args:
         filename(str): Name of Touchstone file to read in.
+        Av(real): Victim driver amplitude.
+        Afe(real): FEXT aggressor driver amplitude.
+        Ane(real): NEXT aggressor driver amplitude.
 
     KeywordArgs:
         vic_chnl(int): Victim channel number (from 1). (Default = 1)
@@ -1175,21 +1215,14 @@ def import_s32p(filename, vic_chnl=1):
         2. The differential through and xtalk channels are returned.
         3. Port 2 of all returned channels correspond to the same
         physical circuit node, typically, the Rx input node.
+        4. All channels are scaled appropriately, according to:
+            `Av`, `Afe`, and `Ane`.
     """
     # Import and sanity check the Touchstone file.
     ntwk = rf.Network(filename)
     (fs, rs, cs) = ntwk.s.shape
     assert rs == cs, "Non-square Touchstone file S-matrix!"
     assert rs == 32, f"Touchstone file must have 32 ports!\n\t{ntwk}"
-    # Check for needed port renumbering.
-    if abs(ntwk.s[0,16,0]) > abs(ntwk.s[0,1,0]):  # |S[17,1]| > |S[2,1]|?
-        ntwk.renumber( [  0, 16,  1, 17,  2, 18,  3, 19,  4, 20,  5, 21,  6, 22,  7, 23
-                       ,  8, 24,  9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31
-                       ]
-                     , [  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15
-                       , 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
-                       ]
-                     )
     # Extract the victim and aggressors.
     def ports_from_chnls(left, right):
         """Return list of 4 ports corresponding to a particular left and right
@@ -1202,10 +1235,13 @@ def import_s32p(filename, vic_chnl=1):
         Returns:
             [int]: List of ports (from 0) for desired channel.
         """
-        return [(left-1)*4, (right-1)*4 + 1, (left-1)*4 + 2, (right-1)*4 + 3]
+        left0  = left-1     # 0-based
+        right0 = right-1
+        return [left0*4, right0*4 + 1, left0*4 + 2, right0*4 + 3]
 
     vic_ports = ports_from_chnls(vic_chnl, vic_chnl)
     vic = sdd_21(rf.subnetwork(ntwk, vic_ports))
+    vic.s *= Av
     if vic_chnl % 2:  # odd?
         vic_rx_ports = [vic_ports[n] for n in [0,2]]
     else:
@@ -1219,7 +1255,13 @@ def import_s32p(filename, vic_chnl=1):
             agg_tx_ports = [agg_ports[n] for n in [1,3]]
         else:
             agg_tx_ports = [agg_ports[n] for n in [0,2]]
-        aggs.append(sdd_21(rf.subnetwork(ntwk, concatenate(list(zip(agg_tx_ports, vic_rx_ports))))))
+        sub_ports = concatenate(list(zip(agg_tx_ports, vic_rx_ports)))
+        subntwk = sdd_21(ntwk.subnetwork(sub_ports))
+        if (vic_chnl + agg_chnl) % 2:
+            subntwk.s *= Ane
+        else:
+            subntwk.s *= Afe
+        aggs.append(subntwk)
     return [vic] + aggs
 
 
@@ -1359,12 +1401,16 @@ def interp_s2p(ntwk, f):
     assert rs == cs, "Non-square Touchstone file S-matrix!"
     assert rs == 2, "Touchstone file must have 2 ports!"
 
-    extrap = ntwk.interpolate(f, fill_value="extrapolate", coords="polar", assume_sorted=True)
+    extrap = ntwk.interpolate(
+        # f, fill_value="extrapolate", coords="polar", assume_sorted=True)
+        f, coords="polar", assume_sorted=True, kind="rational")
     assert extrap.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tf: {f}\n\textrap: {extrap}"
     s11 = cap_mag(extrap.s[:, 0, 0])
     s22 = cap_mag(extrap.s[:, 1, 1])
-    s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
-    s21 = ntwk.s21.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
+    # s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
+    # s21 = ntwk.s21.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
+    s12 = cap_mag(extrap.s[:, 0, 1])
+    s21 = cap_mag(extrap.s[:, 1, 0])
     s = np.array(list(zip(zip(s11, s12), zip(s21, s22))))
     if ntwk.name is None:
         ntwk.name = "s2p"
@@ -1515,12 +1561,12 @@ def Zcap(w, C):
     else:
         return -1j / (w * C)
 
-def calc_com(ui, sbr, osf, ser, rlm,
+def calc_com(ui, sbr, osf, ser, rlm, Av, Afe, Ane,
     z, p1, p2, gDC_min, gDC_max, fHP, gHP_min, gHP_max,
     nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
     Add, TxSNR, eta0, sigRj,
     Rd, Cd, Cb, Cp, Ls, Zc, td,
-    mod=0):
+    mod=0, fr=0.75):
     """Calculate the Channel Operating Margin (COM), given single bit response (SBR).
 
     Args:
@@ -1528,9 +1574,13 @@ def calc_com(ui, sbr, osf, ser, rlm,
         sbr([[real]]): Single bit response, uniformly spaced samples, dimmensions KxN, where:
             K is 1 + the number of aggressors (victim occupies first row), and
             N is the length of the response to be considered here.
+            Note that this is assumed to be the response to a *unit magnitude* pulse (i.e. - 0-1V).
         osf(int): Oversampling factor (i.e. - samples per UI).
         ser(real): Target symbol error rate.
         rlm(real): Relative level mismatch (for PAMn).
+        Av(real): Peak differential voltage - victim.
+        Afe(real): Peak differential voltage - far end aggressor.
+        Ane(real): Peak differential voltage - near end aggressor.
         z(complex): Zero in CTLE response (Hz).
         p1(complex): First pole in CTLE response (Hz).
         p2(complex): Second pole in CTLE response (Hz).
@@ -1560,6 +1610,8 @@ def calc_com(ui, sbr, osf, ser, rlm,
     KeywordArgs:
         mod(int): Modulation type (0=NRZ, 1=PAM4).
             Default: 0 (NRZ)
+        fr(real): Relative cutoff frequency for Rx AFE low-pass filter (ui^-1)
+            Default: 0.75
 
     Returns:
         (real, real, [real], [real], int, [real], [real], real, [real], {}): A tuple consisting of:
@@ -1593,7 +1645,7 @@ def calc_com(ui, sbr, osf, ser, rlm,
     w  = 2*pi*f
     s  = 1j*w
     # Construct Rx input filter.
-    r   = s / (2*pi * 0.75/ui)                            # As per COM, f_cutoff = 0.75 f_symb.
+    r   = s / (2*pi * fr/ui)
     Hrx = 105 / (r**4 + 10*r**3 + 45*r**2 + 105*r + 105)  # 4th-order Bessel-Thomson LP
     # Calculate package response.
     Zchnl = 100  # ToDo: Do we have this after a PyBERT run?
@@ -1604,12 +1656,16 @@ def calc_com(ui, sbr, osf, ser, rlm,
     Zin   = Zc * (1 + Rout_dly)/(1 - Rout_dly)  # Impedance looking into the TL.
     Ztot  = 2*Rd + parZ(Zcap(w, Cd*1e-12/2), 1j*w*2*Ls*1e-9 + parZ(Zcap(w, Cb*1e-12/2), Zin))
     Hpkg  = Zload / Ztot
+    # # Normalize SBRs, according to: `Av`, `Afe`, and `Ane`.
+    # sbr = [list(array(sbr[0]) * Av)] + [ list(array(p) * a)
+    #                                      for (p,a) in zip(sbr[1:], [Ane, Afe]*4)
+    #                                    ]
     # Find optimal equalization scheme.
     tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts = com_opt(
         w, sbr, ui, osf, rlm, Hrx * Hpkg**2,
         ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
         nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
-        Add, TxSNR, varRj, eta0, mod=mod, max_iter=5000)
+        Add, TxSNR, varRj, eta0, mod=mod, max_iter=10000)
     sbr_opt   = opt_rslts['sbr_eq']
     cur_ix    = opt_rslts['cur_ix']
     Asig      = opt_rslts['Asig']
@@ -1627,41 +1683,65 @@ def calc_com(ui, sbr, osf, ser, rlm,
     dj_noises = Add * mu_n
     opt_rslts['dj_noises'] = dj_noises
     if len(sbr) > 1:
-        deltas = [ level*Asig + dj_noise + dISI + xtalk
+        deltas = [ Asig*level + xtalk + dj_noise + dISI
                      for level    in levels
-                     for dj_noise in dj_noises
-                     for dISI     in dISI_n
-                     for xtalk    in concatenate([agg[cur_ix::osf] for agg in sbr[1:]])
+                     for dj_noise in [ lvl * n
+                                         for lvl in levels
+                                         for n   in dj_noises
+                                     ]
+                     for dISI     in [ lvl * d
+                                         for lvl in levels
+                                         for d   in dISI_n
+                                     ]
+                     for xtalk    in [ lvl * x
+                                         for lvl in levels
+                                         for x   in concatenate([agg[cur_ix::osf] for agg in sbr[1:]])
+                                     ]
                  ]
     else:       
-        deltas = [ level*Asig + dj_noise + dISI
+        deltas = [ Asig*level + dj_noise + dISI
                      for level    in levels
-                     for dj_noise in dj_noises
-                     for dISI     in dISI_n
+                     for dj_noise in [ lvl * n
+                                         for lvl in levels
+                                         for n   in dj_noises
+                                     ]
+                     for dISI     in [ lvl * d
+                                         for lvl in levels
+                                         for d   in dISI_n
+                                     ]
                  ]
     varG = varTx + varSpec + sum(varRj * mu_n)
     opt_rslts['deltas'] = deltas
     opt_rslts['varG']   = varG
-    gaus = array([exp(-(y**2 / varG)) for y in linspace(-0.5, 0.5, num=1001)])
-    pmf = array(sum([np.roll(gaus, int(delta*1000)) for delta in deltas]))
+    gMin = min(deltas) * 2
+    gMax = max(deltas) * 2
+    opt_rslts['gMin'] = gMin
+    opt_rslts['gMax'] = gMax
+    gaus = array([exp(-(y**2 / varG)) for y in linspace(gMin, gMax, num=1001)])
+    scale = 1000/(gMax-gMin)
+    # pmf = array(sum([np.roll(gaus, int(delta*scale)) for delta in deltas]))
+    # The line above was causing PyBERT to crash w/o Traceback. So, instead...
+    pmf = zeros(len(gaus))
+    for delta in deltas:
+        pmf += np.roll(gaus, int(delta*scale))
     pmf = pmf / sum(pmf)
     cmf = cumsum(pmf)
-    try:
-        if mod:  # PAM4
-            _cmf = abs(cmf*4 - 2)
-        else:    # NRZ
-            _cmf = abs(cmf*2 - 1)
-        open_ixs = where(_cmf < ser)[0]
+    if mod:  # PAM4
+        _cmf = abs(cmf*4 - 2)
+    else:    # NRZ
+        _cmf = abs(cmf*2 - 1)
+    open_ixs = where(_cmf < ser)[0]
+    if len(open_ixs) == 0:
+        ix = 500
+    else:
         left_ix  = open_ixs[0]
         right_ix = open_ixs[-1]
         if (right_ix - 500) < (500 - left_ix):
             ix = right_ix
         else:
             ix = left_ix
-    except:
-        print(pmf)
-        ix = 190
-    Anoise_xtalk = Asig - abs(ix - 500) * 0.001
+    Anoise_xtalk = Asig - abs(ix - 500)/scale
+    assert Anoise_xtalk > 0, "Anoise_xtalk is negative!"
     if Anoise_xtalk == 0:
         print(f"Asig: {Asig}, varG: {varG}, min(deltas): {min(deltas)}, max(deltas): {max(deltas)}\ndISI_n: {dISI_n}")
 
@@ -1669,7 +1749,7 @@ def calc_com(ui, sbr, osf, ser, rlm,
 
 def com_opt(w, sbr, ui, osf, rlm, Hdev, ctle_gen, gDC_min, gDC_max, gHP_min, gHP_max,
     nTx, tx_min, tx_max, nDFE, dfe_min, dfe_max,
-    Add, TxSNR, varRj, eta0, mod=0, max_iter=50):
+    Add, TxSNR, varRj, eta0, mod=0, max_iter=1000):
     """Optimize EQ for COM calculation.
     
     Args:
@@ -1719,22 +1799,23 @@ def com_opt(w, sbr, ui, osf, rlm, Hdev, ctle_gen, gDC_min, gDC_max, gHP_min, gHP
         ctle_gain = args[nTx]
         hp_gain   = args[nTx+1]
         dfe_taps  = args[nTx+2:]
-        tx_ffe_h  = np.zeros(osf*nTx, dtype=tx_taps.dtype)
+        tx_taps   = np.insert(tx_taps, -1, 1 - sum([abs(t) for t in tx_taps]))
+        tx_ffe_h  = np.zeros(osf*len(tx_taps), dtype=tx_taps.dtype)
         tx_ffe_h[::osf] = tx_taps
-        tx_ffe_H  = rfft(tx_ffe_h, n=n_samps)
-        tx_ffe_H *= sum(tx_taps) / abs(tx_ffe_H[0])
         ctle_H    = ctle_gen(ctle_gain, hp_gain, w)
         ctle_h    = irfft(ctle_H)
-        ctle_h    = roll(ctle_h, (nTx-2)*osf)       # Line up w/ Tx FFE main tap.
         ctle_s    = cumsum(ctle_h)                  # Use step response to scale impulse response,
         ctle_h   *= abs(ctle_H[0]) / ctle_s[-1]     # since we know our desired d.c. gain.
-        Heq       = Hdev * tx_ffe_H * ctle_H        # Complete freq. resp. of Tx/Rx pair.
-        heq       = irfft(Heq)
-        seq       = cumsum(heq)                     # Use step response to scale impulse response,
-        heq      *= abs(Heq[0]) / seq[-1]           # since we know our desired d.c. gain.
+        hdev      = irfft(Hdev)
+        sdev      = cumsum(hdev)                    # Use step response to scale impulse response,
+        hdev     *= abs(Hdev[0]) / sdev[-1]         # since we know our desired d.c. gain.
+        heq       = convolve( convolve( tx_ffe_h
+                                      , ctle_h)
+                            , hdev)
+        heq, _    = trim_impulse(heq, front_porch=False)
         sbr_eq    = convolve(sbr[0], heq)[:n_samps]
         cur_ix, ui_height = pulse_center(sbr_eq, osf)
-        Asig      = sbr_eq[cur_ix]  # ToDo: Do we need to scale this?
+        Asig      = sbr_eq[cur_ix]
         sbr_tail  = sbr_eq[cur_ix+osf::osf]
         dISI      = sbr_tail - pad(dfe_taps*Asig, (0, len(sbr_tail) - len(dfe_taps)),
                                      mode='constant', constant_values=0)
@@ -1749,7 +1830,9 @@ def com_opt(w, sbr, ui, osf, rlm, Hdev, ctle_gen, gDC_min, gDC_max, gHP_min, gHP
         if mod:
             varJ *= 5/9
         varSpec  = sum(abs(ctle_H)**2) * eta0
-        varXtalk = sum([sum(agg[cur_ix::osf]**2) for agg in sbr[1:]])
+        varXtalk = sum([ sum(agg[cur_ix::osf]**2)
+                         for agg in map(lambda p: convolve(p, heq)[:n_samps], sbr[1:])
+                       ])
         if mod:
             varXtalk *= 5/9
 
@@ -1761,29 +1844,50 @@ def com_opt(w, sbr, ui, osf, rlm, Hdev, ctle_gen, gDC_min, gDC_max, gHP_min, gHP
         opt_rslts['mu_n']    = mu_n
         opt_rslts['varJ']    = varJ
         opt_rslts['varSpec'] = varSpec
+        opt_rslts['varXtalk'] = varXtalk
         opt_rslts['dISI']    = dISI
         opt_rslts['tx_ffe_h'] = tx_ffe_h
-        opt_rslts['tx_ffe_H'] = tx_ffe_H
         opt_rslts['ctle_h']   = ctle_h
         opt_rslts['ctle_H']   = ctle_H
-        opt_rslts['Htot']     = Heq
+        opt_rslts['sbr_tail'] = sbr_tail
 
         # Returned result is negated, because `scipy.optimize` only offers a `minimize()` function.
-        return -Asig**2 / (varTx + varISI + varJ + varXtalk + varSpec)
+        # return -Asig**2 / (varTx + varISI + varJ + varXtalk + varSpec)
+        return (varTx + varISI + varJ + varXtalk + varSpec) / Asig**2
 
-    bounds = list(zip(tx_min, tx_max)) \
-           + [(pow(10, gDC_min/20), pow(10, gDC_max/20))] + [(pow(10, gHP_min/20), pow(10, gHP_max/20))] \
-           + list(zip(dfe_min, dfe_max))
-    cons   = {"type": "ineq", "fun": lambda x: 1 - sum(abs(x[:nTx]))}
-    res = minimize(fom, append(append(append(zeros(nTx - 2), array([1, 0])), array([1,1])), zeros(nDFE)),
-        bounds=bounds,
-        constraints=cons,
-        method="trust-constr",
-        options={"disp": False, "maxiter": max_iter},
-    )
-    if not res.success:
-        print(f"Optimizer failed with: {res.message}")
+    bounds = array(
+        list(zip(tx_min, tx_max)) +
+        [(pow(10, gDC_min/20), pow(10, gDC_max/20))] +
+        [(pow(10, gHP_min/20), pow(10, gHP_max/20))] +
+        list(zip(dfe_min, dfe_max)) )
+    maxs = array(list(map(lambda pr: pr[1], bounds)))
+    mins = array(list(map(lambda pr: pr[0], bounds)))
+    ranges = maxs - mins
+    # Note: Don't set initial values equal to upper bounds!
+    x0 = array(list(map(lambda pr: (pr[0] + pr[1])/2, bounds)))  # average of upper/lower bounds
+    ress = []
+    perturbs = []
+    for n in range(20):
+        try:
+            res = minimize(fom, x0,
+                bounds=bounds,
+                method="Nelder-Mead",
+                options={"disp": True, "maxiter": max_iter},
+            )
+        except:
+            print(f"bounds: {bounds}")
+            print(f"x0: {x0}")
+            raise
+        if not res.success:
+            print(f"Optimizer failed with: {res.message}")
+        ress.append(res)
+        perturb = uniform((mins - res.x)/(n+1), (maxs - res.x)/(n+1))
+        perturbs.append(perturb)
+        x0 = res.x + perturb
+    opt_rslts['ress'] = ress
+    opt_rslts['perturbs'] = perturbs
     tx_taps   = res.x[:nTx]
+    tx_taps   = np.insert(tx_taps, -1, 1 - sum([abs(t) for t in tx_taps]))
     ctle_gain = res.x[nTx]
     hp_gain   = res.x[nTx+1]
     dfe_taps  = res.x[nTx+2:]
@@ -1800,7 +1904,7 @@ def t_from_f(f):
     raise RuntimeError("Not yet implemented.")
 
 
-def calc_sbr(s2p, ui, Zt=None):
+def calc_sbr(s2p, ui, Zt=None, fstep=10e6):
     """Calculate the single bit response of a 2-port network.
 
     Args:
@@ -1810,32 +1914,33 @@ def calc_sbr(s2p, ui, Zt=None):
     KeywordArgs:
         Zt(complex or [complex]): Termination impedance, either scalar or as function of frequency.
             (Default: None)
+        fstep(real): Frequency step to use.
 
     Returns:
         ([real], [real]): Pair consisting of:
             t: Time vector associated w/ calculated SBR (s).
             sbr: Single bit response (SBR) (a.k.a. - pulse response) of network.
     """
-    ts = 1/(2 * s2p.f[-1])  # Sampling frequency = twice Nyquist.
-    t = array([n*ts for n in range(2 * (len(s2p.f) - 1))])  # `f` carries an extra element, for Nyquist.
+    t, h, _, _ = calc_s2p_resp(s2p, Zt=Zt, fstep=fstep)
     dt = t[1] - t[0]
     dn = round(ui/dt)
-    h, H = calc_s2p_resp(s2p, Zt)
     s = cumsum(h)
     assert dn < len(s), f"dn ({dn}) is too large!"
-
     s_shift = pad(s[:-dn], (dn, 0), mode="constant", constant_values=0)
     return (t, s - s_shift)
 
 
-def calc_s2p_resp(s2p, Zt=None):
+def calc_s2p_resp(s2p, Zt=None, fstep=10e6):
     """Calculate the impulse and frequency response of an arbitrarily terminated 2-port network.
 
     Args:
         s2p(skrf.Network): 2-port network representing the channel.
 
     KeywordArgs:
-        Zt(complex or [complex]): Termination impedance, either scalar or as function of frequency.
+        Zt(real -> complex): Function from frequency (Hz) to response.
+            Default: None (i.e. - no renormalization occurs.)
+        fstep(real): Frequency step to use (Hz).
+            Default: 10 MHz
 
     Returns:
         ([real], [complex]): A pair consisting of:
@@ -1844,15 +1949,35 @@ def calc_s2p_resp(s2p, Zt=None):
     """
     s2p_term = s2p.copy()
     if Zt is not None:
-        assert len(Zt) == 1 or len(Zt) == len(s2p.f), \
-            "Zt must be a scalar or have the same length as network frequency vector!"
         s2p_term_z0 = s2p.z0.copy()
-        s2p_term_z0[:, 1] = Zt
-        s2p_term.renormalize(s2p_term_z0)
+        s2p_term_z0[:, 1] = array(list(map(Zt, s2p.f)))
+        try:
+            s2p_term.renormalize(s2p_term_z0)
+        except:
+            print(s2p_term_z0)
+            raise
+
+    # Ensure uniform frequency sampling down to d.c.
+    fmax = s2p_term.f[-1]
+    f = arange(fstep, fmax+fstep, fstep)  # "+fstep" so fmax will actually be included.
+    s2p_resamp = s2p_term.interpolate(f).extrapolate_to_dc()
+    f = s2p_resamp.f
+
+    # ToDo: Use SciKit-RF `impulse_response()` and `step_response()`?
+
     # We take the transfer function, H, to be a ratio of voltages.
     # So, we must normalize our (now generalized) S-parameters.
-    H = s2p_term.s21.s.flatten() * np.sqrt(s2p_term.z0[:, 1] / s2p_term.z0[:, 0])
-    h = irfft(H)
+    H = s2p_resamp.s21.s.flatten() * np.sqrt(s2p_resamp.z0[:, 1] / s2p_resamp.z0[:, 0])
+
+    # Apply windowing, to eliminate artifacts.
+    win = (cos(pi * f / fmax) + 1)/2
+    Hwin = H * win
+
+    # Calculate impulse response and associated time vector.
+    h = irfft(Hwin)
     s = cumsum(h)
-    h *= abs(H[0]) / s[-1]  # Scale for proper d.c. value.
-    return (h, H)
+    h *= abs(Hwin[0]) / s[-1]  # Scale for proper d.c. value.
+    ts = 0.5/fmax
+    t = array([n*ts for n in range(len(h))])
+
+    return (t, h, f, Hwin)

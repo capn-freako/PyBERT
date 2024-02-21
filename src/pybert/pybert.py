@@ -26,8 +26,8 @@ import numpy as np
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
 from numpy import (
-    append, array, convolve, cos, exp, linspace, logspace,
-    log10, ones, pad, pi, sinc, where, zeros)
+    append, array, convolve, cos, cumsum, diff, exp, linspace, logspace,
+    log10, ones, pad, pi, roll, sinc, where, zeros)
 from numpy.fft import fft, irfft
 from numpy.random import randint
 from scipy.interpolate import interp1d
@@ -280,12 +280,17 @@ class PyBERT(HasTraits):
     console_log = String("PyBERT Console Log\n\n")
 
     # COM
+    kMaxTxTaps   = 7
+    kMaxDFETaps  = 20
     standard = Map(
         {
             "IEEE-802.3ck": {
                 # General
                 "ser": 1e-4,
                 "R_LM": 0.95,
+                "Av":  0.4,  # victim
+                "Afe": 0.4,  # far end aggressor
+                "Ane": 0.6,  # near end aggressor
                 # Noise
                 "Add": 0.02,  # (UI)
                 "TxSNR": 33,  # (dB)
@@ -301,11 +306,9 @@ class PyBERT(HasTraits):
                 "gHP_min":  -6, # (dB)
                 "gHP_max":   0, # (dB)
                 # Tx FFE
-                "nTx": 5,
                 "tx_min": [-0.06, 0, -0.34, 0.54, -0.2],
                 "tx_max": [0, 0.12, 0, 1, 0],
                 # Rx DFE
-                "nDFE": 12,
                 "dfe_min": [0.3, 0.05] + [-0.03]*10,
                 "dfe_max": [0.85, 0.3] + [0.2]*10,
                 # Die & Package
@@ -321,6 +324,9 @@ class PyBERT(HasTraits):
                 # General
                 "ser": 1e-4,
                 "R_LM": 0.95,
+                "Av":  0.4,  # victim
+                "Afe": 0.4,  # far end aggressor
+                "Ane": 0.6,  # near end aggressor
                 # Noise
                 "Add": 0.02,  # (UI)
                 "TxSNR": 33,  # (dB)
@@ -336,11 +342,9 @@ class PyBERT(HasTraits):
                 "gHP_min":  -6, # (dB)
                 "gHP_max":   0, # (dB)
                 # Tx FFE
-                "nTx": 5,
                 "tx_min": [0,0,0,1,0],
                 "tx_max": [0,0,0,1,0],
                 # Rx DFE
-                "nDFE": 12,
                 "dfe_min": [0.3, 0.05] + [-0.03]*10,
                 "dfe_max": [0.85, 0.3] + [0.2]*10,
                 # Die & Package
@@ -351,6 +355,48 @@ class PyBERT(HasTraits):
                 "Ls": 0.120,  # (nH)
                 "Zc": 78,     # (Ohms)
                 "td": 60,     # (ps)
+            },
+            "IEEE-802.3by_Pkg2": {
+                # General
+                "fb": 25.78125,  # (GBaud)
+                "M": 32,
+                "ser": 1e-5,
+                "L": 2,
+                "R_LM": 1.0,
+                "Av":  0.4,  # victim
+                "Afe": 0.4,  # far end aggressor
+                "Ane": 0.6,  # near end aggressor
+                # Noise
+                "Add": 0.05,  # (UI)
+                "TxSNR": 27,  # (dB)
+                "eta0": 5.20E-08,  # (V^2/GHz)
+                "sigma_Rj": 0.01,  # (UI)
+                # CTLE
+                "z":   6.445,  # (GHz)
+                "p1":  6.445,  # (GHz)
+                "p2": 25.78125,  # (GHz)
+                "fHP": 0.001,  # (GHz)
+                "gDC_min": -12, # (dB)
+                "gDC_max":   0, # (dB)
+                "gHP_min":   0, # (dB)
+                "gHP_max":   0, # (dB)
+                # Tx FFE
+                #          c(-1)  c(+1)
+                "tx_min": [-0.18, -0.38],
+                "tx_max": [ 0.00,  0.00],
+                # Rx DFE
+                "fr": 0.75,  # (fb)
+                "dfe_min": [-1.0]*14,
+                "dfe_max": [ 1.0]*14,
+                # Die & Package
+                "Rd": 55,     # (Ohms)
+                "Cd": 0.250,  # (pF)
+                # "Cb": 0.000,  # (pF)
+                "Cb": 0.010,  # (pF)
+                "Cp": 0.180,  # (pF)
+                "Ls": 0.000,  # (nH)
+                "Zc": 78.2,     # (Ohms)
+                "td": 200,    # (ps)
             },
         },
         default_value="IEEE-802.3ck",
@@ -374,21 +420,21 @@ class PyBERT(HasTraits):
     com_gHP_max = Float(0)
     nTx         = 5
     com_nTx     = Int(nTx)
-    com_tx_min  = Array(shape=(1, nTx), dtype=float, value=[[-0.06, 0, -0.34, 0.54, -0.2],])
-    com_tx_max  = Array(shape=(1, nTx), dtype=float, value=[[0, 0.12, 0, 1, 0],])
+    com_tx_min  = Array(shape=(1, (1, kMaxTxTaps)), dtype=float, value=[[-0.06, 0, -0.34, 0.54, -0.2],])
+    com_tx_max  = Array(shape=(1, (1, kMaxTxTaps)), dtype=float, value=[[0, 0.12, 0, 1, 0],])
     nDFE        = 12
     com_nDFE    = Int(nDFE)
-    com_dfe_lim = Array( shape=(4, nDFE), dtype=float
+    com_dfe_lim = Array( shape=(4, (1, kMaxDFETaps)), dtype=float
                        , value=[ array(range(nDFE)) + 1     # tap #
                                , [0.30, 0.05] + [-0.03]*10  # allowed minimums
                                , [0.85, 0.30] + [ 0.20]*10  # allowed maximums
                                , ones(nDFE)                 # dummy row, due to GUI weirdness
                                ]
                        )
-    com_tx_taps   = Array(shape=(1, nTx), dtype=float, value=[[0]*(nTx-2) + [1, 0],])
+    com_tx_taps   = Array(shape=(1, (1, kMaxTxTaps)), dtype=float, value=[[0]*(nTx-2) + [1, 0],])
     com_ctle_gain = Float(1)
     com_hp_gain   = Float(1)
-    com_dfe_taps  = Array( shape=(3, nDFE), dtype=float
+    com_dfe_taps  = Array( shape=(3, (1, kMaxDFETaps)), dtype=float
                          , value=[ array(range(nDFE)) + 1  # tap #
                                  , zeros(nDFE)             # final tap values
                                  , ones(nDFE)              # dummy row, due to GUI weirdness
@@ -623,18 +669,17 @@ class PyBERT(HasTraits):
 
     def _btn_com_fired(self):
         self.calc_chnl_h()
-        ui = self.ui
-        nspb = self.nspb
-        chnl_p = self.chnl_p
-        t = self.t[:len(chnl_p)]
-        Ts = t[1] - t[0]
+        ui     = self.ui
+        nspb   = self.nspb
+        chnl_p = self.com_chnl_p
+        t      = self.t[:len(chnl_p)]
+        Ts     = t[1] - t[0]
+        sbr    = [chnl_p]
         if self.do_xtalk:
-            sbr = [chnl_p] + self.agg_ps
-        else:
-            sbr = [chnl_p]
-        self.sbr = sbr  # for debugging
+            sbr += self.agg_ps
+        self.com_sbrs = sbr  # for debugging
         (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts) = calc_com(
-            ui, sbr, nspb, self.com_ser, self.com_rlm, 
+            ui, sbr, nspb, self.com_ser, self.com_rlm, self.com_Av, self.com_Afe, self.com_Ane,
             -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
             self.com_gDC_min, self.com_gDC_max, self.com_fHP*1e9, self.com_gHP_min, self.com_gHP_max,
             self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
@@ -648,12 +693,13 @@ class PyBERT(HasTraits):
         self.com_pmf = pmf
         self.com_cmf = cmf
         self.com_loc = loc
-        self.com_tx_taps   = tx_taps.reshape((1, self.com_nTx))
+        self.com_tx_taps   = tx_taps.reshape((1, self.com_nTx + 1))
         self.com_ctle_gain = ctle_gain
         self.com_hp_gain   = hp_gain
         self.com_dfe_taps[1]  = dfe_taps.reshape((1, self.com_nDFE))
         self.opt_rslts = opt_rslts
         self.plotdata.set_data("com_tns",      self.t_ns_chnl)
+        self.plotdata.set_data("com_bins",     linspace(opt_rslts['gMin'], opt_rslts['gMax'], 1001))
         self.plotdata.set_data("com_pmf",      pmf/max(pmf))  # for better plot visibility
         self.plotdata.set_data("com_cmf",      cmf)
         self.plotdata.set_data("com_sbr",      sbr_opt)
@@ -662,9 +708,9 @@ class PyBERT(HasTraits):
         self.plotdata.set_data("com_fGHz",  opt_rslts['f'] / 1e9)
         self.plotdata.set_data("com_Hrx",   20.0 * safe_log10(abs(opt_rslts['Hrx'])))
         self.plotdata.set_data("com_Hpkg",  20.0 * safe_log10(abs(opt_rslts['Hpkg'])))
-        self.plotdata.set_data("com_Hffe",  20.0 * safe_log10(abs(opt_rslts['tx_ffe_H'])))
+        # self.plotdata.set_data("com_Hffe",  20.0 * safe_log10(abs(opt_rslts['tx_ffe_H'])))
         self.plotdata.set_data("com_Hctle", 20.0 * safe_log10(abs(opt_rslts['ctle_H'])))
-        self.plotdata.set_data("com_Htot",  20.0 * safe_log10(abs(opt_rslts['Htot'])))
+        # self.plotdata.set_data("com_Htot",  20.0 * safe_log10(abs(opt_rslts['Htot'])))
 
     # Independent variable setting intercepts
     # (Primarily, for debugging.)
@@ -1449,25 +1495,22 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.com_z       = param_vals["z"]
         self.com_p1      = param_vals["p1"]
         self.com_p2      = param_vals["p2"]
-        nTx              = param_vals["nTx"]
+        nTx              = len(param_vals["tx_max"])
         self.com_nTx     = nTx
+        # self.com_tx_min.resize((1, nTx))
         self.com_tx_min  = [param_vals["tx_min"],]
+        # self.com_tx_max.resize((1, nTx))
         self.com_tx_max  = [param_vals["tx_max"],]
-        nDFE             = param_vals["nDFE"]
+        nDFE             = len(param_vals["dfe_max"])
         self.com_nDFE    = nDFE
         self.com_dfe_lim = [ array(range(nDFE)) + 1
                            , param_vals["dfe_min"]
                            , param_vals["dfe_max"]
                            , ones(nDFE)
                            ]
+        # self.com_tx_taps.reshape(1, nTx)
         self.com_tx_taps   = [[0]*(nTx-2) + [1, 0],]
         self.com_ctle_gain = 1
-        # self.com_dfe_taps  = Array( shape=(3, nDFE), dtype=float
-        #                           , value=[ array(range(nDFE)) + 1
-        #                                   , zeros(nDFE)
-        #                                   , ones(nDFE)
-        #                                   ]
-        #                           )
         self.com_dfe_taps  = [ array(range(nDFE)) + 1
                              , zeros(nDFE)
                              , ones(nDFE)
@@ -1485,6 +1528,9 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.com_Ls        = param_vals["Ls"]
         self.com_Zc        = param_vals["Zc"]
         self.com_td        = param_vals["td"]
+        self.com_Av        = param_vals["Av"]
+        self.com_Afe       = param_vals["Afe"]
+        self.com_Ane       = param_vals["Ane"]
 
     def _ch_file_changed(self, new_value):
         extension = splitext(new_value)[1][1:]
@@ -1534,7 +1580,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.aggressors = []
         if self.use_ch_file:
             ch_s2p_pre, self.aggressors = import_channel(
-                self.ch_file, ts, f, vic_chnl_ix=self.victim_chnl_ix)
+                self.ch_file, ts, f, self.com_Av, self.com_Afe, self.com_Ane,
+                vic_chnl_ix=self.victim_chnl_ix)
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
@@ -1602,28 +1649,67 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.ch_s2p = ch_s2p
 
         # Calculate channel impulse response.
-        Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
-        chnl_h, chnl_H = calc_s2p_resp(ch_s2p, Zt)
-        chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
-        min_len = 20 * nspui
+        def apply_Zt(s2p, _Zt, _min_len, _max_len, fstep=10e6, front_porch=True):
+            chnl_t, chnl_h, chnl_f, chnl_H = calc_s2p_resp(s2p, _Zt, fstep=fstep)
+            spl = interp1d(chnl_t, chnl_h, bounds_error=False, fill_value=0)
+            chnl_h = spl(t)
+            chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
+            chnl_h, start_ix = trim_impulse(
+                chnl_h, min_len=_min_len, max_len=_max_len, front_porch=front_porch)
+            chnl_s = cumsum(chnl_h)
+            chnl_h *= abs(chnl_H[0]) / chnl_s[-1]
+            return chnl_h, chnl_f, chnl_H, start_ix, chnl_dly
+
+        # Do it for PyBERT.
+        min_len =  30 * nspui
         max_len = 100 * nspui
         if impulse_length:
             min_len = max_len = impulse_length / ts
-        chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
-        end_ix = start_ix + len(chnl_h)  # For properly sizing aggressor responses, below.
+
+        def Zt(f):
+            """Rx termination impedance generator.
+            """
+            return RL / (1 + 1j * 2*pi*f * RL * Cp)
+
+        chnl_h, chnl_f, chnl_H, start_ix, chnl_dly = apply_Zt(
+            ch_s2p, Zt, min_len, max_len, fstep=self.f_step*1e6)
+        chnl_s = chnl_h.cumsum()
+        chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
         temp = chnl_h.copy()
         temp.resize(len(t), refcheck=False)
         chnl_trimmed_H = fft(temp)
 
-        chnl_s = chnl_h.cumsum()
-        chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
+        # Do it for COM, which takes care of modeling the Rx AFE itself.
+        min_len = max_len = len(chnl_h)
 
+        def Zt(f):
+            """Rx termination impedance generator.
+            """
+            return RL
+
+        com_chnl_h, com_chnl_f, com_chnl_H, _, _ = apply_Zt(
+            ch_s2p, Zt, min_len, max_len, fstep=self.f_step*1e6)
+        com_chnl_s = com_chnl_h.cumsum()
+        com_chnl_p = com_chnl_s - pad(com_chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
         if self.aggressors:
-            self.agg_hs, self.agg_Hs = list(zip(*[calc_s2p_resp(agg, Zt) for agg in self.aggressors]))
-            self.agg_hs = [ h[start_ix : end_ix] for h in self.agg_hs]
+            def init_edge(x):
+                """Locate the initial edge in a signal vector.
+                """                
+                x_diff         = diff(x)
+                x_diff_abs     = abs(x_diff)
+                x_diff_abs_max = max(x_diff_abs)
+                return where(x_diff_abs > 0.2*x_diff_abs_max)[0][0]
+
+            com_chnl_p_init = init_edge(com_chnl_p)
+            self.agg_hs, self.agg_fs, self.agg_Hs, _, _ = list(
+                zip(*[ apply_Zt(agg, Zt, min_len, max_len, fstep=self.f_step*1e6)
+                       for agg in self.aggressors
+                     ]) )
             self.agg_ss = [h.cumsum() for h in self.agg_hs]
-            self.agg_ps = [ s - pad( s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
+            agg_ps      = [ s - pad( s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
                             for s in self.agg_ss ]
+            self.agg_ps = list(map( lambda x: roll(x, com_chnl_p_init - init_edge(x))
+                                  , agg_ps))
 
         self.chnl_h = chnl_h
         self.len_h = len(chnl_h)
@@ -1634,6 +1720,9 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.t_ns_chnl = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
         self.chnl_s = chnl_s
         self.chnl_p = chnl_p
+        self.com_chnl_h = com_chnl_h
+        self.com_chnl_s = com_chnl_s
+        self.com_chnl_p = com_chnl_p
 
         return chnl_h
 
