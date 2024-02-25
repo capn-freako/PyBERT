@@ -110,6 +110,22 @@ traits_view = View(
                         label="Impulse Response Length (ns)",
                         tooltip="Manual impulse response length override",
                     ),
+                    HGroup(
+                        Item(
+                            name="f_max",
+                            label="Maximum Frequency",
+                            tooltip="Max. frequency to use in generating H(f).",
+                        ),
+                        Item(label="GHz"),
+                    ),
+                    HGroup(
+                        Item(
+                            name="f_step",
+                            label="Frequency Step",
+                            tooltip="Frequency step to use in generating H(f).",
+                        ),
+                        Item(label="MHz"),
+                    ),
                     Item(
                         name="thresh",
                         label="Pj Threshold (sigma)",
@@ -186,13 +202,6 @@ traits_view = View(
                                     label="Use File",
                                     enabled_when="ch_file_valid == True",
                                 ),
-                                Item(
-                                    name="f_step",
-                                    label="f_step",
-                                    tooltip="Frequency step to use in generating H(f).",
-                                    enabled_when="use_ch_file == True",
-                                ),
-                                Item(label="MHz"),
                             ),
                             HGroup(
                                 Item(

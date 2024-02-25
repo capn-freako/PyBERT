@@ -343,6 +343,8 @@ def calc_jitter(
         t_jitter.append(ideal_xing)
     jitter = array(jitter)
 
+    assert len(jitter) > 0 and len(t_jitter) > 0, "No crossings found!"
+
     if debug:
         print("mean(jitter):", mean(jitter))
         print("len(jitter):", len(jitter))
@@ -386,7 +388,12 @@ def calc_jitter(
 
     # -- Make TIE vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
     # spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
-    spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
+    try:
+        spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
+    except:
+        print(f"t_jitter: {t_jitter}")
+        print(f"jitter: {jitter}")
+        raise
     tie_interp = spl(t)
     y = fft(tie_interp)
     jitter_spectrum = abs(y[:half_len])
@@ -949,7 +956,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     return rf.Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_channel(filename, sample_per, fs, Av, Afe, Ane, zref=100, vic_chnl_ix=1):
+def import_channel(filename, sample_per, fs, Av, Afe, Ane, zref=100, vic_chnl_ix=1, renumber=False):
     """Read in a channel description file.
 
     Args:
@@ -958,8 +965,12 @@ def import_channel(filename, sample_per, fs, Av, Afe, Ane, zref=100, vic_chnl_ix
         fs([real]): (Positive only) frequency values being used by caller (Hz).
 
     KeywordArgs:
-        zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
-        vic_chnl_ix(int): Victim channel number (from 1). (Default = 1)
+        zref(real): Reference impedance (Ohms), for time domain files.
+            Default = 100
+        vic_chnl_ix(int): Victim channel number (from 1).
+            Default = 1
+        renumber(bool): Automatically detect/fix "1=>3/2=>4" port numbering, when True.
+            Default = False
 
     Returns:
         (skrf.Network, [skrf.Network]): Pair consisting of:
@@ -984,23 +995,23 @@ def import_channel(filename, sample_per, fs, Av, Afe, Ane, zref=100, vic_chnl_ix
         port 2 of all returned networks corresponds to the same physical node,
         the victim Rx node.
     """
-    assert vic_chnl_ix > 0 and vic_chnl_ix <= 8, f"Victim index ({vic_chnl_ix}) out of range!"
     aggs = []
     extension = os.path.splitext(filename)[1][1:]
     tstone_ext = re.match(r"^s(\d+)p$", extension, re.ASCII | re.IGNORECASE)
     if tstone_ext:  # Touchstone file?
         n_ports = int(tstone_ext.group(1))
         if n_ports == 32:
+            assert vic_chnl_ix > 0 and vic_chnl_ix <= 8, f"Victim index ({vic_chnl_ix}) out of range!"
             ntwks = import_s32p(filename, Av, Afe, Ane, vic_chnl_ix)
             assert ntwks[0].f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tntwks[0] = {ntwks[0]}"
-            # chnls = list(map(lambda ntwk: interp_s2p(ntwk, fs), ntwks))
-            # ts2N  = chnls[0]
             ts2N  = ntwks[0]
             assert ts2N.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tfs = {fs}\n\tts2N = {ts2N}"
-            # aggs = chnls[1:]
             aggs = ntwks[1:]
         else:
-            ts2N = interp_s2p(import_freq(filename), fs)
+            ts2N = import_freq(
+                filename, renumber=renumber
+                ).extrapolate_to_dc().windowed(normalize=False).interpolate(
+                    fs, coords='polar', bounds_error=False, fill_value='extrapolate')
     else:  # simple 2-column time domain description (impulse or step).
         h = import_time(filename, sample_per)
         # Fixme: an a.c. coupled channel breaks this naive approach!
@@ -1122,7 +1133,6 @@ def se2mm(ntwk, norm=0.5, renumber=False):
     assert rs == 4, "Touchstone file must have 4 ports!"
 
     # Detect/correct "1 => 3" port numbering if requested.
-    # ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
     if renumber:
         ix = 1
         if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
@@ -1158,12 +1168,16 @@ def se2mm(ntwk, norm=0.5, renumber=False):
     return rf.Network(frequency=f, s=s, z0=z)
 
 
-def import_freq(filename):
+def import_freq(filename, renumber=False):
     """Read in a 1, 2, or 4-port Touchstone file, and return an equivalent
     2-port network.
 
     Args:
         filename(str): Name of Touchstone file to read in.
+
+    KeywordArgs:
+        renumber(bool): Automatically detect/fix "1=>3/2=>4" port numbering, when True.
+            Default = False
 
     Returns:
         skrf.Network: 2-port network.
@@ -1183,7 +1197,7 @@ def import_freq(filename):
 
     # Convert to a 2-port network.
     if rs == 4:  # 4-port Touchstone files are assumed single-ended!
-        return sdd_21(ntwk)
+        return sdd_21(ntwk, renumber=renumber)
     if rs == 2:
         return ntwk
     return rf.network.one_port_2_two_port(ntwk)
@@ -1381,97 +1395,6 @@ def mon_mag(zs):
     for ix in range(1, len(zs_flat)):
         zs_flat[ix] = rect(min(abs(zs_flat[ix - 1]), abs(zs_flat[ix])), phase(zs_flat[ix]))
     return zs_flat.reshape(zs.shape)
-
-
-def interp_s2p(ntwk, f):
-    """Safely interpolate a 2-port network, by applying certain constraints to
-    any necessary extrapolation.
-
-    Args:
-        ntwk(skrf.Network): The 2-port network to be interpolated.
-        f([real]): The list of new frequency sampling points (Hz).
-
-    Returns:
-        skrf.Network: The interpolated/extrapolated 2-port network.
-
-    Raises:
-        ValueError: If `ntwk` is _not_ a 2-port network.
-    """
-    (fs, rs, cs) = ntwk.s.shape
-    assert rs == cs, "Non-square Touchstone file S-matrix!"
-    assert rs == 2, "Touchstone file must have 2 ports!"
-
-    extrap = ntwk.interpolate(
-        # f, fill_value="extrapolate", coords="polar", assume_sorted=True)
-        f, coords="polar", assume_sorted=True, kind="rational")
-    assert extrap.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tf: {f}\n\textrap: {extrap}"
-    s11 = cap_mag(extrap.s[:, 0, 0])
-    s22 = cap_mag(extrap.s[:, 1, 1])
-    # s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
-    # s21 = ntwk.s21.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
-    s12 = cap_mag(extrap.s[:, 0, 1])
-    s21 = cap_mag(extrap.s[:, 1, 0])
-    s = np.array(list(zip(zip(s11, s12), zip(s21, s22))))
-    if ntwk.name is None:
-        ntwk.name = "s2p"
-    return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
-
-
-# ToDo: Are there any uses of this function remaining? Can we eliminate them?
-def renorm_s2p(ntwk, zs):
-    """Renormalize a simple 2-port network to a new set of port impedances.
-
-    This function was originally written as a check on the
-    `skrf.Network.renormalize()` function, which I was attempting to use
-    to model the Rx termination when calculating the channel impulse
-    response. (See lines 1640-1650'ish of `pybert.py`.)
-
-    In my original specific case, I was attempting to model an open
-    circuit termination. And when I did the magnitude of my resultant
-    S21 dropped from 0 to -44 dB!
-    I didn't think that could possibly be correct.
-    So, I wrote this function as a check on that.
-
-    Args:
-        ntwk(skrf.Network): A 2-port network, which must use the same
-        (singular) impedance at both ports.
-
-        zs(complex array-like): The set of new port impedances to be
-        used. This set of frequencies may be unique for each port and at
-        each frequency.
-
-    Returns:
-        skrf.Network: The renormalized 2-port network.
-    """
-    (Nf, Nr, Nc) = ntwk.s.shape
-    assert Nr == 2 and Nc == 2, "May only be used to renormalize a 2-port network!"
-    assert all(ntwk.z0[:, 0] == ntwk.z0[0, 0]) and all(
-        ntwk.z0[:, 0] == ntwk.z0[:, 1]
-    ), f"May only be used to renormalize a network with equal (singular) reference impedances! z0: {ntwk.z0}"
-    assert zs.shape == (2,) or zs.shape == (
-        len(ntwk.f),
-        2,
-    ), "The list of new impedances must have shape (2,) or (len(ntwk.f), 2)!"
-
-    if zs.shape == (2,):
-        zt = zs.repeat(len(Nf))
-    else:
-        zt = np.array(zs)
-    z0 = ntwk.z0[0, 0]
-    S = ntwk.s
-    I = np.identity(2)
-    Z = []
-    for s in S:
-        Z.append(inv(I - s).dot(I + s))  # Resultant values are normalized to z0.
-    Z = np.array(Z)
-    Zn = []
-    for z, zn in zip(Z, zt):  # Iterration is over frequency and yields: (2x2 array, 2-element vector).
-        Zn.append(z.dot(z0 / zn))
-    Zn = np.array(Zn)
-    Sn = []
-    for z in Zn:
-        Sn.append(inv(z + I).dot(z - I))
-    return rf.Network(s=Sn, f=ntwk.f / 1e9, z0=zs)
 
 
 def getwave_step_resp(ami_model):
@@ -1912,8 +1835,8 @@ def calc_sbr(s2p, ui, Zt=None, fstep=10e6):
         ui(real): Unit interval (s).
 
     KeywordArgs:
-        Zt(complex or [complex]): Termination impedance, either scalar or as function of frequency.
-            (Default: None)
+        Zt(real -> complex): Function from frequency (Hz) to response.
+            Default: None
         fstep(real): Frequency step to use.
 
     Returns:
@@ -1947,31 +1870,25 @@ def calc_s2p_resp(s2p, Zt=None, fstep=10e6):
             h: impulse response, and
             H: frequency response.
     """
-    s2p_term = s2p.copy()
-    if Zt is not None:
-        s2p_term_z0 = s2p.z0.copy()
-        s2p_term_z0[:, 1] = array(list(map(Zt, s2p.f)))
-        try:
-            s2p_term.renormalize(s2p_term_z0)
-        except:
-            print(s2p_term_z0)
-            raise
-
     # Ensure uniform frequency sampling down to d.c.
-    fmax = s2p_term.f[-1]
-    f = arange(fstep, fmax+fstep, fstep)  # "+fstep" so fmax will actually be included.
-    s2p_resamp = s2p_term.interpolate(f).extrapolate_to_dc()
-    f = s2p_resamp.f
+    fmax = s2p.f[-1]
+    f = arange(0, fmax+fstep, fstep)  # "+fstep" so fmax will actually be included.
+    s2p_term = s2p.extrapolate_to_dc().windowed(normalize=False).interpolate(
+        f, bounds_error=False, fill_value='extrapolate')
 
-    # ToDo: Use SciKit-RF `impulse_response()` and `step_response()`?
+    if Zt is not None:
+        new_z0 = s2p_term.z0.copy()
+        new_z0[:, 1] = array(list(map(Zt, f)))
+        try:
+            s2p_term.renormalize(new_z0)
+        except:
+            print(new_z0)
+            print(f)
+            raise
 
     # We take the transfer function, H, to be a ratio of voltages.
     # So, we must normalize our (now generalized) S-parameters.
-    H = s2p_resamp.s21.s.flatten() * np.sqrt(s2p_resamp.z0[:, 1] / s2p_resamp.z0[:, 0])
-
-    # Apply windowing, to eliminate artifacts.
-    win = (cos(pi * f / fmax) + 1)/2
-    Hwin = H * win
+    Hwin = s2p_term.s21.s.flatten() * np.sqrt(s2p_term.z0[:, 1] / s2p_term.z0[:, 0])
 
     # Calculate impulse response and associated time vector.
     h = irfft(Hwin)
@@ -1981,3 +1898,11 @@ def calc_s2p_resp(s2p, Zt=None, fstep=10e6):
     t = array([n*ts for n in range(len(h))])
 
     return (t, h, f, Hwin)
+
+
+def raised_cosine(x):
+    """Apply raised cosine window to input.
+    """
+    len_x = len(x)
+    w = (array([cos(pi * n / len_x) for n in range(len_x)]) + 1) / 2
+    return w * x

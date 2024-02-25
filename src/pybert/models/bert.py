@@ -27,6 +27,7 @@ from numpy import (
     mean,
     ones,
     pad,
+    pi,
     repeat,
     resize,
     std,
@@ -37,6 +38,7 @@ from numpy import (
 from numpy.fft import fft, irfft
 from numpy.random import normal
 from scipy.signal import iirfilter, lfilter
+from scipy.interpolate import interp1d
 
 from pybert.models.dfe import DFE
 from pybert.utility import (
@@ -47,6 +49,7 @@ from pybert.utility import (
     import_channel,
     make_bathtub,
     make_ctle,
+    raised_cosine,
     safe_log10,
     trim_impulse,
 )
@@ -138,6 +141,7 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
+    t_model = self.t_model
     w = self.w
     bits = self.bits
     symbols = self.symbols
@@ -171,12 +175,17 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
     bandwidth = self.sum_bw * 1.0e9
     rel_thresh = self.thresh
     mod_type = self.mod_type[0]
+    impulse_length = self.impulse_length
 
     try:
         # Calculate misc. values.
         fs = bit_rate * nspb
         Ts = t[1]
         ts = Ts
+        min_len =  30 * nspui
+        max_len = 100 * nspui
+        if impulse_length:
+            min_len = max_len = impulse_length / ts
 
         # Generate the ideal over-sampled signal.
         #
@@ -291,7 +300,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     self.status = "Tx GetWave() Error."
                     self.log("ERROR: Never saw a rising step come out of Tx GetWave()!", alert=True)
                     return
-                tx_h, _ = trim_impulse(diff(tx_s))
+                tx_h, _ = trim_impulse(diff(tx_s), min_len=min_len, max_len=max_len)
                 tx_out, _ = tx_model.getWave(self.x)
             else:  # Init()-only.
                 tx_out = convolve(tx_h, self.x)
@@ -435,10 +444,20 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 ctle_H = fft(ctle_h)
                 ctle_H *= sum(ctle_h) / ctle_H[0]
             else:
-                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-                ctle_h = irfft(ctle_H)
-            ctle_h.resize(len(chnl_h), refcheck=False)
-            ctle_out = convolve(rx_in, ctle_h)
+                ctle_w, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
+                ctle_h = irfft(raised_cosine(ctle_H))
+                spl = interp1d(t_model, ctle_h, bounds_error=False, fill_value=0)
+                ctle_h = spl(t)
+                ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
+                spl = interp1d(ctle_w/(2*pi), ctle_H, bounds_error=False, fill_value='extrapolate')
+                ctle_H = spl(self.f_plot)
+            ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
+            try:
+                ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
+            except:
+                print(f"rx_in: {rx_in}")
+                print(f"ctle_h: {ctle_h}")
+                raise
             ctle_out -= mean(ctle_out)  # Force zero mean.
             if self.ctle_mode == "AGC":  # Automatic gain control engaged?
                 ctle_out *= 2.0 * decision_scaler / ctle_out.ptp()
@@ -789,7 +808,7 @@ def update_results(self):
     eye_uis = self.eye_uis
     num_ui = self.nui
     clock_times = self.clock_times
-    f = self.f
+    f = self.f_plot
     t = self.t
     t_ns = self.t_ns
     t_ns_chnl = self.t_ns_chnl
@@ -800,7 +819,7 @@ def update_results(self):
     ignore_samps = (num_ui - eye_uis) * samps_per_ui
 
     # Misc.
-    f_GHz = f[: len(f) // 2] / 1.0e9
+    f_GHz = f / 1.0e9
     len_f_GHz = len(f_GHz)
     len_t = len(t_ns)
     self.plotdata.set_data("f_GHz",        f_GHz[1:])

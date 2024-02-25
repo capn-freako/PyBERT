@@ -26,7 +26,7 @@ import numpy as np
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
 from numpy import (
-    append, array, convolve, cos, cumsum, diff, exp, linspace, logspace,
+    append, arange, array, convolve, cos, cumsum, diff, exp, linspace, logspace,
     log10, ones, pad, pi, roll, sinc, where, zeros)
 from numpy.fft import fft, irfft
 from numpy.random import randint
@@ -65,10 +65,8 @@ from pybert.utility import (
     calc_com,
     calc_gamma,
     calc_s2p_resp,
-    calc_sbr,
     com_opt,
     import_channel,
-    interp_s2p,
     interp_time,
     lfsr_bits,
     make_ctle,
@@ -135,7 +133,8 @@ class PyBERT(HasTraits):
     do_xtalk    = Bool(False)  #: Include crosstalk, for s32p file?     (Default = False)
     ch_is_s32p  = Bool(False)  #: Is channel Touchstone file 32-port?   (Default = False)
     victim_chnl_ix = Range(low=1, high=8, value=1)  #: Victim channel # when s32p given. (Default = 1)
-    f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
+    f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
+    f_max = Float(40)  #: Maximum frequency to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(0.1876)  #: Channel d.c. resistance (Ohms/m).
     w0 = Float(10e6)  #: Channel transition frequency (rads./s).
@@ -402,6 +401,9 @@ class PyBERT(HasTraits):
         default_value="IEEE-802.3ck",
     )
     com         = Float(0)
+    com_Av      = Float(0.4)
+    com_Afe     = Float(0.4)
+    com_Ane     = Float(0.6)
     com_Asig    = Float(0)
     com_loc     = Int(0)
     com_ser     = Float(1e-4)
@@ -490,8 +492,10 @@ class PyBERT(HasTraits):
     rel_opt = Property(Float, depends_on=["cost"])
     t = Property(Array, depends_on=["ui", "nspb", "nbits"])
     t_ns = Property(Array, depends_on=["t"])
-    f = Property(Array, depends_on=["t"])
-    w = Property(Array, depends_on=["f"])
+    f_plot = Property(Array, depends_on=["t"])
+    f_model = Property(Array, depends_on=["f_step", "f_max"])
+    w = Property(Array, depends_on=["f_model"])
+    t_model = Property(Array, depends_on=["f_model"])
     bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count"])
     symbols = Property(Array, depends_on=["bits", "mod_type", "vod"])
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
@@ -740,24 +744,41 @@ class PyBERT(HasTraits):
         return self.t * 1.0e9
 
     @cached_property
-    def _get_f(self):
-        """Calculate the frequency vector appropriate for indexing non-shifted
-        FFT output, in Hz.
-
+    def _get_f_plot(self):
+        """
+        Calculate the frequency vector appropriate for indexing non-shiftedFFT output, in Hz.
         # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
 
-        Note: Changed to positive freqs. only, in conjunction w/ irfft() usage.
+        Note: Changed to positive freqs. only, in conjunction w/ `irfft()` usage.
         """
         t = self.t
         npts = len(t)
         f0 = 1.0 / (t[1] * npts)
-        half_npts = npts // 2
-        return array([i * f0 for i in range(half_npts + 1)])
+        return array([i * f0 for i in range(npts//2 + 1)])
+
+    @cached_property
+    def _get_f_model(self):
+        """
+        Calculate the frequency vector for channel model construction.
+        """
+        fstep = self.f_step * 1e6
+        fmax  = self.f_max  * 1e9
+        return arange(0, fmax+fstep, fstep)  # "+fstep", so fmax gets included
 
     @cached_property
     def _get_w(self):
         """System frequency vector, in rads./sec."""
-        return 2 * pi * self.f
+        return 2 * pi * self.f_model
+
+    @cached_property
+    def _get_t_model(self):
+        """
+        Calculate the equivalent time vector to `f_model`.
+        """
+        f_model = self.f_model
+        tmax = 1 / f_model[1]
+        tstep = 0.5 / f_model[-1]
+        return arange(0, tmax, tstep)
 
     @cached_property
     def _get_bits(self):
@@ -1563,8 +1584,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         """
 
         t = self.t
-        f = self.f
-        w = self.w
+        f = self.f_model
         nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
         Rs = self.rs
@@ -1581,7 +1601,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         if self.use_ch_file:
             ch_s2p_pre, self.aggressors = import_channel(
                 self.ch_file, ts, f, self.com_Av, self.com_Afe, self.com_Ane,
-                vic_chnl_ix=self.victim_chnl_ix)
+                vic_chnl_ix=self.victim_chnl_ix,
+                renumber=True)
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
@@ -1612,7 +1633,9 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             """
             ts4N = rf.Network(ts4f)  # Grab the 4-port single-ended on-die network.
             ntwk = sdd_21(ts4N)  # Convert it to a differential, 2-port network.
-            ntwk2 = interp_s2p(ntwk, s2p.f)  # Interpolate to system freqs.
+            # Interpolate to system freqs.
+            ntwk2 = ntwk.extrapolate_to_dc().windowed(normalize=False).interpolate(
+                s2p.f, coords='polar', bounds_error=False, fill_value='extrapolate')
             if isRx:
                 res = s2p**ntwk2
             else:  # Tx
@@ -1654,11 +1677,11 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             spl = interp1d(chnl_t, chnl_h, bounds_error=False, fill_value=0)
             chnl_h = spl(t)
             chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
-            chnl_h, start_ix = trim_impulse(
+            chnl_h_trim, start_ix = trim_impulse(
                 chnl_h, min_len=_min_len, max_len=_max_len, front_porch=front_porch)
-            chnl_s = cumsum(chnl_h)
-            chnl_h *= abs(chnl_H[0]) / chnl_s[-1]
-            return chnl_h, chnl_f, chnl_H, start_ix, chnl_dly
+            chnl_s_trim = cumsum(chnl_h_trim)
+            chnl_h_trim *= abs(chnl_H[0]) / chnl_s_trim[-1]
+            return chnl_h_trim, chnl_f, chnl_H, start_ix, chnl_dly, chnl_h
 
         # Do it for PyBERT.
         min_len =  30 * nspui
@@ -1671,13 +1694,16 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             """
             return RL / (1 + 1j * 2*pi*f * RL * Cp)
 
-        chnl_h, chnl_f, chnl_H, start_ix, chnl_dly = apply_Zt(
+        chnl_h, chnl_f, chnl_H, start_ix, chnl_dly, chnl_h_orig = apply_Zt(
             ch_s2p, Zt, min_len, max_len, fstep=self.f_step*1e6)
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
         temp = chnl_h.copy()
         temp.resize(len(t), refcheck=False)
-        chnl_trimmed_H = fft(temp)
+        chnl_trimmed_H = fft(temp)  # Has a different fundamental freq.!
+        chnl_trimmed_H *= abs(chnl_H[0]) / abs(chnl_trimmed_H[0])
+        spl = interp1d(chnl_f, chnl_H, bounds_error=False, fill_value=0)
+        chnl_H = spl(self.f_plot)
 
         # Do it for COM, which takes care of modeling the Rx AFE itself.
         min_len = max_len = len(chnl_h)
@@ -1687,7 +1713,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             """
             return RL
 
-        com_chnl_h, com_chnl_f, com_chnl_H, _, _ = apply_Zt(
+        com_chnl_h, com_chnl_f, com_chnl_H, _, _, _ = apply_Zt(
             ch_s2p, Zt, min_len, max_len, fstep=self.f_step*1e6)
         com_chnl_s = com_chnl_h.cumsum()
         com_chnl_p = com_chnl_s - pad(com_chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
@@ -1701,7 +1727,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
                 return where(x_diff_abs > 0.2*x_diff_abs_max)[0][0]
 
             com_chnl_p_init = init_edge(com_chnl_p)
-            self.agg_hs, self.agg_fs, self.agg_Hs, _, _ = list(
+            self.agg_hs, self.agg_fs, self.agg_Hs, _, _, _ = list(
                 zip(*[ apply_Zt(agg, Zt, min_len, max_len, fstep=self.f_step*1e6)
                        for agg in self.aggressors
                      ]) )
