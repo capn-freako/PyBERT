@@ -375,14 +375,13 @@ class PyBERT(HasTraits):
                 "p1":  6.445,  # (GHz)
                 "p2": 25.78125,  # (GHz)
                 "fHP": 0.001,  # (GHz)
-                "gDC_min": -12, # (dB)
-                "gDC_max":   0, # (dB)
-                "gHP_min":   0, # (dB)
-                "gHP_max":   0, # (dB)
+                "gDC": [-n for n in range(13)], # (dB)
+                "gHP": [0], # (dB)
                 # Tx FFE
                 #          c(-1)  c(+1)
                 "tx_min": [-0.18, -0.38],
                 "tx_max": [ 0.00,  0.00],
+                "tx_step": [ 0.02,  0.02],
                 # Rx DFE
                 "fr": 0.75,  # (fb)
                 "dfe_min": [-1.0]*14,
@@ -424,6 +423,7 @@ class PyBERT(HasTraits):
     com_nTx     = Int(nTx)
     com_tx_min  = Array(shape=(1, (1, kMaxTxTaps)), dtype=float, value=[[-0.06, 0, -0.34, 0.54, -0.2],])
     com_tx_max  = Array(shape=(1, (1, kMaxTxTaps)), dtype=float, value=[[0, 0.12, 0, 1, 0],])
+    com_tx_step = Array(shape=(1, (1, kMaxTxTaps)), dtype=float, value=[[0.02, 0.02, 0.02, 0.02, 0.02],])
     nDFE        = 12
     com_nDFE    = Int(nDFE)
     com_dfe_lim = Array( shape=(4, (1, kMaxDFETaps)), dtype=float
@@ -678,15 +678,15 @@ class PyBERT(HasTraits):
         chnl_p = self.com_chnl_p
         t      = self.t[:len(chnl_p)]
         Ts     = t[1] - t[0]
-        sbr    = [chnl_p]
+        sbr    = [(chnl_p, 'THRU')]
         if self.do_xtalk:
             sbr += self.agg_ps
         self.com_sbrs = sbr  # for debugging
         (Asig, Anoise_xtalk, pmf, cmf, loc, sbr_opt, tx_taps, ctle_gain, hp_gain, dfe_taps, opt_rslts) = calc_com(
             ui, sbr, nspb, self.com_ser, self.com_rlm, self.com_Av, self.com_Afe, self.com_Ane,
             -self.com_z*1e9, -self.com_p1*1e9, -self.com_p2*1e9,
-            self.com_gDC_min, self.com_gDC_max, self.com_fHP*1e9, self.com_gHP_min, self.com_gHP_max,
-            self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(),
+            self.com_gDC, self.com_fHP*1e9, self.com_gHP,
+            self.com_nTx,  self.com_tx_min.flatten(),  self.com_tx_max.flatten(), self.com_tx_step.flatten(),
             self.com_nDFE, self.com_dfe_lim[1].flatten(), self.com_dfe_lim[2].flatten(),
             self.com_Add, self.com_TxSNR, self.com_eta0*1e-9, self.com_sigRj,
             self.com_Rd, self.com_Cd, self.com_Cb, self.com_Cp, self.com_Ls,
@@ -697,7 +697,7 @@ class PyBERT(HasTraits):
         self.com_pmf = pmf
         self.com_cmf = cmf
         self.com_loc = loc
-        self.com_tx_taps   = tx_taps.reshape((1, self.com_nTx + 1))
+        self.com_tx_taps   = array(tx_taps).reshape((1, self.com_nTx + 1))
         self.com_ctle_gain = ctle_gain
         self.com_hp_gain   = hp_gain
         self.com_dfe_taps[1]  = dfe_taps.reshape((1, self.com_nDFE))
@@ -1522,6 +1522,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.com_tx_min  = [param_vals["tx_min"],]
         # self.com_tx_max.resize((1, nTx))
         self.com_tx_max  = [param_vals["tx_max"],]
+        self.com_tx_step = [param_vals["tx_step"],]
         nDFE             = len(param_vals["dfe_max"])
         self.com_nDFE    = nDFE
         self.com_dfe_lim = [ array(range(nDFE)) + 1
@@ -1538,10 +1539,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
                              ]
         self.com_rlm       = param_vals["R_LM"]
         self.com_fHP       = param_vals["fHP"]
-        self.com_gDC_min   = param_vals["gDC_min"]
-        self.com_gDC_max   = param_vals["gDC_max"]
-        self.com_gHP_min   = param_vals["gHP_min"]
-        self.com_gHP_max   = param_vals["gHP_max"]
+        self.com_gDC       = param_vals["gDC"]
+        self.com_gHP       = param_vals["gHP"]
         self.com_Rd        = param_vals["Rd"]
         self.com_Cd        = param_vals["Cd"]
         self.com_Cb        = param_vals["Cb"]
@@ -1613,7 +1612,11 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             ch_s2p_pre = rf.Network(s=tmp, f=f / 1e9, z0=Zc)
             # - And, finally, renormalize to driver impedance.
             ch_s2p_pre.renormalize(Rs)
-        ch_s2p_pre.name = "ch_s2p_pre"
+        try:
+            ch_s2p_pre.name = "ch_s2p_pre"
+        except:
+            print(f"ch_s2p_pre: {ch_s2p_pre}")
+            raise
         self.ch_s2p_pre = ch_s2p_pre
         ch_s2p = ch_s2p_pre  # In case neither set of on-die S-parameters is being invoked, below.
 
@@ -1718,24 +1721,15 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         com_chnl_s = com_chnl_h.cumsum()
         com_chnl_p = com_chnl_s - pad(com_chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
         if self.aggressors:
-            def init_edge(x):
-                """Locate the initial edge in a signal vector.
-                """                
-                x_diff         = diff(x)
-                x_diff_abs     = abs(x_diff)
-                x_diff_abs_max = max(x_diff_abs)
-                return where(x_diff_abs > 0.2*x_diff_abs_max)[0][0]
-
-            com_chnl_p_init = init_edge(com_chnl_p)
-            self.agg_hs, self.agg_fs, self.agg_Hs, _, _, _ = list(
+            aggs, atypes = zip(*self.aggressors)
+            agg_hs, self.agg_fs, self.agg_Hs, _, _, _ = list(
                 zip(*[ apply_Zt(agg, Zt, min_len, max_len, fstep=self.f_step*1e6)
-                       for agg in self.aggressors
+                       for agg in aggs
                      ]) )
-            self.agg_ss = [h.cumsum() for h in self.agg_hs]
-            agg_ps      = [ s - pad( s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
-                            for s in self.agg_ss ]
-            self.agg_ps = list(map( lambda x: roll(x, com_chnl_p_init - init_edge(x))
-                                  , agg_ps))
+            self.agg_hs = list(zip(agg_hs, atypes))
+            self.agg_ss = [(h.cumsum(), atype) for (h, atype) in self.agg_hs]
+            self.agg_ps = [ (s - pad( s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0)), atype)
+                            for (s, atype) in self.agg_ss ]
 
         self.chnl_h = chnl_h
         self.len_h = len(chnl_h)
