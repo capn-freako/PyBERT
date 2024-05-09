@@ -27,6 +27,7 @@ from numpy import (
     mean,
     ones,
     pad,
+    pi,
     repeat,
     resize,
     std,
@@ -34,9 +35,10 @@ from numpy import (
     where,
     zeros,
 )
-from numpy.fft import fft, irfft
+from numpy.fft import fft, irfft, rfft
 from numpy.random import normal
 from scipy.signal import iirfilter, lfilter
+from scipy.interpolate import interp1d
 
 from pybert.models.dfe import DFE
 from pybert.utility import (
@@ -47,6 +49,7 @@ from pybert.utility import (
     import_channel,
     make_bathtub,
     make_ctle,
+    raised_cosine,
     safe_log10,
     trim_impulse,
 )
@@ -138,7 +141,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
-    w = self.w
+    t_rfft = self.t_model
+    w = self.w_model
     bits = self.bits
     symbols = self.symbols
     ffe = self.ffe
@@ -171,12 +175,17 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
     bandwidth = self.sum_bw * 1.0e9
     rel_thresh = self.thresh
     mod_type = self.mod_type[0]
+    impulse_length = self.impulse_length
 
     try:
         # Calculate misc. values.
         fs = bit_rate * nspb
         Ts = t[1]
         ts = Ts
+        min_len =  30 * nspui
+        max_len = 100 * nspui
+        if impulse_length:
+            min_len = max_len = impulse_length / ts
 
         # Generate the ideal over-sampled signal.
         #
@@ -238,7 +247,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
 
     _check_sim_status()
 
-    # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the Tx.
+    # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of,
+    # the Tx.
     try:
         if self.tx_use_ami:
             # Note: Within the PyBERT computational environment, we use normalized impulse responses,
@@ -291,7 +301,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     self.status = "Tx GetWave() Error."
                     self.log("ERROR: Never saw a rising step come out of Tx GetWave()!", alert=True)
                     return
-                tx_h, _ = trim_impulse(diff(tx_s))
+                tx_h, _ = trim_impulse(diff(tx_s), min_len=min_len, max_len=max_len)
                 tx_out, _ = tx_model.getWave(self.x)
             else:  # Init()-only.
                 tx_out = convolve(tx_h, self.x)
@@ -299,7 +309,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             self.tx_model = tx_model
         else:
             # - Generate the ideal, post-preemphasis signal.
-            # To consider: use 'scipy.interp()'. This is what Mark does, in order to induce jitter in the Tx output.
+            # To consider: use 'scipy.interp()'.
+            # This is what Mark does, in order to induce jitter in the Tx output.
             ffe_out = convolve(symbols, ffe)[: len(symbols)]
             if self.use_ch_file:
                 self.rel_power = mean(ffe_out**2) / self.rs
@@ -311,25 +322,32 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
             # - (The Tx is unique in that the calculated responses aren't used to form the output.
             #    This is partly due to the out of order nature in which we combine the Tx and channel,
             #    and partly due to the fact that we're adding noise to the Tx output.)
-            tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using sum to concatenate.
+            tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using `sum` to concatenate.
             tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
             tx_s = tx_h.cumsum()
         tx_out.resize(len(t))
         temp = tx_h.copy()
         temp.resize(len(t), refcheck=False)
-        tx_H = fft(temp)
+        krnl = interp1d(t, temp, kind="cubic",
+                        bounds_error=False, fill_value=0, assume_sorted=True)
+        temp_rfft = krnl(t_rfft)
+        tx_H = rfft(temp_rfft)
         tx_H *= tx_s[-1] / abs(tx_H[0])
 
         # - Add the uncorrelated periodic and random noise to the Tx output.
         tx_out += pn
         tx_out += normal(scale=rn, size=(len(tx_out),))
-
         # - Convolve w/ channel.
+        rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
+
+        # - Calculate cumulative frequency response.
         tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
         temp = tx_out_h.copy()
         temp.resize(len(t), refcheck=False)
-        tx_out_H = fft(temp)
-        rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
+        krnl = interp1d(t, temp, kind="cubic",
+                        bounds_error=False, fill_value=0, assume_sorted=True)
+        temp_rfft = krnl(t_rfft)
+        tx_out_H = rfft(temp_rfft)
 
         self.tx_s = tx_s
         self.tx_out = tx_out
@@ -435,10 +453,20 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 ctle_H = fft(ctle_h)
                 ctle_H *= sum(ctle_h) / ctle_H[0]
             else:
-                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-                ctle_h = irfft(ctle_H)
-            ctle_h.resize(len(chnl_h), refcheck=False)
-            ctle_out = convolve(rx_in, ctle_h)
+                ctle_w, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
+                ctle_h = irfft(raised_cosine(ctle_H))
+                spl = interp1d(t_rfft, ctle_h, bounds_error=False, fill_value=0)
+                ctle_h = spl(t)
+                ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
+                spl = interp1d(ctle_w/(2*pi), ctle_H, bounds_error=False, fill_value='extrapolate')
+                ctle_H = spl(self.f_plot)
+            ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
+            try:
+                ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
+            except:
+                print(f"rx_in: {rx_in}")
+                print(f"ctle_h: {ctle_h}")
+                raise
             ctle_out -= mean(ctle_out)  # Force zero mean.
             if self.ctle_mode == "AGC":  # Automatic gain control engaged?
                 ctle_out *= 2.0 * decision_scaler / ctle_out.ptp()
@@ -492,10 +520,13 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         dfe_out = array(dfe_out)
         dfe_out.resize(len(t))
         bits_out = array(bits_out)
+        start_ix = len(bits_out) - eye_bits
+        assert start_ix >= 0, "`start_ix` is negative!"
+        end_ix = len(bits_out)
         auto_corr = (
             1.0
-            * correlate(bits_out[(nbits - eye_bits) :], bits[(nbits - eye_bits) :], mode="same")
-            / sum(bits[(nbits - eye_bits) :])
+            * correlate(bits_out[start_ix : end_ix], bits[start_ix : end_ix], mode="same")
+            / sum(bits[start_ix : end_ix])
         )
         auto_corr = auto_corr[len(auto_corr) // 2 :]
         self.auto_corr = auto_corr
@@ -531,6 +562,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         self.status = "Analyzing jitter...(sweep %d of %d)" % (sweep_num, num_sweeps)
     except Exception:
         self.status = "Exception: DFE"
+        print(f"len(bits_out): {len(bits_out)}\nnbits: {nbits}\neye_bits: {eye_bits}")
+        print(f"len(t): {len(t)}, len(ctle_out): {len(ctle_out)}")
         raise
 
     _check_sim_status()
@@ -748,6 +781,10 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         split_time = clock()
         self.status = "Updating plots...(sweep %d of %d)" % (sweep_num, num_sweeps)
     except Exception:
+        if update_plots:
+            update_results(self)
+            if not initial_run:
+                update_eyes(self)
         self.status = "Exception: jitter"
         raise
 
@@ -780,7 +817,7 @@ def update_results(self):
     eye_uis = self.eye_uis
     num_ui = self.nui
     clock_times = self.clock_times
-    f = self.f
+    f = self.f_plot
     t = self.t
     t_ns = self.t_ns
     t_ns_chnl = self.t_ns_chnl
@@ -883,9 +920,11 @@ def update_results(self):
     self.plotdata.set_data("dfe_out", self.dfe_out[:len_t])
 
     # Frequency responses
+    self.plotdata.set_data("chnl_H_raw", 20.0 * safe_log10(abs(self.chnl_H_raw[1:len_f_GHz])))
     self.plotdata.set_data("chnl_H", 20.0 * safe_log10(abs(self.chnl_H[1:len_f_GHz])))
     self.plotdata.set_data("chnl_trimmed_H", 20.0 * safe_log10(abs(self.chnl_trimmed_H[1:len_f_GHz])))
-    self.plotdata.set_data("tx_H", 20.0 * safe_log10(abs(self.tx_H[1:len_f_GHz])))
+    # self.plotdata.set_data("tx_H", 20.0 * safe_log10(abs(self.tx_H[1:len_f_GHz])))
+    self.plotdata.set_data("tx_H", 20.0 * safe_log10(abs(self.tx_H[1:])))
     self.plotdata.set_data("tx_out_H", 20.0 * safe_log10(abs(self.tx_out_H[1:len_f_GHz])))
     self.plotdata.set_data("ctle_H", 20.0 * safe_log10(abs(self.ctle_H[1:len_f_GHz])))
     self.plotdata.set_data("ctle_out_H", 20.0 * safe_log10(abs(self.ctle_out_H[1:len_f_GHz])))

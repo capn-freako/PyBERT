@@ -226,7 +226,8 @@ def make_plots(self, n_dfe_taps):
 
     # - Frequency Responses tab
     plot_H_chnl = Plot(plotdata, padding_left=75)
-    plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue", name="Original Impulse", index_scale="log")
+    plot_H_chnl.plot(("f_GHz", "chnl_H_raw"), type="line", color="black", name="Perfect Term.", index_scale="log")
+    plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue", name="Actual Term.", index_scale="log")
     plot_H_chnl.plot(("f_GHz", "chnl_trimmed_H"), type="line", color="red", name="Trimmed Impulse", index_scale="log")
     plot_H_chnl.title = post_chnl_str
     plot_H_chnl.index_axis.title = "Frequency (GHz)"

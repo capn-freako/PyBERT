@@ -15,9 +15,9 @@ import skrf  as rf
 from cmath     import phase, rect
 from functools import reduce
 from numpy     import (
-    append,    argmax, array,  concatenate, convolve, cumsum, diff,
+    append,    argmax, array,  concatenate, convolve, cos,    cumsum, diff,
     histogram, insert, log,    log10,       maximum,  mean,   ones,
-    pi,        power,  real,        reshape,  resize, sign,
+    pi,        power,  real,        reshape,  resize, roll,   sign,
     sort,      sqrt,   where,       zeros,
 )
 from numpy.fft         import fft, ifft, fftshift
@@ -342,6 +342,8 @@ def calc_jitter(
         t_jitter.append(ideal_xing)
     jitter = array(jitter)
 
+    assert len(jitter) > 0 and len(t_jitter) > 0, "No crossings found!"
+
     if debug:
         print("mean(jitter):", mean(jitter))
         print("len(jitter):", len(jitter))
@@ -385,7 +387,12 @@ def calc_jitter(
 
     # -- Make TIE vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
     # spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
-    spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
+    try:
+        spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
+    except:
+        print(f"t_jitter: {t_jitter}")
+        print(f"jitter: {jitter}")
+        raise
     tie_interp = spl(t)
     y = fft(tie_interp)
     jitter_spectrum = abs(y[:half_len])
@@ -815,47 +822,73 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
     return (w, H)
 
 
-def trim_impulse(g, min_len=0, max_len=1000000):
+def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):
     """Trim impulse response, for more useful display, by:
 
-      - clipping off the tail, after 99.8% of the total power has been
-        captured (Using 99.9% was causing problems; I don't know why.), and
-      - setting the "front porch" length equal to 20% of the total length.
+        - clipping off the tail, after 99.8% of the total power has been
+            captured (Using 99.9% was causing problems; I don't know why.), and
+        - setting the "front porch" length equal to 20% of the total length.
 
-    Inputs:
+    Args:
+        g([real]): Response to trim.
 
-      - g         impulse response
+    KeywordArgs:
+        min_len(int): Minimum length of returned vector.
+            Default: 0
+        max_len(int): Maximum length of returned vector.
+            Default: 1000000
+        front_porch(bool): Adjust "front porch" when True.
+            Set to False if accurate delay is required.
+            Default: True
 
-      - min_len   (optional) minimum length of returned vector
-
-      - max_len   (optional) maximum length of returned vector
-
-    Outputs:
-
-      - g_trim    trimmed impulse response
-
-      - start_ix  index of first returned sample
+    Returns:
+        ([real], int): A pair consisting of:
+            - the trimmed response, and
+            - the index of the chosen starting position.
     """
 
-    # Trim off potential FFT artifacts from the end and capture peak location.
-    g = array(g[: int(0.9 * len(g))])
-    max_ix = np.argmax(g)
+    # Move main lobe to center, in case of any non-causality.
+    half_len = len(g) // 2
+    _g = roll(g, half_len)
+    max_ix = np.argmax(_g)
+    len_g = len(_g)
 
-    # Capture 99.8% of the total energy.
-    Pt = 0.998 * sum(g**2)
-    i = 0
+    # Capture 99.9% of the total energy.
+    Ptot = sum(_g**2)
+    Pbeg = 0.0005 * Ptot
+    Pend = 0.9995 * Ptot
+    ix_beg = 0
+    ix_end = 0
     P = 0
-    while P < Pt:
-        P += g[i] ** 2
-        i += 1
-    stop_ix = min(max_ix + max_len, max(i, max_ix + min_len))
+    while P < Pbeg:
+        P      += _g[ix_beg]**2
+        ix_beg += 1
+    ix_end = ix_beg
+    while P < Pend and ix_end < len_g:
+        P      += _g[ix_end]**2
+        ix_end += 1
 
-    # Set "front/back porch" to 20%, doing appropriate bounds checking.
-    length = stop_ix - max_ix
-    porch = length // 3
-    start_ix = max(0, max_ix - porch)
-    stop_ix = min(len(g), stop_ix + porch)
-    return (g[start_ix:stop_ix].copy(), start_ix)
+    # Return trimmed original if no front porch requested.
+    if not front_porch:
+        res = g[:ix_end - half_len].copy()
+        start_ix = 0
+    else:
+        # Bound end index accordingly.
+        back_porch_len = int(0.8*max_len)  # max. back porch length
+        stop_ix = max_ix + back_porch_len  # This is our max. bound.
+        stop_ix = min(stop_ix, ix_end)
+
+        # Set "front porch" to 20%, doing appropriate bounds checking.
+        start_ix = int(max_ix - (stop_ix - max_ix)*0.25)
+        start_ix = max(0, min(ix_beg, start_ix))
+        res = _g[start_ix:stop_ix].copy()
+        start_ix -= half_len
+
+    if len(res) < min_len:
+        res.resize(min_len)
+    if len(res) > max_len:
+        res.resize(max_len)
+    return (res, start_ix)
 
 
 def H_2_s2p(H, Zc, fs, Zref=50):
@@ -872,6 +905,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     Returns:
         skrf.Network: 2-port network representing the channel to which `H` and `Zc` pertain.
     """
+    # ToDo: Fix this code.
     ws = 2 * pi * fs
     G = calc_G(H, Zref, 0, Zc, Zref, 0, ws)  # See `calc_G()` docstring.
     R1 = (Zc - Zref) / (Zc + Zref)  # reflection coefficient looking into medium from port
@@ -894,8 +928,8 @@ def import_channel(filename, sample_per, fs, zref=100):
 
     Args:
         filename(str): Name of file from which to import channel description.
-        sample_per(real): Sample period of system signal vector.
-        fs([real]): (Positive only) frequency values being used by caller.
+        sample_per(real): Sample period of system signal vector (s).
+        fs([real]): (Positive only) frequency values being used by caller (Hz).
 
     KeywordArgs:
         zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
@@ -951,7 +985,8 @@ def interp_time(ts, xs, sample_per):
             i = i + 1
         res.append(xs[i - 1] + (xs[i] - xs[i - 1]) * (t - ts[i - 1]) / (ts[i] - ts[i - 1]))
         t += sample_per
-
+    if len(res) > n_max:
+        res = res[:n_max]
     return array(res)
 
 
@@ -983,6 +1018,7 @@ def import_time(filename, sample_per):
     return interp_time(ts, xs, sample_per)
 
 
+# ToDo: Are there SciKit-RF alternatives to these next two functions?
 def sdd_21(ntwk, norm=0.5):
     """Given a 4-port single-ended network, return its differential 2-port
     network.
@@ -997,7 +1033,7 @@ def sdd_21(ntwk, norm=0.5):
         skrf.Network: Sdd (2-port).
     """
     mm = se2mm(ntwk)
-    return rf.Network(frequency=ntwk.f / 1e9, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
+    return rf.Network(frequency=ntwk.f, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
 
 
 def se2mm(ntwk, norm=0.5):
@@ -1053,15 +1089,19 @@ def se2mm(ntwk, norm=0.5):
     z[:, 2] = (ntwk.z0[:, 0] + ntwk.z0[:, 2]) / 2
     z[:, 3] = (ntwk.z0[:, 1] + ntwk.z0[:, 3]) / 2
 
-    return rf.Network(frequency=f / 1e9, s=s, z0=z)
+    return rf.Network(frequency=f, s=s, z0=z)
 
 
-def import_freq(filename):
+def import_freq(filename, renumber=False):
     """Read in a 1, 2, or 4-port Touchstone file, and return an equivalent
     2-port network.
 
     Args:
         filename(str): Name of Touchstone file to read in.
+
+    KeywordArgs:
+        renumber(bool): Automatically detect/fix "1=>3/2=>4" port numbering, when True.
+            Default = False
 
     Returns:
         skrf.Network: 2-port network.
@@ -1074,14 +1114,14 @@ def import_freq(filename):
         and the "DD" quadrant of its mixed-mode equivalent gets returned.
     """
     # Import and sanity check the Touchstone file.
-    ntwk = rf.Network(filename)
+    ntwk = rf.Network(filename, f_unit="Hz")
     (fs, rs, cs) = ntwk.s.shape
     assert rs == cs, "Non-square Touchstone file S-matrix!"
-    assert rs in (1, 2, 4), "Touchstone file must have 1, 2, or 4 ports!"
+    assert rs in (1, 2, 4), f"Touchstone file must have 1, 2, or 4 ports!\n{ntwk}"
 
     # Convert to a 2-port network.
     if rs == 4:  # 4-port Touchstone files are assumed single-ended!
-        return sdd_21(ntwk)
+        return sdd_21(ntwk, renumber=renumber)
     if rs == 2:
         return ntwk
     return rf.network.one_port_2_two_port(ntwk)
@@ -1211,7 +1251,7 @@ def interp_s2p(ntwk, f):
 
     Args:
         ntwk(skrf.Network): The 2-port network to be interpolated.
-        f([real]): The list of new frequency sampling points.
+        f([real]): The list of new frequency sampling points (Hz).
 
     Returns:
         skrf.Network: The interpolated/extrapolated 2-port network.
@@ -1224,6 +1264,7 @@ def interp_s2p(ntwk, f):
     assert rs == 2, "Touchstone file must have 2 ports!"
 
     extrap = ntwk.interpolate(f, fill_value="extrapolate", coords="polar", assume_sorted=True)
+    assert extrap.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tf: {f}\n\textrap: {extrap}"
     s11 = cap_mag(extrap.s[:, 0, 0])
     s22 = cap_mag(extrap.s[:, 1, 1])
     s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
@@ -1231,9 +1272,10 @@ def interp_s2p(ntwk, f):
     s = np.array(list(zip(zip(s11, s12), zip(s21, s22))))
     if ntwk.name is None:
         ntwk.name = "s2p"
-    return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"))
+    return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
 
 
+# ToDo: Are there any uses of this function remaining? Can we eliminate them?
 def renorm_s2p(ntwk, zs):
     """Renormalize a simple 2-port network to a new set of port impedances.
 
@@ -1345,9 +1387,11 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):
     half_len  = len(jit_pdf) // 2
     dt        = centers[1] - centers[0]  # Bins assumed to be uniformly spaced!
     zero_locs = where(fftshift(jit_pdf) == 0)[0]
-    ext_first = min(zero_locs)
-    ext_last  = max(zero_locs)
-    if extrap:
+    ext_first = 0
+    ext_last  = len(jit_pdf)
+    if (extrap and len(zero_locs)):
+        ext_first = min(zero_locs)
+        ext_last  = max(zero_locs)
         sqrt_2pi = sqrt(2*pi)
         ix_r = ext_first + half_len - 1
         mu_r = centers[ix_r] - sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_r]))
@@ -1361,3 +1405,11 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):
     bathtub  = array(bathtub + list(cumsum(jit_pdf[: half_len+1]))) * 2*dt
     bathtub  = where(bathtub < min_val, min_val * ones(len(bathtub)), bathtub)
     return (bathtub, (ext_first,ext_last))
+
+
+def raised_cosine(x):
+    """Apply raised cosine window to input.
+    """
+    len_x = len(x)
+    w = (array([cos(pi * n / len_x) for n in range(len_x)]) + 1) / 2
+    return w * x

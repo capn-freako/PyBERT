@@ -18,7 +18,7 @@ try:
 except:
     __version__ = "(dev)"
 
-__date__ = "October 12, 2023"
+__date__ = "May 5, 2024"
 __authors__ = "David Banas & David Patterson"
 __copy__ = "Copyright (c) 2014 David Banas, 2019 David Patterson"
 

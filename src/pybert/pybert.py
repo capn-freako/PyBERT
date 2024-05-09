@@ -24,8 +24,8 @@ from time import sleep
 import numpy as np
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
-from numpy import array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
-from numpy.fft import fft, irfft
+from numpy import arange, array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
+from numpy.fft import fft, irfft, rfft
 from numpy.random import randint
 from traits.api import (
     Array,
@@ -45,6 +45,7 @@ from traits.api import (
     cached_property,
 )
 from traitsui.message import message
+from scipy.interpolate import interp1d
 
 from pybert import __authors__ as AUTHORS
 from pybert import __copy__ as COPY
@@ -119,7 +120,8 @@ class PyBERT(HasTraits):
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
     )  #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
-    f_step = Float(10)  #: Frequency step to use when constructing H(f). (Default = 10 MHz)
+    f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
+    f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
     Rdc = Float(0.1876)  #: Channel d.c. resistance (Ohms/m).
     w0 = Float(10e6)  #: Channel transition frequency (rads./s).
@@ -291,8 +293,10 @@ class PyBERT(HasTraits):
     rel_opt = Property(Float, depends_on=["cost"])
     t = Property(Array, depends_on=["ui", "nspb", "nbits"])
     t_ns = Property(Array, depends_on=["t"])
-    f = Property(Array, depends_on=["t"])
-    w = Property(Array, depends_on=["f"])
+    f_plot = Property(Array, depends_on=["t"])
+    f_model = Property(Array, depends_on=["f_step", "f_max"])
+    w_model = Property(Array, depends_on=["f_model"])
+    t_model = Property(Array, depends_on=["f_model"])
     bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count"])
     symbols = Property(Array, depends_on=["bits", "mod_type", "vod"])
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
@@ -492,25 +496,45 @@ class PyBERT(HasTraits):
 
         return self.t * 1.0e9
 
+    #ToDo: Eliminate `f_plot`?
+    
     @cached_property
-    def _get_f(self):
-        """Calculate the frequency vector appropriate for indexing non-shifted
-        FFT output, in Hz.
-
+    def _get_f_plot(self):
+        """
+        Calculate the frequency vector appropriate for indexing non-shifted FFT output, in Hz.
         # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
 
-        Note: Changed to positive freqs. only, in conjunction w/ irfft() usage.
+        Notes:
+            1. Changed to positive freqs. only, in conjunction w/ `irfft()` usage.
         """
         t = self.t
         npts = len(t)
         f0 = 1.0 / (t[1] * npts)
-        half_npts = npts // 2
-        return array([i * f0 for i in range(half_npts)])
+        return array([i * f0 for i in range(npts//2 + 1)])  # "+ 1", because that's what `irfft()` expects.
 
     @cached_property
-    def _get_w(self):
-        """System frequency vector, in rads./sec."""
-        return 2 * pi * self.f
+    def _get_f_model(self):
+        """
+        Calculate the frequency vector for channel model construction.
+        """
+        fstep = self.f_step * 1e6
+        fmax  = self.f_max  * 1e9
+        return arange(0, fmax+fstep, fstep)  # "+fstep", so fmax gets included
+
+    @cached_property
+    def _get_w_model(self):
+        """Channel modeling frequency vector, in rads./sec."""
+        return 2 * pi * self.f_model
+
+    @cached_property
+    def _get_t_model(self):
+        """
+        Calculate the equivalent time vector to `f_model`.
+        """
+        f_model = self.f_model
+        tmax = 1 / f_model[1]
+        tstep = 0.5 / f_model[-1]
+        return arange(0, tmax, tstep)
 
     @cached_property
     def _get_bits(self):
@@ -976,7 +1000,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ctle_h_tune(self):
-        w = self.w
+        w = self.w_model
         len_h = self.len_h
         rx_bw = self.rx_bw_tune * 1.0e9
         peak_freq = self.peak_freq_tune * 1.0e9
@@ -1247,9 +1271,10 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
              channel pulse response
         """
 
-        t = self.t
-        f = self.f
-        w = self.w
+        t = self.t  # This time vector has NO relationship to `f`/`w`!
+        t_irfft = self.t_model  # This time vector IS related to `f`/`w`.
+        f = self.f_model
+        w = self.w_model
         nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
         Rs = self.rs
@@ -1264,7 +1289,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
         if self.use_ch_file:
-            ch_s2p_pre = import_channel(self.ch_file, ts, self.f)
+            ch_s2p_pre = import_channel(self.ch_file, ts, f)
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
@@ -1285,7 +1310,11 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             ch_s2p_pre = rf.Network(s=tmp, f=f / 1e9, z0=Zc)
             # - And, finally, renormalize to driver impedance.
             ch_s2p_pre.renormalize(Rs)
-        ch_s2p_pre.name = "ch_s2p_pre"
+        try:
+            ch_s2p_pre.name = "ch_s2p_pre"
+        except:
+            print(f"ch_s2p_pre: {ch_s2p_pre}")
+            raise
         self.ch_s2p_pre = ch_s2p_pre
         ch_s2p = ch_s2p_pre  # In case neither set of on-die S-parameters is being invoked, below.
 
@@ -1305,7 +1334,9 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             """
             ts4N = rf.Network(ts4f)  # Grab the 4-port single-ended on-die network.
             ntwk = sdd_21(ts4N)  # Convert it to a differential, 2-port network.
-            ntwk2 = interp_s2p(ntwk, s2p.f)  # Interpolate to system freqs.
+            # Interpolate to system freqs.
+            ntwk2 = ntwk.extrapolate_to_dc().windowed(normalize=False).interpolate(
+                s2p.f, coords='polar', bounds_error=False, fill_value='extrapolate')
             if isRx:
                 res = s2p**ntwk2
             else:  # Tx
@@ -1340,6 +1371,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.ch_s2p = ch_s2p
 
         # Calculate channel impulse response.
+        # ToDo: Incorporate Tx output impedance.
         Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
         ch_s2p_term = ch_s2p.copy()
         ch_s2p_term_z0 = ch_s2p.z0.copy()
@@ -1351,6 +1383,9 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         # So, we must normalize our (now generalized) S-parameters.
         chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])
         chnl_h = irfft(chnl_H)
+        krnl = interp1d(t_irfft, chnl_h, kind="cubic",
+                        bounds_error=False, fill_value=0, assume_sorted=True)
+        chnl_h = krnl(t)
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
 
         min_len = 20 * nspui
@@ -1358,9 +1393,9 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         if impulse_length:
             min_len = max_len = impulse_length / ts
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
-        temp = chnl_h.copy()
-        temp.resize(len(t), refcheck=False)
-        chnl_trimmed_H = fft(temp)
+        krnl = interp1d(t[:len(chnl_h)], chnl_h, kind="cubic",
+                        bounds_error=False, fill_value=0, assume_sorted=True)
+        chnl_trimmed_H = rfft(krnl(t_irfft))
 
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
@@ -1369,6 +1404,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.len_h = len(chnl_h)
         self.chnl_dly = chnl_dly
         self.chnl_H = chnl_H
+        self.chnl_H_raw = H
         self.chnl_trimmed_H = chnl_trimmed_H
         self.start_ix = start_ix
         self.t_ns_chnl = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
