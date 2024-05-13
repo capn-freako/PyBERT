@@ -293,10 +293,9 @@ class PyBERT(HasTraits):
     rel_opt = Property(Float, depends_on=["cost"])
     t = Property(Array, depends_on=["ui", "nspb", "nbits"])
     t_ns = Property(Array, depends_on=["t"])
-    f_plot = Property(Array, depends_on=["t"])
-    f_model = Property(Array, depends_on=["f_step", "f_max"])
-    w_model = Property(Array, depends_on=["f_model"])
-    t_model = Property(Array, depends_on=["f_model"])
+    f = Property(Array, depends_on=["f_step", "f_max"])
+    w = Property(Array, depends_on=["f"])
+    t_irfft = Property(Array, depends_on=["f"])
     bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count"])
     symbols = Property(Array, depends_on=["bits", "mod_type", "vod"])
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
@@ -496,24 +495,8 @@ class PyBERT(HasTraits):
 
         return self.t * 1.0e9
 
-    #ToDo: Eliminate `f_plot`?
-    
     @cached_property
-    def _get_f_plot(self):
-        """
-        Calculate the frequency vector appropriate for indexing non-shifted FFT output, in Hz.
-        # (i.e. - [0, f0, 2 * f0, ... , fN] + [-(fN - f0), -(fN - 2 * f0), ... , -f0]
-
-        Notes:
-            1. Changed to positive freqs. only, in conjunction w/ `irfft()` usage.
-        """
-        t = self.t
-        npts = len(t)
-        f0 = 1.0 / (t[1] * npts)
-        return array([i * f0 for i in range(npts//2 + 1)])  # "+ 1", because that's what `irfft()` expects.
-
-    @cached_property
-    def _get_f_model(self):
+    def _get_f(self):
         """
         Calculate the frequency vector for channel model construction.
         """
@@ -522,18 +505,20 @@ class PyBERT(HasTraits):
         return arange(0, fmax+fstep, fstep)  # "+fstep", so fmax gets included
 
     @cached_property
-    def _get_w_model(self):
-        """Channel modeling frequency vector, in rads./sec."""
-        return 2 * pi * self.f_model
+    def _get_w(self):
+        """
+        Channel modeling frequency vector, in rads./sec.
+        """
+        return 2 * pi * self.f
 
     @cached_property
-    def _get_t_model(self):
+    def _get_t_irfft(self):
         """
-        Calculate the equivalent time vector to `f_model`.
+        Calculate the time vector appropriate for indexing `irfft()` output.
         """
-        f_model = self.f_model
-        tmax = 1 / f_model[1]
-        tstep = 0.5 / f_model[-1]
+        f = self.f
+        tmax = 1 / f[1]
+        tstep = 0.5 / f[-1]
         return arange(0, tmax, tstep)
 
     @cached_property
@@ -1000,7 +985,7 @@ class PyBERT(HasTraits):
 
     @cached_property
     def _get_ctle_h_tune(self):
-        w = self.w_model
+        w = self.w
         len_h = self.len_h
         rx_bw = self.rx_bw_tune * 1.0e9
         peak_freq = self.peak_freq_tune * 1.0e9
@@ -1272,9 +1257,9 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         """
 
         t = self.t  # This time vector has NO relationship to `f`/`w`!
-        t_irfft = self.t_model  # This time vector IS related to `f`/`w`.
-        f = self.f_model
-        w = self.w_model
+        t_irfft = self.t_irfft  # This time vector IS related to `f`/`w`.
+        f = self.f
+        w = self.w
         nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
         Rs = self.rs
@@ -1385,7 +1370,8 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         chnl_h = irfft(chnl_H)
         krnl = interp1d(t_irfft, chnl_h, kind="cubic",
                         bounds_error=False, fill_value=0, assume_sorted=True)
-        chnl_h = krnl(t)
+        temp = krnl(t)
+        chnl_h = temp * sum(chnl_h) / sum(temp)
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
 
         min_len = 20 * nspui
@@ -1396,6 +1382,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         krnl = interp1d(t[:len(chnl_h)], chnl_h, kind="cubic",
                         bounds_error=False, fill_value=0, assume_sorted=True)
         chnl_trimmed_H = rfft(krnl(t_irfft))
+        chnl_trimmed_H *= abs(chnl_H[0]) / abs(chnl_trimmed_H[0])
 
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))

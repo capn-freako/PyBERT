@@ -35,9 +35,9 @@ from numpy import (
     where,
     zeros,
 )
-from numpy.fft import fft, irfft, rfft
+from numpy.fft import rfft, irfft
 from numpy.random import normal
-from scipy.signal import iirfilter, lfilter
+from scipy.signal import iirfilter, lfilter, deconvolve
 from scipy.interpolate import interp1d
 
 from pybert.models.dfe import DFE
@@ -107,21 +107,34 @@ def my_run_sweeps(self, is_thread_stopped: Optional[Callable[[], bool]] = None):
         my_run_simulation(self, aborted_sim=is_thread_stopped)
 
 
-def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: Optional[Callable[[], bool]] = None):
-    """Runs the simulation.
+def my_run_simulation(
+    self, initial_run: bool = False, update_plots: bool = True,
+    aborted_sim: Optional[Callable[[], bool]] = None):
+    """
+    Runs the simulation.
 
     Args:
-        self(PyBERT): Reference to an instance of the *PyBERT* class.
-        initial_run(Bool): If True, don't update the eye diagrams, since
+        self: Reference to an instance of the *PyBERT* class.
+
+    Keyword Args:
+        initial_run: If True, don't update the eye diagrams, since
             they haven't been created, yet.
-            (Optional; default = False.)
-        update_plots(Bool): If True, update the plots, after simulation
+            Default: False
+        update_plots: If True, update the plots, after simulation
             completes. This option can be used by larger scripts, which
             import *pybert*, in order to avoid graphical back-end
             conflicts and speed up this function's execution time.
-            (Optional; default = True.)
+            Default: True
         aborted_sim: a function that is used to tell the simulation that the user
-          has requested to stop/abort the simulation.
+            has requested to stop/abort the simulation.
+
+    Raises:
+        RuntimeError: If the simulation is aborted by the user or cannot continue.
+
+    Notes:
+        1. When using IBIS-AMI models, we often need to scale the impulse response
+            by the sample interval, or its inverse, because while IBIS-AMI models
+            take the impulse response to have units: (V/s), PyBERT uses: (V/sample).
     """
 
     def _check_sim_status():
@@ -141,8 +154,8 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
-    t_rfft = self.t_model
-    w = self.w_model
+    t_irfft = self.t_irfft
+    w = self.w
     bits = self.bits
     symbols = self.symbols
     ffe = self.ffe
@@ -177,91 +190,79 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
     mod_type = self.mod_type[0]
     impulse_length = self.impulse_length
 
+    # Calculate misc. values.
+    fs = bit_rate * nspb
+    Ts = t[1]
+    ts = Ts
+    min_len =  30 * nspui
+    max_len = 100 * nspui
+    if impulse_length:
+        min_len = max_len = impulse_length / ts
+
+    # Generate the ideal over-sampled signal.
+    #
+    # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
+    # impulse response, in order to produce the proper ideal signal.
+    x = repeat(symbols, nspui)
+    # self.x = x
+    ideal_signal = x
+    if mod_type == 1:  # Handle duo-binary case.
+        duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
+        ideal_signal = convolve(x, duob_h)[: len(t)]
+
+    # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
+    # Generate the ideal rectangular aggressor waveform.
+    pn_period = 1.0 / pn_freq
+    pn_samps = int(pn_period / Ts + 0.5)
+    pn = zeros(pn_samps)
+    pn[pn_samps // 2 :] = pn_mag
+    self.pn_period = pn_period
+    self.pn_samps = pn_samps
+    pn = resize(pn, len(x))
+    # High pass filter it. (Simulating capacitive coupling.)
+    (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
+    pn = lfilter(b, a, pn)[: len(pn)]
+    self.pn = pn
+
     try:
-        # Calculate misc. values.
-        fs = bit_rate * nspb
-        Ts = t[1]
-        ts = Ts
-        min_len =  30 * nspui
-        max_len = 100 * nspui
-        if impulse_length:
-            min_len = max_len = impulse_length / ts
-
-        # Generate the ideal over-sampled signal.
-        #
-        # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
-        # impulse response, in order to produce the proper ideal signal.
-        x = repeat(symbols, nspui)
-        self.x = x
-        if mod_type == 1:  # Handle duo-binary case.
-            duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
-            x = convolve(x, duob_h)[: len(t)]
-        self.ideal_signal = x
-
-        # Find the ideal crossing times, for subsequent jitter analysis of transmitted signal.
-        ideal_xings = find_crossings(t, x, decision_scaler, mod_type=mod_type)
-        self.ideal_xings = ideal_xings
-
-        # - Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
-        #   - Generate the ideal rectangular aggressor waveform.
-        pn_period = 1.0 / pn_freq
-        pn_samps = int(pn_period / Ts + 0.5)
-        pn = zeros(pn_samps)
-        pn[pn_samps // 2 :] = pn_mag
-        self.pn_period = pn_period
-        self.pn_samps = pn_samps
-        pn = resize(pn, len(x))
-        #   - High pass filter it. (Simulating capacitive coupling.)
-        (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
-        pn = lfilter(b, a, pn)[: len(pn)]
-        self.pn = pn
-
-        # Calculate the channel output.
-        #
+        # Calculate the channel response, as well as its (hypothetical)
+        # solitary effect on the data, for plotting purposes only.
+        split_time = clock()
+        chnl_h = self.calc_chnl_h()
+        _calc_chnl_time = clock() - split_time
         # Note: We're not using 'self.ideal_signal', because we rely on the system response to
         #       create the duobinary waveform. We only create it explicitly, above,
         #       so that we'll have an ideal reference for comparison.
         split_time = clock()
-        chnl_h = self.calc_chnl_h()
-        _calc_chnl_time = clock() - split_time
-        split_time = clock()
-        # - Add the uncorrelated periodic and random noise to the Tx output.
-        x  = self.x
-        x += pn
-        x += normal(scale=rn, size=(len(x),))
         chnl_out = convolve(x, chnl_h)[: len(t)]
         _conv_chnl_time = clock() - split_time
         if self.debug:
             self.log(f"Channel calculation time: {_calc_chnl_time}")
             self.log(f"Channel convolution time: {_conv_chnl_time}")
-
         self.channel_perf = nbits * nspb / (clock() - start_time)
-        split_time = clock()
-        self.status = "Running Tx...(sweep %d of %d)" % (sweep_num, num_sweeps)
-    except Exception:
-        self.status = "Exception: channel"
+    except Exception as err:
+        self.status = f"Exception: channel: {err.msg}"
         raise
-
     self.chnl_out = chnl_out
-    self.chnl_out_H = fft(chnl_out)
-
     _check_sim_status()
 
-    # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of,
-    # the Tx.
     try:
+        # Calculate the impulse response of the Tx.
         if self.tx_use_ami:
-            # Note: Within the PyBERT computational environment, we use normalized impulse responses,
-            #       which have units of (V/ts), where 'ts' is the sample interval. However, IBIS-AMI models expect
-            #       units of (V/s). So, we have to scale accordingly, as we transit the boundary between these two worlds.
+            # Validate the model against the requested use mode.
             tx_cfg = self._tx_cfg  # Grab the 'AMIParamConfigurator' instance for this model.
-            # Get the model invoked and initialized, except for 'channel_response', which
-            # we need to do several different ways, in order to gather all the data we need.
+            if tx_use_getwave:
+                assert tx_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]), RuntimeError(
+                    "You've requested to use the `AMI_GetWave()` function of an IBIS-AMI model, which doesn't provide one!")
+            else:
+                assert tx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]), RuntimeError(
+                    "You've requested to use the `AMI_Init()` function of an IBIS-AMI model, which doesn't return an impulse response!")
+
+            # Load and initialize the model, capturing its incremental responses.
             tx_param_dict = tx_cfg.input_ami_params
             tx_model_init = AMIModelInitializer(tx_param_dict)
             tx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
-            # Start with a delta function, to capture the model's impulse response.
-            tx_model_init.channel_response = [1.0 / ts] + [0.0] * (len(chnl_h) - 1)
+            tx_model_init.channel_response = chnl_h
             tx_model_init.bit_time = ui
             tx_model = AMIModel(self.tx_dll_file)
             tx_model.initialize(tx_model_init)
@@ -276,107 +277,92 @@ def my_run_simulation(self, initial_run=False, update_plots=True, aborted_sim: O
                     tx_model.msg.decode("utf-8"),
                 )
             )
-            if tx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
-                tx_h = array(tx_model.initOut) * ts
-            elif not tx_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]):
-                self.status = "Simulation Error."
-                self.log(
-                    "ERROR: Both 'Init_Returns_Impulse' and 'GetWave_Exists' are False!\n \
-I cannot continue.\nYou will have to select a different model.",
-                    alert=True,
-                )
-                return
-            elif not self.tx_use_getwave:
-                self.status = "Simulation Error."
-                self.log(
-                    "ERROR: You have elected not to use GetWave for a model, which does not return an impulse response!\n \
-I cannot continue.\nPlease, select 'Use GetWave' and try again.",
-                    alert=True,
-                )
-                return
-            if self.tx_use_getwave:
-                try:
-                    tx_s = getwave_step_resp(tx_model)
-                except RuntimeError as err:
-                    self.status = "Tx GetWave() Error."
-                    self.log("ERROR: Never saw a rising step come out of Tx GetWave()!", alert=True)
-                    return
-                tx_h, _ = trim_impulse(diff(tx_s), min_len=min_len, max_len=max_len)
-                tx_out, _ = tx_model.getWave(self.x)
-            else:  # Init()-only.
-                tx_out = convolve(tx_h, self.x)
-                tx_s = tx_h.cumsum()
-            self.tx_model = tx_model
+            tx_resps = tx_model.get_responses()
+            if tx_use_getwave:
+                tx_h = tx_resps["imp_resp_getw"]
+                tx_out_h = tx_resps["out_resp_getw"]
+            else:
+                tx_h = tx_resps["imp_resp_init"]
+                tx_out_h = tx_resps["out_resp_init"]
+        else:  # PyBERT native Tx model
+            # Using `sum` to concatenate:
+            tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
+            tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
+            tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
+        
+        # Calculate the Tx step and frequency responses from the impulse response.
+        tx_s = tx_h.cumsum()
+        temp = tx_h.copy()
+        temp.resize(len(t), refcheck=False)
+        krnl = interp1d(t, temp, kind="cubic",
+                        bounds_error=False, fill_value=0, assume_sorted=True)
+        temp_rfft = krnl(t_irfft)
+        tx_H = rfft(temp_rfft)
+        tx_H *= tx_s[-1] / abs(tx_H[0])
+
+        # Calculate cumulative step, and frequency responses.
+        tx_out_s = tx_out_h.cumsum()
+        temp = tx_out_h.copy()
+        temp.resize(len(t), refcheck=False)
+        krnl = interp1d(t, temp, kind="cubic",
+                        bounds_error=False, fill_value=0, assume_sorted=True)
+        temp_rfft = krnl(t_irfft)
+        tx_out_H = rfft(temp_rfft)
+        tx_out_H *= tx_out_s[-1] / abs(tx_out_H[0])
+
+        # Generate the input to the Rx.
+        if self.tx_use_ami:
+            # Which order we go in depends on whether we're using `GetWave()` for the Tx.
+            if tx_use_getwave:
+                tx_out, tx_clks = tx_model.getWave(x)
+                tx_out += pn
+                tx_out += normal(scale=rn, size=(len(tx_out),))
+                rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
+            else:
+                x_noisy = x + pn + normal(scale=rn, size=(len(x),))
+                tx_out = convolve(x_noisy, tx_h)[: len(x_noisy)]
+                rx_in = convolve(x_noisy, tx_out_h)[: len(x_noisy)]
         else:
-            # - Generate the ideal, post-preemphasis signal.
-            # To consider: use 'scipy.interp()'.
-            # This is what Mark does, in order to induce jitter in the Tx output.
             ffe_out = convolve(symbols, ffe)[: len(symbols)]
             if self.use_ch_file:
                 self.rel_power = mean(ffe_out**2) / self.rs
             else:
                 self.rel_power = mean(ffe_out**2) / self.Z0
             tx_out = repeat(ffe_out, nspui)  # oversampled output
-
-            # - Calculate the responses.
-            # - (The Tx is unique in that the calculated responses aren't used to form the output.
-            #    This is partly due to the out of order nature in which we combine the Tx and channel,
-            #    and partly due to the fact that we're adding noise to the Tx output.)
-            tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))  # Using `sum` to concatenate.
-            tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
-            tx_s = tx_h.cumsum()
-        tx_out.resize(len(t))
-        temp = tx_h.copy()
-        temp.resize(len(t), refcheck=False)
-        krnl = interp1d(t, temp, kind="cubic",
-                        bounds_error=False, fill_value=0, assume_sorted=True)
-        temp_rfft = krnl(t_rfft)
-        tx_H = rfft(temp_rfft)
-        tx_H *= tx_s[-1] / abs(tx_H[0])
-
-        # - Add the uncorrelated periodic and random noise to the Tx output.
-        tx_out += pn
-        tx_out += normal(scale=rn, size=(len(tx_out),))
-        # - Convolve w/ channel.
-        rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
-
-        # - Calculate cumulative frequency response.
-        tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
-        temp = tx_out_h.copy()
-        temp.resize(len(t), refcheck=False)
-        krnl = interp1d(t, temp, kind="cubic",
-                        bounds_error=False, fill_value=0, assume_sorted=True)
-        temp_rfft = krnl(t_rfft)
-        tx_out_H = rfft(temp_rfft)
+            tx_out += pn
+            tx_out += normal(scale=rn, size=(len(tx_out),))
+            rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
 
         self.tx_s = tx_s
         self.tx_out = tx_out
         self.rx_in = rx_in
-        self.tx_out_s = tx_out_h.cumsum()
-        self.tx_out_p = self.tx_out_s[nspui:] - self.tx_out_s[:-nspui]
+        self.tx_out_s = tx_out_s
+        self.tx_out_p = tx_out_s - pad(tx_out_s[:-nspui], (nspui, 0),
+                                       mode="constant", constant_values=0)
         self.tx_H = tx_H
         self.tx_h = tx_h
         self.tx_out_H = tx_out_H
         self.tx_out_h = tx_out_h
-
+        self.ideal_signal = ideal_signal
+        
         self.tx_perf = nbits * nspb / (clock() - split_time)
         split_time = clock()
         self.status = "Running CTLE...(sweep %d of %d)" % (sweep_num, num_sweeps)
-    except Exception:
-        self.status = "Exception: Tx"
+    except Exception as err:
+        self.status = f"Exception: Tx: {err}"
         raise
-
+    
     _check_sim_status()
 
-    # Generate the output from, and the incremental/cumulative impulse/step/frequency responses of, the CTLE.
+    # Generate the output from, as well as the incremental/cumulative
+    # impulse/step/frequency responses of, the CTLE.
     try:
         if self.rx_use_ami:
-            rx_cfg = self._rx_cfg  # Grab the 'AMIParamConfigurator' instance for this model.
-            # Get the model invoked and initialized, except for 'channel_response', which
-            # we need to do several different ways, in order to gather all the data we need.
+            rx_cfg = self._rx_cfg  # Grab the 'AMIParamConfigurator' instance for this model,
+            # and use it to get the model invoked and initialized.
             rx_param_dict = rx_cfg.input_ami_params
             rx_model_init = AMIModelInitializer(rx_param_dict)
-            rx_model_init.sample_interval = ts  # Must be set, before 'channel_response'!
+            rx_model_init.sample_interval = ts  # Must be set before 'channel_response'!
             rx_model_init.channel_response = tx_out_h / ts
             rx_model_init.bit_time = ui
             rx_model = AMIModel(self.rx_dll_file)
@@ -418,26 +404,33 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                     self.log("ERROR: Never saw a rising step come out of Rx GetWave()!", alert=True)
                     return
                 ctle_h = diff(ctle_s)
-                temp = ctle_h.copy()
-                temp.resize(len(t))
-                ctle_H = fft(temp)
+                # temp = ctle_h.copy()
+                # temp.resize(len(t))
+                krnl = interp1d(t, ctle_h, kind="cubic",
+                                bounds_error=False, fill_value=0, assume_sorted=True)
+                temp_rfft = krnl(t_irfft)
+                ctle_H = rfft(temp_rfft)
                 ctle_h.resize(len(chnl_h))
                 ctle_out_h = convolve(ctle_h, tx_out_h)[: len(chnl_h)]
-            else:  # Init() only.
-                ctle_out_h_padded = pad(
-                    ctle_out_h,
-                    (nspb, len(rx_in) - nspb - len(ctle_out_h)),
-                    "linear_ramp",
-                    end_values=(0.0, 0.0),
-                )
-                tx_out_h_padded = pad(
-                    tx_out_h,
-                    (nspb, len(rx_in) - nspb - len(tx_out_h)),
-                    "linear_ramp",
-                    end_values=(0.0, 0.0),
-                )
-                ctle_H = fft(ctle_out_h_padded) / fft(tx_out_h_padded)  # ToDo: I think this is wrong.
-                ctle_h = irfft(ctle_H)  # I shouldn't be sending the output of `fft()` into `irfft()`, should I?
+            else:  # Init() only model - must deconvolve to get CTLE impulse response.
+                # ToDo: Should we just re-init., using a delta for the channel response?
+                #       Or, maybe, initialize a separate copy, so we don't perturb an already
+                #       running model?
+                ctle_h, _ = deconvolve(ctle_out_h, tx_out_h)
+                # ctle_out_h_padded = pad(
+                #     ctle_out_h,
+                #     (nspb, len(rx_in) - nspb - len(ctle_out_h)),
+                #     "linear_ramp",
+                #     end_values=(0.0, 0.0),
+                # )
+                # tx_out_h_padded = pad(
+                #     tx_out_h,
+                #     (nspb, len(rx_in) - nspb - len(tx_out_h)),
+                #     "linear_ramp",
+                #     end_values=(0.0, 0.0),
+                # )
+                ctle_H = rfft(ctle_out_h_padded) / rfft(tx_out_h_padded)  # ToDo: I think this is wrong.
+                ctle_h = irfft(ctle_H)  # I shouldn't be sending the output of `rfft()` into `irfft()`, should I?
                 ctle_h.resize(len(chnl_h))
             ctle_s = ctle_h.cumsum()
             ctle_out = convolve(rx_in, ctle_h)
@@ -450,16 +443,16 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
                 else:
                     ctle_h *= ts  # Normalize to (V/sample)
                 ctle_h.resize(len(t))
-                ctle_H = fft(ctle_h)
+                ctle_H = rfft(ctle_h)
                 ctle_H *= sum(ctle_h) / ctle_H[0]
             else:
                 ctle_w, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
                 ctle_h = irfft(raised_cosine(ctle_H))
-                spl = interp1d(t_rfft, ctle_h, bounds_error=False, fill_value=0)
+                spl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
                 ctle_h = spl(t)
                 ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
                 spl = interp1d(ctle_w/(2*pi), ctle_H, bounds_error=False, fill_value='extrapolate')
-                ctle_H = spl(self.f_plot)
+                ctle_H = spl(self.f)
             ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
             try:
                 ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
@@ -482,7 +475,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         ctle_out_s = ctle_out_h.cumsum()
         temp = ctle_out_h.copy()
         temp.resize(len(t), refcheck=False)
-        ctle_out_H = fft(temp)
+        ctle_out_H = rfft(temp)
         # - Store local variables to class instance.
         # Consider changing this; it could be sensitive to insufficient "front porch" in the CTLE output step response.
         self.ctle_out_p = ctle_out_s[nspui:] - ctle_out_s[:-nspui]
@@ -544,7 +537,7 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
         dfe_h.resize(len(ctle_out_h), refcheck=False)
         temp = dfe_h.copy()
         temp.resize(len(t), refcheck=False)
-        dfe_H = fft(temp)
+        dfe_H = rfft(temp)
         self.dfe_s = dfe_h.cumsum()
         dfe_out_H = ctle_out_H * dfe_H
         dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
@@ -620,6 +613,8 @@ I cannot continue.\nPlease, select 'Use GetWave' and try again.",
 
     try:
         # - ideal
+        ideal_xings = find_crossings(t, ideal_signal, decision_scaler, mod_type=mod_type)
+        self.ideal_xings = ideal_xings
         ideal_xings_jit = eye_xings(ideal_xings)
 
         # - channel output
@@ -817,7 +812,7 @@ def update_results(self):
     eye_uis = self.eye_uis
     num_ui = self.nui
     clock_times = self.clock_times
-    f = self.f_plot
+    f = self.f
     t = self.t
     t_ns = self.t_ns
     t_ns_chnl = self.t_ns_chnl
@@ -828,7 +823,7 @@ def update_results(self):
     ignore_samps = (num_ui - eye_uis) * samps_per_ui
 
     # Misc.
-    f_GHz = f[: len(f) // 2] / 1.0e9
+    f_GHz = f / 1.0e9
     len_f_GHz = len(f_GHz)
     len_t = len(t_ns)
     self.plotdata.set_data("f_GHz", f_GHz[1:])
@@ -875,7 +870,7 @@ def update_results(self):
     start_ix = where(array(clock_times) > start_t)[0][0]
     (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
-    clock_spec = fft(clock_pers[start_ix:])
+    clock_spec = rfft(clock_pers[start_ix:])
     clock_spec = abs(clock_spec[: len(clock_spec) // 2])
     spec_freqs = arange(len(clock_spec)) / (2.0 * len(clock_spec))  # In this case, fNyquist = half the bit rate.
     clock_spec /= clock_spec[1:].mean()  # Normalize the mean non-d.c. value to 0 dB.
@@ -923,7 +918,6 @@ def update_results(self):
     self.plotdata.set_data("chnl_H_raw", 20.0 * safe_log10(abs(self.chnl_H_raw[1:len_f_GHz])))
     self.plotdata.set_data("chnl_H", 20.0 * safe_log10(abs(self.chnl_H[1:len_f_GHz])))
     self.plotdata.set_data("chnl_trimmed_H", 20.0 * safe_log10(abs(self.chnl_trimmed_H[1:len_f_GHz])))
-    # self.plotdata.set_data("tx_H", 20.0 * safe_log10(abs(self.tx_H[1:len_f_GHz])))
     self.plotdata.set_data("tx_H", 20.0 * safe_log10(abs(self.tx_H[1:])))
     self.plotdata.set_data("tx_out_H", 20.0 * safe_log10(abs(self.tx_out_H[1:len_f_GHz])))
     self.plotdata.set_data("ctle_H", 20.0 * safe_log10(abs(self.ctle_H[1:len_f_GHz])))
