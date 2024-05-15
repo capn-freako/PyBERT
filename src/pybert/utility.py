@@ -16,16 +16,19 @@ from cmath     import phase, rect
 from functools import reduce
 from numpy     import (
     append,    argmax, array,  concatenate, convolve, cos,    cumsum, diff,
-    histogram, insert, log,    log10,       maximum,  mean,   ones,
+    histogram, insert, log,    log10,       maximum,  mean,   ones,   pad,
     pi,        power,  real,        reshape,  resize, roll,   sign,
     sort,      sqrt,   where,       zeros,
 )
-from numpy.fft         import fft, ifft, fftshift
+from numpy.fft         import fft, ifft, fftshift, rfft
 from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.linalg      import inv
 from scipy.optimize    import curve_fit
 from scipy.signal      import freqs, invres
 from scipy.stats       import norm
+
+from pybert.common import *
+from pyibisami.ami.parser import AMIParamConfigurator
 
 debug          = False
 gDebugOptimize = False
@@ -244,7 +247,7 @@ def gaus_pdf(x, mu, sigma):
 
 def calc_jitter(
     ui, nui, pattern_len, ideal_xings, actual_xings,
-    rel_thresh=3.0, num_bins=100, zero_mean=True, dbg_obj=None, smooth_width=5
+    rel_thresh=3.0, num_bins=101, zero_mean=True, dbg_obj=None, smooth_width=5
 ):
     """
     Calculate the jitter in a set of actual zero crossings,
@@ -261,7 +264,7 @@ def calc_jitter(
         rel_thresh(float): The threshold for determining periodic jitter spectral components (sigma).
             (Default: 3.0)
         num_bins(int): The number of bins to use, when forming histograms.
-            (Default: 99)
+            (Default: 101)
         zero_mean(bool): Force the mean jitter to zero, when True.
             (Default: True)
         dbg_obj(object): Object for stashing debugging info.
@@ -891,6 +894,44 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):
     return (res, start_ix)
 
 
+def calc_resps(
+    t: Rvec, h: Rvec, ui: float, t_fft: Optional[Rvec] = None) -> tuple[Rvec, Rvec, Cvec]:
+    """
+    From a uniformly sampled impulse response,
+    calculate the: step, pulse, and frequency responses.
+
+    Args:
+        t: time vector associated with ``h`` (s)
+        h: impulse response (V/sample)
+        ui: unit interval
+
+    Keyword Args:
+        t_fft: time vector associated w/ frequency response, if different than ``t``
+            Default: None
+
+    Returns:
+        s, p, H: tuple consisting of: step, pulse, and frequency responses.
+
+    Notes:
+        1. ``t`` is assumed to be uniformly spaced and monotonic.
+            (It is *not* assumed to begin at zero.)
+    """
+    s = h.cumsum()
+    ts = t[1] - t[0]
+    nspui = int(ui / ts)
+    p = s - pad(s[:-nspui], (nspui, 0), mode="constant", constant_values=0)
+    temp = h.copy()
+    temp.resize(len(t), refcheck=False)
+    krnl = interp1d(t, temp, kind="cubic",
+                    bounds_error=False, fill_value=0, assume_sorted=True)
+    if t_fft is None:
+        t_fft = t
+    temp_rfft = krnl(t_fft)
+    H = rfft(temp_rfft)
+    H *= s[-1] / abs(H[0])
+    return (s, p, H)
+
+
 def H_2_s2p(H, Zc, fs, Zref=50):
     """Convert transfer function to 2-port network.
 
@@ -1348,20 +1389,20 @@ def getwave_step_resp(ami_model):
     # frequency artifactual energy sometimes introduced near
     # the signal edges by frequency domain processing in some models.
     tmp = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
-    tx_s, _ = ami_model.getWave(tmp)
+    s, _ = ami_model.getWave(tmp)
     # Some models delay signal flow through GetWave() arbitrarily.
     tmp = array([0.5] * 1024)
     max_tries = 10
     n_tries = 0
-    while max(tx_s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-        tx_s, _ = ami_model.getWave(tmp)
+    while max(s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
+        s, _ = ami_model.getWave(tmp)
         n_tries += 1
     if n_tries == max_tries:
         raise RuntimeError("No step rise detected!")
     # Make one more call, just to ensure a sufficient "tail".
     tmp, _ = ami_model.getWave(tmp)
-    tx_s = np.append(tx_s, tmp)
-    return tx_s - tx_s[0]
+    s = np.append(s, tmp)
+    return s - s[0]
 
 
 def init_imp_resp(ami_model):
@@ -1379,20 +1420,79 @@ def init_imp_resp(ami_model):
     # frequency artifactual energy sometimes introduced near
     # the signal edges by frequency domain processing in some models.
     tmp = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
-    tx_s, _ = ami_model.getWave(tmp)
+    s, _ = ami_model.getWave(tmp)
     # Some models delay signal flow through GetWave() arbitrarily.
     tmp = array([0.5] * 1024)
     max_tries = 10
     n_tries = 0
-    while max(tx_s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-        tx_s, _ = ami_model.getWave(tmp)
+    while max(s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
+        s, _ = ami_model.getWave(tmp)
         n_tries += 1
     if n_tries == max_tries:
         raise RuntimeError("No step rise detected!")
     # Make one more call, just to ensure a sufficient "tail".
     tmp, _ = ami_model.getWave(tmp)
-    tx_s = np.append(tx_s, tmp)
-    return tx_s - tx_s[0]
+    s = np.append(s, tmp)
+    return s - s[0]
+
+
+def run_ami_model(
+    dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
+    ui: float, ts: float, chnl_h: Rvec) -> tuple[Rvec, Rvec, str]:
+    """
+    Run a simulation of an IBIS-AMI model.
+
+    Args:
+        dll_fname: filename of DLL/SO
+        param_cfg: a pre-configured ``AMIParamConfigurator`` instance
+        use_getwave: Use ``AMI_GetWave()`` when True, ``AMI_Init()`` when False.
+        ui: unit interval
+        ts: sample interval
+        chnl_h: impulse response input to model
+
+    Returns:
+        h, out_h, params_out: A tuple consisting of:
+            - the model's impulse response,
+            - the impulse response of the model concatenated w/ the given channel, and
+            - input parameters, and any output parameters and/or message returned by the model.
+
+    Raises:
+        IOError: if the given file name cannot be found/opened.
+        RuntimeError: if the given model doesn't support the requested mode.
+    """
+
+    # Validate the model against the requested use mode.
+    if use_getwave:
+        assert param_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]), RuntimeError(
+            "You've requested to use the `AMI_GetWave()` function of an IBIS-AMI model, which doesn't provide one!")
+    else:
+        assert param_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]), RuntimeError(
+            "You've requested to use the `AMI_Init()` function of an IBIS-AMI model, which doesn't return an impulse response!")
+
+    # Load and initialize the model, capturing its incremental responses.
+    param_dict = param_cfg.input_ami_params
+    model_init = AMIModelInitializer(param_dict)
+    model_init.sample_interval = ts  # Must be set, before 'channel_response'!
+    model_init.channel_response = chnl_h
+    model_init.bit_time = ui
+    model = AMIModel(dll_fname)
+    model.initialize(model_init)
+    if model.ami_params_out:
+        params_out = model.ami_params_out.decode("utf-8")
+    else:
+        params_out = ""
+    resps = model.get_responses()
+    if use_getwave:
+        h = resps["imp_resp_getw"]
+        out_h = resps["out_resp_getw"]
+    else:
+        h = resps["imp_resp_init"]
+        out_h = resps["out_resp_init"]
+    msg = sum[
+        f"Input parameters: {model.ami_params_in.decode('utf-8')}\n",
+        f"Output parameters: {params_out.decode('utf-8')}\n",
+        f"Message: {model.msg.decode('utf-8')}\n" ]
+    return (h, out_h, msg)
 
 
 def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):
