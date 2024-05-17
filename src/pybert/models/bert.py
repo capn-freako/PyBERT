@@ -233,8 +233,16 @@ def my_run_simulation(
     self.chnl_out = chnl_out
 
     _check_sim_status()
+    split_time = clock()
+    self.status = "Running Tx...(sweep %d of %d)" % (sweep_num, num_sweeps)
 
-    # Tx output and incremental/cumulative responses.
+    # Calculate Tx output power dissipation.
+    ffe_out = convolve(symbols, ffe)[: len(symbols)]
+    if self.use_ch_file:
+        self.rel_power = mean(ffe_out**2) / self.rs
+    else:
+        self.rel_power = mean(ffe_out**2) / self.Z0
+
     # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
     # Generate the ideal rectangular aggressor waveform.
     pn_period = 1.0 / pn_freq
@@ -252,131 +260,131 @@ def my_run_simulation(
     noise = pn + normal(scale=rn, size=(len(x),))
     self.noise = noise
 
+    # Tx and Rx modeling are not separable in all cases.
+    # So, we model each of the 4 possible combinations explicitly.
+    # For the purposes of tallying possible combinations,
+    # AMI Init() and PyBERT native are equivalent,
+    # as both rely on convolving w/ impulse responses.
+
+    def get_ctle_h():
+        "Return the impulse response of the PyBERT native CTLE model."
+        if self.use_ctle_file:
+            # FIXME: The new import_channel() implementation breaks this:
+            ctle_h = import_channel(self.ctle_file, ts, self.f)
+            if max(abs(ctle_h)) < 100.0:  # step response?
+                ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
+            else:
+                ctle_h *= ts  # Normalize to (V/sample)
+            ctle_h.resize(len(t))
+            ctle_H = rfft(ctle_h)
+            ctle_H *= sum(ctle_h) / ctle_H[0]
+        else:
+            _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
+            ctle_h = irfft(raised_cosine(ctle_H))
+            krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
+            ctle_h = krnl(t)
+            ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
+        ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
+        return ctle_h
+
     try:
-        # Calculate the impulse responses of the Tx and Tx+channel.
-        if self.tx_use_ami:
-            rx_in, _, tx_h, tx_out_h, msg = run_ami_model(
-                self.tx_dll_file, self._tx_cfg, tx_use_getwave, ui, ts, chnl_h, noise, x)
+        if self.tx_use_ami and self.tx_use_getwave:
+            tx_out, _, tx_h, tx_out_h, msg = run_ami_model(
+                self.tx_dll_file, self._tx_cfg, True, ui, ts, chnl_h, x)
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
-        else:  # PyBERT native Tx model
-            # Using `sum` to concatenate:
-            tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
-            tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
-            tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
-        
-        # Calculate the remaining responses from the impulse responses.
-        tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, t_fft=t_irfft)
-        tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, t_fft=t_irfft)
-
-        # Generate the input to the Rx.
-        if self.tx_use_ami:
-            # Which order we go in depends on whether we're using `GetWave()` for the Tx.
-            if tx_use_getwave:
-                tx_out, tx_clks = tx_model.getWave(x)
-                tx_out += pn
-                tx_out += normal(scale=rn, size=(len(tx_out),))
-                rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
-            else:
-                x_noisy = x + pn + normal(scale=rn, size=(len(x),))
-                tx_out = convolve(x_noisy, tx_h)[: len(x_noisy)]
-                rx_in = convolve(x_noisy, tx_out_h)[: len(x_noisy)]
-        else:
-            ffe_out = convolve(symbols, ffe)[: len(symbols)]
-            if self.use_ch_file:
-                self.rel_power = mean(ffe_out**2) / self.rs
-            else:
-                self.rel_power = mean(ffe_out**2) / self.Z0
-            tx_out = repeat(ffe_out, nspui)  # oversampled output
-            tx_out += pn
-            tx_out += normal(scale=rn, size=(len(tx_out),))
-            rx_in = convolve(tx_out, chnl_h)[: len(tx_out)]
-
-        self.tx_h = tx_h
-        self.tx_s = tx_s
-        self.tx_p = tx_p
-        self.tx_H = tx_H
-        self.tx_out_h = tx_out_h
-        self.tx_out_s = tx_out_s
-        self.tx_out_p = tx_out_p
-        self.tx_out_H = tx_out_H
-        self.ideal_signal = ideal_signal
-        self.tx_out = tx_out
-        self.rx_in = rx_in
-
-        self.tx_perf = nbits * nspb / (clock() - split_time)
-        split_time = clock()
-        self.status = "Running CTLE...(sweep %d of %d)" % (sweep_num, num_sweeps)
+            rx_in = convolve(tx_out + noise, chnl_h)[:len(tx_out)]
+            self.tx_perf = nbits * nspb / (clock() - split_time)
+            split_time = clock()
+            self.status = "Running CTLE...(sweep %d of %d)" % (sweep_num, num_sweeps)
+            if self.rx_use_ami and self.rx_use_getwave:
+                ctle_out, rx_clks, ctle_h, ctle_out_h, msg = run_ami_model(
+                    self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
+                self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
+            else:  # Rx is either AMI_Init() or PyBERT native.
+                if self.rx_use_ami:  # Rx Init()
+                    _, _, ctle_h, ctle_out_h, msg = run_ami_model(
+                        self.rx_dll_file, self._rx_cfg, False, ui, ts, chnl_h, tx_out)
+                    self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
+                    ctle_out = convolve(tx_out, ctle_out_h)[:len(tx_out)]
+                else:                # PyBERT native Rx
+                    ctle_h = get_ctle_h()
+                    ctle_out_h = convolve(ctle_h, tx_out_h)[:len(ctle_h)]
+                    ctle_out = convolve(tx_out, convolve(ctle_h, chnl_h))[:len(tx_out)]
+        else:  # Tx is either AMI_Init() or PyBERT native.
+            if self.tx_use_ami:  # Tx is AMI_Init().
+                rx_in, _, tx_h, tx_out_h, msg = run_ami_model(
+                    self.tx_dll_file, self._tx_cfg, False, ui, ts, chnl_h, x)
+                self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
+                rx_in += noise
+            else:                # Tx is PyBERT native.
+                # Using `sum` to concatenate:
+                tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
+                tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
+                tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
+                rx_in = convolve(x, tx_out_h)[:len(x)] + noise
+            self.tx_perf = nbits * nspb / (clock() - split_time)
+            split_time = clock()
+            self.status = "Running CTLE...(sweep %d of %d)" % (sweep_num, num_sweeps)
+            if self.rx_use_ami and self.rx_use_getwave:
+                ctle_out, rx_clks, ctle_h, ctle_out_h, msg = run_ami_model(
+                    self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
+                self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
+            else:  # Rx is either AMI_Init() or PyBERT native.
+                if self.rx_use_ami:  # Rx Init()
+                    ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
+                        self.rx_dll_file, self._rx_cfg, False, ui, ts, tx_out_h, x)
+                    self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
+                    ctle_out += noise
+                else:                # PyBERT native Rx
+                    ctle_h = get_ctle_h()
+                    ctle_out_h = convolve(ctle_h, tx_out_h)[:len(ctle_h)]
+                    ctle_out = convolve(x + noise, ctle_out_h)[:len(x)]
     except Exception as err:
-        self.status = f"Exception: Tx: {err}"
+        self.status = f"Exception: {err}"
         raise
-    
-    _check_sim_status()
 
-    # CTLE output and incremental/cumulative responses.
-    try:
-        # Calculate the impulse responses of the Rx and Rx+upstream,
-        # as well as the Rx output (to accommodate PyBERT's native AGC).
-        if self.rx_use_ami:
-            ctle_h, ctle_out_h, msg = run_ami_model(
-                self.rx_dll_file, self._rx_cfg, self.rx_use_getwave, ui, ts, tx_out_h / ts)  # ToDo: Move "/ ts" scaling into `run_ami_model()`.
-            self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
-            ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]  # ToDo: This is problematic in statistical mode, due to deconvolution noise.
-        else:
-            if self.use_ctle_file:
-                # FIXME: The new import_channel() implementation breaks this:
-                ctle_h = import_channel(self.ctle_file, ts, self.f)
-                if max(abs(ctle_h)) < 100.0:  # step response?
-                    ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
-                else:
-                    ctle_h *= ts  # Normalize to (V/sample)
-                ctle_h.resize(len(t))
-                ctle_H = rfft(ctle_h)
-                ctle_H *= sum(ctle_h) / ctle_H[0]
-            else:
-                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-                ctle_h = irfft(raised_cosine(ctle_H))
-                krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
-                ctle_h = krnl(t)
-                ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
-            ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
-            ctle_out_h = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
-            ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
-            ctle_out -= mean(ctle_out)  # Force zero mean.
-            if self.ctle_mode == "AGC":  # Automatic gain control engaged?
-                ctle_out *= 2.0 * decision_scaler / ctle_out.ptp()
+    # Calculate the remaining responses from the impulse responses.
+    tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, t_fft=t_irfft)
+    tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, t_fft=t_irfft)
+    ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, t_fft=t_irfft)
+    ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, t_fft=t_irfft)
 
-        # Calculate the remaining responses from the impulse responses.
-        ctle_h.resize(len(chnl_h))
-        ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, t_fft=t_irfft)
-        ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, t_fft=t_irfft)
+    # Calculate convolutional delay.
+    ctle_out.resize(len(t), refcheck=False)
+    ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
+    if ctle_out_h_main_lobe.size:
+        conv_dly_ix = ctle_out_h_main_lobe[0]
+    else:
+        conv_dly_ix = int(self.chnl_dly // Ts)
+    conv_dly = t[conv_dly_ix]
 
-        ctle_out.resize(len(t), refcheck=False)
-        ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
-        if ctle_out_h_main_lobe.size:
-            conv_dly_ix = ctle_out_h_main_lobe[0]
-        else:
-            conv_dly_ix = int(self.chnl_dly // Ts)
-        conv_dly = t[conv_dly_ix]
+    # Stash needed intermediate results, as instance variables.
+    self.tx_h = tx_h
+    self.tx_s = tx_s
+    self.tx_p = tx_p
+    self.tx_H = tx_H
+    self.tx_out_h = tx_out_h
+    self.tx_out_s = tx_out_s
+    self.tx_out_p = tx_out_p
+    self.tx_out_H = tx_out_H
+    self.ideal_signal = ideal_signal
+    # self.tx_out = tx_out
+    self.rx_in = rx_in
+    self.ctle_h = ctle_h
+    self.ctle_s = ctle_s
+    self.ctle_p = ctle_p
+    self.ctle_H = ctle_H
+    self.ctle_out_h = ctle_out_h
+    self.ctle_out_s = ctle_out_s
+    self.ctle_out_p = ctle_out_p
+    self.ctle_out_H = ctle_out_H
+    self.ctle_out = ctle_out
+    self.conv_dly = conv_dly
+    self.conv_dly_ix = conv_dly_ix
 
-        # Store local variables to class instance.
-        self.ctle_h = ctle_h
-        self.ctle_s = ctle_s
-        self.ctle_p = ctle_p
-        self.ctle_H = ctle_H
-        self.ctle_out_h = ctle_out_h
-        self.ctle_out_s = ctle_out_s
-        self.ctle_out_p = ctle_out_p
-        self.ctle_out_H = ctle_out_H
-        self.ctle_out = ctle_out
-        self.conv_dly = conv_dly
-        self.conv_dly_ix = conv_dly_ix
-
-        self.ctle_perf = nbits * nspb / (clock() - split_time)
-        split_time = clock()
-        self.status = "Running DFE/CDR...(sweep %d of %d)" % (sweep_num, num_sweeps)
-    except Exception:
-        self.status = "Exception: Rx"
-        raise
+    self.ctle_perf = nbits * nspb / (clock() - split_time)
+    split_time = clock()
+    self.status = "Running DFE/CDR...(sweep %d of %d)" % (sweep_num, num_sweeps)
 
     _check_sim_status()
 

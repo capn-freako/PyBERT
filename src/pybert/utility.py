@@ -1438,24 +1438,21 @@ def init_imp_resp(ami_model):
 
 
 def run_ami_model(
-    dll_fname: str, param_cfg: AMIParamConfigurator, is_rx: bool, use_getwave: bool,
-    ui: float, ts: float, chnl_h: Rvec, x: Rvec,
-    noise: Rvec = None, bits_per_call: int = 0) -> tuple[Rvec, Rvec, Rvec, Rvec, str]:
+    dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
+    ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0) -> tuple[Rvec, Rvec, Rvec, Rvec, str]:
     """
     Run a simulation of an IBIS-AMI model.
 
     Args:
         dll_fname: Filename of DLL/SO.
         param_cfg: A pre-configured ``AMIParamConfigurator`` instance.
-        is_rx: True for Rx models; False for Tx models.
         use_getwave: Use ``AMI_GetWave()`` when True, ``AMI_Init()`` when False.
-        ui: Unit interval.
-        ts: Sample interval.
-        chnl_h: Impulse response input to model.
-        x: Ideal input waveform (i.e. - digital input to Tx).
+        ui: Unit interval (s).
+        ts: Sample interval (s).
+        chnl_h: Impulse response input to model (V/sample).
+        x: Input waveform.
 
     Keyword Args:
-        noise: Noise to be added to model's output.
         bits_per_call: Number of bits per call of `GetWave()`.
             Default: 0 (Means "Use existing value.")
 
@@ -1463,8 +1460,8 @@ def run_ami_model(
         y, clks, h, out_h, params_out: A tuple consisting of:
             - the model output convolved w/ any channel impulse response given in `chnl_h`,
             - the model determined sampling instants (a.k.a. - "clock times"), if appropriate,
-            - the model's impulse response,
-            - the impulse response of the model concatenated w/ the given channel, and
+            - the model's impulse response (V/sample),
+            - the impulse response of the model concatenated w/ the given channel (V/sample), and
             - input parameters, and any output parameters and/or message returned by the model.
 
     Raises:
@@ -1483,7 +1480,7 @@ def run_ami_model(
     # Load and initialize the model.
     model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)
     model_init.sample_interval = ts  # Must be set, before 'channel_response'!
-    model_init.channel_response = chnl_h
+    model_init.channel_response = chnl_h / ts
     model_init.bit_time = ui
     model = AMIModel(dll_fname)
     model.initialize(model_init)
@@ -1507,12 +1504,10 @@ def run_ami_model(
 
     # Generate model's output.
     if use_getwave:
-        if is_rx:
-            y, clks = model.getWave(convolve(x, chnl_h)[:len(x)], bits_per_call=bits_per_call)
-        else:
-            y, clks = model.getWave(convolve(x, chnl_h)[:len(x)], bits_per_call=bits_per_call)
+        y, clks = model.getWave(x, bits_per_call=bits_per_call)
     else:
-        y = convolve(x, out_h)  # ToDo: Are we double counting the channel impulse response? Yes. :(
+        y = convolve(x, out_h)[:len(x)]
+        clks = None
 
     return (y, clks, h, out_h, msg)
 
