@@ -206,25 +206,10 @@ def my_run_simulation(
     # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
     # impulse response, in order to produce the proper ideal signal.
     x = repeat(symbols, nspui)
-    # self.x = x
     ideal_signal = x
     if mod_type == 1:  # Handle duo-binary case.
         duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
         ideal_signal = convolve(x, duob_h)[: len(t)]
-
-    # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
-    # Generate the ideal rectangular aggressor waveform.
-    pn_period = 1.0 / pn_freq
-    pn_samps = int(pn_period / Ts + 0.5)
-    pn = zeros(pn_samps)
-    pn[pn_samps // 2 :] = pn_mag
-    self.pn_period = pn_period
-    self.pn_samps = pn_samps
-    pn = resize(pn, len(x))
-    # High pass filter it. (Simulating capacitive coupling.)
-    (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
-    pn = lfilter(b, a, pn)[: len(pn)]
-    self.pn = pn
 
     # Calculate the channel response, as well as its (hypothetical)
     # solitary effect on the data, for plotting purposes only.
@@ -250,11 +235,28 @@ def my_run_simulation(
     _check_sim_status()
 
     # Tx output and incremental/cumulative responses.
+    # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
+    # Generate the ideal rectangular aggressor waveform.
+    pn_period = 1.0 / pn_freq
+    pn_samps = int(pn_period / Ts + 0.5)
+    pn = zeros(pn_samps)
+    pn[pn_samps // 2 :] = pn_mag
+    self.pn_period = pn_period
+    self.pn_samps = pn_samps
+    pn = resize(pn, len(x))
+    # High pass filter it. (Simulating capacitive coupling.)
+    (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
+    pn = lfilter(b, a, pn)[: len(pn)]
+    self.pn = pn
+
+    noise = pn + normal(scale=rn, size=(len(x),))
+    self.noise = noise
+
     try:
         # Calculate the impulse responses of the Tx and Tx+channel.
         if self.tx_use_ami:
-            tx_h, tx_out_h, msg = run_ami_model(
-                self.tx_dll_file, self._tx_cfg, tx_use_getwave, ui, ts, chnl_h)
+            rx_in, _, tx_h, tx_out_h, msg = run_ami_model(
+                self.tx_dll_file, self._tx_cfg, tx_use_getwave, ui, ts, chnl_h, noise, x)
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
         else:  # PyBERT native Tx model
             # Using `sum` to concatenate:
@@ -316,9 +318,9 @@ def my_run_simulation(
         # as well as the Rx output (to accommodate PyBERT's native AGC).
         if self.rx_use_ami:
             ctle_h, ctle_out_h, msg = run_ami_model(
-                self.rx_dll_file, self._rx_cfg, rx_use_getwave, ui, ts, tx_out_h / ts)
+                self.rx_dll_file, self._rx_cfg, self.rx_use_getwave, ui, ts, tx_out_h / ts)  # ToDo: Move "/ ts" scaling into `run_ami_model()`.
             self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
-            ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
+            ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]  # ToDo: This is problematic in statistical mode, due to deconvolution noise.
         else:
             if self.use_ctle_file:
                 # FIXME: The new import_channel() implementation breaks this:
@@ -346,7 +348,6 @@ def my_run_simulation(
         # Calculate the remaining responses from the impulse responses.
         ctle_h.resize(len(chnl_h))
         ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, t_fft=t_irfft)
-        # ctle_s, ctle_p, _ = calc_resps(t, ctle_h, ui, t_fft=t_irfft)
         ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, t_fft=t_irfft)
 
         ctle_out.resize(len(t), refcheck=False)
@@ -702,6 +703,7 @@ def update_results(self):
     t_ns = self.t_ns
     t_ns_chnl = self.t_ns_chnl
     n_taps = self.n_taps
+    t_irfft = self.t_irfft
 
     Ts = t[1]
     ignore_until = (num_ui - eye_uis) * ui
@@ -714,6 +716,7 @@ def update_results(self):
     self.plotdata.set_data("f_GHz", f_GHz[1:])
     self.plotdata.set_data("t_ns", t_ns)
     self.plotdata.set_data("t_ns_chnl", t_ns_chnl)
+    self.plotdata.set_data("t_ns_irfft", t_irfft * 1e9)
 
     # DFE.
     tap_weights = transpose(array(self.adaptation))
@@ -770,6 +773,7 @@ def update_results(self):
 
     # Impulse responses
     self.plotdata.set_data("chnl_h", self.chnl_h * 1.0e-9 / Ts)  # Re-normalize to (V/ns), for plotting.
+    # self.plotdata.set_data("chnl_h", self.chnl_h_raw * 1.0e-9 / Ts)  # Re-normalize to (V/ns), for plotting.
     self.plotdata.set_data("tx_h", self.tx_h * 1.0e-9 / Ts)
     self.plotdata.set_data("tx_out_h", self.tx_out_h * 1.0e-9 / Ts)
     self.plotdata.set_data("ctle_h", self.ctle_h * 1.0e-9 / Ts)

@@ -108,6 +108,9 @@ cython_debug/
 .*
 !.pre-commit-config.yaml
 
+# Debugging output
+*_dbg.txt
+
 # Project specific stuff
 *.pdf
 *.key

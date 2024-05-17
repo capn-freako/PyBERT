@@ -65,6 +65,7 @@ from pybert.utility import (
     lfsr_bits,
     make_ctle,
     pulse_center,
+    raised_cosine,
     safe_log10,
     sdd_21,
     trim_impulse,
@@ -120,6 +121,7 @@ class PyBERT(HasTraits):
         "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
     )  #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
+    renumber = Bool(False)  #: Automically fix "1=>3/2=>4" port numbering? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
     f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
@@ -1273,8 +1275,12 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         len_f = len(f)
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
+        chnl_h_raw = zeros(len(t_irfft))
         if self.use_ch_file:
-            ch_s2p_pre = import_channel(self.ch_file, ts, f)
+            ch_s2p_pre = import_channel(self.ch_file, ts, f, renumber=self.renumber)
+            self.log(str(ch_s2p_pre))
+            H = ch_s2p_pre.s21.s.flatten()
+            chnl_h_raw = irfft(raised_cosine(H))
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
@@ -1367,27 +1373,27 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         # We take the transfer function, H, to be a ratio of voltages.
         # So, we must normalize our (now generalized) S-parameters.
         chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])
-        chnl_h = irfft(chnl_H)
+        chnl_h = irfft(raised_cosine(chnl_H))
         krnl = interp1d(t_irfft, chnl_h, kind="cubic",
                         bounds_error=False, fill_value=0, assume_sorted=True)
         temp = krnl(t)
-        chnl_h = temp * sum(chnl_h) / sum(temp)
+        chnl_h = temp * t[1] / t_irfft[1]
         chnl_dly = where(chnl_h == max(chnl_h))[0][0] * ts
 
         min_len = 20 * nspui
         max_len = 100 * nspui
         if impulse_length:
             min_len = max_len = impulse_length / ts
-        chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len)
+        chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len, front_porch=True)
         krnl = interp1d(t[:len(chnl_h)], chnl_h, kind="cubic",
                         bounds_error=False, fill_value=0, assume_sorted=True)
-        chnl_trimmed_H = rfft(krnl(t_irfft))
-        chnl_trimmed_H *= abs(chnl_H[0]) / abs(chnl_trimmed_H[0])
+        chnl_trimmed_H = rfft(krnl(t_irfft) * t_irfft[1] / t[1])
 
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
 
         self.chnl_h = chnl_h
+        # self.chnl_h_raw = chnl_h_raw
         self.len_h = len(chnl_h)
         self.chnl_dly = chnl_dly
         self.chnl_H = chnl_H

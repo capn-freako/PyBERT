@@ -28,6 +28,7 @@ from scipy.signal      import freqs, invres
 from scipy.stats       import norm
 
 from pybert.common import *
+from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from pyibisami.ami.parser import AMIParamConfigurator
 
 debug          = False
@@ -828,8 +829,8 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):
 def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):
     """Trim impulse response, for more useful display, by:
 
-        - clipping off the tail, after 99.8% of the total power has been
-            captured (Using 99.9% was causing problems; I don't know why.), and
+        - clipping off the tail, after 99.99% of the total first
+            derivative power has been captured, and
         - setting the "front porch" length equal to 20% of the total length.
 
     Args:
@@ -851,24 +852,25 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):
     """
 
     # Move main lobe to center, in case of any non-causality.
-    half_len = len(g) // 2
+    len_g = len(g)
+    half_len = len_g // 2
     _g = roll(g, half_len)
     max_ix = np.argmax(_g)
-    len_g = len(_g)
 
-    # Capture 99.9% of the total energy.
-    Ptot = sum(_g**2)
-    Pbeg = 0.0005 * Ptot
-    Pend = 0.9995 * Ptot
+    # Capture 99.9% of the total first derivative energy.
+    diff_g = diff(g)
+    Ptot = sum(diff_g ** 2)
+    Pbeg = 0.00005 * Ptot
+    Pend = 0.99995 * Ptot
     ix_beg = 0
     ix_end = 0
     P = 0
     while P < Pbeg:
-        P      += _g[ix_beg]**2
+        P      += diff_g[ix_beg] ** 2
         ix_beg += 1
     ix_end = ix_beg
     while P < Pend and ix_end < len_g:
-        P      += _g[ix_end]**2
+        P      += diff_g[ix_end] ** 2
         ix_end += 1
 
     # Return trimmed original if no front porch requested.
@@ -876,21 +878,15 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):
         res = g[:ix_end - half_len].copy()
         start_ix = 0
     else:
-        # Bound end index accordingly.
-        back_porch_len = int(0.8*max_len)  # max. back porch length
-        stop_ix = max_ix + back_porch_len  # This is our max. bound.
-        stop_ix = min(stop_ix, ix_end)
-
-        # Set "front porch" to 20%, doing appropriate bounds checking.
-        start_ix = int(max_ix - (stop_ix - max_ix)*0.25)
-        start_ix = max(0, min(ix_beg, start_ix))
-        res = _g[start_ix:stop_ix].copy()
+        trimmed_len = min(max_len, max(min_len, ix_end - ix_beg))
+        start_ix = max(0, int(max_ix - 0.2 * trimmed_len))
+        stop_ix = min(len_g, start_ix + trimmed_len)
+        try:
+            res = _g[start_ix:stop_ix].copy()
+        except:
+            print(f"start_ix: {start_ix}, stop_ix: {stop_ix}")
+            raise
         start_ix -= half_len
-
-    if len(res) < min_len:
-        res.resize(min_len)
-    if len(res) > max_len:
-        res.resize(max_len)
     return (res, start_ix)
 
 
@@ -964,7 +960,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     return rf.Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_channel(filename, sample_per, fs, zref=100):
+def import_channel(filename, sample_per, fs, zref=100, renumber=False):
     """Read in a channel description file.
 
     Args:
@@ -974,6 +970,7 @@ def import_channel(filename, sample_per, fs, zref=100):
 
     KeywordArgs:
         zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
+        renumber(bool): Automatically fix "1=>3/2=>4" port numbering when True.
 
     Returns:
         skrf.Network: 2-port network description of channel.
@@ -993,7 +990,7 @@ def import_channel(filename, sample_per, fs, zref=100):
     """
     extension = os.path.splitext(filename)[1][1:]
     if re.search(r"^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
-        ts2N = interp_s2p(import_freq(filename), fs)
+        ts2N = interp_s2p(import_freq(filename, renumber=renumber), fs)
     else:  # simple 2-column time domain description (impulse or step).
         h = import_time(filename, sample_per)
         # Fixme: an a.c. coupled channel breaks this naive approach!
@@ -1060,7 +1057,7 @@ def import_time(filename, sample_per):
 
 
 # ToDo: Are there SciKit-RF alternatives to these next two functions?
-def sdd_21(ntwk, norm=0.5):
+def sdd_21(ntwk, norm=0.5, renumber=False):
     """Given a 4-port single-ended network, return its differential 2-port
     network.
 
@@ -1069,15 +1066,16 @@ def sdd_21(ntwk, norm=0.5):
 
     KeywordArgs:
         norm(real): Normalization factor. (Default = 0.5)
+        renumber(bool): Automatically fix "1=>3/2=>4" port numbering when True.
 
     Returns:
         skrf.Network: Sdd (2-port).
     """
-    mm = se2mm(ntwk)
+    mm = se2mm(ntwk, renumber=renumber)
     return rf.Network(frequency=ntwk.f, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
 
 
-def se2mm(ntwk, norm=0.5):
+def se2mm(ntwk, norm=0.5, renumber=False):
     """Given a 4-port single-ended network, return its mixed mode equivalent.
 
     Args:
@@ -1085,6 +1083,7 @@ def se2mm(ntwk, norm=0.5):
 
     KeywordArgs:
         norm(real): Normalization factor. (Default = 0.5)
+        renumber(bool): Automatically fix "1=>3/2=>4" port numbering when True.
 
     Returns:
         skrf.Network: Mixed mode equivalent network, in the following format:
@@ -1099,9 +1098,10 @@ def se2mm(ntwk, norm=0.5):
     assert rs == 4, "Touchstone file must have 4 ports!"
 
     # Detect/correct "1 => 3" port numbering.
-    ix = ntwk.s.shape[0] // 5  # So as not to be fooled by d.c. blocking.
-    if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
-        ntwk.renumber((1, 2), (2, 1))
+    if renumber:
+        ix = ntwk.s.shape[0] // 20  # So as not to be fooled by d.c. blocking.
+        if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
+            ntwk.renumber((1, 2), (2, 1))
 
     # Convert S-parameter data.
     s = np.zeros(ntwk.s.shape, dtype=complex)
@@ -1314,6 +1314,7 @@ def interp_s2p(ntwk, f):
     if ntwk.name is None:
         ntwk.name = "s2p"
     return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
+    # return rf.Network(f=f/1e9, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
 
 
 # ToDo: Are there any uses of this function remaining? Can we eliminate them?
@@ -1437,21 +1438,31 @@ def init_imp_resp(ami_model):
 
 
 def run_ami_model(
-    dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
-    ui: float, ts: float, chnl_h: Rvec) -> tuple[Rvec, Rvec, str]:
+    dll_fname: str, param_cfg: AMIParamConfigurator, is_rx: bool, use_getwave: bool,
+    ui: float, ts: float, chnl_h: Rvec, x: Rvec,
+    noise: Rvec = None, bits_per_call: int = 0) -> tuple[Rvec, Rvec, Rvec, Rvec, str]:
     """
     Run a simulation of an IBIS-AMI model.
 
     Args:
-        dll_fname: filename of DLL/SO
-        param_cfg: a pre-configured ``AMIParamConfigurator`` instance
+        dll_fname: Filename of DLL/SO.
+        param_cfg: A pre-configured ``AMIParamConfigurator`` instance.
+        is_rx: True for Rx models; False for Tx models.
         use_getwave: Use ``AMI_GetWave()`` when True, ``AMI_Init()`` when False.
-        ui: unit interval
-        ts: sample interval
-        chnl_h: impulse response input to model
+        ui: Unit interval.
+        ts: Sample interval.
+        chnl_h: Impulse response input to model.
+        x: Ideal input waveform (i.e. - digital input to Tx).
+
+    Keyword Args:
+        noise: Noise to be added to model's output.
+        bits_per_call: Number of bits per call of `GetWave()`.
+            Default: 0 (Means "Use existing value.")
 
     Returns:
-        h, out_h, params_out: A tuple consisting of:
+        y, clks, h, out_h, params_out: A tuple consisting of:
+            - the model output convolved w/ any channel impulse response given in `chnl_h`,
+            - the model determined sampling instants (a.k.a. - "clock times"), if appropriate,
             - the model's impulse response,
             - the impulse response of the model concatenated w/ the given channel, and
             - input parameters, and any output parameters and/or message returned by the model.
@@ -1469,9 +1480,8 @@ def run_ami_model(
         assert param_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]), RuntimeError(
             "You've requested to use the `AMI_Init()` function of an IBIS-AMI model, which doesn't return an impulse response!")
 
-    # Load and initialize the model, capturing its incremental responses.
-    param_dict = param_cfg.input_ami_params
-    model_init = AMIModelInitializer(param_dict)
+    # Load and initialize the model.
+    model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)
     model_init.sample_interval = ts  # Must be set, before 'channel_response'!
     model_init.channel_response = chnl_h
     model_init.bit_time = ui
@@ -1481,6 +1491,12 @@ def run_ami_model(
         params_out = model.ami_params_out.decode("utf-8")
     else:
         params_out = ""
+    msg = "\n".join([  # Python equivalent of Haskell's `unlines()`.
+        f"Input parameters: {model.ami_params_in.decode('utf-8')}",
+        f"Output parameters: {params_out}",
+        f"Message: {model.msg.decode('utf-8')}"])
+
+    # Capture model's responses.
     resps = model.get_responses()
     if use_getwave:
         h = resps["imp_resp_getw"]
@@ -1488,11 +1504,17 @@ def run_ami_model(
     else:
         h = resps["imp_resp_init"]
         out_h = resps["out_resp_init"]
-    msg = sum[
-        f"Input parameters: {model.ami_params_in.decode('utf-8')}\n",
-        f"Output parameters: {params_out.decode('utf-8')}\n",
-        f"Message: {model.msg.decode('utf-8')}\n" ]
-    return (h, out_h, msg)
+
+    # Generate model's output.
+    if use_getwave:
+        if is_rx:
+            y, clks = model.getWave(convolve(x, chnl_h)[:len(x)], bits_per_call=bits_per_call)
+        else:
+            y, clks = model.getWave(convolve(x, chnl_h)[:len(x)], bits_per_call=bits_per_call)
+    else:
+        y = convolve(x, out_h)  # ToDo: Are we double counting the channel impulse response? Yes. :(
+
+    return (y, clks, h, out_h, msg)
 
 
 def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):

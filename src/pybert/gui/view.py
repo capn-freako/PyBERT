@@ -113,6 +113,20 @@ traits_view = View(
                         label="Pj Threshold (sigma)",
                         tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
                     ),
+                    HGroup(
+                        Item(
+                            name="f_max",
+                            label="fMax",
+                            tooltip="Maximum frequency used for plotting, modeling, and signal processing. (GHz)",
+                        ),
+                        Item(label="GHz"),
+                        Item(
+                            name="f_step",
+                            label="fStep",
+                            tooltip="Frequency step used for plotting, modeling, and signal processing. (MHz)",
+                        ),
+                        Item(label="MHz"),
+                    ),
                     Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
                     label="Analysis Parameters",
                     show_border=True,
@@ -166,30 +180,22 @@ traits_view = View(
                 VGroup(  # Interconnect
                     VGroup(  # From File
                         VGroup(
-                            HGroup(
-                                Item(
-                                    name="ch_file",
-                                    label="File",
-                                    springy=True,
-                                    editor=FileEditor(dialog_style="open"),
-                                ),
+                            Item(
+                                name="ch_file",
+                                label="File",
+                                editor=FileEditor(dialog_style="open"),
                             ),
                             HGroup(
                                 Item(
                                     name="use_ch_file",
                                     label="Use file",
                                 ),
+                                Item(
+                                    name="renumber",
+                                    label="Fix port numbering",
+                                ),
                                 spring,
                             ),
-                        ),
-                        HGroup(
-                            Item(
-                                name="f_step",
-                                label="f_step",
-                                tooltip="Frequency step to use in generating H(f).",
-                            ),
-                            Item(label="MHz"),
-                            enabled_when="use_ch_file == True",
                         ),
                         label="From File",
                         show_border=True,
