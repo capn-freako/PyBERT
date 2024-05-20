@@ -15,6 +15,7 @@ from pybert.models.bert import update_eyes
 PLOT_SPACING = 20
 
 
+# pylint: disable=too-many-locals,too-many-statements
 def make_plots(self, n_dfe_taps):
     """Create the plots used by the PyBERT GUI."""
 
@@ -72,7 +73,7 @@ def make_plots(self, n_dfe_taps):
     container_dfe.add(plot_clk_per_hist)
     container_dfe.add(plot_clk_per_spec)
     self.plots_dfe = container_dfe
-    self._dfe_plot = plot9
+    self._dfe_plot = plot9  # pylint: disable=protected-access
 
     # - EQ Tune tab
     # plot_h_tune = Plot(plotdata, padding_left=75)
@@ -322,8 +323,8 @@ def make_plots(self, n_dfe_taps):
     self.plots_out = container_out
 
     # - Eye Diagrams tab
-    seg_map = dict(
-        red=[
+    seg_map = {
+        "red": [
             (0.00, 0.00, 0.00),  # black
             (0.00001, 0.00, 0.00),  # blue
             (0.15, 0.00, 0.00),  # cyan
@@ -334,7 +335,7 @@ def make_plots(self, n_dfe_taps):
             (0.90, 1.00, 1.00),  # pink
             (1.00, 1.00, 1.00),  # white
         ],
-        green=[
+        "green": [
             (0.00, 0.00, 0.00),  # black
             (0.00001, 0.00, 0.00),  # blue
             (0.15, 0.50, 0.50),  # cyan
@@ -345,7 +346,7 @@ def make_plots(self, n_dfe_taps):
             (0.90, 0.50, 0.50),  # pink
             (1.00, 1.00, 1.00),  # white
         ],
-        blue=[
+        "blue": [
             (0.00, 0.00, 0.00),  # black
             (1e-18, 0.50, 0.50),  # blue
             (0.15, 0.50, 0.50),  # cyan
@@ -355,8 +356,8 @@ def make_plots(self, n_dfe_taps):
             (0.75, 0.00, 0.00),  # red
             (0.90, 0.50, 0.50),  # pink
             (1.00, 1.00, 1.00),  # white
-        ],
-    )
+        ]
+    }
     clr_map = ColorMapper.from_segment_map(seg_map)
     self.clr_map = clr_map
 

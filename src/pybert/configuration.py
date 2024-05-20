@@ -44,7 +44,7 @@ CONFIG_SAVE_WILDCARD = "|".join(
 """This sets the supported file types in the GUI's save-as dialog."""
 
 
-class PyBertCfg:
+class PyBertCfg:  # pylint: disable=too-many-instance-attributes
     """PyBERT simulation configuration data encapsulation class.
 
     This class is used to encapsulate that subset of the configuration
@@ -52,7 +52,7 @@ class PyBertCfg:
     clicks the "Save Config." button.
     """
 
-    def __init__(self, the_PyBERT, date_created: str, version: str):
+    def __init__(self, the_PyBERT, date_created: str, version: str):  # pylint: disable=too-many-statements
         """Copy just that subset of the supplied PyBERT instance's __dict__,
         which should be saved."""
 

@@ -1,3 +1,5 @@
+"Tx FFE tap weight tuner, used by the optimizer."
+
 from traits.api import Bool, Float, HasTraits, Int, String
 
 
@@ -11,6 +13,7 @@ class TxTapTuner(HasTraits):
     value = Float(0.0)
     steps = Int(0)  # Non-zero means we want to sweep it.
 
+    # pylint: disable=too-many-arguments
     def __init__(self, name="(noname)", enabled=False, min_val=0.0, max_val=0.0, value=0.0, steps=0):
         """Allows user to define properties, at instantiation."""
 

@@ -81,6 +81,7 @@ class PyBertData:
         with open(filepath, "wb") as the_file:
             pickle.dump(self, the_file)
 
+    # pylint: disable=too-many-branches
     @staticmethod
     def load_from_file(filepath: Union[str, Path], pybert):
         """Recall all the results from a file and load them as reference plots.
@@ -101,7 +102,7 @@ class PyBertData:
         with open(filepath, "rb") as the_file:
             user_results = pickle.load(the_file)
         if not isinstance(user_results, PyBertData):
-            raise Exception("The data structure read in is NOT of type: ArrayPlotData!")
+            raise ValueError("The data structure read in is NOT of type: ArrayPlotData!")
 
         # Load the reference plots.
         for prop, value in user_results.the_data.arrays.items():

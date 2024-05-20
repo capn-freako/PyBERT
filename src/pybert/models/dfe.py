@@ -18,7 +18,7 @@ from pybert.models.cdr import CDR
 gNch_taps = 3  # Number of taps used in summing node filter.
 
 
-class LfilterSS:
+class LfilterSS:  # pylint: disable=too-few-public-methods
     """A single steppable version of scipy.signal.lfilter()."""
 
     def __init__(self, b, a):
@@ -62,10 +62,10 @@ class LfilterSS:
         return y
 
 
-class DFE:
+class DFE:  # pylint: disable=too-many-instance-attributes
     """Behavioral model of a decision feedback equalizer (DFE)."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         n_taps,
         gain,
@@ -255,6 +255,7 @@ class DFE:
 
         return decision, bits
 
+    # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     def run(self, sample_times, signal):
         """Run the DFE on the input signal.
 
@@ -315,6 +316,7 @@ class DFE:
         clocks = zeros(len(sample_times))
         clock_times = [next_clock_time]
         bits = []
+        boundary_sample = 0
         for t, x in zip(sample_times, signal):
             if not ideal:
                 sum_out = summing_filter.step(x - filter_out)

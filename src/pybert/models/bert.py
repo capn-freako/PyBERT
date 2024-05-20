@@ -9,8 +9,6 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 from time import perf_counter
 from typing import Callable, Optional
 
-clock = perf_counter
-
 import scipy.signal as sig
 from chaco.api import Plot
 from chaco.tools.api import PanTool, ZoomTool
@@ -20,14 +18,10 @@ from numpy import (
     array,
     convolve,
     correlate,
-    cumsum,
     diff,
     histogram,
     linspace,
     mean,
-    ones,
-    pad,
-    pi,
     repeat,
     resize,
     std,
@@ -37,7 +31,7 @@ from numpy import (
 )
 from numpy.fft import rfft, irfft
 from numpy.random import normal
-from scipy.signal import iirfilter, lfilter, deconvolve
+from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
 from pybert.models.dfe import DFE
@@ -46,7 +40,6 @@ from pybert.utility import (
     calc_jitter,
     calc_resps,
     find_crossings,
-    getwave_step_resp,
     import_channel,
     make_bathtub,
     make_ctle,
@@ -55,7 +48,8 @@ from pybert.utility import (
     safe_log10,
     trim_impulse,
 )
-from pyibisami.ami.model import AMIModel, AMIModelInitializer
+
+clock = perf_counter
 
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.0e-18
@@ -109,6 +103,7 @@ def my_run_sweeps(self, is_thread_stopped: Optional[Callable[[], bool]] = None):
         my_run_simulation(self, aborted_sim=is_thread_stopped)
 
 
+# pylint: disable=too-many-locals,protected-access,too-many-branches,too-many-statements
 def my_run_simulation(
     self, initial_run: bool = False, update_plots: bool = True,
     aborted_sim: Optional[Callable[[], bool]] = None):
@@ -149,7 +144,7 @@ def my_run_simulation(
     sweep_num = self.sweep_num
 
     start_time = clock()
-    self.status = "Running channel...(sweep %d of %d)" % (sweep_num, num_sweeps)
+    self.status = f"Running channel...(sweep {sweep_num} of {num_sweeps})"
 
     if not self.seed:  # The user sets `seed` to zero to indicate that she wants new bits generated for each run.
         self.run_count += 1  # Force regeneration of bit stream.
@@ -234,7 +229,7 @@ def my_run_simulation(
 
     _check_sim_status()
     split_time = clock()
-    self.status = "Running Tx...(sweep %d of %d)" % (sweep_num, num_sweeps)
+    self.status = f"Running Tx...(sweep {sweep_num} of {num_sweeps})"
 
     # Calculate Tx output power dissipation.
     ffe_out = convolve(symbols, ffe)[: len(symbols)]
@@ -269,7 +264,7 @@ def my_run_simulation(
     def get_ctle_h():
         "Return the impulse response of the PyBERT native CTLE model."
         if self.use_ctle_file:
-            # FIXME: The new import_channel() implementation breaks this:
+            # FIXME: The new import_channel() implementation breaks this:  # pylint: disable=fixme
             ctle_h = import_channel(self.ctle_file, ts, self.f)
             if max(abs(ctle_h)) < 100.0:  # step response?
                 ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
@@ -295,9 +290,9 @@ def my_run_simulation(
             rx_in = convolve(tx_out + noise, chnl_h)[:len(tx_out)]
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
-            self.status = "Running CTLE...(sweep %d of %d)" % (sweep_num, num_sweeps)
+            self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
             if self.rx_use_ami and self.rx_use_getwave:
-                ctle_out, rx_clks, ctle_h, ctle_out_h, msg = run_ami_model(
+                ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
             else:  # Rx is either AMI_Init() or PyBERT native.
@@ -324,9 +319,9 @@ def my_run_simulation(
                 rx_in = convolve(x, tx_out_h)[:len(x)] + noise
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
-            self.status = "Running CTLE...(sweep %d of %d)" % (sweep_num, num_sweeps)
+            self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
             if self.rx_use_ami and self.rx_use_getwave:
-                ctle_out, rx_clks, ctle_h, ctle_out_h, msg = run_ami_model(
+                ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
             else:  # Rx is either AMI_Init() or PyBERT native.
@@ -384,7 +379,7 @@ def my_run_simulation(
 
     self.ctle_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
-    self.status = "Running DFE/CDR...(sweep %d of %d)" % (sweep_num, num_sweeps)
+    self.status = "Running DFE/CDR...(sweep {sweep_num} of {num_sweeps})"
 
     _check_sim_status()
 
@@ -446,7 +441,7 @@ def my_run_simulation(
 
         self.dfe_perf = nbits * nspb / (clock() - split_time)
         split_time = clock()
-        self.status = "Analyzing jitter...(sweep %d of %d)" % (sweep_num, num_sweeps)
+        self.status = f"Analyzing jitter...(sweep {sweep_num} of {num_sweeps})"
     except Exception:
         self.status = "Exception: DFE"
         print(f"len(bits_out): {len(bits_out)}\nnbits: {nbits}\neye_bits: {eye_bits}")
@@ -668,7 +663,7 @@ def my_run_simulation(
         self.jitter_perf = nbits * nspb / (clock() - split_time)
         self.total_perf = nbits * nspb / (clock() - start_time)
         split_time = clock()
-        self.status = "Updating plots...(sweep %d of %d)" % (sweep_num, num_sweeps)
+        self.status = f"Updating plots...(sweep {sweep_num} of {num_sweeps})"
     except Exception:
         if update_plots:
             update_results(self)
@@ -693,6 +688,7 @@ def my_run_simulation(
 
 
 # Plot updating
+# pylint: disable=too-many-locals,protected-access,too-many-statements
 def update_results(self):
     """Updates all plot data used by GUI.
 
@@ -729,22 +725,21 @@ def update_results(self):
     # DFE.
     tap_weights = transpose(array(self.adaptation))
     i = 1
-    for tap_weight in tap_weights:
+    for tap_weight in tap_weights:  # pylint: disable=undefined-loop-variable
         self.plotdata.set_data(f"tap{i}_weights", tap_weight)
         i += 1
-    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))
-    if self._old_n_taps != n_taps:
+    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))  # pylint: disable=undefined-loop-variable
+    if self._old_n_taps != n_taps:  # pylint: disable=undefined-loop-variable
         new_plot = Plot(
             self.plotdata,
             auto_colors=["red", "orange", "yellow", "green", "blue", "purple"],
             padding_left=75,
         )
         for i in range(self.n_taps):
-            new_plot.plot(
-                ("tap_weight_index", "tap%d_weights" % (i + 1)),
+            new_plot.plot( ("tap_weight_index", f"tap{i + 1}_weights"),
                 type="line",
+                name=f"tap{i + 1}",
                 color="auto",
-                name="tap%d" % (i + 1),
             )
         new_plot.title = "DFE Adaptation"
         new_plot.tools.append(PanTool(new_plot, constrain=True, constrain_key=None, constrain_direction="x"))
@@ -828,7 +823,6 @@ def update_results(self):
     jitter_ctle = self.jitter_ctle
     jitter_dfe  = self.jitter_dfe
     jitter_bins = self.jitter_bins
-    jitter_dt   = jitter_bins[1] - jitter_bins[0]
     self.plotdata.set_data("jitter_bins", array(self.jitter_bins)  * 1e12)
     self.plotdata.set_data("jitter_chnl",     jitter_chnl          * 1e-12)  # PDF (/ps)
     self.plotdata.set_data("jitter_ext_chnl", self.jitter_ext_chnl * 1e-12)
@@ -858,16 +852,16 @@ def update_results(self):
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
     # Bathtubs
-    bathtub_chnl, (ext_start_chnl, ext_end_chnl) = make_bathtub(
+    bathtub_chnl, (_, _) = make_bathtub(
         jitter_bins, jitter_chnl, min_val=0.1*MIN_BATHTUB_VAL,
         rj=self.rj_chnl, extrap=True)
-    bathtub_tx,   (ext_start_tx,  ext_end_tx)    = make_bathtub(
+    bathtub_tx,   (_,  _)    = make_bathtub(
         jitter_bins, jitter_tx,   min_val=0.1*MIN_BATHTUB_VAL,
         rj=self.rj_tx,   extrap=True)
-    bathtub_ctle, (ext_start_ctle, ext_end_ctle) = make_bathtub(
+    bathtub_ctle, (_, _) = make_bathtub(
         jitter_bins, jitter_ctle, min_val=0.1*MIN_BATHTUB_VAL,
         rj=self.rj_ctle, extrap=True)
-    bathtub_dfe,  (ext_start_dfe,  ext_end_dfe)  = make_bathtub(
+    bathtub_dfe,  (_,  _)  = make_bathtub(
         jitter_bins, jitter_dfe,  min_val=0.1*MIN_BATHTUB_VAL,
         rj=self.rj_dfe,  extrap=True)
     self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))

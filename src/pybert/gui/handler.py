@@ -10,7 +10,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from pyface.api import OK, FileDialog, MessageDialog
+from pyface.api import OK, FileDialog, MessageDialog  # pylint: disable=no-name-in-module
 from traits.api import Instance
 from traitsui.api import Handler
 
@@ -49,7 +49,6 @@ class MyHandler(Handler):
         Args:
             info: When an action is clicked, it passes the whole trait instance to this function.
         """
-        # pylint: disable=no-self-use
         pybert = info.object
         configuration_file = Path(pybert.cfg_file)
         if pybert.cfg_file and configuration_file.exists():
@@ -63,7 +62,6 @@ class MyHandler(Handler):
         Args:
             info: When an action is clicked, it passes the whole trait instance to this function.
         """
-        # pylint: disable=no-self-use
         pybert = info.object
         dialog = FileDialog(
             action="save as",
@@ -79,7 +77,6 @@ class MyHandler(Handler):
         Args:
             info: When an action is clicked, it passes the whole trait instance to this function.
         """
-        # pylint: disable=no-self-use
         pybert = info.object
         dialog = FileDialog(
             action="open",
@@ -95,7 +92,6 @@ class MyHandler(Handler):
         Args:
             info: When an action is clicked, it passes the whole trait instance to this function.
         """
-        # pylint: disable=no-self-use
         pybert = info.object
         dialog = FileDialog(action="save as", wildcard=RESULTS_FILEDIALOG_WILDCARD, default_path=pybert.data_file)
         if dialog.open() == OK:
@@ -109,7 +105,6 @@ class MyHandler(Handler):
         Args:
             info: When an action is clicked, it passes the whole trait instance to this function.
         """
-        # pylint: disable=no-self-use
         pybert = info.object
         dialog = FileDialog(action="open", wildcard=RESULTS_FILEDIALOG_WILDCARD, default_path=pybert.data_file)
         if dialog.open() == OK:
@@ -121,23 +116,21 @@ class MyHandler(Handler):
         Args:
             info: When an action is clicked, it passes the whole trait instance to this function.
         """
-        # pylint: disable=no-self-use
         pybert = info.object
         pybert.clear_reference_from_plots()
 
     def toggle_debug_clicked(self, info):
         """Toggle whether debug mode is enabled or not."""
-        # pylint: disable=no-self-use
         info.object.debug = not info.object.debug
 
     def getting_started_clicked(self, info):
         """Open up Pybert's wiki."""
-        # pylint: disable=no-self-use,unused-argument
+        # pylint: disable=unused-argument
         webbrowser.open("https://github.com/capn-freako/PyBERT/wiki")
 
     def show_about_clicked(self, info):
         """Open a dialog and show the user the about info."""
-        # pylint: disable=no-self-use,unused-argument
+        # pylint: disable=unused-argument
         dialog = MessageDialog(
             title="About Pybert",
             message=f"PyBERT v{__version__} - a serial communication link design tool, written in Python.",
@@ -153,5 +146,5 @@ class MyHandler(Handler):
 
         Can't use CloseAction until https://github.com/enthought/traitsui/issues/1442 is resolved.
         """
-        # pylint: disable=no-self-use,unused-argument
+        # pylint: disable=unused-argument
         sys.exit(0)

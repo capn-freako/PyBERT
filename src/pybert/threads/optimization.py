@@ -8,6 +8,7 @@ from pybert.threads.stoppable import StoppableThread
 gDebugOptimize = False
 
 
+# pylint: disable=no-member
 class TxOptThread(StoppableThread):
     """Used to run Tx tap weight optimization in its own thread, in order to
     preserve GUI responsiveness."""
@@ -59,7 +60,7 @@ class TxOptThread(StoppableThread):
                 else:
                     pybert.status = f"Optimization failed: {res['message']}"
 
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-exception-caught
             pybert.status = err
 
     def do_opt_tx(self, taps):
@@ -112,7 +113,7 @@ class RxOptThread(StoppableThread):
             else:
                 pybert.status = f"Optimization failed: {res['message']}"
 
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-exception-caught
             pybert.status = err
 
     def do_opt_rx(self, peak_mag):
@@ -161,7 +162,7 @@ class CoOptThread(StoppableThread):
             else:
                 pybert.status = f"Optimization failed: {res['message']}"
 
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-exception-caught
             pybert.status = err.message
 
     def do_coopt(self, peak_mag):
@@ -173,10 +174,10 @@ class CoOptThread(StoppableThread):
 
         pybert = self.pybert
         pybert.peak_mag_tune = peak_mag
-        if any([pybert.tx_tap_tuners[i].enabled for i in range(len(pybert.tx_tap_tuners))]):
+        if any(pybert.tx_tap_tuners[i].enabled for i in range(len(pybert.tx_tap_tuners))):
             while pybert.tx_opt_thread and pybert.tx_opt_thread.is_alive():
                 time.sleep(0.001)
-            pybert._do_opt_tx(update_status=False)
+            pybert._do_opt_tx(update_status=False)  # pylint: disable=protected-access
             while pybert.tx_opt_thread and pybert.tx_opt_thread.is_alive():
                 time.sleep(0.001)
         return pybert.cost

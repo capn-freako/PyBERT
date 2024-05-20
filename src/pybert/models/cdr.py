@@ -15,11 +15,11 @@ from typing import List, Sequence, Tuple
 from numpy import array, mean, sign, where
 
 
-class CDR:
+class CDR:  # pylint: disable=too-many-instance-attributes
     """A class providing behavioral modeling of a 'bang- bang' clock data
     recovery (CDR) unit."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         delta_t: float,
         alpha: float,
@@ -70,7 +70,7 @@ class CDR:
 
         return self._locked
 
-    def adapt(self, samples: Sequence[float]) -> Tuple[float, bool]:
+    def adapt(self, samples: Sequence[float]) -> Tuple[float, bool]:  # pylint: disable=too-many-locals
         """Adapt period/phase, according to 3 samples.
 
         Should be called, when the clock has just struck.

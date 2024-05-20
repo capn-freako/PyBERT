@@ -11,7 +11,7 @@ class StoppableThread(Thread):
     """
 
     def __init__(self):
-        super(StoppableThread, self).__init__()
+        super().__init__()
         self._stop_event = Event()
 
     def stop(self):

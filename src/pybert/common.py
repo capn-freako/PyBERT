@@ -8,9 +8,9 @@ Original date:   May 13, 2024
 Copyright (c) 2024 David Banas; all rights reserved World wide.
 """
 
+from typing import Any, Optional, TypeVar, TypeAlias  # pylint: disable=unused-import
 import numpy as np  # type: ignore
 import numpy.typing as npt  # type: ignore
-from typing import Any, Optional, TypeVar, TypeAlias
 
 Real = TypeVar('Real', float, float)
 Comp = TypeVar('Comp', complex, complex)

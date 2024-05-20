@@ -1,3 +1,5 @@
+"Thread for running the PyBERT simulation."
+
 from pybert.models.bert import my_run_sweeps
 from pybert.threads.stoppable import StoppableThread
 

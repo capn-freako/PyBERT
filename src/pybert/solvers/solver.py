@@ -18,12 +18,12 @@ from typing import List, Tuple
 ChType = Enum("ChType", "microstrip_se microstrip_diff stripline_se stripline_diff")
 
 
-class Solver(ABC):
+class Solver(ABC):  # pylint: disable=too-few-public-methods
     """Abstract base class providing a consistent interface to channel
     solver."""
 
     @abstractmethod
-    def solve(
+    def solve(  # pylint: disable=too-many-arguments
         self,
         ch_type: str = "microstrip_se",  #: Channel cross-sectional configuration.
         diel_const: float = 4.3,  #: Dielectric constant of substrate at ``des_freq`` (rel.).
