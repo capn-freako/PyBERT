@@ -17,5 +17,6 @@ Comp = TypeVar('Comp', complex, complex)
 Rvec: TypeAlias = npt.NDArray[Real]
 Cvec: TypeAlias = npt.NDArray[Comp]
 
-PI: float = np.pi
-TWOPI: float = 2 * np.pi
+# PI: float = np.pi
+PI: float = 3.14159265359
+TWOPI: float = 2. * PI
