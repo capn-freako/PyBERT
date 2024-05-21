@@ -270,14 +270,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             else:
                 ctle_h *= ts  # Normalize to (V/sample)
             ctle_h.resize(len(t))
-            ctle_H = rfft(ctle_h)
-            ctle_H *= sum(ctle_h) / ctle_H[0]
+            ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.  # pylint: disable=fixme
+            # ctle_H *= sum(ctle_h) / ctle_H[0]
         else:
             _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
             ctle_h = irfft(raised_cosine(ctle_H))
             krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
             ctle_h = krnl(t)
-            ctle_h *= abs(ctle_H[0]) / sum(ctle_h)
+            ctle_h *= t[1] / t_irfft[1]
         ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
         return ctle_h
 
@@ -663,10 +663,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         split_time = clock()
         self.status = f"Updating plots...(sweep {sweep_num} of {num_sweeps})"
     except Exception:
-        if update_plots:
-            update_results(self)
-            if not initial_run:
-                update_eyes(self)
+        # if update_plots:
+        #     update_results(self)
+        #     if not initial_run:
+        #         update_eyes(self)
         self.status = "Exception: jitter"
         raise
 

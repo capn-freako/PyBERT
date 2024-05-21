@@ -196,7 +196,7 @@ def find_crossings(  # pylint: disable=too-many-arguments
     """
 
     # assert mod_type >= 0 and mod_type <= 2, f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}"
-    assert 0 < mod_type <= 2, f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}"
+    assert 0 <= mod_type <= 2, f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}"
 
     xings = []
     if mod_type == 0:  # NRZ
@@ -376,7 +376,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
     _jitter = jitter.copy()
-    _jitter.resize(num_patterns * xings_per_pattern)
+    _jitter.resize(num_patterns * xings_per_pattern, refcheck=False)  # Accommodating Tox.
     tie_ave = resize(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
     tie_ind = jitter - tie_ave
     if zero_mean:
@@ -831,7 +831,8 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):  # py
     return (w, H)
 
 
-def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):  # pylint: disable=too-many-locals
+# pylint: disable=too-many-locals
+def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True, kept_energy=0.999):
     """Trim impulse response, for more useful display, by:
 
         - clipping off the tail, after 99.99% of the total first
@@ -849,6 +850,8 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):  # pylint: di
         front_porch(bool): Adjust "front porch" when True.
             Set to False if accurate delay is required.
             Default: True
+        kept_energy(float): The portion of first derivative "energy" retained.
+            Default: 99.9%
 
     Returns:
         ([real], int): A pair consisting of:
@@ -865,8 +868,9 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):  # pylint: di
     # Capture 99.9% of the total first derivative energy.
     diff_g = diff(g)
     Ptot = sum(diff_g ** 2)
-    Pbeg = 0.00005 * Ptot
-    Pend = 0.99995 * Ptot
+    half_residual_energy = 0.5 * (1 - kept_energy)
+    Pbeg = half_residual_energy * Ptot
+    Pend = (1 - half_residual_energy) * Ptot
     ix_beg = 0
     ix_end = 0
     P = 0
@@ -879,11 +883,11 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):  # pylint: di
         ix_end += 1
 
     # Return trimmed original if no front porch requested.
+    trimmed_len = min(max_len, max(min_len, ix_end - ix_beg))
     if not front_porch:
-        res = g[:ix_end - half_len].copy()
+        res = g[:trimmed_len].copy()
         start_ix = 0
     else:
-        trimmed_len = min(max_len, max(min_len, ix_end - ix_beg))
         start_ix = max(0, int(max_ix - 0.2 * trimmed_len))
         stop_ix = min(len_g, start_ix + trimmed_len)
         try:
@@ -1270,7 +1274,8 @@ def cap_mag(zs, maxMag=1.0):
     """
     zs_flat = zs.flatten()
     subs = [rect(maxMag, phase(z)) for z in zs_flat]
-    return where(abs(zs_flat) > maxMag, subs, zs_flat)[0].reshape(zs.shape)
+    # return where(abs(zs_flat) > maxMag, subs, zs_flat)[0].reshape(zs.shape)
+    return where(abs(zs_flat) > maxMag, subs, zs_flat).reshape(zs.shape)
 
 
 def mon_mag(zs):

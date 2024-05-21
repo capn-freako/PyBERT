@@ -220,7 +220,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     use_dfe = Bool(gUseDfe)  #: True = use a DFE (Bool).
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
     decision_scaler = Float(0.5)  #: DFE slicer output voltage (V).
-    gain = Float(0.5)  #: DFE error gain (unitless).
+    gain = Float(0.2)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     n_taps = Int(gNtaps)  #: DFE # of taps.
     _old_n_taps = n_taps
@@ -670,7 +670,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         return taps
 
     # pylint: disable=too-many-locals,consider-using-f-string,too-many-branches,too-many-statements
-    @cached_property
+    # @cached_property
     def _get_jitter_info(self):
         isi_chnl = self.isi_chnl * 1.0e12
         dcd_chnl = self.dcd_chnl * 1.0e12
@@ -881,7 +881,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         return info_str
 
-    @cached_property
+    # @cached_property
     def _get_perf_info(self):
         info_str = "<H2>Performance by Component</H2>\n"
         info_str += '  <TABLE border="1">\n'
@@ -913,7 +913,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         return info_str
 
-    @cached_property
+    # @cached_property
     def _get_sweep_info(self):
         sweep_results = self.sweep_results
 
@@ -932,9 +932,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         return info_str
 
-    @cached_property
+    # @cached_property
     def _get_status_str(self):
-        status_str = f"{self.status:-20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
+        status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
         err_str = f"    | BitErrs: {int(self.bit_errs)}"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
@@ -951,7 +951,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         return status_str
 
-    @cached_property
+    # @cached_property
     def _get_tx_h_tune(self):
         nspui = self.nspui
         tap_tuners = self.tx_tap_tuners
@@ -968,7 +968,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         return h
 
-    @cached_property
+    # @cached_property
     def _get_ctle_h_tune(self):
         w = self.w
         rx_bw = self.rx_bw_tune * 1.0e9
@@ -982,7 +982,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         return h
 
-    @cached_property
+    # @cached_property
     def _get_ctle_out_h_tune(self):
         chnl_h = self.chnl_h
         tx_h = self.tx_h_tune
@@ -991,9 +991,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         tx_out_h = convolve(tx_h, chnl_h)
         return convolve(ctle_h, tx_out_h)
 
-    @cached_property
+    # @cached_property
     def _get_cost(self):
-        nspui = self.nspui.value
+        nspui = self.nspui
         h = self.ctle_out_h_tune
         mod_type = self.mod_type[0]
 
@@ -1038,11 +1038,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             return isi - p[clock_pos] - p[clock_pos + nspui] + 2.0 * abs(p[clock_pos + nspui] - p[clock_pos])
         return isi - p[clock_pos]
 
-    @cached_property
+    # @cached_property
     def _get_rel_opt(self):
-        return -self.cost.value
+        return -self.cost
 
-    @cached_property
+    # @cached_property
     def _get_przf_err(self):
         p = self.dfe_out_p
         nspui = self.nspui
@@ -1245,7 +1245,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         t_irfft = self.t_irfft  # This time vector IS related to `f`/`w`.
         f = self.f
         w = self.w
-        nspui = self.nspui.value
+        nspui = self.nspui
         impulse_length = self.impulse_length * 1.0e-9
         Rs = self.rs
         Cs = self.cout * 1.0e-12
@@ -1264,7 +1264,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         else:
             # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
             # - Grab model parameters from PyBERT instance.
-            l_ch = self.l_ch.value
+            l_ch = self.l_ch
             v0 = self.v0 * 3.0e8
             R0 = self.R0
             w0 = self.w0
@@ -1489,3 +1489,32 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
     _rx_ibis_dir = ""
     _rx_cfg = Instance(AMIParamConfigurator)
     _rx_model = Instance(AMIModel)
+
+    isi_chnl = 0
+    dcd_chnl = 0
+    pj_chnl = 0
+    rj_chnl = 0
+    pjDD_chnl = 0
+    rjDD_chnl = 0
+    isi_tx = 0
+    dcd_tx = 0
+    pj_tx = 0
+    rj_tx = 0
+    pjDD_tx = 0
+    rjDD_tx = 0
+    isi_ctle = 0
+    dcd_ctle = 0
+    pj_ctle = 0
+    rj_ctle = 0
+    pjDD_ctle = 0
+    rjDD_ctle = 0
+    isi_dfe = 0
+    dcd_dfe = 0
+    pj_dfe = 0
+    rj_dfe = 0
+    pjDD_dfe = 0
+    rjDD_dfe = 0
+
+    jitter_chnl = 0
+    jitter_bins = []
+

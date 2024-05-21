@@ -727,8 +727,6 @@ traits_view = View(
         springy=True,
         id="tabs",
     ),
-    resizable=True,
-    handler=MyHandler(),
     menubar=MenuBar(
         Menu(
             Action(name="Load Config.", action="do_load_cfg", accelerator="Ctrl+O"),
@@ -771,7 +769,9 @@ traits_view = View(
         ),
     ),
     buttons=NoButtons,
+    handler=MyHandler(),
+    icon=ImageResource("icon.png"),
+    resizable=False,
     statusbar="status_str",
     title="PyBERT",
-    icon=ImageResource("icon.png"),
 )
