@@ -31,7 +31,7 @@ import skrf  as rf
 from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from pyibisami.ami.parser import AMIParamConfigurator
 
-from pybert.common import *  # pylint: disable=wildcard-import,unused-wildcard-import
+from pybert.common import *  # pylint: disable=wildcard-import,unused-wildcard-import  # noqa: F403
 
 debug          = False
 gDebugOptimize = False
@@ -62,7 +62,7 @@ def moving_average(a, n=3):
            Because of this non-standard use, those bins shouldn't be
            included in averaging.
     """
-    win = ones((n+1)//2)
+    win = ones((n + 1) // 2)
     krnl = convolve(win, win)
     krnl = krnl / krnl.sum()
     res  = convolve(a[1:-1], krnl, mode='same')
@@ -110,7 +110,7 @@ def find_crossing_times(  # pylint: disable=too-many-arguments
 
     try:
         max_mag_x = max(abs(x))
-    except:
+    except Exception:  # pylint: disable=broad-exception-caught
         print("len(x):", len(x))
         raise
     min_mag_x = min_init_dev * max_mag_x
@@ -148,7 +148,7 @@ def find_crossing_times(  # pylint: disable=too-many-arguments
     try:
         if rising_first and diff_sign_x[xing_ix[i]] < 0.0:
             i += 1
-    except:
+    except Exception:  # pylint: disable=broad-exception-caught
         print("len(diff_sign_x):", len(diff_sign_x))
         print("len(xing_ix):", len(xing_ix))
         print("i:", i)
@@ -335,7 +335,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         if i == len(actual_xings):  # We've exhausted the list of actual crossings; we're done.
             break
         if actual_xings[i] > max_t:  # Means the xing we're looking for didn't occur, in the actual signal.
-            jitter.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.
+            jitter.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.  # noqa: E201
             jitter.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
             skip_next_ideal_xing = True  # If we missed one, we missed two.
         else:  # Noise may produce several crossings.
@@ -396,7 +396,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     # spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
     try:
         spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
-    except:
+    except Exception:  # pylint: disable=broad-exception-caught
         print(f"t_jitter: {t_jitter}")
         print(f"jitter: {jitter}")
         raise
@@ -440,7 +440,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         into the last bin.
         """
         bin_edges   = array([-ui] + [-ui / 2.0 + i * ui / (num_bins - 2) for i in range(num_bins - 1)] + [ui])
-        bin_centers = [-ui/2] + list((bin_edges[1:-2] + bin_edges[2:-1]) / 2) + [ui/2]
+        bin_centers = [-ui / 2] + list((bin_edges[1:-2] + bin_edges[2:-1]) / 2) + [ui / 2]
         hist, _     = histogram(x, bin_edges)
         hist        = hist / hist.sum()  # PMF
         if density:
@@ -459,9 +459,9 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     hist_tot_smooth = array(moving_average(hist_tot, n=smooth_width))
     hist_dd = hist_tot_smooth
     # Trying to avoid any residual peak at zero, which can confuse the algorithm:
-    center_ix = (num_bins-1)/2  # May be fractional.
-    peak_ixs  = array(list(filter( lambda x: abs(x - center_ix) > 1
-                                , where(diff(sign(diff(hist_dd))) < 0)[0] + 1 )))
+    center_ix = (num_bins - 1) / 2  # May be fractional.
+    peak_ixs  = array(list(filter(lambda x: abs(x - center_ix) > 1,
+                                  where(diff(sign(diff(hist_dd))) < 0)[0] + 1)))
     neg_peak_ixs = list(filter(lambda x: x < center_ix, peak_ixs))
     if neg_peak_ixs:
         neg_peak_loc = neg_peak_ixs[argmax(hist_dd[neg_peak_ixs])]
@@ -490,7 +490,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     neg_tail_ix = where(hist_dd[:neg_peak_loc] < neg_max / 2)[0]
     dd_soltn    = []
     try:
-        popt, pcov, _, _, _ = curve_fit(gaus_pdf, centers[pos_tail_ix]*1e12, hist_dd[pos_tail_ix]*1e-12)
+        popt, pcov, _, _, _ = curve_fit(gaus_pdf, centers[pos_tail_ix] * 1e12,
+                                        hist_dd[pos_tail_ix] * 1e-12)
         mu_pos, sigma_pos = popt
         mu_pos    *= 1e-12  # back to (s)
         sigma_pos *= 1e-12
@@ -499,7 +500,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     except Exception:  # pylint: disable=broad-exception-caught
         sigma_pos = 0
     try:
-        popt, pcov, _, _, _ = curve_fit(gaus_pdf, centers[neg_tail_ix]*1e12, hist_dd[neg_tail_ix]*1e-12)
+        popt, pcov, _, _, _ = curve_fit(gaus_pdf, centers[neg_tail_ix] * 1e12,
+                                        hist_dd[neg_tail_ix] * 1e-12)
         mu_neg, sigma_neg = popt
         mu_neg    *= 1e-12  # back to (s)
         sigma_neg *= 1e-12
@@ -736,8 +738,8 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):  # pylint: 
             interp_fac = (start_time - start_ix * tsamp) // tsamp
             i = 0
             for samp1, samp2 in zip(
-                ys[start_ix : start_ix + 2 * samps_per_ui],
-                ys[start_ix + 1 : start_ix + 1 + 2 * samps_per_ui],
+                ys[start_ix: start_ix + 2 * samps_per_ui],
+                ys[start_ix + 1: start_ix + 1 + 2 * samps_per_ui],
             ):
                 y = samp1 + (samp2 - samp1) * interp_fac
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
@@ -747,7 +749,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):  # pylint: 
         last_start_ix = len(ys) - 2 * samps_per_ui
         while start_ix < last_start_ix:
             i = 0
-            for y in ys[start_ix : start_ix + 2 * samps_per_ui]:
+            for y in ys[start_ix: start_ix + 2 * samps_per_ui]:
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
                 i += 1
             start_ix += samps_per_ui
@@ -886,15 +888,15 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True):  # pylint: di
         stop_ix = min(len_g, start_ix + trimmed_len)
         try:
             res = _g[start_ix:stop_ix].copy()
-        except:
+        except Exception:  # pylint: disable=broad-exception-caught
             print(f"start_ix: {start_ix}, stop_ix: {stop_ix}")
             raise
         start_ix -= half_len
     return (res, start_ix)
 
 
-def calc_resps(
-    t: Rvec, h: Rvec, ui: float, t_fft: Optional[Rvec] = None) -> tuple[Rvec, Rvec, Cvec]:
+def calc_resps(t: Rvec, h: Rvec, ui: float,  # noqa: F405
+               t_fft: Optional[Rvec] = None) -> tuple[Rvec, Rvec, Cvec]:  # noqa: F405
     """
     From a uniformly sampled impulse response,
     calculate the: step, pulse, and frequency responses.
@@ -950,7 +952,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     G = calc_G(H, Zref, 0, Zc, Zref, 0, ws)  # See `calc_G()` docstring.
     R1 = (Zc - Zref) / (Zc + Zref)  # reflection coefficient looking into medium from port
     # T1 = 1 + R1  # transmission coefficient looking into medium from port
-    Z2   = Zc * (1 - R1*H**2)         # impedance looking into port 2, with port 1 terminated into Zref
+    Z2   = Zc * (1 - R1 * H**2)         # impedance looking into port 2, with port 1 terminated into Zref
     R2   = (Z2 - Zc) / (Z2 + Zc)      # reflection coefficient looking out of port 2
     # R2   = 0
     # Z1   = Zc * (1 + R2*H**2)         # impedance looking into port 1, with port 2 terminated into Z2
@@ -958,7 +960,7 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     # G    = calc_G(H, Zref, 0, Zc, Zc, 0, 2*pi*fs)  # See `calc_G()` docstring.
     # R2   = -R1                        # reflection coefficient looking into ref. impedance
     S21 = G
-    S11  = 2*(R1 + H*R2*G)
+    S11  = 2 * (R1 + H * R2 * G)
     tmp = np.array(list(zip(zip(S11, S21), zip(S21, S11))))
     return rf.Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
@@ -1349,7 +1351,7 @@ def renorm_s2p(ntwk, zs):
     assert all(ntwk.z0[:, 0] == ntwk.z0[0, 0]) and all(
         ntwk.z0[:, 0] == ntwk.z0[:, 1]
     ), f"May only be used to renormalize a network with equal (singular) reference impedances! z0: {ntwk.z0}"
-    assert zs.shape in ((2,), (len(ntwk.f),2)), ValueError(
+    assert zs.shape in ((2,), (len(ntwk.f), 2)), ValueError(
         "The list of new impedances must have shape (2,) or (len(ntwk.f), 2)!")
 
     if zs.shape == (2,):
@@ -1358,10 +1360,10 @@ def renorm_s2p(ntwk, zs):
         zt = np.array(zs)
     z0 = ntwk.z0[0, 0]
     S = ntwk.s
-    I = np.identity(2)
+    Id = np.identity(2)
     Z = []
     for s in S:
-        Z.append(inv(I - s).dot(I + s))  # Resultant values are normalized to z0.
+        Z.append(inv(Id - s).dot(Id + s))  # Resultant values are normalized to z0.
     Z = np.array(Z)
     Zn = []
     for z, zn in zip(Z, zt):  # Iterration is over frequency and yields: (2x2 array, 2-element vector).
@@ -1369,7 +1371,7 @@ def renorm_s2p(ntwk, zs):
     Zn = np.array(Zn)
     Sn = []
     for z in Zn:
-        Sn.append(inv(z + I).dot(z - I))
+        Sn.append(inv(z + Id).dot(z - Id))
     return rf.Network(s=Sn, f=ntwk.f / 1e9, z0=zs)
 
 
@@ -1435,9 +1437,10 @@ def init_imp_resp(ami_model):
     return s - s[0]
 
 
-def run_ami_model(  # pylint: disable=too-many-arguments,too-many-locals
-    dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
-    ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0) -> tuple[Rvec, Rvec, Rvec, Rvec, str]:
+# pylint: disable=too-many-arguments,too-many-locals
+def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
+                  ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0  # noqa: F405
+                  ) -> tuple[Rvec, Rvec, Rvec, Rvec, str]:  # noqa: F405
     """
     Run a simulation of an IBIS-AMI model.
 
@@ -1535,19 +1538,19 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: di
     if (extrap and len(zero_locs)):
         ext_first = min(zero_locs)
         ext_last  = max(zero_locs)
-        sqrt_2pi = sqrt(2*pi)
+        sqrt_2pi = sqrt(2 * pi)
         ix_r = ext_first + half_len - 1
         mu_r = centers[ix_r] - sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_r]))
         ix_l = ext_last - half_len + 1
         mu_l = centers[ix_l] + sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_l]))
-        jit_pdf = append( append( gaus_pdf(centers[:ix_l], mu_l, rj)
-                                , jit_pdf[ix_l:ix_r+1])
-                        , gaus_pdf(centers[ix_r+1:], mu_r, rj))
-    bathtub  = list(cumsum(jit_pdf[-1 : -(half_len+1) : -1]))
+        jit_pdf = append(append(gaus_pdf(centers[:ix_l], mu_l, rj),
+                                jit_pdf[ix_l: ix_r + 1]),
+                         gaus_pdf(centers[ix_r + 1:], mu_r, rj))
+    bathtub  = list(cumsum(jit_pdf[-1: -(half_len + 1): -1]))
     bathtub.reverse()
-    bathtub  = array(bathtub + list(cumsum(jit_pdf[: half_len+1]))) * 2*dt
+    bathtub  = array(bathtub + list(cumsum(jit_pdf[: half_len + 1]))) * 2 * dt
     bathtub  = where(bathtub < min_val, min_val * ones(len(bathtub)), bathtub)
-    return (bathtub, (ext_first,ext_last))
+    return (bathtub, (ext_first, ext_last))
 
 
 def raised_cosine(x):

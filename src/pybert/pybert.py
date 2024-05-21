@@ -53,9 +53,9 @@ from pyibisami.ami.model import AMIModel
 from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
-from pybert import __authors__ as AUTHORS
-from pybert import __copy__ as COPY
-from pybert import __date__ as DATE
+# from pybert import __authors__ as AUTHORS
+# from pybert import __copy__ as COPY
+# from pybert import __date__ as DATE
 from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.gui.help import help_str
@@ -331,7 +331,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         _msg = msg.strip()
         txt = f"[{datetime.now()}]: PyBERT: {_msg}"
         if self.debug:
-            ## In case PyBERT crashes, before we can read this in its `Console` tab:
+            # In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt, flush=True)
         self.console_log += txt + "\n"
         if exception:
@@ -401,8 +401,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _btn_opt_tx_fired(self):
         if (
             self.tx_opt_thread
-            and self.tx_opt_thread.is_alive()
-            or not any(tuner.enabled for tuner in self.tx_tap_tuners)
+            and self.tx_opt_thread.is_alive()  # noqa: W503
+            or not any(tuner.enabled for tuner in self.tx_tap_tuners)  # noqa: W503
         ):
             pass
         else:
@@ -505,7 +505,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         """
         fstep = self.f_step * 1e6
         fmax  = self.f_max  * 1e9
-        return arange(0, fmax+fstep, fstep)  # "+fstep", so fmax gets included
+        return arange(0, fmax + fstep, fstep)  # "+fstep", so fmax gets included
 
     @cached_property
     def _get_w(self):
@@ -1029,7 +1029,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if self.use_dfe_tune:
             for i in range(self.n_taps_tune):
                 if clock_pos + nspui * (1 + i) < len(p):
-                    p[int(clock_pos + nspui * (0.5 + i)) :] -= p[clock_pos + nspui * (1 + i)]
+                    p[int(clock_pos + nspui * (0.5 + i)):] -= p[clock_pos + nspui * (1 + i)]
         plot_len = len(self.chnl_h)
         self.plotdata.set_data("ctle_out_h_tune", p[:plot_len])
         self.plotdata.set_data("clocks_tune", clocks[:plot_len])
@@ -1251,7 +1251,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         Cs = self.cout * 1.0e-12
         RL = self.rin
         Cp = self.cin * 1.0e-12
-        CL = self.cac * 1.0e-6  # pylint: disable=unused-variable
+        # CL = self.cac * 1.0e-6  # pylint: disable=unused-variable
 
         ts = t[1]
         len_f = len(f)
@@ -1283,7 +1283,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             ch_s2p_pre.renormalize(Rs)
         try:
             ch_s2p_pre.name = "ch_s2p_pre"
-        except:
+        except Exception:  # pylint: disable=broad-exception-caught
             print(f"ch_s2p_pre: {ch_s2p_pre}")
             raise
         self.ch_s2p_pre = ch_s2p_pre
@@ -1380,7 +1380,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.chnl_H_raw = H
         self.chnl_trimmed_H = chnl_trimmed_H
         self.start_ix = start_ix
-        self.t_ns_chnl = array(t[start_ix : start_ix + len(chnl_h)]) * 1.0e9
+        self.t_ns_chnl = array(t[start_ix: start_ix + len(chnl_h)]) * 1.0e9
         self.chnl_s = chnl_s
         self.chnl_p = chnl_p
 

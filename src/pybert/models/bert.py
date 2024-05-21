@@ -104,9 +104,8 @@ def my_run_sweeps(self, is_thread_stopped: Optional[Callable[[], bool]] = None):
 
 
 # pylint: disable=too-many-locals,protected-access,too-many-branches,too-many-statements
-def my_run_simulation(
-    self, initial_run: bool = False, update_plots: bool = True,
-    aborted_sim: Optional[Callable[[], bool]] = None):
+def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True,
+                      aborted_sim: Optional[Callable[[], bool]] = None):
     """
     Runs the simulation.
 
@@ -243,7 +242,7 @@ def my_run_simulation(
     pn_period = 1.0 / pn_freq
     pn_samps = int(pn_period / Ts + 0.5)
     pn = zeros(pn_samps)
-    pn[pn_samps // 2 :] = pn_mag
+    pn[pn_samps // 2:] = pn_mag
     self.pn_period = pn_period
     self.pn_samps = pn_samps
     pn = resize(pn, len(x))
@@ -387,13 +386,13 @@ def my_run_simulation(
     try:
         if self.use_dfe:
             _gain = gain
-            _ideal=self.sum_ideal
+            _ideal = self.sum_ideal
         else:
             _gain = 0.0
-            _ideal=True
-        dfe = DFE( n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type
-                 , n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol
-                 , lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal )
+            _ideal = True
+        dfe = DFE(n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
+                  n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
+                  lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal)
         (dfe_out, tap_weights, ui_ests, clocks,
             lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
         dfe_out = array(dfe_out)
@@ -403,15 +402,14 @@ def my_run_simulation(
         assert start_ix >= 0, "`start_ix` is negative!"
         end_ix = len(bits_out)
         auto_corr = (
-            1.0
-            * correlate(bits_out[start_ix : end_ix], bits[start_ix : end_ix], mode="same")
-            / sum(bits[start_ix : end_ix])
+            1.0 * correlate(bits_out[start_ix: end_ix], bits[start_ix: end_ix], mode="same") /  # noqa: W504
+            sum(bits[start_ix: end_ix])
         )
-        auto_corr = auto_corr[len(auto_corr) // 2 :]
+        auto_corr = auto_corr[len(auto_corr) // 2:]
         self.auto_corr = auto_corr
         bit_dly = where(auto_corr == max(auto_corr))[0][0]
-        bits_ref = bits[(nbits - eye_bits) :]
-        bits_tst = bits_out[(nbits + bit_dly - eye_bits) :]
+        bits_ref = bits[(nbits - eye_bits):]
+        bits_tst = bits_out[(nbits + bit_dly - eye_bits):]
         if len(bits_ref) > len(bits_tst):
             bits_ref = bits_ref[: len(bits_tst)]
         elif len(bits_tst) > len(bits_ref):
@@ -420,8 +418,8 @@ def my_run_simulation(
         self.bit_errs = len(bit_errs)
 
         dfe_h = array(
-            [1.0] + list(zeros(nspb - 1)) +
-            sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []) )  # sum as concat
+            [1.0] + list(zeros(nspb - 1)) +  # noqa: W504
+            sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))  # sum as concat
         dfe_h.resize(len(ctle_out_h), refcheck=False)
         dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
 
@@ -736,11 +734,11 @@ def update_results(self):
             padding_left=75,
         )
         for i in range(self.n_taps):
-            new_plot.plot( ("tap_weight_index", f"tap{i + 1}_weights"),
+            new_plot.plot(
+                ("tap_weight_index", f"tap{i + 1}_weights"),
                 type="line",
                 name=f"tap{i + 1}",
-                color="auto",
-            )
+                color="auto")
         new_plot.title = "DFE Adaptation"
         new_plot.tools.append(PanTool(new_plot, constrain=True, constrain_key=None, constrain_direction="x"))
         zoom9 = ZoomTool(new_plot, tool_mode="range", axis="index", always_on=False)
@@ -853,16 +851,16 @@ def update_results(self):
 
     # Bathtubs
     bathtub_chnl, (_, _) = make_bathtub(
-        jitter_bins, jitter_chnl, min_val=0.1*MIN_BATHTUB_VAL,
+        jitter_bins, jitter_chnl, min_val=0.1 * MIN_BATHTUB_VAL,
         rj=self.rj_chnl, extrap=True)
-    bathtub_tx,   (_,  _)    = make_bathtub(
-        jitter_bins, jitter_tx,   min_val=0.1*MIN_BATHTUB_VAL,
+    bathtub_tx,   (_,  _) = make_bathtub(
+        jitter_bins, jitter_tx,   min_val=0.1 * MIN_BATHTUB_VAL,
         rj=self.rj_tx,   extrap=True)
     bathtub_ctle, (_, _) = make_bathtub(
-        jitter_bins, jitter_ctle, min_val=0.1*MIN_BATHTUB_VAL,
+        jitter_bins, jitter_ctle, min_val=0.1 * MIN_BATHTUB_VAL,
         rj=self.rj_ctle, extrap=True)
-    bathtub_dfe,  (_,  _)  = make_bathtub(
-        jitter_bins, jitter_dfe,  min_val=0.1*MIN_BATHTUB_VAL,
+    bathtub_dfe,  (_,  _) = make_bathtub(
+        jitter_bins, jitter_dfe,  min_val=0.1 * MIN_BATHTUB_VAL,
         rj=self.rj_dfe,  extrap=True)
     self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))
     self.plotdata.set_data("bathtub_tx",   safe_log10(bathtub_tx))

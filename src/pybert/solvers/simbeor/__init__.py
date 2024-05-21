@@ -1,5 +1,7 @@
 # pylint: disable=undefined-variable
 # type: ignore
+# flake8: noqa
+
 """Initialization file for Simbeor solver.
 
 .. moduleauthor:: David Banas <capn.freako@gmail.com>
