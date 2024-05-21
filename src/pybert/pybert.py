@@ -21,12 +21,12 @@ from datetime import datetime
 from os.path import dirname, join
 from pathlib import Path
 
-import numpy as np
+import numpy as np  # type: ignore
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
 from numpy import arange, array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
-from numpy.fft import irfft, rfft
-from numpy.random import randint
+from numpy.fft import irfft, rfft  # type: ignore
+from numpy.random import randint  # type: ignore
 from traits.api import (
     Array,
     Bool,
@@ -48,7 +48,7 @@ from traits.etsconfig.api import ETSConfig
 from traitsui.message import message
 from scipy.interpolate import interp1d
 
-from pyibisami import __version__ as PyAMI_VERSION
+from pyibisami import __version__ as PyAMI_VERSION  # type: ignore
 from pyibisami.ami.model import AMIModel
 from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel

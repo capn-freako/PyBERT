@@ -1,7 +1,7 @@
 """Main Entry Point for the PyBERT GUI when using the CLI."""
 from pathlib import Path
 
-import click
+import click  # type: ignore
 
 from pybert import __version__
 from pybert.gui.view import traits_view

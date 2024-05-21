@@ -10,7 +10,7 @@ into the larger *PyBERT* framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-from numpy import array, sign, zeros
+from numpy import array, sign, zeros  # type: ignore
 from scipy.signal import iirfilter
 
 from pybert.models.cdr import CDR

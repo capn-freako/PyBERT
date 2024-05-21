@@ -12,7 +12,7 @@ from typing import Callable, Optional
 import scipy.signal as sig
 from chaco.api import Plot
 from chaco.tools.api import PanTool, ZoomTool
-from numpy import (
+from numpy import (  # type: ignore
     arange,
     argmax,
     array,
@@ -29,8 +29,8 @@ from numpy import (
     where,
     zeros,
 )
-from numpy.fft import rfft, irfft
-from numpy.random import normal
+from numpy.fft import rfft, irfft  # type: ignore
+from numpy.random import normal  # type: ignore
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 

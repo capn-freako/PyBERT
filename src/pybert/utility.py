@@ -14,14 +14,14 @@ import pkgutil
 import re
 from cmath     import phase, rect
 from functools import reduce
-from numpy     import (
+from numpy     import (  # type: ignore
     append,    arange, argmax, array,  concatenate, convolve, cos,    cumsum, diff,
     histogram, log,    log10,       mean,   ones,   pad,
     pi,        power,  real,        reshape,  resize, roll,   sign,
     sort,      sqrt,   where,       zeros,
 )
 import numpy as np
-from numpy.fft         import fft, ifft, fftshift, rfft
+from numpy.fft         import fft, ifft, fftshift, rfft  # type: ignore
 from scipy.interpolate import interp1d
 from scipy.linalg      import inv
 from scipy.optimize    import curve_fit

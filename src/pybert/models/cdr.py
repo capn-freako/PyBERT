@@ -12,7 +12,7 @@ Copyright (c) 2019 by David Banas; All rights reserved World wide.
 """
 from typing import List, Sequence, Tuple
 
-from numpy import array, mean, sign, where
+from numpy import array, mean, sign, where  # type: ignore
 
 
 class CDR:  # pylint: disable=too-many-instance-attributes
