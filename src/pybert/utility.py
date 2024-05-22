@@ -1275,7 +1275,7 @@ def cap_mag(zs, maxMag=1.0):
     zs_flat = zs.flatten()
     subs = [rect(maxMag, phase(z)) for z in zs_flat]
     # return where(abs(zs_flat) > maxMag, subs, zs_flat)[0].reshape(zs.shape)
-    return where(abs(zs_flat) > maxMag, subs, zs_flat).reshape(zs.shape)
+    return where(abs(zs_flat) > maxMag, subs, zs_flat).reshape(zs.shape)  # pylint: disable=no-member
 
 
 def mon_mag(zs):

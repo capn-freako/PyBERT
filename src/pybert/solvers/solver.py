@@ -34,7 +34,7 @@ class Solver(ABC):  # pylint: disable=too-few-public-methods
         height: float = 0.127,  #: Trace height above/below ground plane (mm).
         separation: float = 0.508,  #: Trace separation (mm).
         roughness: float = 0.004,  #: Trace surface roughness (mm-rms).
-        fs: List[float] = [],  #: Angular frequency sample points (Hz).
+        fs: List[float] = [],  #: Angular frequency sample points (Hz).  # pylint: disable=dangerous-default-value
         lic_path: str = "",  #: Path to license file.
         lic_name: str = "",  #: Name of license type (if needed by solver).
         prj_name: str = "",  #: Name of project (if needed by solver).

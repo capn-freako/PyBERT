@@ -998,7 +998,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         mod_type = self.mod_type[0]
 
         s = h.cumsum()
-        p = s - pad(s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
+        p = s - pad(s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))  # pylint: disable=invalid-unary-operand-type
 
         (clock_pos, thresh) = pulse_center(p, nspui)
         if clock_pos == -1:
@@ -1040,7 +1040,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # @cached_property
     def _get_rel_opt(self):
-        return -self.cost
+        return -self.cost  # pylint: disable=invalid-unary-operand-type
 
     # @cached_property
     def _get_przf_err(self):
@@ -1274,7 +1274,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             # - Calculate propagation constant, characteristic impedance, and transfer function.
             gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
             self.Zc = Zc
-            H = exp(-l_ch * gamma)
+            H = exp(-l_ch * gamma)  # pylint: disable=invalid-unary-operand-type
             self.H = H
             # - Use the transfer function and characteristic impedance to form "perfectly matched" network.
             tmp = np.array(list(zip(zip(zeros(len_f), H), zip(H, zeros(len_f)))))
@@ -1370,7 +1370,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         chnl_trimmed_H = rfft(krnl(t_irfft) * t_irfft[1] / t[1])
 
         chnl_s = chnl_h.cumsum()
-        chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))
+        chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))  # pylint: disable=invalid-unary-operand-type
 
         self.chnl_h = chnl_h
         # self.chnl_h_raw = chnl_h_raw
@@ -1514,7 +1514,3 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
     rj_dfe = 0
     pjDD_dfe = 0
     rjDD_dfe = 0
-
-    jitter_chnl = 0
-    jitter_bins = []
-
