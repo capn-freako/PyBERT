@@ -73,6 +73,8 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.sweep_aves = the_PyBERT.sweep_aves
         self.do_sweep = the_PyBERT.do_sweep
         self.debug = the_PyBERT.debug
+        self.f_max = the_PyBERT.f_max
+        self.f_step = the_PyBERT.f_step
 
         # Channel Control
         self.use_ch_file = the_PyBERT.use_ch_file

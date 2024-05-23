@@ -933,7 +933,7 @@ def calc_resps(t: Rvec, h: Rvec, ui: float,  # noqa: F405
         t_fft = t
     temp_rfft = krnl(t_fft)
     H = rfft(temp_rfft)
-    H *= s[-1] / abs(H[0])
+    # H *= s[-1] / abs(H[0])
     return (s, p, H)
 
 
@@ -1493,8 +1493,8 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     params_out = model.ami_params_out
     msg = "\n".join([  # Python equivalent of Haskell's `unlines()`.
         f"Input parameters: {model.ami_params_in.decode('utf-8')}",
-        f"Output parameters: {params_out}",
-        f"Message: {model.msg}"])
+        f"Output parameters: {params_out.decode('utf-8')}",
+        f"Message: {model.msg.decode('utf-8')}"])
 
     # Capture model's responses.
     resps = model.get_responses()
@@ -1528,7 +1528,7 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: di
         rj(real): Standard deviation of Gaussian PDF characterizing random jitter.
             Default: 0
         extrap(bool): Extrapolate bathtub tails, using `rj`, if True.
-            Default: True
+            Default: False
 
     Returns:
         ([real], (int,int)): A pair consisting of:
@@ -1537,20 +1537,23 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: di
     """
     half_len  = len(jit_pdf) // 2
     dt        = centers[1] - centers[0]  # Bins assumed to be uniformly spaced!
-    zero_locs = where(fftshift(jit_pdf) == 0)[0]
+    jit_pdf_center_of_mass = int(mean([k * pk for (k, pk) in enumerate(jit_pdf)]))
+    _jit_pdf = roll(jit_pdf, half_len - jit_pdf_center_of_mass)
+    zero_locs = where(fftshift(_jit_pdf) == 0)[0]
     ext_first = 0
     ext_last  = len(jit_pdf)
     if (extrap and len(zero_locs)):
         ext_first = min(zero_locs)
         ext_last  = max(zero_locs)
-        sqrt_2pi = sqrt(2 * pi)
-        ix_r = ext_first + half_len - 1
-        mu_r = centers[ix_r] - sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_r]))
-        ix_l = ext_last - half_len + 1
-        mu_l = centers[ix_l] + sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_l]))
-        jit_pdf = append(append(gaus_pdf(centers[:ix_l], mu_l, rj),
-                                jit_pdf[ix_l: ix_r + 1]),
-                         gaus_pdf(centers[ix_r + 1:], mu_r, rj))
+        if ext_first < half_len and ext_last > half_len:
+            sqrt_2pi = sqrt(2 * pi)
+            ix_r = ext_first + half_len - 1
+            mu_r = centers[ix_r] - sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_r]))
+            ix_l = ext_last - half_len + 1
+            mu_l = centers[ix_l] + sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_l]))
+            jit_pdf = append(append(gaus_pdf(centers[:ix_l], mu_l, rj),
+                                    jit_pdf[ix_l: ix_r + 1]),
+                             gaus_pdf(centers[ix_r + 1:], mu_r, rj))
     bathtub  = list(cumsum(jit_pdf[-1: -(half_len + 1): -1]))
     bathtub.reverse()
     bathtub  = array(bathtub + list(cumsum(jit_pdf[: half_len + 1]))) * 2 * dt

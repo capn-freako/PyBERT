@@ -187,9 +187,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     impulse_length = self.impulse_length
 
     # Calculate misc. values.
-    fs = bit_rate * nspb
     Ts = t[1]
     ts = Ts
+    # fs = bit_rate * nspb
+    fs = 1 / ts
     min_len =  30 * nspui
     max_len = 100 * nspui
     if impulse_length:
@@ -273,12 +274,15 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.  # pylint: disable=fixme
             # ctle_H *= sum(ctle_h) / ctle_H[0]
         else:
-            _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-            ctle_h = irfft(raised_cosine(ctle_H))
-            krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
-            ctle_h = krnl(t)
-            ctle_h *= t[1] / t_irfft[1]
-        ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
+            if ctle_mode != "Off":
+                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
+                ctle_h = irfft(raised_cosine(ctle_H))
+                krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
+                ctle_h = krnl(t)
+                ctle_h *= t[1] / t_irfft[1]
+                ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
+            else:
+                ctle_h = array([1.] + [0. for _ in range(min_len - 1)])
         return ctle_h
 
     try:
@@ -287,6 +291,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 self.tx_dll_file, self._tx_cfg, True, ui, ts, chnl_h, x)
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
             rx_in = convolve(tx_out + noise, chnl_h)[:len(tx_out)]
+            # Calculate the remaining responses from the impulse responses.
+            tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, t_fft=t_irfft)
+            tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, t_fft=t_irfft)
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
             self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
@@ -316,6 +323,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
                 tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
                 rx_in = convolve(x, tx_out_h)[:len(x)] + noise
+            # Calculate the remaining responses from the impulse responses.
+            tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, t_fft=t_irfft)
+            tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, t_fft=t_irfft)
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
             self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
@@ -330,16 +340,19 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                     ctle_out += noise
                 else:                # PyBERT native Rx
-                    ctle_h = get_ctle_h()
-                    ctle_out_h = convolve(ctle_h, tx_out_h)[:len(ctle_h)]
-                    ctle_out = convolve(x + noise, ctle_out_h)[:len(x)]
+                    if ctle_mode != "Off":
+                        ctle_h = get_ctle_h()
+                        ctle_out_h = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
+                        ctle_out = convolve(x + noise, ctle_out_h)[:len(x)]
+                    else:
+                        ctle_h = array([1.] + [0.] * (min_len - 1))
+                        ctle_out_h = tx_out_h
+                        ctle_out = rx_in
     except Exception as err:
         self.status = f"Exception: {err}"
         raise
 
     # Calculate the remaining responses from the impulse responses.
-    tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, t_fft=t_irfft)
-    tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, t_fft=t_irfft)
     ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, t_fft=t_irfft)
     ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, t_fft=t_irfft)
 
@@ -362,7 +375,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.tx_out_p = tx_out_p
     self.tx_out_H = tx_out_H
     self.ideal_signal = ideal_signal
-    # self.tx_out = tx_out
     self.rx_in = rx_in
     self.ctle_h = ctle_h
     self.ctle_s = ctle_s
@@ -378,7 +390,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     self.ctle_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
-    self.status = "Running DFE/CDR...(sweep {sweep_num} of {num_sweeps})"
+    self.status = f"Running DFE/CDR...(sweep {sweep_num} of {num_sweeps})"
 
     _check_sim_status()
 
@@ -716,9 +728,13 @@ def update_results(self):
     len_f_GHz = len(f_GHz)
     len_t = len(t_ns)
     self.plotdata.set_data("f_GHz", f_GHz[1:])
-    self.plotdata.set_data("t_ns", t_ns)
     self.plotdata.set_data("t_ns_chnl", t_ns_chnl)
     self.plotdata.set_data("t_ns_irfft", t_irfft * 1e9)
+    if len_t > 1000:  # to prevent Chaco plotting error with too much data
+        t_ns_plot = linspace(0, t_ns[-1], 1000)
+    else:
+        t_ns_plot = t_ns
+    self.plotdata.set_data("t_ns", t_ns_plot)
 
     # DFE.
     tap_weights = transpose(array(self.adaptation))
@@ -768,13 +784,17 @@ def update_results(self):
     self.plotdata.set_data("clk_spec", 10.0 * safe_log10(clock_spec[1:]))  # Omit the d.c. value.
     self.plotdata.set_data("clk_freqs", spec_freqs[1:])
     self.plotdata.set_data("dfe_out", self.dfe_out)
-    self.plotdata.set_data("ui_ests", self.ui_ests)
     self.plotdata.set_data("clocks", self.clocks)
     self.plotdata.set_data("lockeds", self.lockeds)
+    if len_t > 1000:  # to prevent Chaco plotting error with too much data
+        krnl = interp1d(t_ns, self.ui_ests)
+        ui_ests_plot = krnl(t_ns_plot)
+    else:
+        ui_ests_plot = self.ui_ests
+    self.plotdata.set_data("ui_ests", ui_ests_plot)
 
     # Impulse responses
     self.plotdata.set_data("chnl_h", self.chnl_h * 1.0e-9 / Ts)  # Re-normalize to (V/ns), for plotting.
-    # self.plotdata.set_data("chnl_h", self.chnl_h_raw * 1.0e-9 / Ts)  # Re-normalize to (V/ns), for plotting.
     self.plotdata.set_data("tx_h", self.tx_h * 1.0e-9 / Ts)
     self.plotdata.set_data("tx_out_h", self.tx_out_h * 1.0e-9 / Ts)
     self.plotdata.set_data("ctle_h", self.ctle_h * 1.0e-9 / Ts)
@@ -797,13 +817,6 @@ def update_results(self):
     self.plotdata.set_data("ctle_out_p", self.ctle_out_p)
     self.plotdata.set_data("dfe_out_p", self.dfe_out_p)
 
-    # Outputs
-    self.plotdata.set_data("ideal_signal", self.ideal_signal[:len_t])
-    self.plotdata.set_data("chnl_out", self.chnl_out[:len_t])
-    self.plotdata.set_data("tx_out", self.rx_in[:len_t])
-    self.plotdata.set_data("ctle_out", self.ctle_out[:len_t])
-    self.plotdata.set_data("dfe_out", self.dfe_out[:len_t])
-
     # Frequency responses
     self.plotdata.set_data("chnl_H_raw", 20.0 * safe_log10(abs(self.chnl_H_raw[1:len_f_GHz])))
     self.plotdata.set_data("chnl_H", 20.0 * safe_log10(abs(self.chnl_H[1:len_f_GHz])))
@@ -814,6 +827,35 @@ def update_results(self):
     self.plotdata.set_data("ctle_out_H", 20.0 * safe_log10(abs(self.ctle_out_H[1:len_f_GHz])))
     self.plotdata.set_data("dfe_H", 20.0 * safe_log10(abs(self.dfe_H[1:len_f_GHz])))
     self.plotdata.set_data("dfe_out_H", 20.0 * safe_log10(abs(self.dfe_out_H[1:len_f_GHz])))
+
+    # Outputs
+    ideal_signal = self.ideal_signal[:len_t]
+    chnl_out = self.chnl_out[:len_t]
+    rx_in = self.rx_in[:len_t]
+    ctle_out = self.ctle_out[:len_t]
+    dfe_out = self.dfe_out[:len_t]
+    if len_t > 1000:  # to prevent Chaco plotting error with too much data
+        krnl = interp1d(t_ns, ideal_signal)
+        ideal_signal_plot = krnl(t_ns_plot)
+        krnl = interp1d(t_ns, chnl_out)
+        chnl_out_plot = krnl(t_ns_plot)
+        krnl = interp1d(t_ns, rx_in)
+        rx_in_plot = krnl(t_ns_plot)
+        krnl = interp1d(t_ns, ctle_out)
+        ctle_out_plot = krnl(t_ns_plot)
+        krnl = interp1d(t_ns, dfe_out)
+        dfe_out_plot = krnl(t_ns_plot)
+    else:
+        ideal_signal_plot = ideal_signal
+        chnl_out_plot = chnl_out
+        rx_in_plot = rx_in
+        ctle_out_plot = ctle_out
+        dfe_out_plot = dfe_out
+    self.plotdata.set_data("ideal_signal", ideal_signal_plot)
+    self.plotdata.set_data("chnl_out", chnl_out_plot)
+    self.plotdata.set_data("rx_in", rx_in_plot)
+    self.plotdata.set_data("ctle_out", ctle_out_plot)
+    self.plotdata.set_data("dfe_out", dfe_out_plot)
 
     # Jitter distributions
     jitter_chnl = self.jitter_chnl  # These are used again in bathtub curve generation, below.
@@ -870,9 +912,10 @@ def update_results(self):
     # Eyes
     width = 2 * samps_per_ui
     xs = linspace(-ui * 1.0e12, ui * 1.0e12, width)
-    height = 100
+    height = 1000
+    tiny_noise = normal(scale=1e-3, size=(len(chnl_out[ignore_samps:])))  # to make channel eye easier to view.
     y_max = 1.1 * max(abs(array(self.chnl_out)))
-    eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[ignore_samps:], y_max)
+    eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[ignore_samps:] + tiny_noise, y_max)
     y_max = 1.1 * max(abs(array(self.rx_in)))
     eye_tx = calc_eye(ui, samps_per_ui, height, self.rx_in[ignore_samps:], y_max)
     y_max = 1.1 * max(abs(array(self.ctle_out)))

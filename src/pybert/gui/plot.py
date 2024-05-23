@@ -12,7 +12,8 @@ from chaco.tools.api import PanTool, ZoomTool
 
 from pybert.models.bert import update_eyes
 
-PLOT_SPACING = 20
+PLOT_SPACING = 1
+PLOT_PADDING = 25
 
 
 # pylint: disable=too-many-locals,too-many-statements
@@ -226,7 +227,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_p = container_p
 
     # - Frequency Responses tab
-    plot_H_chnl = Plot(plotdata, padding_left=75)
+    plot_H_chnl = Plot(plotdata, padding_left=PLOT_PADDING)
     plot_H_chnl.plot(("f_GHz", "chnl_H_raw"), type="line", color="black", name="Perfect Term.", index_scale="log")
     plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue", name="Actual Term.", index_scale="log")
     plot_H_chnl.plot(("f_GHz", "chnl_trimmed_H"), type="line", color="red", name="Trimmed Impulse", index_scale="log")
@@ -234,45 +235,49 @@ def make_plots(self, n_dfe_taps):
     plot_H_chnl.index_axis.title = "Frequency (GHz)"
     plot_H_chnl.y_axis.title = "Frequency Response (dB)"
     plot_H_chnl.index_range.low_setting = 0.01
-    plot_H_chnl.index_range.high_setting = 40.0
+    # plot_H_chnl.index_range.high_setting = 40.0
+    plot_H_chnl.value_range.low_setting = -40.0
+    # plot_H_ctle.value_range.high_setting = 0
     plot_H_chnl.legend.visible = True
     plot_H_chnl.legend.align = "ll"
 
-    plot_H_tx = Plot(plotdata, padding_left=75)
+    plot_H_tx = Plot(plotdata, padding_left=PLOT_PADDING)
     plot_H_tx.plot(("f_GHz", "tx_H"), type="line", color="blue", name="Incremental", index_scale="log")
     plot_H_tx.plot(("f_GHz", "tx_out_H"), type="line", color="red", name="Cumulative", index_scale="log")
     plot_H_tx.title = post_tx_str
     plot_H_tx.index_axis.title = "Frequency (GHz)"
     plot_H_tx.y_axis.title = "Frequency Response (dB)"
     plot_H_tx.index_range.low_setting = 0.01
-    plot_H_tx.index_range.high_setting = 40.0
+    # plot_H_tx.index_range.high_setting = 40.0
+    plot_H_tx.value_range.low_setting = -40.0
     plot_H_tx.legend.visible = True
     plot_H_tx.legend.align = "ll"
 
-    plot_H_ctle = Plot(plotdata, padding_left=75)
+    plot_H_ctle = Plot(plotdata, padding_left=PLOT_PADDING)
     plot_H_ctle.plot(("f_GHz", "ctle_H"), type="line", color="blue", name="Incremental", index_scale="log")
     plot_H_ctle.plot(("f_GHz", "ctle_out_H"), type="line", color="red", name="Cumulative", index_scale="log")
     plot_H_ctle.title = post_ctle_str
     plot_H_ctle.index_axis.title = "Frequency (GHz)"
     plot_H_ctle.y_axis.title = "Frequency Response (dB)"
     plot_H_ctle.index_range.low_setting = 0.01
-    plot_H_ctle.index_range.high_setting = 40.0
+    # plot_H_ctle.index_range.high_setting = 40.0
     plot_H_ctle.value_range.low_setting = -40.0
     plot_H_ctle.legend.visible = True
     plot_H_ctle.legend.align = "ll"
 
-    plot_H_chnl.value_range = plot_H_ctle.value_range
-    plot_H_tx.value_range = plot_H_ctle.value_range
+    # plot_H_chnl.value_range = plot_H_ctle.value_range
+    # plot_H_tx.value_range = plot_H_ctle.value_range
 
-    plot_H_dfe = Plot(plotdata, padding_left=75)
+    plot_H_dfe = Plot(plotdata, padding_left=PLOT_PADDING)
     plot_H_dfe.plot(("f_GHz", "dfe_H"), type="line", color="blue", name="Incremental", index_scale="log")
     plot_H_dfe.plot(("f_GHz", "dfe_out_H"), type="line", color="red", name="Cumulative", index_scale="log")
     plot_H_dfe.title = post_dfe_str
     plot_H_dfe.index_axis.title = "Frequency (GHz)"
     plot_H_dfe.y_axis.title = "Frequency Response (dB)"
     plot_H_dfe.index_range.low_setting = 0.01
-    plot_H_dfe.index_range.high_setting = 40.0
-    plot_H_dfe.value_range = plot_H_ctle.value_range
+    # plot_H_dfe.index_range.high_setting = 40.0
+    # plot_H_dfe.value_range = plot_H_ctle.value_range
+    plot_H_dfe.value_range.low_setting = -40.0
     plot_H_dfe.legend.visible = True
     plot_H_dfe.legend.align = "ll"
 
@@ -285,7 +290,7 @@ def make_plots(self, n_dfe_taps):
 
     # - Outputs tab
     plot_out_chnl = Plot(plotdata, padding_left=75)
-    # plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="lightgrey")
+    plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="lightgrey")
     plot_out_chnl.plot(("t_ns", "chnl_out"), type="line", color="blue")
     plot_out_chnl.title = post_chnl_str
     plot_out_chnl.index_axis.title = "Time (ns)"
@@ -295,7 +300,7 @@ def make_plots(self, n_dfe_taps):
     plot_out_chnl.overlays.append(zoom_out_chnl)
 
     plot_out_tx = Plot(plotdata, padding_left=75)
-    plot_out_tx.plot(("t_ns", "tx_out"), type="line", color="blue")
+    plot_out_tx.plot(("t_ns", "rx_in"), type="line", color="blue")
     plot_out_tx.title = post_tx_str
     plot_out_tx.index_axis.title = "Time (ns)"
     plot_out_tx.y_axis.title = "Output (V)"
@@ -526,6 +531,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_jitter_spec = container_jitter_spec
 
     # - Bathtub Curves tab
+    # ToDo: Make extrapolated portion of curve dashed.
     plot_bathtub_chnl = Plot(plotdata)
     plot_bathtub_chnl.plot(("jitter_bins", "bathtub_chnl"), type="line", color="blue")
     plot_bathtub_chnl.value_range.high_setting = 0

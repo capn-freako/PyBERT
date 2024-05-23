@@ -133,6 +133,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     Z0 = Float(100)  #: Channel characteristic impedance, in LC region (Ohms).
     v0 = Float(0.67)  #: Channel relative propagation velocity (c).
     l_ch = Float(0.5)  #: Channel length (m).
+    use_window = Bool(False)  #: Apply raised cosine to frequency response before FFT()-ing? (Default = False)
 
     # - EQ Tune
     tx_tap_tuners = List(
@@ -202,7 +203,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
     ctle_offset = Float(gCTLEOffset)  #: CTLE d.c. offset (dB)
     ctle_mode = Enum("Off", "Passive", "AGC", "Manual")  #: CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
-    ctle_mode = "Passive"
+    # ctle_mode = "Passive"
     rx_use_ami = Bool(False)  #: (Bool)
     rx_has_ts4 = Bool(False)  #: (Bool)
     rx_use_ts4 = Bool(False)  #: (Bool)
@@ -1353,7 +1354,10 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         # We take the transfer function, H, to be a ratio of voltages.
         # So, we must normalize our (now generalized) S-parameters.
         chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])
-        chnl_h = irfft(raised_cosine(chnl_H))
+        if self.use_window:
+            chnl_h = irfft(raised_cosine(chnl_H))
+        else:
+            chnl_h = irfft(chnl_H)
         krnl = interp1d(t_irfft, chnl_h, kind="cubic",
                         bounds_error=False, fill_value=0, assume_sorted=True)
         temp = krnl(t)
@@ -1364,10 +1368,11 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         max_len = 100 * nspui
         if impulse_length:
             min_len = max_len = impulse_length / ts
-        chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len, front_porch=True)
+        chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len,
+                                        front_porch=True, kept_energy=0.999)
         krnl = interp1d(t[:len(chnl_h)], chnl_h, kind="cubic",
                         bounds_error=False, fill_value=0, assume_sorted=True)
-        chnl_trimmed_H = rfft(krnl(t_irfft) * t_irfft[1] / t[1])
+        chnl_trimmed_H = rfft(krnl(t_irfft)) * t_irfft[1] / t[1]
 
         chnl_s = chnl_h.cumsum()
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))  # pylint: disable=invalid-unary-operand-type
