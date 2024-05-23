@@ -151,6 +151,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
     t_irfft = self.t_irfft
+    f = self.f
     w = self.w
     bits = self.bits
     symbols = self.symbols
@@ -265,7 +266,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         "Return the impulse response of the PyBERT native CTLE model."
         if self.use_ctle_file:
             # FIXME: The new import_channel() implementation breaks this:  # pylint: disable=fixme
-            ctle_h = import_channel(self.ctle_file, ts, self.f)
+            ctle_h = import_channel(self.ctle_file, ts, f)
             if max(abs(ctle_h)) < 100.0:  # step response?
                 ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
             else:
@@ -292,8 +293,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
             rx_in = convolve(tx_out + noise, chnl_h)[:len(tx_out)]
             # Calculate the remaining responses from the impulse responses.
-            tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, t_fft=t_irfft)
-            tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, t_fft=t_irfft)
+            tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, f)
+            tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, f)
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
             self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
@@ -324,8 +325,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
                 rx_in = convolve(x, tx_out_h)[:len(x)] + noise
             # Calculate the remaining responses from the impulse responses.
-            tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, t_fft=t_irfft)
-            tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, t_fft=t_irfft)
+            tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, f)
+            tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, f)
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
             self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
@@ -353,8 +354,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         raise
 
     # Calculate the remaining responses from the impulse responses.
-    ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, t_fft=t_irfft)
-    ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, t_fft=t_irfft)
+    ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, f)
+    ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, f)
 
     # Calculate convolutional delay.
     ctle_out.resize(len(t), refcheck=False)
@@ -436,8 +437,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
 
         # Calculate the remaining responses from the impulse responses.
-        dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, t_fft=t_irfft)
-        dfe_out_s, dfe_out_p, dfe_out_H = calc_resps(t, dfe_out_h, ui, t_fft=t_irfft)
+        dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
+        dfe_out_s, dfe_out_p, dfe_out_H = calc_resps(t, dfe_out_h, ui, f)
 
         self.dfe_h = dfe_h
         self.dfe_s = dfe_s

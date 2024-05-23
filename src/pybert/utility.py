@@ -899,41 +899,60 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True, kept_energy=0.
     return (res, start_ix)
 
 
-def calc_resps(t: Rvec, h: Rvec, ui: float,  # noqa: F405
-               t_fft: Optional[Rvec] = None) -> tuple[Rvec, Rvec, Cvec]:  # noqa: F405
+def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,
+               eps: float = 1e-18) -> tuple[Rvec, Rvec, Cvec]:  # noqa: F405
     """
     From a uniformly sampled impulse response,
     calculate the: step, pulse, and frequency responses.
 
     Args:
-        t: time vector associated with ``h`` (s)
-        h: impulse response (V/sample)
-        ui: unit interval
+        t: Time vector associated with ``h`` (s).
+        h: Impulse response (V/sample).
+        ui: Unit interval (s).
+        f: Frequency vector associated w/ `H` (Hz).
 
     Keyword Args:
-        t_fft: time vector associated w/ frequency response, if different than ``t``
-            Default: None
+        eps: Threshold for floating point equality.
+            Default: 1e-18
 
     Returns:
         s, p, H: tuple consisting of: step, pulse, and frequency responses.
 
+    Raises:
+        ValueError: If any of the following are true:
+            - `t` is not uniformly spaced.
+            - length of `t` is not at least length of `h`.
+            - `f` is not uniformly spaced.
+            - `f` does not begin with zero.
     Notes:
         1. ``t`` is assumed to be uniformly spaced and monotonic.
             (It is *not* assumed to begin at zero.)
     """
+    ddt = diff(diff(t))
+    assert not any(ddt > eps), ValueError(
+        f"`t` must be uniformly spaced! (Largest spacing difference: {max(ddt)})")
+    assert len(t) >= len(h), ValueError(
+        f"Length of `t` ({len(t)}) must be at least length of `h` ({len(h)})!")
+    assert f[0] == 0, ValueError(
+        f"`f` must begin with zero! (f[0] = {f[0]})")
+    ddf = diff(diff(f))
+    assert not any(ddf > eps), ValueError(
+        f"`f` must be uniformly spaced! (Largest spacing difference: {max(ddf)})")
+
     s = h.cumsum()
     ts = t[1] - t[0]
     nspui = int(ui / ts)
     p = s - pad(s[:-nspui], (nspui, 0), mode="constant", constant_values=0)
-    temp = h.copy()
-    temp.resize(len(t), refcheck=False)
-    krnl = interp1d(t, temp, kind="cubic",
-                    bounds_error=False, fill_value=0, assume_sorted=True)
-    if t_fft is None:
-        t_fft = t
-    temp_rfft = krnl(t_fft)
-    H = rfft(temp_rfft)
-    # H *= s[-1] / abs(H[0])
+
+    _ts = 1 / (2 * f[-1])
+    _tmax = 1 / f[1]
+    _t = arange(0, _tmax, _ts) + t[0]
+    krnl = interp1d(t[:len(h)], h, kind="cubic", assume_sorted=True,
+                    bounds_error=False, fill_value=0)
+    _h = krnl(_t) * (_t[1] - _t[0]) / (t[1] - t[0])
+    _h *= sqrt(sum(h**2) / sum(_h**2))
+    H = rfft(_h)
+
     return (s, p, H)
 
 
