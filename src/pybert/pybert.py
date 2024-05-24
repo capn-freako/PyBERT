@@ -280,21 +280,21 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     tx_h_tune = Property(Array, depends_on=["tx_tap_tuners.value", "nspui"])
     ctle_h_tune = Property(
         Array,
-        depends_on=[
-            "peak_freq_tune",
-            "peak_mag_tune",
-            "rx_bw_tune",
-            "w",
-            "len_h",
-            "ctle_mode_tune",
-            "ctle_offset_tune",
-            "use_dfe_tune",
-            "n_taps_tune",
-        ],
+        # depends_on=[
+        #     "peak_freq_tune",
+        #     "peak_mag_tune",
+        #     "rx_bw_tune",
+        #     "w",
+        #     "len_h",
+        #     "ctle_mode_tune",
+        #     "ctle_offset_tune",
+        #     "use_dfe_tune",
+        #     "n_taps_tune",
+        # ],
     )
-    ctle_out_h_tune = Property(Array, depends_on=["tx_h_tune", "ctle_h_tune", "chnl_h"])
-    cost = Property(Float, depends_on=["ctle_out_h_tune", "nspui"])
-    rel_opt = Property(Float, depends_on=["cost"])
+    ctle_out_h_tune = Property(Array)  # , depends_on=["tx_h_tune", "ctle_h_tune", "chnl_h"])
+    cost = Property(Float)  # , depends_on=["ctle_out_h_tune", "nspui"])
+    rel_opt = Property(Float)  # , depends_on=["cost"])
     t = Property(Array, depends_on=["ui", "nspb", "nbits"])
     t_ns = Property(Array, depends_on=["t"])
     f = Property(Array, depends_on=["f_step", "f_max"])

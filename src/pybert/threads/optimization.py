@@ -180,4 +180,7 @@ class CoOptThread(StoppableThread):
             pybert._do_opt_tx(update_status=False)  # pylint: disable=protected-access
             while pybert.tx_opt_thread and pybert.tx_opt_thread.is_alive():
                 time.sleep(0.001)
-        return pybert.cost
+        cost = pybert.cost
+        pybert.status = f"Co-optimizing (cost: {cost:5.3f})..."
+        time.sleep(0.001)
+        return cost

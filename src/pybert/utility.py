@@ -933,27 +933,29 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,
         f"`t` must be uniformly spaced! (Largest spacing difference: {max(ddt)})")
     assert len(t) >= len(h), ValueError(
         f"Length of `t` ({len(t)}) must be at least length of `h` ({len(h)})!")
-    assert f[0] == 0, ValueError(
-        f"`f` must begin with zero! (f[0] = {f[0]})")
     ddf = diff(diff(f))
     assert not any(ddf > eps), ValueError(
         f"`f` must be uniformly spaced! (Largest spacing difference: {max(ddf)})")
+    assert f[0] == 0, ValueError(
+        f"`f` must begin at zero! (f[0] = {f[0]})")
 
     s = h.cumsum()
     ts = t[1] - t[0]
     nspui = int(ui / ts)
     p = s - pad(s[:-nspui], (nspui, 0), mode="constant", constant_values=0)
 
-    _ts = 1 / (2 * f[-1])
-    _tmax = 1 / f[1]
-    _t = arange(0, _tmax, _ts) + t[0]
-    krnl = interp1d(t[:len(h)], h, kind="cubic", assume_sorted=True,
-                    bounds_error=False, fill_value=0)
-    _h = krnl(_t) * (_t[1] - _t[0]) / (t[1] - t[0])
-    _h *= sqrt(sum(h**2) / sum(_h**2))
+    tmax = 1 / f[1]
+    n_samps = int(tmax / ts + 0.5)
+    _h = h.copy()
+    _h.resize(n_samps, refcheck=False)  # Accommodating Tox.
     H = rfft(_h)
+    fmax = 0.5 / ts
+    _f = arange(0, fmax + f[1], f[1])
+    # krnl = interp1d(_f, H, kind="linear", assume_sorted=True, bounds_error=False, fill_value=0)
+    krnl = interp1d(_f, H, kind="linear", assume_sorted=True)
+    _H = krnl(f)
 
-    return (s, p, H)
+    return (s, p, _H)
 
 
 def H_2_s2p(H, Zc, fs, Zref=50):

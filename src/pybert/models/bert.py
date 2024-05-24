@@ -277,7 +277,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:
             if ctle_mode != "Off":
                 _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-                ctle_h = irfft(raised_cosine(ctle_H))
+                # ctle_h = irfft(raised_cosine(ctle_H))
+                ctle_h = irfft(ctle_H)
                 krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
                 ctle_h = krnl(t)
                 ctle_h *= t[1] / t_irfft[1]
