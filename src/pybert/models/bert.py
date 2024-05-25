@@ -161,7 +161,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     bit_rate = self.bit_rate * 1.0e9
     eye_bits = self.eye_bits
     eye_uis = self.eye_uis
-    nspb = self.nspb
     nspui = self.nspui
     rn = self.rn
     pn_mag = self.pn_mag
@@ -190,13 +189,15 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     # Calculate misc. values.
     Ts = t[1]
     ts = Ts
-    # fs = bit_rate * nspb
     fs = 1 / ts
     min_len =  30 * nspui
     max_len = 100 * nspui
     if impulse_length:
         min_len = max_len = impulse_length / ts
-
+    if mod_type == 2:  # PAM-4
+        nspb = nspui // 2
+    else:
+        nspb = nspui
     # Generate the ideal over-sampled signal.
     #
     # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
@@ -277,7 +278,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:
             if ctle_mode != "Off":
                 _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-                # ctle_h = irfft(raised_cosine(ctle_H))
                 ctle_h = irfft(ctle_H)
                 krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
                 ctle_h = krnl(t)
@@ -432,8 +432,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.bit_errs = len(bit_errs)
 
         dfe_h = array(
-            [1.0] + list(zeros(nspb - 1)) +  # noqa: W504
-            sum([[-x] + list(zeros(nspb - 1)) for x in tap_weights[-1]], []))  # sum as concat
+            [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
+            sum([[-x] + list(zeros(nspui - 1)) for x in tap_weights[-1]], []))  # sum as concat
         dfe_h.resize(len(ctle_out_h), refcheck=False)
         dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
 

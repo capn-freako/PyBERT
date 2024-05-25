@@ -53,9 +53,9 @@ traits_view = View(
                                 editor=TextEditor(auto_set=False, enter_set=True, evaluate=int),
                             ),
                             Item(
-                                name="nspb",
-                                label="Nspb",
-                                tooltip="# of samples per bit",
+                                name="nspui",
+                                label="Samps. per UI",
+                                tooltip="# of samples per unit interval",
                                 editor=TextEditor(auto_set=False, enter_set=True, evaluate=int),
                             ),
                             Item(
@@ -556,6 +556,7 @@ traits_view = View(
                                 ObjectColumn(name="enabled"),
                                 ObjectColumn(name="min_val"),
                                 ObjectColumn(name="max_val"),
+                                ObjectColumn(name="step"),
                                 ObjectColumn(name="value", format="%+05.3f"),
                             ],
                             configurable=False,
@@ -573,7 +574,6 @@ traits_view = View(
                     show_border=True,
                     springy=True,
                 ),
-                # HGroup(
                 VGroup(
                     HGroup(
                         Item(
@@ -615,11 +615,11 @@ traits_view = View(
                 ),
                 # ),
                 VGroup(
-                    Item(
-                        name="max_iter",
-                        label="Max. Iterations",
-                        tooltip="Maximum number of iterations to allow, during optimization.",
-                    ),
+                    # Item(
+                    #     name="max_iter",
+                    #     label="Max. Iterations",
+                    #     tooltip="Maximum number of iterations to allow, during optimization.",
+                    # ),
                     Item(
                         name="rel_opt",
                         label="Rel. Opt.:",

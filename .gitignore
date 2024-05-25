@@ -142,3 +142,4 @@ pybert.log
 *.sublime-workspace
 *.gcbench
 misc/*
+*_cfg.yaml

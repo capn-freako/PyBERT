@@ -63,7 +63,7 @@ from pybert.gui.plot import make_plots
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
 from pybert.results import PyBertData
-from pybert.threads.optimization import CoOptThread, RxOptThread, TxOptThread
+from pybert.threads.optimization import RxOptThread, TxOptThread, coopt
 from pybert.utility import (
     calc_gamma,
     import_channel,
@@ -108,7 +108,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         default_value="PRBS-7",
     )
     seed = Int(1)  # LFSR seed. 0 means regenerate bits, using a new random seed, each run.
-    nspb = Range(low=2, high=256, value=32)  #: Signal vector samples per bit.
+    nspui = Range(low=2, high=256, value=32)  #: Signal vector samples per unit interval.
     mod_type   = List([0])                   #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
     num_sweeps = Int(1)                      #: Number of sweeps to run.
     sweep_num  = Int(1)
@@ -138,24 +138,35 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - EQ Tune
     tx_tap_tuners = List(
         [
-            TxTapTuner(name="Pre-tap", enabled=True, min_val=-0.2, max_val=0.2, value=0.0),
-            TxTapTuner(name="Post-tap1", enabled=False, min_val=-0.4, max_val=0.4, value=0.0),
-            TxTapTuner(name="Post-tap2", enabled=False, min_val=-0.3, max_val=0.3, value=0.0),
-            TxTapTuner(name="Post-tap3", enabled=False, min_val=-0.2, max_val=0.2, value=0.0),
+            TxTapTuner(name="Pre-tap3",  pos=-3, enabled=True, min_val=-0.05, max_val=0.05),
+            TxTapTuner(name="Pre-tap2",  pos=-2, enabled=True, min_val=-0.1,  max_val=0.1),
+            TxTapTuner(name="Pre-tap1",  pos=-1, enabled=True, min_val=-0.2,  max_val=0.2),
+            TxTapTuner(name="Post-tap1", pos=1,  enabled=True, min_val=-0.2,  max_val=0.2),
+            TxTapTuner(name="Post-tap2", pos=2,  enabled=True, min_val=-0.1,  max_val=0.1),
+            TxTapTuner(name="Post-tap3", pos=3,  enabled=True, min_val=-0.05, max_val=0.05),
         ]
     )  #: EQ optimizer list of TxTapTuner objects.
     rx_bw_tune = Float(12.0)  #: EQ optimizer CTLE bandwidth (GHz).
     peak_freq_tune = Float(gPeakFreq)  #: EQ optimizer CTLE peaking freq. (GHz).
     peak_mag_tune = Float(gPeakMag)  #: EQ optimizer CTLE peaking mag. (dB).
-    max_mag_tune = Float(20)  #: EQ optimizer CTLE peaking mag. (dB).
+    min_mag_tune = Float(2)   #: EQ optimizer CTLE peaking mag. min. (dB).
+    max_mag_tune = Float(12)  #: EQ optimizer CTLE peaking mag. max. (dB).
+    step_mag_tune = Float(1)  #: EQ optimizer CTLE peaking mag. step (dB).
     ctle_offset_tune = Float(gCTLEOffset)  #: EQ optimizer CTLE d.c. offset (dB).
     ctle_mode_tune = Enum("Off", "Passive", "AGC", "Manual")  #: EQ optimizer CTLE mode
     use_dfe_tune = Bool(gUseDfe)  #: EQ optimizer DFE select (Bool).
     n_taps_tune = Int(gNtaps)  #: EQ optimizer # DFE taps.
-    max_iter = Int(50)  #: EQ optimizer max. # of optimization iterations.
+    dfe_tap_tuners = List(
+        [TxTapTuner(name="Tap1", enabled=True, min_val=0.1, max_val=0.4, value=0.1),
+         TxTapTuner(name="Tap2", enabled=True, min_val=-0.15, max_val=0.15, value=0.0),
+         TxTapTuner(name="Tap3", enabled=True, min_val=-0.05, max_val=0.1, value=0.0),
+         TxTapTuner(name="Tap4", enabled=True, min_val=-0.05, max_val=0.1, value=0.0),
+         TxTapTuner(name="Tap5", enabled=True, min_val=-0.05, max_val=0.1, value=0.0),
+        ]
+    )  #: EQ optimizer list of TxTapTuner objects.
+    # max_iter = Int(50)  #: EQ optimizer max. # of optimization iterations.
     tx_opt_thread = Instance(TxOptThread)  #: Tx EQ optimization thread.
     rx_opt_thread = Instance(RxOptThread)  #: Rx EQ optimization thread.
-    coopt_thread = Instance(CoOptThread)  #: EQ co-optimization thread.
 
     # - Tx
     vod = Float(1.0)  #: Tx differential output voltage (V)
@@ -292,10 +303,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         #     "n_taps_tune",
         # ],
     )
-    ctle_out_h_tune = Property(Array)  # , depends_on=["tx_h_tune", "ctle_h_tune", "chnl_h"])
+    # ctle_out_h_tune = Property(Array)  # , depends_on=["tx_h_tune", "ctle_h_tune", "chnl_h"])
+    ctle_out_h_tune = Array(value=zeros(3200))
     cost = Property(Float)  # , depends_on=["ctle_out_h_tune", "nspui"])
     rel_opt = Property(Float)  # , depends_on=["cost"])
-    t = Property(Array, depends_on=["ui", "nspb", "nbits"])
+    t = Property(Array, depends_on=["ui", "nspui", "nbits"])
     t_ns = Property(Array, depends_on=["t"])
     f = Property(Array, depends_on=["f_step", "f_max"])
     w = Property(Array, depends_on=["f"])
@@ -305,7 +317,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
     ui = Property(Float, depends_on=["bit_rate", "mod_type"])
     nui = Property(Int, depends_on=["nbits", "mod_type"])
-    nspui = Property(Int, depends_on=["nspb", "mod_type"])
     eye_uis = Property(Int, depends_on=["eye_bits", "mod_type"])
     dfe_out_p = Array()
     przf_err = Property(Float, depends_on=["dfe_out_p"])
@@ -367,10 +378,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if self.debug:
             self.log("Debug Mode Enabled.")
 
+        self.plotdata.set_data("ctle_out_h_tune", self.ctle_out_h_tune)
+        self.plotdata.set_data("clocks_tune", zeros(3200))
+
         if run_simulation:
             self.simulate(initial_run=True)
-        else:
-            self.calc_chnl_h()  # Prevents missing attribute error in _get_ctle_out_h_tune().
 
     # Custom button handlers
     def _btn_rst_eq_fired(self):
@@ -424,12 +436,15 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.rx_opt_thread.start()
 
     def _btn_coopt_fired(self):
-        if self.coopt_thread and self.coopt_thread.is_alive():
-            pass
-        else:
-            self.coopt_thread = CoOptThread()
-            self.coopt_thread.pybert = self
-            self.coopt_thread.start()
+        self.status = "Co-optimizing..."
+        time.sleep(0.001)
+        tx_weights, rx_peaking = coopt(self)
+        self.log(f"len(tx_weights): {len(tx_weights)}")
+        for k, tx_weight in enumerate(tx_weights):
+            self.tx_tap_tuners[k].value = tx_weight
+        self.peak_mag_tune = rx_peaking
+        self.status = "Finished."
+        time.sleep(0.001)
 
     def _btn_abort_fired(self):
         if self.coopt_thread and self.coopt_thread.is_alive():
@@ -569,19 +584,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         return nui
 
     @cached_property
-    def _get_nspui(self):
-        """Returns the number of samples per unit interval."""
-
-        mod_type = self.mod_type[0]
-        nspb = self.nspb
-
-        nspui = nspb
-        if mod_type == 2:  # PAM-4
-            nspui *= 2
-
-        return nspui
-
-    @cached_property
     def _get_eye_uis(self):
         """Returns the number of unit intervals to use for eye construction."""
 
@@ -599,7 +601,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         """Returns the ideal link impulse response."""
 
         ui = self.ui.value
-        nspui = self.nspui.value
+        nspui = self.nspui
         t = self.t
         mod_type = self.mod_type[0]
         ideal_type = self.ideal_type[0]
@@ -963,7 +965,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 taps.append(tuner.value)
             else:
                 taps.append(0.0)
-        taps.insert(1, 1.0 - sum(map(abs, taps)))  # Assume one pre-tap.
+        taps.insert(1, 1.0 - sum(map(abs, taps)))  # Assume one pre-tap.  # ToDo: Remove this assumption.
 
         h = sum([[x] + list(zeros(nspui - 1)) for x in taps], [])
 

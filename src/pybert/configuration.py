@@ -88,6 +88,8 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.Z0 = the_PyBERT.Z0
         self.v0 = the_PyBERT.v0
         self.l_ch = the_PyBERT.l_ch
+        self.renumber = the_PyBERT.renumber
+        self.use_window = the_PyBERT.use_window
 
         # Tx
         self.vod = the_PyBERT.vod
@@ -98,11 +100,11 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rn = the_PyBERT.rn
         tx_taps = []
         for tap in the_PyBERT.tx_taps:
-            tx_taps.append((tap.enabled, tap.value))
+            tx_taps.append((tap.enabled, tap.value, tap.min_val, tap.max_val))
         self.tx_taps = tx_taps
         self.tx_tap_tuners = []
         for tap in the_PyBERT.tx_tap_tuners:
-            self.tx_tap_tuners.append((tap.enabled, tap.value))
+            self.tx_tap_tuners.append((tap.enabled, tap.pos, tap.min_val, tap.max_val, tap.step))
         self.tx_use_ami = the_PyBERT.tx_use_ami
         self.tx_use_ts4 = the_PyBERT.tx_use_ts4
         self.tx_use_getwave = the_PyBERT.tx_use_getwave
@@ -152,6 +154,22 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         # Analysis
         self.thresh = the_PyBERT.thresh
 
+        # Optimization
+        self.rx_bw_tune = the_PyBERT.rx_bw_tune
+        self.peak_freq_tune = the_PyBERT.peak_freq_tune
+        self.peak_mag_tune = the_PyBERT.peak_mag_tune
+        self.min_mag_tune = the_PyBERT.min_mag_tune
+        self.max_mag_tune = the_PyBERT.max_mag_tune
+        self.step_mag_tune = the_PyBERT.step_mag_tune
+        self.ctle_offset_tune = the_PyBERT.ctle_offset_tune
+        self.ctle_mode_tune = the_PyBERT.ctle_mode_tune
+        self.use_dfe_tune = the_PyBERT.use_dfe_tune
+        self.n_taps_tune = the_PyBERT.n_taps_tune
+        self.dfe_tap_tuners = []
+        for tap in the_PyBERT.dfe_tap_tuners:
+            self.dfe_tap_tuners.append((tap.enabled, tap.min_val, tap.max_val))
+
+
     @staticmethod
     def load_from_file(filepath: Union[str, Path], pybert):
         """Apply all of the configuration settings to the pybert instance.
@@ -190,13 +208,23 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         # Actually load values back into pybert using `setattr`.
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
-                for count, (enabled, val) in enumerate(value):
+                for count, (enabled, val, min_val, max_val) in enumerate(value):
                     setattr(pybert.tx_taps[count], "enabled", enabled)
                     setattr(pybert.tx_taps[count], "value", val)
+                    setattr(pybert.tx_taps[count], "min_val", min_val)
+                    setattr(pybert.tx_taps[count], "max_val", max_val)
             elif prop == "tx_tap_tuners":
-                for count, (enabled, val) in enumerate(value):
+                for count, (enabled, pos, min_val, max_val, step) in enumerate(value):
                     setattr(pybert.tx_tap_tuners[count], "enabled", enabled)
-                    setattr(pybert.tx_tap_tuners[count], "value", val)
+                    setattr(pybert.tx_tap_tuners[count], "pos", pos)
+                    setattr(pybert.tx_tap_tuners[count], "min_val", min_val)
+                    setattr(pybert.tx_tap_tuners[count], "max_val", max_val)
+                    setattr(pybert.tx_tap_tuners[count], "step", step)
+            elif prop == "dfe_tap_tuners":
+                for count, (enabled, min_val, max_val) in enumerate(value):
+                    setattr(pybert.dfe_tap_tuners[count], "enabled", enabled)
+                    setattr(pybert.dfe_tap_tuners[count], "min_val", min_val)
+                    setattr(pybert.dfe_tap_tuners[count], "max_val", max_val)
             elif prop in ("version", "date_created"):
                 pass  # Just including it for some good housekeeping.  Not currently used.
             else:
