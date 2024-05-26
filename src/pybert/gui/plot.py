@@ -13,7 +13,7 @@ from chaco.tools.api import PanTool, ZoomTool
 from pybert.models.bert import update_eyes
 
 PLOT_SPACING = 1
-PLOT_PADDING = 25
+PLOT_PADDING = 75
 
 
 # pylint: disable=too-many-locals,too-many-statements
@@ -28,7 +28,7 @@ def make_plots(self, n_dfe_taps):
     plotdata = self.plotdata
 
     # - DFE tab
-    plot2 = Plot(plotdata, padding_left=75)
+    plot2 = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot2.plot(("t_ns", "ui_ests"), type="line", color="blue")
     plot2.title = "CDR Adaptation"
     plot2.index_axis.title = "Time (ns)"
@@ -37,7 +37,7 @@ def make_plots(self, n_dfe_taps):
     plot9 = Plot(
         plotdata,
         auto_colors=["red", "orange", "yellow", "green", "blue", "purple"],
-        padding_left=75,
+        padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING,
     )
     for i in range(n_dfe_taps):
         plot9.plot(
@@ -47,19 +47,20 @@ def make_plots(self, n_dfe_taps):
             name=f"tap{int(i + 1)}",
         )
     plot9.title = "DFE Adaptation"
+    plot9.index_axis.title = "Sample Number"
     plot9.tools.append(PanTool(plot9, constrain=True, constrain_key=None, constrain_direction="x"))
     zoom9 = ZoomTool(plot9, tool_mode="range", axis="index", always_on=False)
     plot9.overlays.append(zoom9)
     plot9.legend.visible = True
     plot9.legend.align = "ul"
 
-    plot_clk_per_hist = Plot(plotdata, padding_left=75)
+    plot_clk_per_hist = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_clk_per_hist.plot(("clk_per_hist_bins", "clk_per_hist_vals"), type="line", color="blue")
     plot_clk_per_hist.title = "CDR Clock Period Histogram"
     plot_clk_per_hist.index_axis.title = "Clock Period (ps)"
     plot_clk_per_hist.value_axis.title = "Bin Count"
 
-    plot_clk_per_spec = Plot(plotdata, padding_left=75)
+    plot_clk_per_spec = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_clk_per_spec.plot(("clk_freqs", "clk_spec"), type="line", color="blue")
     plot_clk_per_spec.title = "CDR Clock Period Spectrum"
     plot_clk_per_spec.index_axis.title = "Frequency (bit rate)"
@@ -77,8 +78,7 @@ def make_plots(self, n_dfe_taps):
     self._dfe_plot = plot9  # pylint: disable=protected-access
 
     # - EQ Tune tab
-    # plot_h_tune = Plot(plotdata, padding_left=75)
-    plot_h_tune = Plot(plotdata, padding_bottom=75)
+    plot_h_tune = Plot(plotdata, padding_bottom=PLOT_PADDING)
     plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="blue")
     plot_h_tune.plot(("t_ns_chnl", "clocks_tune"), type="line", color="gray")
     plot_h_tune.title = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + Ideal DFE"
@@ -89,7 +89,7 @@ def make_plots(self, n_dfe_taps):
     self.plot_h_tune = plot_h_tune
 
     # - Impulse Responses tab
-    plot_h_chnl = Plot(plotdata, padding_left=75)
+    plot_h_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue", name="Incremental")
     plot_h_chnl.title = post_chnl_str
     plot_h_chnl.index_axis.title = "Time (ns)"
@@ -99,7 +99,7 @@ def make_plots(self, n_dfe_taps):
     zoom_h = ZoomTool(plot_h_chnl, tool_mode="range", axis="index", always_on=False)
     plot_h_chnl.overlays.append(zoom_h)
 
-    plot_h_tx = Plot(plotdata, padding_left=75)
+    plot_h_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_h_tx.plot(("t_ns_chnl", "tx_out_h"), type="line", color="red", name="Cumulative")
     plot_h_tx.title = post_tx_str
     plot_h_tx.index_axis.title = "Time (ns)"
@@ -108,7 +108,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_tx.legend.align = "ur"
     plot_h_tx.index_range = plot_h_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_h_ctle = Plot(plotdata, padding_left=75)
+    plot_h_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_h_ctle.plot(("t_ns_chnl", "ctle_out_h"), type="line", color="red", name="Cumulative")
     plot_h_ctle.title = post_ctle_str
     plot_h_ctle.index_axis.title = "Time (ns)"
@@ -117,7 +117,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_ctle.legend.align = "ur"
     plot_h_ctle.index_range = plot_h_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_h_dfe = Plot(plotdata, padding_left=75)
+    plot_h_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_h_dfe.plot(("t_ns_chnl", "dfe_out_h"), type="line", color="red", name="Cumulative")
     plot_h_dfe.title = post_dfe_str
     plot_h_dfe.index_axis.title = "Time (ns)"
@@ -134,7 +134,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_h = container_h
 
     # - Step Responses tab
-    plot_s_chnl = Plot(plotdata, padding_left=75)
+    plot_s_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_s_chnl.plot(("t_ns_chnl", "chnl_s"), type="line", color="blue", name="Incremental")
     plot_s_chnl.title = post_chnl_str
     plot_s_chnl.index_axis.title = "Time (ns)"
@@ -144,7 +144,7 @@ def make_plots(self, n_dfe_taps):
     zoom_s = ZoomTool(plot_s_chnl, tool_mode="range", axis="index", always_on=False)
     plot_s_chnl.overlays.append(zoom_s)
 
-    plot_s_tx = Plot(plotdata, padding_left=75)
+    plot_s_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_s_tx.plot(("t_ns_chnl", "tx_s"), type="line", color="blue", name="Incremental")
     plot_s_tx.plot(("t_ns_chnl", "tx_out_s"), type="line", color="red", name="Cumulative")
     plot_s_tx.title = post_tx_str
@@ -154,7 +154,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_tx.legend.align = "lr"
     plot_s_tx.index_range = plot_s_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_s_ctle = Plot(plotdata, padding_left=75)
+    plot_s_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_s_ctle.plot(("t_ns_chnl", "ctle_s"), type="line", color="blue", name="Incremental")
     plot_s_ctle.plot(("t_ns_chnl", "ctle_out_s"), type="line", color="red", name="Cumulative")
     plot_s_ctle.title = post_ctle_str
@@ -164,7 +164,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_ctle.legend.align = "lr"
     plot_s_ctle.index_range = plot_s_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_s_dfe = Plot(plotdata, padding_left=75)
+    plot_s_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_s_dfe.plot(("t_ns_chnl", "dfe_s"), type="line", color="blue", name="Incremental")
     plot_s_dfe.plot(("t_ns_chnl", "dfe_out_s"), type="line", color="red", name="Cumulative")
     plot_s_dfe.title = post_dfe_str
@@ -182,7 +182,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_s = container_s
 
     # - Pulse Responses tab
-    plot_p_chnl = Plot(plotdata, padding_left=75)
+    plot_p_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_p_chnl.plot(("t_ns_chnl", "chnl_p"), type="line", color="blue", name="Incremental")
     plot_p_chnl.title = post_chnl_str
     plot_p_chnl.index_axis.title = "Time (ns)"
@@ -192,7 +192,7 @@ def make_plots(self, n_dfe_taps):
     zoom_p = ZoomTool(plot_p_chnl, tool_mode="range", axis="index", always_on=False)
     plot_p_chnl.overlays.append(zoom_p)
 
-    plot_p_tx = Plot(plotdata, padding_left=75)
+    plot_p_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_p_tx.plot(("t_ns_chnl", "tx_out_p"), type="line", color="red", name="Cumulative")
     plot_p_tx.title = post_tx_str
     plot_p_tx.index_axis.title = "Time (ns)"
@@ -201,7 +201,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_tx.legend.align = "ur"
     plot_p_tx.index_range = plot_p_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_p_ctle = Plot(plotdata, padding_left=75)
+    plot_p_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_p_ctle.plot(("t_ns_chnl", "ctle_out_p"), type="line", color="red", name="Cumulative")
     plot_p_ctle.title = post_ctle_str
     plot_p_ctle.index_axis.title = "Time (ns)"
@@ -210,7 +210,7 @@ def make_plots(self, n_dfe_taps):
     plot_p_ctle.legend.align = "ur"
     plot_p_ctle.index_range = plot_p_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_p_dfe = Plot(plotdata, padding_left=75)
+    plot_p_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_p_dfe.plot(("t_ns_chnl", "dfe_out_p"), type="line", color="red", name="Cumulative")
     plot_p_dfe.title = post_dfe_str
     plot_p_dfe.index_axis.title = "Time (ns)"
@@ -227,7 +227,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_p = container_p
 
     # - Frequency Responses tab
-    plot_H_chnl = Plot(plotdata, padding_left=PLOT_PADDING)
+    plot_H_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_H_chnl.plot(("f_GHz", "chnl_H_raw"), type="line", color="black", name="Perfect Term.", index_scale="log")
     plot_H_chnl.plot(("f_GHz", "chnl_H"), type="line", color="blue", name="Actual Term.", index_scale="log")
     plot_H_chnl.plot(("f_GHz", "chnl_trimmed_H"), type="line", color="red", name="Trimmed Impulse", index_scale="log")
@@ -235,48 +235,39 @@ def make_plots(self, n_dfe_taps):
     plot_H_chnl.index_axis.title = "Frequency (GHz)"
     plot_H_chnl.y_axis.title = "Frequency Response (dB)"
     plot_H_chnl.index_range.low_setting = 0.01
-    # plot_H_chnl.index_range.high_setting = 40.0
     plot_H_chnl.value_range.low_setting = -40.0
-    # plot_H_ctle.value_range.high_setting = 0
     plot_H_chnl.legend.visible = True
     plot_H_chnl.legend.align = "ll"
 
-    plot_H_tx = Plot(plotdata, padding_left=PLOT_PADDING)
+    plot_H_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_H_tx.plot(("f_GHz", "tx_H"), type="line", color="blue", name="Incremental", index_scale="log")
     plot_H_tx.plot(("f_GHz", "tx_out_H"), type="line", color="red", name="Cumulative", index_scale="log")
     plot_H_tx.title = post_tx_str
     plot_H_tx.index_axis.title = "Frequency (GHz)"
     plot_H_tx.y_axis.title = "Frequency Response (dB)"
     plot_H_tx.index_range.low_setting = 0.01
-    # plot_H_tx.index_range.high_setting = 40.0
     plot_H_tx.value_range.low_setting = -40.0
     plot_H_tx.legend.visible = True
     plot_H_tx.legend.align = "ll"
 
-    plot_H_ctle = Plot(plotdata, padding_left=PLOT_PADDING)
+    plot_H_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_H_ctle.plot(("f_GHz", "ctle_H"), type="line", color="blue", name="Incremental", index_scale="log")
     plot_H_ctle.plot(("f_GHz", "ctle_out_H"), type="line", color="red", name="Cumulative", index_scale="log")
     plot_H_ctle.title = post_ctle_str
     plot_H_ctle.index_axis.title = "Frequency (GHz)"
     plot_H_ctle.y_axis.title = "Frequency Response (dB)"
     plot_H_ctle.index_range.low_setting = 0.01
-    # plot_H_ctle.index_range.high_setting = 40.0
     plot_H_ctle.value_range.low_setting = -40.0
     plot_H_ctle.legend.visible = True
     plot_H_ctle.legend.align = "ll"
 
-    # plot_H_chnl.value_range = plot_H_ctle.value_range
-    # plot_H_tx.value_range = plot_H_ctle.value_range
-
-    plot_H_dfe = Plot(plotdata, padding_left=PLOT_PADDING)
+    plot_H_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_H_dfe.plot(("f_GHz", "dfe_H"), type="line", color="blue", name="Incremental", index_scale="log")
     plot_H_dfe.plot(("f_GHz", "dfe_out_H"), type="line", color="red", name="Cumulative", index_scale="log")
     plot_H_dfe.title = post_dfe_str
     plot_H_dfe.index_axis.title = "Frequency (GHz)"
     plot_H_dfe.y_axis.title = "Frequency Response (dB)"
     plot_H_dfe.index_range.low_setting = 0.01
-    # plot_H_dfe.index_range.high_setting = 40.0
-    # plot_H_dfe.value_range = plot_H_ctle.value_range
     plot_H_dfe.value_range.low_setting = -40.0
     plot_H_dfe.legend.visible = True
     plot_H_dfe.legend.align = "ll"
@@ -289,7 +280,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_H = container_H
 
     # - Outputs tab
-    plot_out_chnl = Plot(plotdata, padding_left=75)
+    plot_out_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_out_chnl.plot(("t_ns", "ideal_signal"), type="line", color="lightgrey")
     plot_out_chnl.plot(("t_ns", "chnl_out"), type="line", color="blue")
     plot_out_chnl.title = post_chnl_str
@@ -299,21 +290,21 @@ def make_plots(self, n_dfe_taps):
     zoom_out_chnl = ZoomTool(plot_out_chnl, tool_mode="range", axis="index", always_on=False)
     plot_out_chnl.overlays.append(zoom_out_chnl)
 
-    plot_out_tx = Plot(plotdata, padding_left=75)
+    plot_out_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_out_tx.plot(("t_ns", "rx_in"), type="line", color="blue")
     plot_out_tx.title = post_tx_str
     plot_out_tx.index_axis.title = "Time (ns)"
     plot_out_tx.y_axis.title = "Output (V)"
     plot_out_tx.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_out_ctle = Plot(plotdata, padding_left=75)
+    plot_out_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_out_ctle.plot(("t_ns", "ctle_out"), type="line", color="blue")
     plot_out_ctle.title = post_ctle_str
     plot_out_ctle.index_axis.title = "Time (ns)"
     plot_out_ctle.y_axis.title = "Output (V)"
     plot_out_ctle.index_range = plot_out_chnl.index_range  # Zoom x-axes in tandem.
 
-    plot_out_dfe = Plot(plotdata, padding_left=75)
+    plot_out_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_out_dfe.plot(("t_ns", "dfe_out"), type="line", color="blue")
     plot_out_dfe.title = post_dfe_str
     plot_out_dfe.index_axis.title = "Time (ns)"
@@ -366,7 +357,7 @@ def make_plots(self, n_dfe_taps):
     clr_map = ColorMapper.from_segment_map(seg_map)
     self.clr_map = clr_map
 
-    plot_eye_chnl = Plot(plotdata, padding_left=75)
+    plot_eye_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_eye_chnl.img_plot("eye_chnl", colormap=clr_map)
     plot_eye_chnl.y_direction = "normal"
     plot_eye_chnl.components[0].y_direction = "normal"
@@ -379,7 +370,7 @@ def make_plots(self, n_dfe_taps):
     plot_eye_chnl.x_grid.line_color = "gray"
     plot_eye_chnl.y_grid.line_color = "gray"
 
-    plot_eye_tx = Plot(plotdata, padding_left=75)
+    plot_eye_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_eye_tx.img_plot("eye_tx", colormap=clr_map)
     plot_eye_tx.y_direction = "normal"
     plot_eye_tx.components[0].y_direction = "normal"
@@ -392,7 +383,7 @@ def make_plots(self, n_dfe_taps):
     plot_eye_tx.x_grid.line_color = "gray"
     plot_eye_tx.y_grid.line_color = "gray"
 
-    plot_eye_ctle = Plot(plotdata, padding_left=75)
+    plot_eye_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_eye_ctle.img_plot("eye_ctle", colormap=clr_map)
     plot_eye_ctle.y_direction = "normal"
     plot_eye_ctle.components[0].y_direction = "normal"
@@ -405,7 +396,7 @@ def make_plots(self, n_dfe_taps):
     plot_eye_ctle.x_grid.line_color = "gray"
     plot_eye_ctle.y_grid.line_color = "gray"
 
-    plot_eye_dfe = Plot(plotdata, padding_left=75)
+    plot_eye_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_eye_dfe.img_plot("eye_dfe", colormap=clr_map)
     plot_eye_dfe.y_direction = "normal"
     plot_eye_dfe.components[0].y_direction = "normal"
@@ -426,7 +417,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_eye = container_eye
 
     # - Jitter Distributions tab
-    plot_jitter_dist_chnl = Plot(plotdata, padding_left=75)
+    plot_jitter_dist_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_dist_chnl.plot(("jitter_bins", "jitter_chnl"), type="line", color="blue", name="Total")
     plot_jitter_dist_chnl.plot(("jitter_bins", "jitter_ext_chnl"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_chnl.title = post_chnl_str
@@ -435,7 +426,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_dist_chnl.legend.visible = True
     plot_jitter_dist_chnl.legend.align = "ur"
 
-    plot_jitter_dist_tx = Plot(plotdata, padding_left=75)
+    plot_jitter_dist_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_dist_tx.plot(("jitter_bins", "jitter_tx"), type="line", color="blue", name="Total")
     plot_jitter_dist_tx.plot(("jitter_bins", "jitter_ext_tx"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_tx.title = post_tx_str
@@ -444,7 +435,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_dist_tx.legend.visible = True
     plot_jitter_dist_tx.legend.align = "ur"
 
-    plot_jitter_dist_ctle = Plot(plotdata, padding_left=75)
+    plot_jitter_dist_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_dist_ctle.plot(("jitter_bins", "jitter_ctle"), type="line", color="blue", name="Total")
     plot_jitter_dist_ctle.plot(("jitter_bins", "jitter_ext_ctle"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_ctle.title = post_ctle_str
@@ -453,7 +444,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_dist_ctle.legend.visible = True
     plot_jitter_dist_ctle.legend.align = "ur"
 
-    plot_jitter_dist_dfe = Plot(plotdata, padding_left=75)
+    plot_jitter_dist_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_dist_dfe.plot(("jitter_bins", "jitter_dfe"), type="line", color="blue", name="Total")
     plot_jitter_dist_dfe.plot(("jitter_bins", "jitter_ext_dfe"), type="line", color="red", name="Data-Ind.")
     plot_jitter_dist_dfe.title = post_dfe_str
@@ -470,7 +461,7 @@ def make_plots(self, n_dfe_taps):
     self.plots_jitter_dist = container_jitter_dist
 
     # - Jitter Spectrums tab
-    plot_jitter_spec_chnl = Plot(plotdata)
+    plot_jitter_spec_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_spec_chnl.plot(("f_MHz", "jitter_spectrum_chnl"),     type="line", color="blue",    name="Total")
     plot_jitter_spec_chnl.plot(("f_MHz", "jitter_ind_spectrum_chnl"), type="line", color="red",     name="Data Independent")
     plot_jitter_spec_chnl.plot(("f_MHz", "thresh_chnl"),              type="line", color="magenta", name="Pj Threshold")
@@ -485,7 +476,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_chnl.legend.visible = True
     plot_jitter_spec_chnl.legend.align = "lr"
 
-    plot_jitter_spec_tx = Plot(plotdata)
+    plot_jitter_spec_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_spec_tx.plot(("f_MHz", "jitter_spectrum_tx"),     type="line", color="blue",    name="Total")
     plot_jitter_spec_tx.plot(("f_MHz", "jitter_ind_spectrum_tx"), type="line", color="red",     name="Data Independent")
     plot_jitter_spec_tx.plot(("f_MHz", "thresh_tx"),              type="line", color="magenta", name="Pj Threshold")
@@ -499,7 +490,7 @@ def make_plots(self, n_dfe_taps):
 
     plot_jitter_spec_chnl.value_range = plot_jitter_spec_tx.value_range
 
-    plot_jitter_spec_ctle = Plot(plotdata)
+    plot_jitter_spec_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_spec_ctle.plot(("f_MHz", "jitter_spectrum_ctle"),     type="line", color="blue",    name="Total")
     plot_jitter_spec_ctle.plot(("f_MHz", "jitter_ind_spectrum_ctle"), type="line", color="red",     name="Data Independent")
     plot_jitter_spec_ctle.plot(("f_MHz", "thresh_ctle"),              type="line", color="magenta", name="Pj Threshold")
@@ -511,7 +502,7 @@ def make_plots(self, n_dfe_taps):
     plot_jitter_spec_ctle.legend.align = "lr"
     plot_jitter_spec_ctle.value_range = plot_jitter_spec_tx.value_range
 
-    plot_jitter_spec_dfe = Plot(plotdata)
+    plot_jitter_spec_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_spectrum_dfe"),     type="line", color="blue",    name="Total")
     plot_jitter_spec_dfe.plot(("f_MHz_dfe", "jitter_ind_spectrum_dfe"), type="line", color="red",     name="Data Independent")
     plot_jitter_spec_dfe.plot(("f_MHz_dfe", "thresh_dfe"),              type="line", color="magenta", name="Pj Threshold")
@@ -532,7 +523,7 @@ def make_plots(self, n_dfe_taps):
 
     # - Bathtub Curves tab
     # ToDo: Make extrapolated portion of curve dashed.
-    plot_bathtub_chnl = Plot(plotdata)
+    plot_bathtub_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_chnl.plot(("jitter_bins", "bathtub_chnl"), type="line", color="blue")
     plot_bathtub_chnl.value_range.high_setting = 0
     plot_bathtub_chnl.value_range.low_setting = -18
@@ -541,7 +532,7 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_chnl.index_axis.title = "Time (ps)"
     plot_bathtub_chnl.value_axis.title = "Log10(P(Transition occurs inside.))"
 
-    plot_bathtub_tx = Plot(plotdata)
+    plot_bathtub_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_tx.plot(("jitter_bins", "bathtub_tx"), type="line", color="blue")
     plot_bathtub_tx.value_range.high_setting = 0
     plot_bathtub_tx.value_range.low_setting = -18
@@ -550,7 +541,7 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_tx.index_axis.title = "Time (ps)"
     plot_bathtub_tx.value_axis.title = "Log10(P(Transition occurs inside.))"
 
-    plot_bathtub_ctle = Plot(plotdata)
+    plot_bathtub_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_ctle.plot(("jitter_bins", "bathtub_ctle"), type="line", color="blue")
     plot_bathtub_ctle.value_range.high_setting = 0
     plot_bathtub_ctle.value_range.low_setting = -18
@@ -559,7 +550,7 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_ctle.index_axis.title = "Time (ps)"
     plot_bathtub_ctle.value_axis.title = "Log10(P(Transition occurs inside.))"
 
-    plot_bathtub_dfe = Plot(plotdata)
+    plot_bathtub_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_dfe.plot(("jitter_bins", "bathtub_dfe"), type="line", color="blue")
     plot_bathtub_dfe.value_range.high_setting = 0
     plot_bathtub_dfe.value_range.low_setting = -18

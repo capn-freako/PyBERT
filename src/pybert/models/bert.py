@@ -139,11 +139,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.status = "Aborted Simulation"
             raise RuntimeError("Simulation aborted by User.")
 
-    num_sweeps = self.num_sweeps
-    sweep_num = self.sweep_num
-
     start_time = clock()
-    self.status = f"Running channel...(sweep {sweep_num} of {num_sweeps})"
+    self.status = f"Running channel..."
 
     if not self.seed:  # The user sets `seed` to zero to indicate that she wants new bits generated for each run.
         self.run_count += 1  # Force regeneration of bit stream.
@@ -231,7 +228,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     _check_sim_status()
     split_time = clock()
-    self.status = f"Running Tx...(sweep {sweep_num} of {num_sweeps})"
+    self.status = f"Running Tx..."
 
     # Calculate Tx output power dissipation.
     ffe_out = convolve(symbols, ffe)[: len(symbols)]
@@ -298,7 +295,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, f)
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
-            self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
+            self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
                 ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
@@ -330,7 +327,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             tx_out_s, tx_out_p, tx_out_H = calc_resps(t, tx_out_h, ui, f)
             self.tx_perf = nbits * nspb / (clock() - split_time)
             split_time = clock()
-            self.status = f"Running CTLE...(sweep {sweep_num} of {num_sweeps})"
+            self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
                 ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
@@ -392,7 +389,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     self.ctle_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
-    self.status = f"Running DFE/CDR...(sweep {sweep_num} of {num_sweeps})"
+    self.status = "Running DFE/CDR..."
 
     _check_sim_status()
 
@@ -453,7 +450,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
         self.dfe_perf = nbits * nspb / (clock() - split_time)
         split_time = clock()
-        self.status = f"Analyzing jitter...(sweep {sweep_num} of {num_sweeps})"
+        self.status = "Analyzing jitter..."
     except Exception:
         self.status = "Exception: DFE"
         print(f"len(bits_out): {len(bits_out)}\nnbits: {nbits}\neye_bits: {eye_bits}")
@@ -675,7 +672,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.jitter_perf = nbits * nspb / (clock() - split_time)
         self.total_perf = nbits * nspb / (clock() - start_time)
         split_time = clock()
-        self.status = f"Updating plots...(sweep {sweep_num} of {num_sweeps})"
+        self.status = "Updating plots..."
     except Exception:
         # if update_plots:
         #     update_results(self)

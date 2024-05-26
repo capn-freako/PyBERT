@@ -11,7 +11,7 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 
 import time
 
-from numpy import arange, array, convolve, floor, ones
+from numpy import arange, array, convolve, floor, log10, ones
 from numpy.fft import irfft
 from scipy.interpolate import interp1d
 
@@ -20,6 +20,25 @@ from pybert.threads.stoppable import StoppableThread
 from pybert.utility import make_ctle, trim_impulse, calc_resps, pulse_center
 
 gDebugOptimize = False
+
+
+# pylint: disable=no-member
+class OptThread(StoppableThread):
+    "Used to run EQ optimization in its own thread, to preserve GUI responsiveness."
+
+    def run(self):
+        "Run the equalization optimization thread."
+
+        pybert = self.pybert
+
+        pybert.status = "Optimizing EQ..."
+        time.sleep(0.001)
+
+        tx_weights, rx_peaking, fom = coopt(pybert)
+        for k, tx_weight in enumerate(tx_weights):
+            pybert.tx_tap_tuners[k].value = tx_weight
+        pybert.peak_mag_tune = rx_peaking
+        pybert.status = f"Finished. (SNR: {20 * log10(fom)} dB)"
 
 
 def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int, TxTapTuner]]) -> list[list[float]]:
@@ -50,7 +69,7 @@ def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int
     return mk_tx_weights(new_weightss, tail) 
 
 
-def coopt(pybert) -> tuple[list[float], float]:
+def coopt(pybert) -> tuple[list[float], float, float]:
     """
     Co-optimize the Tx/Rx linear equalization, assuming ideal bounded DFE.
 
@@ -58,7 +77,7 @@ def coopt(pybert) -> tuple[list[float], float]:
         pybert(PyBERT): The PyBERT instance on which to perform co-optimization.
 
     Returns:
-        (tx_weights, ctle_peaking): The ideal Tx FFE / Rx CTLE settings.
+        (tx_weights, ctle_peaking, FOM): The ideal Tx FFE / Rx CTLE settings & figure of merit.
     """
 
     w         = pybert.w
@@ -83,6 +102,12 @@ def coopt(pybert) -> tuple[list[float], float]:
     n_weights = len(tx_taps)
     tx_curs_pos = max(0, -tx_taps[0].pos)  # list position at which to insert main tap
 
+    tx_weightss = mk_tx_weights([[0 for _ in range(n_weights)],], enumerate(pybert.tx_tap_tuners))
+    for tx_weights in tx_weightss:
+        tx_weights.insert(tx_curs_pos, 1 - sum(abs(array(tx_weights))))
+    peak_mags = arange(min_mag, max_mag + step_mag, step_mag)
+    n_trials = len(tx_weightss) * len(peak_mags)
+
     pybert.log("\n".join([
         "Optimizing linear EQ...",
         f"\tTime step: {t[1] * 1e12:5.1f} ps",
@@ -90,15 +115,13 @@ def coopt(pybert) -> tuple[list[float], float]:
         f"\tOversampling factor: {nspui}",
         f"\tNumber of Tx taps: {n_weights}",
         f"\tTx cursor tap position: {tx_curs_pos}",
+        f"\tRunning {n_trials} trials.",
         ""]))
 
-    tx_weightss = mk_tx_weights([[0 for _ in range(n_weights)],], enumerate(pybert.tx_tap_tuners))
-    for tx_weights in tx_weightss:
-        tx_weights.insert(tx_curs_pos, 1 - sum(abs(array(tx_weights))))
-
-    curs_ix = None
     fom_max = -1000
-    for peak_mag in arange(min_mag, max_mag + step_mag, step_mag):
+    trials_run = 0
+    next_trials_run = int(0.05 * n_trials)
+    for peak_mag in peak_mags:
         _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w)
         _ctle_h = irfft(ctle_H)
         krnl = interp1d(t_irfft, _ctle_h, bounds_error=False, fill_value=0)
@@ -131,126 +154,11 @@ def coopt(pybert) -> tuple[list[float], float]:
                 pybert.plotdata.set_data("ctle_out_h_tune", p_tx)
                 pybert.plotdata.set_data("t_ns_chnl", pybert.t_ns[:len(p_tx)])
                 fom_max = fom
-    return (tx_weights_best, peak_mag_best)
+                time.sleep(0.001)
+            trials_run += 1
+            if trials_run >= next_trials_run:
+                pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
+                next_trials_run += int(0.05 * n_trials)
+                time.sleep(0.001)
 
-
-# pylint: disable=no-member
-class TxOptThread(StoppableThread):
-    """Used to run Tx tap weight optimization in its own thread, in order to
-    preserve GUI responsiveness."""
-
-    def run(self):
-        """Run the Tx equalization optimization thread."""
-
-        pybert = self.pybert
-
-        if self.update_status:
-            pybert.status = "Optimizing Tx..."
-
-        max_iter = pybert.max_iter
-
-        old_taps = []
-        min_vals = []
-        max_vals = []
-        for tuner in pybert.tx_tap_tuners:
-            if tuner.enabled:
-                old_taps.append(tuner.value)
-                min_vals.append(tuner.min_val)
-                max_vals.append(tuner.max_val)
-
-        cons = {"type": "ineq", "fun": lambda x: 0.7 - sum(abs(x))}
-
-        bounds = list(zip(min_vals, max_vals))
-
-        try:
-            if gDebugOptimize:
-                res = minimize(
-                    self.do_opt_tx,
-                    old_taps,
-                    bounds=bounds,
-                    constraints=cons,
-                    options={"disp": True, "maxiter": max_iter},
-                )
-            else:
-                res = minimize(
-                    self.do_opt_tx,
-                    old_taps,
-                    bounds=bounds,
-                    constraints=cons,
-                    options={"disp": False, "maxiter": max_iter},
-                )
-
-            if self.update_status:
-                if res["success"]:
-                    pybert.status = "Optimization succeeded."
-                else:
-                    pybert.status = f"Optimization failed: {res['message']}"
-
-        except Exception as err:  # pylint: disable=broad-exception-caught
-            pybert.status = err
-
-    def do_opt_tx(self, taps):
-        """Run the Tx Optimization."""
-        time.sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
-
-        if self.stopped():
-            raise RuntimeError("Optimization aborted.")
-
-        pybert = self.pybert
-        tuners = pybert.tx_tap_tuners
-        taps = list(taps)
-        for tuner in tuners:
-            if tuner.enabled:
-                tuner.value = taps.pop(0)
-        return pybert.cost
-
-
-class RxOptThread(StoppableThread):
-    """Used to run Rx tap weight optimization in its own thread, in order to
-    preserve GUI responsiveness."""
-
-    def run(self):
-        """Run the Rx equalization optimization thread."""
-
-        pybert = self.pybert
-
-        pybert.status = "Optimizing Rx..."
-        max_iter = pybert.max_iter
-        max_mag_tune = pybert.max_mag_tune
-
-        try:
-            if gDebugOptimize:
-                res = minimize_scalar(
-                    self.do_opt_rx,
-                    bounds=(0, max_mag_tune),
-                    method="Bounded",
-                    options={"disp": True, "maxiter": max_iter},
-                )
-            else:
-                res = minimize_scalar(
-                    self.do_opt_rx,
-                    bounds=(0, max_mag_tune),
-                    method="Bounded",
-                    options={"disp": False, "maxiter": max_iter},
-                )
-
-            if res["success"]:
-                pybert.status = "Optimization succeeded."
-            else:
-                pybert.status = f"Optimization failed: {res['message']}"
-
-        except Exception as err:  # pylint: disable=broad-exception-caught
-            pybert.status = err
-
-    def do_opt_rx(self, peak_mag):
-        """Run the Rx Optimization."""
-        time.sleep(0.001)  # Give the GUI a chance to acknowledge user clicking the Abort button.
-
-        if self.stopped():
-            raise RuntimeError("Optimization aborted.")
-
-        pybert = self.pybert
-        pybert.peak_mag_tune = peak_mag
-        return pybert.cost
-
-
+    return (tx_weights_best, peak_mag_best, fom_max)

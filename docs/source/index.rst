@@ -40,6 +40,7 @@ Contents
 
    intro
    modules
+   todo
 
 Indices and tables
 ------------------
