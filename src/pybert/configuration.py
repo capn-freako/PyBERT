@@ -65,13 +65,9 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.nbits = the_PyBERT.nbits
         self.pattern = the_PyBERT.pattern
         self.seed = the_PyBERT.seed
-        self.nspb = the_PyBERT.nspb
+        self.nspui = the_PyBERT.nspui
         self.eye_bits = the_PyBERT.eye_bits
         self.mod_type = list(the_PyBERT.mod_type)  # See Issue #95 and PR #98 (jdpatt)
-        self.num_sweeps = the_PyBERT.num_sweeps
-        self.sweep_num = the_PyBERT.sweep_num
-        self.sweep_aves = the_PyBERT.sweep_aves
-        self.do_sweep = the_PyBERT.do_sweep
         self.debug = the_PyBERT.debug
         self.f_max = the_PyBERT.f_max
         self.f_step = the_PyBERT.f_step
@@ -80,7 +76,6 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.use_ch_file = the_PyBERT.use_ch_file
         self.ch_file = the_PyBERT.ch_file
         self.impulse_length = the_PyBERT.impulse_length
-        self.f_step = the_PyBERT.f_step
         self.Rdc = the_PyBERT.Rdc
         self.w0 = the_PyBERT.w0
         self.R0 = the_PyBERT.R0
@@ -136,7 +131,6 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
 
         # DFE
         self.use_dfe = the_PyBERT.use_dfe
-        self.use_dfe_tune = the_PyBERT.use_dfe_tune
         self.sum_ideal = the_PyBERT.sum_ideal
         self.decision_scaler = the_PyBERT.decision_scaler
         self.gain = the_PyBERT.gain
@@ -163,8 +157,6 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.step_mag_tune = the_PyBERT.step_mag_tune
         self.ctle_offset_tune = the_PyBERT.ctle_offset_tune
         self.ctle_mode_tune = the_PyBERT.ctle_mode_tune
-        self.use_dfe_tune = the_PyBERT.use_dfe_tune
-        self.n_taps_tune = the_PyBERT.n_taps_tune
         self.dfe_tap_tuners = []
         for tap in the_PyBERT.dfe_tap_tuners:
             self.dfe_tap_tuners.append((tap.enabled, tap.min_val, tap.max_val))

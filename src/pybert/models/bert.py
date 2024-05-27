@@ -56,53 +56,6 @@ MIN_BATHTUB_VAL = 1.0e-18
 gFc             = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
 
 
-def my_run_sweeps(self, is_thread_stopped: Optional[Callable[[], bool]] = None):
-    """Runs the simulation sweeps.
-
-    Args:
-        self(PyBERT): Reference to an instance of the *PyBERT* class.
-        is_thread_stopped: a function that is used to tell the simulation that the user
-          has requested to stop/abort the simulation by setting the thread stop event.
-    """
-
-    sweep_aves = self.sweep_aves
-    do_sweep = self.do_sweep
-    tx_taps = self.tx_taps
-
-    if do_sweep:
-        # Assemble the list of desired values for each sweepable parameter.
-        sweep_vals = []
-        for tap in tx_taps:
-            if tap.enabled:
-                if tap.steps:
-                    sweep_vals.append(list(arange(tap.min_val, tap.max_val, (tap.max_val - tap.min_val) / tap.steps)))
-                else:
-                    sweep_vals.append([tap.value])
-            else:
-                sweep_vals.append([0.0])
-        # Run the sweep, using the lists assembled, above.
-        sweeps = [
-            [w, x, y, z] for w in sweep_vals[0] for x in sweep_vals[1] for y in sweep_vals[2] for z in sweep_vals[3]
-        ]
-        num_sweeps = sweep_aves * len(sweeps)
-        self.num_sweeps = num_sweeps
-        sweep_results = []
-        sweep_num = 1
-        for sweep in sweeps:
-            for i in range(4):
-                self.tx_taps[i].value = sweep[i]
-            bit_errs = []
-            for i in range(sweep_aves):
-                self.sweep_num = sweep_num
-                my_run_simulation(self, update_plots=False, aborted_sim=is_thread_stopped)
-                bit_errs.append(self.bit_errs)
-                sweep_num += 1
-            sweep_results.append((sweep, mean(bit_errs), std(bit_errs)))
-        self.sweep_results = sweep_results
-    else:
-        my_run_simulation(self, aborted_sim=is_thread_stopped)
-
-
 # pylint: disable=too-many-locals,protected-access,too-many-branches,too-many-statements
 def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True,
                       aborted_sim: Optional[Callable[[], bool]] = None):
@@ -166,8 +119,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     rx_bw = self.rx_bw * 1.0e9
     peak_freq = self.peak_freq * 1.0e9
     peak_mag = self.peak_mag
-    ctle_offset = self.ctle_offset
-    ctle_mode = self.ctle_mode
+    ctle_enable = self.ctle_enable
     delta_t = self.delta_t * 1.0e-12
     alpha = self.alpha
     ui = self.ui
@@ -273,12 +225,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.  # pylint: disable=fixme
             # ctle_H *= sum(ctle_h) / ctle_H[0]
         else:
-            if ctle_mode != "Off":
-                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w, ctle_mode, ctle_offset)
-                ctle_h = irfft(ctle_H)
-                krnl = interp1d(t_irfft, ctle_h, bounds_error=False, fill_value=0)
+            if ctle_enable:
+                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w)
+                _ctle_h = irfft(ctle_H)
+                krnl = interp1d(t_irfft, _ctle_h, bounds_error=False, fill_value=0)
                 ctle_h = krnl(t)
-                ctle_h *= t[1] / t_irfft[1]
+                # ctle_h *= t[1] / t_irfft[1]
+                ctle_h *= sum(_ctle_h) / sum(ctle_h)
                 ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
             else:
                 ctle_h = array([1.] + [0. for _ in range(min_len - 1)])
@@ -339,7 +292,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                     ctle_out += noise
                 else:                # PyBERT native Rx
-                    if ctle_mode != "Off":
+                    if ctle_enable:
                         ctle_h = get_ctle_h()
                         ctle_out_h = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
                         ctle_out = convolve(x + noise, ctle_out_h)[:len(x)]
@@ -401,9 +354,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:
             _gain = 0.0
             _ideal = True
+        limits = []
+        for tuner in self.dfe_tap_tuners:
+            limits.append((tuner.min_val, tuner.max_val))
         dfe = DFE(n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
                   n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
-                  lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal)
+                  lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
+                  limits=limits)
         (dfe_out, tap_weights, ui_ests, clocks,
             lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
         dfe_out = array(dfe_out)
@@ -447,6 +404,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.dfe_out_p = dfe_out_p
         self.dfe_out_H = dfe_out_H
         self.dfe_out = dfe_out
+        self.lockeds = lockeds
 
         self.dfe_perf = nbits * nspb / (clock() - split_time)
         split_time = clock()
@@ -833,6 +791,7 @@ def update_results(self):
     rx_in = self.rx_in[:len_t]
     ctle_out = self.ctle_out[:len_t]
     dfe_out = self.dfe_out[:len_t]
+    lockeds = self.lockeds[:len_t]
     if len_t > 1000:  # to prevent Chaco plotting error with too much data
         krnl = interp1d(t_ns, ideal_signal)
         ideal_signal_plot = krnl(t_ns_plot)
@@ -844,17 +803,21 @@ def update_results(self):
         ctle_out_plot = krnl(t_ns_plot)
         krnl = interp1d(t_ns, dfe_out)
         dfe_out_plot = krnl(t_ns_plot)
+        krnl = interp1d(t_ns, lockeds)
+        lockeds_plot = krnl(t_ns_plot)
     else:
         ideal_signal_plot = ideal_signal
         chnl_out_plot = chnl_out
         rx_in_plot = rx_in
         ctle_out_plot = ctle_out
         dfe_out_plot = dfe_out
+        lockeds_plot = lockeds
     self.plotdata.set_data("ideal_signal", ideal_signal_plot)
     self.plotdata.set_data("chnl_out", chnl_out_plot)
     self.plotdata.set_data("rx_in", rx_in_plot)
     self.plotdata.set_data("ctle_out", ctle_out_plot)
     self.plotdata.set_data("dfe_out", dfe_out_plot)
+    self.plotdata.set_data("dbg_out", lockeds_plot)
 
     # Jitter distributions
     jitter_chnl = self.jitter_chnl  # These are used again in bathtub curve generation, below.
@@ -924,7 +887,8 @@ def update_results(self):
         i += 1
         assert i < len(clock_times), "ERROR: Insufficient coverage in 'clock_times' vector."
     y_max = 1.1 * max(abs(array(self.dfe_out)))
-    eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out, y_max, clock_times[i:])
+    # eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out, y_max, clock_times[i:])
+    eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out[ignore_samps:], y_max, clock_times[i:])
     self.plotdata.set_data("eye_index", xs)
     self.plotdata.set_data("eye_chnl", eye_chnl)
     self.plotdata.set_data("eye_tx", eye_tx)

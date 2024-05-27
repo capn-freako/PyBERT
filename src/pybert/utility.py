@@ -349,7 +349,10 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         t_jitter.append(ideal_xing)
     jitter = array(jitter)
 
-    assert len(jitter) > 0 and len(t_jitter) > 0, "No crossings found!"
+    # ToDo: Report this in the status bar.
+    # assert len(jitter) > 0 and len(t_jitter) > 0, "No crossings found!"
+    if len(jitter) == 0 or len(t_jitter) == 0:
+        print("No crossings found!", flush=True)
 
     if debug:
         print("mean(jitter):", mean(jitter))
@@ -396,21 +399,31 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     # spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
     try:
         spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
-    except Exception:  # pylint: disable=broad-exception-caught
+        tie_interp = spl(t)
+        y = fft(tie_interp)
+        jitter_spectrum = abs(y[:half_len])
+    except Exception as err:  # pylint: disable=broad-exception-caught
         print(f"t_jitter: {t_jitter}")
         print(f"jitter: {jitter}")
-        raise
-    tie_interp = spl(t)
-    y = fft(tie_interp)
-    jitter_spectrum = abs(y[:half_len])
+        print(f"Error calculating data dependent TIE: {err}", flush=True)
+        jitter_spectrum = zeros(half_len)
     jitter_freqs    = f[:half_len]
 
+
     # -- Repeat for data-independent jitter.
-    spl = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
-    tie_ind_interp = spl(t)
-    y = fft(tie_ind_interp)
-    y_mag = abs(y)
-    tie_ind_spectrum = y_mag[:half_len]
+    try:
+        spl = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
+        tie_ind_interp = spl(t)
+        y = fft(tie_ind_interp)
+        y_mag = abs(y)
+        tie_ind_spectrum = y_mag[:half_len]
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        print(f"t_jitter: {t_jitter}")
+        print(f"tie_ind: {tie_ind}")
+        print(f"Error calculating data independent TIE: {err}", flush=True)
+        y = zeros(half_len)
+        y_mag = zeros(half_len)
+        tie_ind_spectrum = zeros(half_len)
 
     # -- Perform spectral extraction of Pj from the data independent jitter,
     # -- using a threshold based on a moving average to identify the periodic components.
@@ -757,57 +770,38 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):  # pylint: 
     return img_array
 
 
-def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):  # pylint: disable=too-many-arguments
-    """Generate the frequency response of a continuous time linear equalizer
-    (CTLE), given the:
+def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments
+    """
+    Generate the frequency response of a continuous time linear equalizer (CTLE), given the:
 
     - signal path bandwidth,
-    - peaking specification
-    - list of frequencies of interest, and
-    - operational mode/offset.
+    - peaking specification, and
+    - list of frequencies of interest.
 
-    We use the 'invres()' function from scipy.signal, as it suggests
-    itself as a natural approach, given our chosen use model of having
-    the user provide the peaking frequency and degree of peaking.
+    Args:
+        rx_bw: The natural (or, unequalized) signal path bandwidth (Hz).
+        peak_freq: The location of the desired peak in the frequency response (Hz).
+        peak_mag: The desired relative magnitude of the peak (dB).
+        w: The list of frequencies of interest (rads./s).
 
-    That is, we define our desired frequency response using one zero
-    and two poles, where:
+    Returns:
+        w, H: The resultant complex frequency response, at the given frequencies.
 
-    - The pole locations are equal to:
-       - the signal path natural bandwidth, and
-       - the user specified peaking frequency.
+    Notes:
+        1. We use the 'invres()' function from scipy.signal, as it suggests
+            itself as a natural approach, given our chosen use model of having
+            the user provide the peaking frequency and degree of peaking.
 
-    - The zero location is chosen, so as to provide the desired degree
-      of peaking.
+            That is, we define our desired frequency response using one zero
+            and two poles, where:
 
-    Inputs:
+            - The pole locations are equal to:
+                - the signal path natural bandwidth, and
+                - the user specified peaking frequency.
 
-      - rx_bw        The natural (or, unequalized) signal path bandwidth (Hz).
-
-      - peak_freq    The location of the desired peak in the frequency
-                     response (Hz).
-
-      - peak_mag     The desired relative magnitude of the peak (dB). (mag(H(0)) = 1)
-
-      - w            The list of frequencies of interest (rads./s).
-
-      - mode         The operational mode; must be one of:
-                       - 'Off'    : CTLE is disengaged.
-                       - 'Passive': Maximum frequency response has magnitude one.
-                       - 'AGC'    : Automatic gain control. (Handled by calling routine.)
-                       - 'Manual' : D.C. offset is set manually.
-
-      - dc_offset    The d.c. offset of the CTLE gain curve (dB).
-                     (Only valid, when 'mode' = 'Manual'.)
-
-    Outputs:
-
-      - w, H         The resultant complex frequency response, at the
-                     given frequencies.
+            - The zero location is chosen, so as to provide the desired degree
+                of peaking.
     """
-
-    if mode == "Off":
-        return (w, ones(len(w)))
 
     p2 = -2.0 * pi * rx_bw
     p1 = -2.0 * pi * peak_freq
@@ -820,13 +814,7 @@ def make_ctle(rx_bw, peak_freq, peak_mag, w, mode="Passive", dc_offset=0):  # py
         r2 = z - p1
     b, a = invres([r1, r2], [p1, p2], [])
     w, H = freqs(b, a, w)
-
-    if mode == "Passive":
-        H /= max(abs(H))
-    elif mode in ("Manual", "AGC"):
-        H *= pow(10.0, dc_offset / 20.0) / abs(H[0])  # Enforce d.c. offset.
-    else:
-        raise RuntimeError(f"pybert_util.make_ctle(): Unrecognized value for 'mode' parameter: {mode}.")
+    H /= max(abs(H))
 
     return (w, H)
 
@@ -1558,7 +1546,11 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: di
     """
     half_len  = len(jit_pdf) // 2
     dt        = centers[1] - centers[0]  # Bins assumed to be uniformly spaced!
-    jit_pdf_center_of_mass = int(mean([k * pk for (k, pk) in enumerate(jit_pdf)]))
+    try:
+        jit_pdf_center_of_mass = int(mean([k * pk for (k, pk) in enumerate(jit_pdf)]))
+    except Exception as err:
+        print(f"Error finding jitter PDF center of mass: {err}", flush=True)
+        jit_pdf_center_of_mass = half_len
     _jit_pdf = roll(jit_pdf, half_len - jit_pdf_center_of_mass)
     zero_locs = where(fftshift(_jit_pdf) == 0)[0]
     ext_first = 0

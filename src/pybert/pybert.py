@@ -14,6 +14,10 @@ This Python script provides a GUI interface to a BERT simulator, which
 can be used to explore the concepts of serial communication link design.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
+
+ToDo:
+    1. Add optional AFE (4th-order Bessel-Thomson).
+    2. Add eye contour plots.
 """
 import platform
 import time
@@ -45,7 +49,7 @@ from traits.api import (
     cached_property,
 )
 from traits.etsconfig.api import ETSConfig
-from traitsui.message import message
+from traitsui.message import message, error
 from scipy.interpolate import interp1d
 
 from pyibisami import __version__ as PyAMI_VERSION  # type: ignore
@@ -150,9 +154,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     max_mag_tune = Float(12)  #: EQ optimizer CTLE peaking mag. max. (dB).
     step_mag_tune = Float(1)  #: EQ optimizer CTLE peaking mag. step (dB).
     ctle_offset_tune = Float(gCTLEOffset)  #: EQ optimizer CTLE d.c. offset (dB).
-    ctle_mode_tune = Enum("Off", "Passive", "AGC", "Manual")  #: EQ optimizer CTLE mode
-    use_dfe_tune = Bool(gUseDfe)  #: EQ optimizer DFE select (Bool).
-    n_taps_tune = Int(gNtaps)  #: EQ optimizer # DFE taps.
+    ctle_enable_tune = Bool(True)  #: EQ optimizer CTLE enable
     dfe_tap_tuners = List(
         [TxTapTuner(name="Tap1",  enabled=True,  min_val=0.1,   max_val=0.4,  value=0.1),
          TxTapTuner(name="Tap2",  enabled=True,  min_val=-0.15, max_val=0.15, value=0.0),
@@ -225,8 +227,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
     ctle_offset = Float(gCTLEOffset)  #: CTLE d.c. offset (dB)
-    ctle_mode = Enum("Off", "Passive", "AGC", "Manual")  #: CTLE mode ('Off', 'Passive', 'AGC', 'Manual').
-    # ctle_mode = "Passive"
+    ctle_enable = Bool(True)  #: CTLE enable.
     rx_use_ami = Bool(False)  #: (Bool)
     rx_has_ts4 = Bool(False)  #: (Bool)
     rx_use_ts4 = Bool(False)  #: (Bool)
@@ -246,7 +247,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     decision_scaler = Float(0.5)  #: DFE slicer output voltage (V).
     gain = Float(0.2)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
-    n_taps = Int(gNtaps)  #: DFE # of taps.
+    # n_taps = Int(gNtaps)  #: DFE # of taps.
+    n_taps = Range(low=1, high=20, value=gNtaps)  #: DFE # of taps.
     _old_n_taps = n_taps
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
 
@@ -343,6 +345,15 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if alert and self.GUI:
             message(_msg, "PyBERT Alert")
 
+    # User "yes"/"no" alert box.
+    def alert(self, msg):
+        "Prompt for a yes/no response, using simple alert dialog."
+        _msg = msg.strip()
+        if self.GUI:
+            return error(_msg, "PyBERT Alert")
+        else:
+            raise RuntimeError("Alert box requested, but no GUI!")
+
     # Default initialization
     def __init__(self, run_simulation=True, gui=True):
         """Initial plot setup occurs here.
@@ -370,8 +381,20 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if self.debug:
             self.log("Debug Mode Enabled.")
 
-        self.plotdata.set_data("clocks_tune", zeros(3200))
-        self.plotdata.set_data("ctle_out_h_tune", zeros(3200))
+        INIT_LEN = 640
+        self.plotdata.set_data("t_ns_opt", self.t_ns[:INIT_LEN])
+        self.plotdata.set_data("clocks_tune", zeros(INIT_LEN))
+        self.plotdata.set_data("ctle_out_h_tune", zeros(INIT_LEN))
+        self.plotdata.set_data("s_ctle", zeros(INIT_LEN))
+        self.plotdata.set_data("s_ctle_out", zeros(INIT_LEN))
+        self.plotdata.set_data("s_tx", zeros(INIT_LEN))
+        self.plotdata.set_data("p_chnl", zeros(INIT_LEN))
+        self.plotdata.set_data("p_ctle", zeros(INIT_LEN))
+        self.plotdata.set_data("p_ctle_out", zeros(INIT_LEN))
+        self.plotdata.set_data("p_tx", zeros(INIT_LEN))
+        self.plotdata.set_data("p_tx_out", zeros(INIT_LEN))
+        self.plotdata.set_data("curs_ix", [0, 0])
+        self.plotdata.set_data("curs_amp", [0, 0])
 
         if run_simulation:
             self.simulate(initial_run=True)
@@ -385,10 +408,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.peak_freq_tune = self.peak_freq
         self.peak_mag_tune = self.peak_mag
         self.rx_bw_tune = self.rx_bw
-        self.ctle_mode_tune = self.ctle_mode
-        self.ctle_offset_tune = self.ctle_offset
-        self.use_dfe_tune = self.use_dfe
-        self.n_taps_tune = self.n_taps
+        self.ctle_enable_tune = self.ctle_enable
 
     def _btn_save_eq_fired(self):
         """Save the equalization."""
@@ -398,15 +418,19 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.peak_freq = self.peak_freq_tune
         self.peak_mag = self.peak_mag_tune
         self.rx_bw = self.rx_bw_tune
-        self.ctle_mode = self.ctle_mode_tune
-        self.ctle_offset = self.ctle_offset_tune
-        self.use_dfe = self.use_dfe_tune
-        self.n_taps = self.n_taps_tune
+        self.ctle_enable = self.ctle_enable_tune
 
     def _btn_coopt_fired(self):
         if self.opt_thread and self.opt_thread.is_alive():
             pass
         else:
+            n_trials = int((self.max_mag_tune - self.min_mag_tune) / self.step_mag_tune)
+            for tuner in self.tx_tap_tuners:
+                n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step)
+            if n_trials > 1_000_000:
+                usr_resp = self.alert(f"You've opted to run over {n_trials // 1_000_000} million trials!\nAre you sure?")
+                if not usr_resp:
+                    return
             self.opt_thread = OptThread()
             self.opt_thread.pybert = self
             self.opt_thread.start()
@@ -641,7 +665,12 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 taps.append(tuner.value)
             else:
                 taps.append(0.0)
-        taps.insert(1, 1.0 - sum(map(abs, taps)))  # Assume one pre-tap.
+        curs_pos = -tap_tuners[0].pos
+        curs_val = 1.0 - sum(abs(array(taps)))
+        if curs_pos < 0:
+            taps.insert(0, curs_val)
+        else:
+            taps.insert(curs_pos, curs_val)
 
         return taps
 
@@ -940,13 +969,12 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             for i in range(1, 4):
                 self.tx_taps[i].enabled = False
 
-    def _use_dfe_tune_changed(self, new_value):
-        if not new_value:
-            for i in range(1, 4):
-                self.tx_tap_tuners[i].enabled = True
-        else:
-            for i in range(1, 4):
-                self.tx_tap_tuners[i].enabled = False
+    def _dfe_tap_tuners_changed(self, new_value):
+        limits = []
+        for tuner in new_value:
+            limits.append((tuner.min_val, tuner.max_val))
+        self.dfe.limits = limits
+        print(f"limits: {limits}", flush=True)
 
     def _tx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
@@ -1295,8 +1323,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         except InvalidFileType:
             self.log("This filetype is not currently supported. Please try again as a yaml file.")
         except Exception as err:  # pylint: disable=broad-exception-caught
-            self.log("Failed to save current user configuration. See the console for more detail.")
-            self.log(str(err))
+            self.log(f"Failed to save configuration:\n\t{err}", alert=True)
 
     def load_results(self, filepath: Path):
         """Load results from a file into pybert.

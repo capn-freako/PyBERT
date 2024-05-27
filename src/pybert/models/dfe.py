@@ -81,6 +81,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         rel_lock_tol=0.01,
         lock_sustain=500,
         ideal=True,
+        limits=None,
     ):
         """
         Inputs:
@@ -145,6 +146,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         self.n_ave = n_ave
         self.corrections = zeros(n_taps)
         self.ideal = ideal
+        self.limits = limits
 
         thresholds = []
         if mod_type == 0:  # NRZ
@@ -183,7 +185,14 @@ class DFE:  # pylint: disable=too-many-instance-attributes
 
         # Update the tap weights with the average corrections, if appropriate.
         if update:
-            tap_weights = [weight + correction / n_ave for (weight, correction) in zip(tap_weights, corrections)]
+            if self.limits:
+                limits = self.limits
+                tap_weights = [max(limits[k][0],
+                                   min(limits[k][1],
+                                       weight + correction / n_ave))
+                               for (k, (weight, correction)) in enumerate(zip(tap_weights, corrections))]
+            else:
+                tap_weights = [weight + correction / n_ave for (weight, correction) in zip(tap_weights, corrections)]
             corrections = zeros(len(corrections))  # Start the averaging process over, again.
 
         # Step the filter delay chain and generate the new output.
@@ -354,7 +363,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 if locked:  # We only want error accumulation to happen, when we're locked.
                     nxt_filter_out = self.step(slicer_output, error, update)
                 else:
-                    nxt_filter_out = self.step(decision, 0.0, update)
+                    # nxt_filter_out = self.step(decision, 0.0, update)
+                    nxt_filter_out = self.step(slicer_output, 0.0, update)
                 tap_weights.append(self.tap_weights)
                 last_clock_sample = sum_out
                 next_boundary_time = next_clock_time + ui / 2.0

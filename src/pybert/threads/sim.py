@@ -1,6 +1,6 @@
 "Thread for running the PyBERT simulation."
 
-from pybert.models.bert import my_run_sweeps
+from pybert.models.bert import my_run_simulation
 from pybert.threads.stoppable import StoppableThread
 
 
@@ -15,6 +15,9 @@ class RunSimThread(StoppableThread):
     def run(self):
         """Run the simulation(s)."""
         try:
-            my_run_sweeps(self.the_pybert, self.stopped)
-        except RuntimeError:
-            pass
+            my_run_simulation(self.the_pybert, aborted_sim=self.stopped)
+            # my_run_sweeps(self.the_pybert, self.stopped)
+        except RuntimeError as err:
+            print(f"Error in `pybert.threads.sim.RunSimThread`: {err}")
+            # pass
+            raise

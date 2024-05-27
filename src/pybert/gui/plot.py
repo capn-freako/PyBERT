@@ -79,14 +79,32 @@ def make_plots(self, n_dfe_taps):
 
     # - EQ Tune tab
     plot_h_tune = Plot(plotdata, padding_bottom=PLOT_PADDING)
-    plot_h_tune.plot(("t_ns_chnl", "ctle_out_h_tune"), type="line", color="blue")
-    plot_h_tune.plot(("t_ns_chnl", "clocks_tune"), type="line", color="gray")
+    plot_h_tune.plot(("t_ns_opt", "clocks_tune"), name="Clocks", type="line", color="gray")
+    plot_h_tune.plot(("t_ns_opt", "ctle_out_h_tune"), name="Equalized Pulse Response", type="line", color="blue")
+    plot_h_tune.plot(("t_ns_opt", "p_chnl"), name="Channel Pulse Response", type="line", color="magenta")
+    # plot_h_tune.plot(("t_ns_opt", "p_tx_out"), name="Tx Out Pulse Response", type="line", color="cyan")
+    # plot_h_tune.plot(("t_ns_opt", "p_ctle_out"), name="CTLE Out Pulse Response", type="line", color="magenta")
+    # plot_h_tune.plot(("t_ns_opt", "p_ctle"), name="CTLE Pulse Response", type="line", color="green")
+    # plot_h_tune.plot(("t_ns_opt", "p_tx"), name="Tx Pulse Response", type="line", color="purple")
+    # plot_h_tune.plot(("t_ns_opt", "s_ctle"), name="CTLE Step Response", type="line", color="green", line_style="dash")
+    # plot_h_tune.plot(("t_ns_opt", "s_ctle_out"), name="CTLE Out Step Response", type="line", color="black", line_style="dash")
+    # plot_h_tune.plot(("t_ns_opt", "s_tx"), name="Tx Step Response", type="line", color="purple", line_style="dash")
+    plot_h_tune.plot(("curs_ix", "curs_amp"), name="Main Cursor", type="segment", color="red")
     plot_h_tune.title = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + Ideal DFE"
+    plot_h_tune.legend.labels = ["Channel Pulse Response",
+                                 "Equalized Pulse Response",
+                                 "Clocks",
+                                 "Main Cursor"]
+    plot_h_tune.legend.visible = True
+    plot_h_tune.legend_alignment = "ur"
     plot_h_tune.index_axis.title = "Time (ns)"
     plot_h_tune.y_axis.title = "Pulse Response (V)"
     zoom_tune = ZoomTool(plot_h_tune, tool_mode="range", axis="index", always_on=False)
     plot_h_tune.overlays.append(zoom_tune)
-    self.plot_h_tune = plot_h_tune
+
+    container_tune = GridPlotContainer(shape=(1, 1))
+    container_tune.add(plot_h_tune)
+    self.plot_h_tune = container_tune
 
     # - Impulse Responses tab
     plot_h_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
@@ -306,6 +324,7 @@ def make_plots(self, n_dfe_taps):
 
     plot_out_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_out_dfe.plot(("t_ns", "dfe_out"), type="line", color="blue")
+    plot_out_dfe.plot(("t_ns", "dbg_out"), type="line", color="gray")
     plot_out_dfe.title = post_dfe_str
     plot_out_dfe.index_axis.title = "Time (ns)"
     plot_out_dfe.y_axis.title = "Output (V)"

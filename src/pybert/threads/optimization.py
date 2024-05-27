@@ -11,7 +11,7 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 
 import time
 
-from numpy import arange, array, convolve, floor, log10, ones
+from numpy import arange, array, convolve, cumsum, floor, log10, ones, pad, where, zeros
 from numpy.fft import irfft
 from scipy.interpolate import interp1d
 
@@ -34,11 +34,14 @@ class OptThread(StoppableThread):
         pybert.status = "Optimizing EQ..."
         time.sleep(0.001)
 
-        tx_weights, rx_peaking, fom = coopt(pybert)
+        tx_weights, rx_peaking, fom, valid = coopt(pybert)
+        if not valid:
+            pybert.status = "Failed."
+            return
         for k, tx_weight in enumerate(tx_weights):
             pybert.tx_tap_tuners[k].value = tx_weight
         pybert.peak_mag_tune = rx_peaking
-        pybert.status = f"Finished. (SNR: {20 * log10(fom)} dB)"
+        pybert.status = f"Finished. (SNR: {20 * log10(fom):5.1f} dB)"
 
 
 def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int, TxTapTuner]]) -> list[list[float]]:
@@ -78,6 +81,9 @@ def coopt(pybert) -> tuple[list[float], float, float]:
 
     Returns:
         (tx_weights, ctle_peaking, FOM): The ideal Tx FFE / Rx CTLE settings & figure of merit.
+
+    ToDo:
+        1. Allow for aborting.
     """
 
     w         = pybert.w
@@ -98,6 +104,7 @@ def coopt(pybert) -> tuple[list[float], float, float]:
     nspui = pybert.nspui
     f = pybert.f
     _, p_chnl, _ = calc_resps(t, h_chnl, ui, f)
+    pybert.plotdata.set_data("p_chnl", p_chnl)
 
     n_weights = len(tx_taps)
     tx_curs_pos = max(0, -tx_taps[0].pos)  # list position at which to insert main tap
@@ -105,8 +112,13 @@ def coopt(pybert) -> tuple[list[float], float, float]:
     tx_weightss = mk_tx_weights([[0 for _ in range(n_weights)],], enumerate(pybert.tx_tap_tuners))
     for tx_weights in tx_weightss:
         tx_weights.insert(tx_curs_pos, 1 - sum(abs(array(tx_weights))))
-    peak_mags = arange(min_mag, max_mag + step_mag, step_mag)
-    n_trials = len(tx_weightss) * len(peak_mags)
+
+    if pybert.ctle_enable_tune:
+        peak_mags = arange(min_mag, max_mag + step_mag, step_mag)
+    else:
+        peak_mags = [0]
+
+    n_trials = len(peak_mags) * len(tx_weightss)
 
     pybert.log("\n".join([
         "Optimizing linear EQ...",
@@ -121,38 +133,58 @@ def coopt(pybert) -> tuple[list[float], float, float]:
     fom_max = -1000
     trials_run = 0
     next_trials_run = int(0.05 * n_trials)
+    dfe_weights = zeros(len(dfe_taps))
     for peak_mag in peak_mags:
-        _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w)
-        _ctle_h = irfft(ctle_H)
-        krnl = interp1d(t_irfft, _ctle_h, bounds_error=False, fill_value=0)
-        ctle_h = krnl(t)
-        ctle_h *= sum(_ctle_h) / sum(ctle_h)
-        ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
-        p_ctle = convolve(p_chnl, ctle_h)[:len(p_chnl)]
+        _, H_ctle = make_ctle(rx_bw, peak_freq, peak_mag, w)
+        _h_ctle = irfft(H_ctle)
+        krnl = interp1d(t_irfft, _h_ctle, bounds_error=False, fill_value=0)
+        h_ctle = krnl(t)
+        h_ctle *= sum(_h_ctle) / sum(h_ctle)
+        h_ctle, _ = trim_impulse(h_ctle, front_porch=False, min_len=min_len, max_len=max_len)
+        # s_ctle = cumsum(h_ctle)
+        # p_ctle = s_ctle - pad(s_ctle[:-nspui], (nspui, 0), "constant", constant_values=0)
+        p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
         for tx_weights in tx_weightss:
-            h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))  # sum = concatenate
-            p_tx = convolve(p_ctle, h_tx)[:len(p_ctle)]
-            curs_ix, _ = pulse_center(p_tx, nspui)
-            curs_amp = p_tx[curs_ix]
-            if pybert.use_dfe_tune:
-                for k in range(pybert.n_taps_tune):
-                    isi = p_tx[curs_ix + (k + 1) * nspui]
-                    ideal_tap_weight = isi / curs_amp
-                    actual_tap_weight = max(dfe_taps[k].min_val, min(dfe_taps[k].max_val, ideal_tap_weight))
-                    p_tx[curs_ix + (k + 1) * nspui - nspui // 2:] -= actual_tap_weight * curs_amp
+            # sum = concatenate
+            h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
+            # s_ctle_out = convolve(convolve(s_ctle, h_chnl), h_tx)
+            # s_tx = cumsum(h_tx)
+            # p_tx = s_tx - pad(s_tx[:-nspui], (nspui, 0), "constant", constant_values=0)
+            # p_tx_out = convolve(p_chnl, h_tx)[:len(p_chnl)]
+            p_tot = convolve(p_ctle_out, h_tx)[:len(p_ctle_out)]
+            # curs_ix, _ = pulse_center(p_chnl, nspui)
+            curs_ix = where(p_tot == max(p_tot))[0][0]
+            curs_amp = p_tot[curs_ix]
+            for k, tap in filter(lambda k_tap: k_tap[1].enabled, enumerate(dfe_taps)):
+                isi = p_tot[curs_ix + (k + 1) * nspui]
+                ideal_tap_weight = isi / curs_amp
+                actual_tap_weight = max(tap.min_val, min(tap.max_val, ideal_tap_weight))
+                dfe_weights[k] = actual_tap_weight
+                p_tot[curs_ix + (k + 1) * nspui - nspui // 2:] -= actual_tap_weight * curs_amp
             n_pre_isi = int(curs_ix / nspui)
-            isi_sum = sum(abs(p_tx[curs_ix - n_pre_isi * nspui::nspui])) - curs_amp
+            isi_sum = sum(abs(p_tot[curs_ix - n_pre_isi * nspui::nspui])) - curs_amp
             fom = curs_amp / isi_sum
             if fom > fom_max:
+                dfe_weights_best = dfe_weights.copy()
                 tx_weights_best = tx_weights.copy()
                 del tx_weights_best[tx_curs_pos]
                 peak_mag_best = peak_mag
-                clocks = 1.1 * curs_amp * ones(len(p_tx))
+                clocks = 1.1 * curs_amp * ones(len(p_tot))
                 for ix in range(curs_ix - n_pre_isi * nspui, len(clocks), nspui):
                     clocks[ix] = 0
                 pybert.plotdata.set_data("clocks_tune", clocks)
-                pybert.plotdata.set_data("ctle_out_h_tune", p_tx)
-                pybert.plotdata.set_data("t_ns_chnl", pybert.t_ns[:len(p_tx)])
+                pybert.plotdata.set_data("ctle_out_h_tune", p_tot)
+                pybert.plotdata.set_data("t_ns_opt", pybert.t_ns[:len(p_tot)])
+                pybert.plotdata.set_data("curs_amp", [0, curs_amp])
+                curs_time = pybert.t_ns[curs_ix]
+                pybert.plotdata.set_data("curs_ix", [curs_time, curs_time])
+                # pybert.plotdata.set_data("s_ctle", s_ctle)
+                # pybert.plotdata.set_data("s_ctle_out", s_ctle_out)
+                # pybert.plotdata.set_data("s_tx", s_tx)
+                # pybert.plotdata.set_data("p_ctle", p_ctle)
+                # pybert.plotdata.set_data("p_ctle_out", p_ctle_out)
+                # pybert.plotdata.set_data("p_tx", p_tx)
+                # pybert.plotdata.set_data("p_tx_out", p_tx_out)
                 fom_max = fom
                 time.sleep(0.001)
             trials_run += 1
@@ -160,5 +192,8 @@ def coopt(pybert) -> tuple[list[float], float, float]:
                 pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
                 next_trials_run += int(0.05 * n_trials)
                 time.sleep(0.001)
+    
+    for k, dfe_weight in enumerate(dfe_weights_best):
+        dfe_taps[k].value = dfe_weight
 
-    return (tx_weights_best, peak_mag_best, fom_max)
+    return (tx_weights_best, peak_mag_best, fom_max, True)
