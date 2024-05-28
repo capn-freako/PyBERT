@@ -82,13 +82,6 @@ def make_plots(self, n_dfe_taps):
     plot_h_tune.plot(("t_ns_opt", "clocks_tune"), name="Clocks", type="line", color="gray")
     plot_h_tune.plot(("t_ns_opt", "ctle_out_h_tune"), name="Equalized Pulse Response", type="line", color="blue")
     plot_h_tune.plot(("t_ns_opt", "p_chnl"), name="Channel Pulse Response", type="line", color="magenta")
-    # plot_h_tune.plot(("t_ns_opt", "p_tx_out"), name="Tx Out Pulse Response", type="line", color="cyan")
-    # plot_h_tune.plot(("t_ns_opt", "p_ctle_out"), name="CTLE Out Pulse Response", type="line", color="magenta")
-    # plot_h_tune.plot(("t_ns_opt", "p_ctle"), name="CTLE Pulse Response", type="line", color="green")
-    # plot_h_tune.plot(("t_ns_opt", "p_tx"), name="Tx Pulse Response", type="line", color="purple")
-    # plot_h_tune.plot(("t_ns_opt", "s_ctle"), name="CTLE Step Response", type="line", color="green", line_style="dash")
-    # plot_h_tune.plot(("t_ns_opt", "s_ctle_out"), name="CTLE Out Step Response", type="line", color="black", line_style="dash")
-    # plot_h_tune.plot(("t_ns_opt", "s_tx"), name="Tx Step Response", type="line", color="purple", line_style="dash")
     plot_h_tune.plot(("curs_ix", "curs_amp"), name="Main Cursor", type="segment", color="red")
     plot_h_tune.title = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + Ideal DFE"
     plot_h_tune.legend.labels = ["Channel Pulse Response",

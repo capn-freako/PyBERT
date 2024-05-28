@@ -24,7 +24,6 @@ from numpy import (  # type: ignore
     mean,
     repeat,
     resize,
-    std,
     transpose,
     where,
     zeros,
@@ -43,7 +42,6 @@ from pybert.utility import (
     import_channel,
     make_bathtub,
     make_ctle,
-    raised_cosine,
     run_ami_model,
     safe_log10,
     trim_impulse,
@@ -93,7 +91,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             raise RuntimeError("Simulation aborted by User.")
 
     start_time = clock()
-    self.status = f"Running channel..."
+    self.status = "Running channel..."
 
     if not self.seed:  # The user sets `seed` to zero to indicate that she wants new bits generated for each run.
         self.run_count += 1  # Force regeneration of bit stream.
@@ -108,7 +106,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ffe = self.ffe
     nbits = self.nbits
     nui = self.nui
-    bit_rate = self.bit_rate * 1.0e9
     eye_bits = self.eye_bits
     eye_uis = self.eye_uis
     nspui = self.nspui
@@ -180,7 +177,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     _check_sim_status()
     split_time = clock()
-    self.status = f"Running Tx..."
+    self.status = "Running Tx..."
 
     # Calculate Tx output power dissipation.
     ffe_out = convolve(symbols, ffe)[: len(symbols)]
@@ -632,10 +629,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         split_time = clock()
         self.status = "Updating plots..."
     except Exception:
-        # if update_plots:
-        #     update_results(self)
-        #     if not initial_run:
-        #         update_eyes(self)
         self.status = "Exception: jitter"
         raise
 
@@ -875,7 +868,7 @@ def update_results(self):
     width = 2 * samps_per_ui
     xs = linspace(-ui * 1.0e12, ui * 1.0e12, width)
     height = 1000
-    tiny_noise = normal(scale=1e-3, size=(len(chnl_out[ignore_samps:])))  # to make channel eye easier to view.
+    tiny_noise = normal(scale=1e-3, size=len(chnl_out[ignore_samps:]))  # to make channel eye easier to view.
     y_max = 1.1 * max(abs(array(self.chnl_out)))
     eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[ignore_samps:] + tiny_noise, y_max)
     y_max = 1.1 * max(abs(array(self.rx_in)))
@@ -887,7 +880,6 @@ def update_results(self):
         i += 1
         assert i < len(clock_times), "ERROR: Insufficient coverage in 'clock_times' vector."
     y_max = 1.1 * max(abs(array(self.dfe_out)))
-    # eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out, y_max, clock_times[i:])
     eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out[ignore_samps:], y_max, clock_times[i:])
     self.plotdata.set_data("eye_index", xs)
     self.plotdata.set_data("eye_chnl", eye_chnl)

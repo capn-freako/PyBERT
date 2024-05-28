@@ -409,7 +409,6 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         jitter_spectrum = zeros(half_len)
     jitter_freqs    = f[:half_len]
 
-
     # -- Repeat for data-independent jitter.
     try:
         spl = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
@@ -770,7 +769,7 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):  # pylint: 
     return img_array
 
 
-def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments
+def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments  # noqa: F405
     """
     Generate the frequency response of a continuous time linear equalizer (CTLE), given the:
 
@@ -887,7 +886,7 @@ def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True, kept_energy=0.
     return (res, start_ix)
 
 
-def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,
+def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,  # noqa: F405
                eps: float = 1e-18) -> tuple[Rvec, Rvec, Cvec]:  # noqa: F405
     """
     From a uniformly sampled impulse response,
@@ -939,7 +938,6 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,
     H = rfft(_h)
     fmax = 0.5 / ts
     _f = arange(0, fmax + f[1], f[1])
-    # krnl = interp1d(_f, H, kind="linear", assume_sorted=True, bounds_error=False, fill_value=0)
     krnl = interp1d(_f, H, kind="linear", assume_sorted=True)
     _H = krnl(f)
 
@@ -1283,7 +1281,6 @@ def cap_mag(zs, maxMag=1.0):
     """
     zs_flat = zs.flatten()
     subs = [rect(maxMag, phase(z)) for z in zs_flat]
-    # return where(abs(zs_flat) > maxMag, subs, zs_flat)[0].reshape(zs.shape)
     return where(abs(zs_flat) > maxMag, subs, zs_flat).reshape(zs.shape)  # pylint: disable=no-member
 
 
@@ -1331,7 +1328,6 @@ def interp_s2p(ntwk, f):
     if ntwk.name is None:
         ntwk.name = "s2p"
     return rf.Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
-    # return rf.Network(f=f/1e9, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
 
 
 # ToDo: Are there any uses of this function remaining? Can we eliminate them?  # pylint: disable=fixme
@@ -1548,7 +1544,7 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: di
     dt        = centers[1] - centers[0]  # Bins assumed to be uniformly spaced!
     try:
         jit_pdf_center_of_mass = int(mean([k * pk for (k, pk) in enumerate(jit_pdf)]))
-    except Exception as err:
+    except Exception as err:  # pylint: disable=broad-exception-caught
         print(f"Error finding jitter PDF center of mass: {err}", flush=True)
         jit_pdf_center_of_mass = half_len
     _jit_pdf = roll(jit_pdf, half_len - jit_pdf_center_of_mass)
@@ -1558,7 +1554,7 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: di
     if (extrap and len(zero_locs)):
         ext_first = min(zero_locs)
         ext_last  = max(zero_locs)
-        if ext_first < half_len and ext_last > half_len:
+        if ext_first < half_len < ext_last:
             sqrt_2pi = sqrt(2 * pi)
             ix_r = ext_first + half_len - 1
             mu_r = centers[ix_r] - sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_r]))

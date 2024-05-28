@@ -1,7 +1,8 @@
 """
 PyBERT Linear Equalization Optimizer
 
-Original author: David Banas <capn.freako@gmail.com>  
+Original author: David Banas <capn.freako@gmail.com>
+
 Original date: June 21, 2017
 
 Copyright (c) 2017 David Banas; all rights reserved World wide.
@@ -11,13 +12,13 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 
 import time
 
-from numpy import arange, array, convolve, cumsum, floor, log10, ones, pad, where, zeros
-from numpy.fft import irfft
+from numpy import arange, array, convolve, log10, ones, where, zeros  # type: ignore
+from numpy.fft import irfft  # type: ignore
 from scipy.interpolate import interp1d
 
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
-from pybert.utility import make_ctle, trim_impulse, calc_resps, pulse_center
+from pybert.utility import make_ctle, trim_impulse, calc_resps
 
 gDebugOptimize = False
 
@@ -34,7 +35,12 @@ class OptThread(StoppableThread):
         pybert.status = "Optimizing EQ..."
         time.sleep(0.001)
 
-        tx_weights, rx_peaking, fom, valid = coopt(pybert)
+        try:
+            tx_weights, rx_peaking, fom, valid = coopt(pybert)
+        except RuntimeError:
+            pybert.status = "User abort."
+            return
+
         if not valid:
             pybert.status = "Failed."
             return
@@ -62,17 +68,17 @@ def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int
     head, *tail = enumerated_tuners
     n, tuner = head
     if not tuner.enabled:
-        return mk_tx_weights(weightss, tail) 
+        return mk_tx_weights(weightss, tail)
     weight_vals = arange(tuner.min_val, tuner.max_val + tuner.step, tuner.step)
     new_weightss = []
     for weights in weightss:
         for val in weight_vals:
             weights[n] = val
             new_weightss.append(weights.copy())
-    return mk_tx_weights(new_weightss, tail) 
+    return mk_tx_weights(new_weightss, tail)
 
 
-def coopt(pybert) -> tuple[list[float], float, float]:
+def coopt(pybert) -> tuple[list[float], float, float, bool]:  # pylint: disable=too-many-locals,too-many-statements
     """
     Co-optimize the Tx/Rx linear equalization, assuming ideal bounded DFE.
 
@@ -81,6 +87,9 @@ def coopt(pybert) -> tuple[list[float], float, float]:
 
     Returns:
         (tx_weights, ctle_peaking, FOM): The ideal Tx FFE / Rx CTLE settings & figure of merit.
+
+    Raises:
+        RuntimeError: If user opts to abort.
 
     ToDo:
         1. Allow for aborting.
@@ -109,7 +118,7 @@ def coopt(pybert) -> tuple[list[float], float, float]:
     n_weights = len(tx_taps)
     tx_curs_pos = max(0, -tx_taps[0].pos)  # list position at which to insert main tap
 
-    tx_weightss = mk_tx_weights([[0 for _ in range(n_weights)],], enumerate(pybert.tx_tap_tuners))
+    tx_weightss = mk_tx_weights([[0 for _ in range(n_weights)],], list(enumerate(pybert.tx_tap_tuners)))
     for tx_weights in tx_weightss:
         tx_weights.insert(tx_curs_pos, 1 - sum(abs(array(tx_weights))))
 
@@ -130,9 +139,9 @@ def coopt(pybert) -> tuple[list[float], float, float]:
         f"\tRunning {n_trials} trials.",
         ""]))
 
-    fom_max = -1000
+    fom_max = -1000.
+    peak_mag_best = 0.
     trials_run = 0
-    next_trials_run = int(0.05 * n_trials)
     dfe_weights = zeros(len(dfe_taps))
     for peak_mag in peak_mags:
         _, H_ctle = make_ctle(rx_bw, peak_freq, peak_mag, w)
@@ -141,18 +150,11 @@ def coopt(pybert) -> tuple[list[float], float, float]:
         h_ctle = krnl(t)
         h_ctle *= sum(_h_ctle) / sum(h_ctle)
         h_ctle, _ = trim_impulse(h_ctle, front_porch=False, min_len=min_len, max_len=max_len)
-        # s_ctle = cumsum(h_ctle)
-        # p_ctle = s_ctle - pad(s_ctle[:-nspui], (nspui, 0), "constant", constant_values=0)
         p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
         for tx_weights in tx_weightss:
             # sum = concatenate
             h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
-            # s_ctle_out = convolve(convolve(s_ctle, h_chnl), h_tx)
-            # s_tx = cumsum(h_tx)
-            # p_tx = s_tx - pad(s_tx[:-nspui], (nspui, 0), "constant", constant_values=0)
-            # p_tx_out = convolve(p_chnl, h_tx)[:len(p_chnl)]
             p_tot = convolve(p_ctle_out, h_tx)[:len(p_ctle_out)]
-            # curs_ix, _ = pulse_center(p_chnl, nspui)
             curs_ix = where(p_tot == max(p_tot))[0][0]
             curs_amp = p_tot[curs_ix]
             for k, tap in filter(lambda k_tap: k_tap[1].enabled, enumerate(dfe_taps)):
@@ -178,22 +180,17 @@ def coopt(pybert) -> tuple[list[float], float, float]:
                 pybert.plotdata.set_data("curs_amp", [0, curs_amp])
                 curs_time = pybert.t_ns[curs_ix]
                 pybert.plotdata.set_data("curs_ix", [curs_time, curs_time])
-                # pybert.plotdata.set_data("s_ctle", s_ctle)
-                # pybert.plotdata.set_data("s_ctle_out", s_ctle_out)
-                # pybert.plotdata.set_data("s_tx", s_tx)
-                # pybert.plotdata.set_data("p_ctle", p_ctle)
-                # pybert.plotdata.set_data("p_ctle_out", p_ctle_out)
-                # pybert.plotdata.set_data("p_tx", p_tx)
-                # pybert.plotdata.set_data("p_tx_out", p_tx_out)
                 fom_max = fom
                 time.sleep(0.001)
             trials_run += 1
-            if trials_run >= next_trials_run:
+            if not trials_run % 100:
                 pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
-                next_trials_run += int(0.05 * n_trials)
                 time.sleep(0.001)
-    
-    for k, dfe_weight in enumerate(dfe_weights_best):
+                if pybert.opt_thread.stopped():
+                    pybert.status = "Optimization aborted by user."
+                    raise RuntimeError("Optimization aborted by user.")
+
+    for k, dfe_weight in enumerate(dfe_weights_best):  # pylint: disable=possibly-used-before-assignment
         dfe_taps[k].value = dfe_weight
 
-    return (tx_weights_best, peak_mag_best, fom_max, True)
+    return (tx_weights_best, peak_mag_best, fom_max, True)  # pylint: disable=possibly-used-before-assignment

@@ -2,7 +2,8 @@
 
 # pylint: disable=too-many-lines
 
-"""Bit error rate tester (BERT) simulator, written in Python.
+"""
+Bit error rate tester (BERT) simulator, written in Python.
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -28,14 +29,13 @@ from pathlib import Path
 import numpy as np  # type: ignore
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
-from numpy import arange, array, convolve, cos, exp, ones, pad, pi, sinc, where, zeros
+from numpy import arange, array, cos, exp, pad, pi, sinc, where, zeros
 from numpy.fft import irfft, rfft  # type: ignore
 from numpy.random import randint  # type: ignore
 from traits.api import (
     Array,
     Bool,
     Button,
-    Enum,
     File,
     Float,
     HasTraits,
@@ -57,9 +57,6 @@ from pyibisami.ami.model import AMIModel
 from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
-# from pybert import __authors__ as AUTHORS
-# from pybert import __copy__ as COPY
-# from pybert import __date__ as DATE
 from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.gui.help import help_str
@@ -72,8 +69,6 @@ from pybert.utility import (
     calc_gamma,
     import_channel,
     lfsr_bits,
-    make_ctle,
-    pulse_center,
     raised_cosine,
     safe_log10,
     sdd_21,
@@ -139,12 +134,12 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - EQ Tune
     tx_tap_tuners = List(
         [
-            TxTapTuner(name="Pre-tap3",  pos=-3, enabled=True, min_val=-0.05, max_val=0.05),
-            TxTapTuner(name="Pre-tap2",  pos=-2, enabled=True, min_val=-0.1,  max_val=0.1),
-            TxTapTuner(name="Pre-tap1",  pos=-1, enabled=True, min_val=-0.2,  max_val=0.2),
-            TxTapTuner(name="Post-tap1", pos=1,  enabled=True, min_val=-0.2,  max_val=0.2),
-            TxTapTuner(name="Post-tap2", pos=2,  enabled=True, min_val=-0.1,  max_val=0.1),
-            TxTapTuner(name="Post-tap3", pos=3,  enabled=True, min_val=-0.05, max_val=0.05),
+            TxTapTuner(name="Pre-tap3",  pos=-3, enabled=True, min_val=-0.05, max_val=0.05, step=0.01),
+            TxTapTuner(name="Pre-tap2",  pos=-2, enabled=True, min_val=-0.1,  max_val=0.1,  step=0.02),
+            TxTapTuner(name="Pre-tap1",  pos=-1, enabled=True, min_val=-0.2,  max_val=0.2,  step=0.04),
+            TxTapTuner(name="Post-tap1", pos=1,  enabled=True, min_val=-0.2,  max_val=0.2,  step=0.04),
+            TxTapTuner(name="Post-tap2", pos=2,  enabled=True, min_val=-0.1,  max_val=0.1,  step=0.02),
+            TxTapTuner(name="Post-tap3", pos=3,  enabled=True, min_val=-0.05, max_val=0.05, step=0.01),
         ]
     )  #: EQ optimizer list of TxTapTuner objects.
     rx_bw_tune = Float(12.0)  #: EQ optimizer CTLE bandwidth (GHz).
@@ -153,7 +148,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     min_mag_tune = Float(2)   #: EQ optimizer CTLE peaking mag. min. (dB).
     max_mag_tune = Float(12)  #: EQ optimizer CTLE peaking mag. max. (dB).
     step_mag_tune = Float(1)  #: EQ optimizer CTLE peaking mag. step (dB).
-    ctle_offset_tune = Float(gCTLEOffset)  #: EQ optimizer CTLE d.c. offset (dB).
     ctle_enable_tune = Bool(True)  #: EQ optimizer CTLE enable
     dfe_tap_tuners = List(
         [TxTapTuner(name="Tap1",  enabled=True,  min_val=0.1,   max_val=0.4,  value=0.1),
@@ -175,8 +169,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
          TxTapTuner(name="Tap17", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
          TxTapTuner(name="Tap18", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
          TxTapTuner(name="Tap19", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap20", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-        ]
+         TxTapTuner(name="Tap20", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),]
     )  #: EQ optimizer list of DFE tap tuner objects.
     opt_thread = Instance(OptThread)  #: EQ optimization thread.
 
@@ -226,7 +219,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_bw = Float(12.0)  #: CTLE bandwidth (GHz).
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
-    ctle_offset = Float(gCTLEOffset)  #: CTLE d.c. offset (dB)
     ctle_enable = Bool(True)  #: CTLE enable.
     rx_use_ami = Bool(False)  #: (Bool)
     rx_has_ts4 = Bool(False)  #: (Bool)
@@ -247,7 +239,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     decision_scaler = Float(0.5)  #: DFE slicer output voltage (V).
     gain = Float(0.2)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
-    # n_taps = Int(gNtaps)  #: DFE # of taps.
     n_taps = Range(low=1, high=20, value=gNtaps)  #: DFE # of taps.
     _old_n_taps = n_taps
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
@@ -317,10 +308,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # Custom buttons, which we'll use in particular tabs.
     # (Globally applicable buttons, such as "Run" and "Ok", are handled more simply, in the View.)
-    btn_rst_eq = Button(label="ResetEq")
-    btn_save_eq = Button(label="SaveEq")
-    btn_coopt = Button(label="OptEq")
-    btn_abort = Button(label="Abort")
     btn_disable = Button(label="Disable All")  # Disable all DFE taps in optimizer.
     btn_enable = Button(label="Enable All")  # Enable all DFE taps in optimizer.
     btn_cfg_tx = Button(label="Configure")  # Configure AMI parameters.
@@ -351,8 +338,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         _msg = msg.strip()
         if self.GUI:
             return error(_msg, "PyBERT Alert")
-        else:
-            raise RuntimeError("Alert box requested, but no GUI!")
+        raise RuntimeError("Alert box requested, but no GUI!")
 
     # Default initialization
     def __init__(self, run_simulation=True, gui=True):
@@ -399,47 +385,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if run_simulation:
             self.simulate(initial_run=True)
 
-    # Custom button handlers
-    def _btn_rst_eq_fired(self):
-        """Reset the equalization."""
-        for i, tap in enumerate(self.tx_taps):
-            self.tx_tap_tuners[i].value   = tap.value
-            self.tx_tap_tuners[i].enabled = tap.enabled
-        self.peak_freq_tune = self.peak_freq
-        self.peak_mag_tune = self.peak_mag
-        self.rx_bw_tune = self.rx_bw
-        self.ctle_enable_tune = self.ctle_enable
-
-    def _btn_save_eq_fired(self):
-        """Save the equalization."""
-        for i, tap in enumerate(self.tx_tap_tuners):
-            self.tx_taps[i].value   = tap.value
-            self.tx_taps[i].enabled = tap.enabled
-        self.peak_freq = self.peak_freq_tune
-        self.peak_mag = self.peak_mag_tune
-        self.rx_bw = self.rx_bw_tune
-        self.ctle_enable = self.ctle_enable_tune
-
-    def _btn_coopt_fired(self):
-        if self.opt_thread and self.opt_thread.is_alive():
-            pass
-        else:
-            n_trials = int((self.max_mag_tune - self.min_mag_tune) / self.step_mag_tune)
-            for tuner in self.tx_tap_tuners:
-                n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step)
-            if n_trials > 1_000_000:
-                usr_resp = self.alert(f"You've opted to run over {n_trials // 1_000_000} million trials!\nAre you sure?")
-                if not usr_resp:
-                    return
-            self.opt_thread = OptThread()
-            self.opt_thread.pybert = self
-            self.opt_thread.start()
-
-    def _btn_abort_fired(self):
-        if self.opt_thread and self.opt_thread.is_alive():
-            self.opt_thread.stop()
-            self.opt_thread.join(10)
-
     def _btn_disable_fired(self):
         if self.opt_thread and self.opt_thread.is_alive():
             pass
@@ -453,7 +398,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         else:
             for tap in self.dfe_tap_tuners:
                 tap.enabled = True
-                
+
     def _btn_cfg_tx_fired(self):
         self._tx_cfg()
 
@@ -740,12 +685,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         # Temporary, until I figure out DPI independence.
         info_str = "<style>\n"
-        # info_str += ' table td {font-size: 36px;}\n'
-        # info_str += ' table th {font-size: 38px;}\n'
         info_str += " table td {font-size: 12em;}\n"
         info_str += " table th {font-size: 14em;}\n"
         info_str += "</style>\n"
-        # info_str += '<font size="+3">\n'
         # End Temp.
 
         info_str = "<H1>Jitter Rejection by Equalization Component</H1>\n"
@@ -1120,6 +1062,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
+    # pylint: disable=attribute-defined-outside-init
     def calc_chnl_h(self):
         """Calculates the channel impulse response.
 
@@ -1274,7 +1217,6 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         chnl_p = chnl_s - pad(chnl_s[:-nspui], (nspui, 0), "constant", constant_values=(0, 0))  # pylint: disable=invalid-unary-operand-type
 
         self.chnl_h = chnl_h
-        # self.chnl_h_raw = chnl_h_raw
         self.len_h = len(chnl_h)
         self.chnl_dly = chnl_dly
         self.chnl_H = chnl_H
@@ -1379,7 +1321,6 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.log(f"PyAMI Version: {PyAMI_VERSION}")
         self.log(f"GUI Toolkit: {ETSConfig.toolkit}")
         self.log(f"Kiva Backend: {ETSConfig.kiva_backend}")
-        # self.log(f"Pixel Scale: {self.trait_view().window.base_pixel_scale}")
 
     _tx_ibis = Instance(IBISModel)
     _tx_ibis_dir = ""

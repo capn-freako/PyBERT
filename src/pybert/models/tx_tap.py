@@ -3,6 +3,7 @@
 from traits.api import Bool, Float, HasTraits, Int, String
 
 
+# pylint: disable=too-many-instance-attributes,too-few-public-methods
 class TxTapTuner(HasTraits):
     """Object used to populate the rows of the Tx FFE tap tuning table."""
 

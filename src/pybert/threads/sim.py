@@ -16,8 +16,6 @@ class RunSimThread(StoppableThread):
         """Run the simulation(s)."""
         try:
             my_run_simulation(self.the_pybert, aborted_sim=self.stopped)
-            # my_run_sweeps(self.the_pybert, self.stopped)
         except RuntimeError as err:
             print(f"Error in `pybert.threads.sim.RunSimThread`: {err}")
-            # pass
             raise

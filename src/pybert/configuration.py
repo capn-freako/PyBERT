@@ -117,10 +117,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_bw = the_PyBERT.rx_bw
         self.peak_freq = the_PyBERT.peak_freq
         self.peak_mag = the_PyBERT.peak_mag
-        self.ctle_offset = the_PyBERT.ctle_offset
-        self.ctle_mode = the_PyBERT.ctle_mode
-        self.ctle_mode_tune = the_PyBERT.ctle_mode_tune
-        self.ctle_offset_tune = the_PyBERT.ctle_offset_tune
+        self.ctle_enable = the_PyBERT.ctle_enable
         self.rx_use_ami = the_PyBERT.rx_use_ami
         self.rx_use_ts4 = the_PyBERT.rx_use_ts4
         self.rx_use_getwave = the_PyBERT.rx_use_getwave
@@ -155,15 +152,13 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.min_mag_tune = the_PyBERT.min_mag_tune
         self.max_mag_tune = the_PyBERT.max_mag_tune
         self.step_mag_tune = the_PyBERT.step_mag_tune
-        self.ctle_offset_tune = the_PyBERT.ctle_offset_tune
-        self.ctle_mode_tune = the_PyBERT.ctle_mode_tune
+        self.ctle_enable_tune = the_PyBERT.ctle_enable_tune
         self.dfe_tap_tuners = []
         for tap in the_PyBERT.dfe_tap_tuners:
             self.dfe_tap_tuners.append((tap.enabled, tap.min_val, tap.max_val))
 
-
     @staticmethod
-    def load_from_file(filepath: Union[str, Path], pybert):
+    def load_from_file(filepath: Union[str, Path], pybert):  # pylint: disable=too-many-branches
         """Apply all of the configuration settings to the pybert instance.
 
         Confirms that the file actually exists, is the correct extension and

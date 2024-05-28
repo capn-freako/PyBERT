@@ -301,7 +301,6 @@ traits_view = View(
                 label="Channel",
                 show_border=True,
             ),
-            # spring,
             label="Config.",
             id="config",
         ),
@@ -556,7 +555,6 @@ traits_view = View(
                     ),
                     label="Tx FFE",
                     show_border=True,
-                    # springy=True,
                 ),
                 VGroup(
                     Item(name="ctle_enable_tune", label="Enable", tooltip="CTLE enable",),
@@ -622,7 +620,6 @@ traits_view = View(
                     label="Rx DFE",
                     show_border=True,
                 ),
-                # springy=False,
             ),
             Item(
                 label="Note: Only CTLE boost will be optimized; please, set peak frequency, bandwidth, and mode appropriately.",
@@ -630,12 +627,6 @@ traits_view = View(
             Item("plot_h_tune", editor=ComponentEditor(high_resolution=True), show_label=False, springy=True),
             Item(
                 label="To zoom: Click in the plot, hit `z` (Cursor will change to crosshair.), and click/drag to select horizontal region of interest.",
-            ),
-            HGroup(
-                Item("btn_rst_eq", show_label=False, tooltip="Reset all values to those on the 'Config.' tab."),
-                Item("btn_save_eq", show_label=False, tooltip="Store all values to 'Config.' tab."),
-                Item("btn_coopt", show_label=False, tooltip="Run co-optimization."),
-                Item("btn_abort", show_label=False, tooltip="Abort all optimizations."),
             ),
             label="Optimizer",
             id="eq_tune",
@@ -723,14 +714,14 @@ traits_view = View(
     ),
     menubar=MenuBar(
         Menu(
-            Action(name="Load Config.", action="do_load_cfg", accelerator="Ctrl+O"),
-            Action(name="Load Results", action="do_load_data"),
+            Action(name="&Quit", action="close_app", accelerator="Ctrl+Q"),  # CloseAction()
             Separator(),
-            Action(name="Save Config.", action="do_save_cfg", accelerator="Ctrl+S"),
-            Action(name="Save Config. As...", action="do_save_cfg_as", accelerator="Ctrl+Shift+S"),
+            Action(name="Load Results", action="do_load_data"),
             Action(name="Save Results", action="do_save_data"),
             Separator(),
-            Action(name="&Quit", action="close_app", accelerator="Ctrl+Q"),  # CloseAction()
+            Action(name="Load Config.", action="do_load_cfg", accelerator="Ctrl+O"),
+            Action(name="Save Config.", action="do_save_cfg", accelerator="Ctrl+S"),
+            Action(name="Save Config. As...", action="do_save_cfg_as", accelerator="Ctrl+Shift+S"),
             id="file",
             name="&File",
         ),
@@ -756,11 +747,11 @@ traits_view = View(
             name="Simulation",
         ),
         Menu(
-            Action(name="Tune EQ", action="do_tune_eq", accelerator="Ctrl+T"),
-            Action(name="Abort", action="do_stop_tune", accelerator="Ctrl+Esc"),
-            Separator(),
             Action(name="Use EQ", action="do_use_eq", accelerator="Ctrl+U"),
             Action(name="Reset EQ", action="do_reset_eq"),
+            Separator(),
+            Action(name="Tune EQ", action="do_tune_eq", accelerator="Ctrl+T"),
+            Action(name="Abort", action="do_stop_tune", accelerator="Ctrl+Esc"),
             id="optimization",
             name="Optimization",
         ),

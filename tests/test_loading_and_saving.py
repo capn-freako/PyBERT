@@ -78,7 +78,7 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
     # All items should exist in both, so fail if one isn't found.
     for name in user_config.__dict__.keys():
         # These are handled differently so skip them.
-        if name not in ["tx_taps", "tx_tap_tuners", "version", "date_created"]:
+        if name not in ["tx_taps", "tx_tap_tuners", "dfe_tap_tuners", "version", "date_created"]:
             # Test the values
             assert getattr(user_config, name) == getattr(dut, name)
 

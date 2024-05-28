@@ -363,7 +363,6 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 if locked:  # We only want error accumulation to happen, when we're locked.
                     nxt_filter_out = self.step(slicer_output, error, update)
                 else:
-                    # nxt_filter_out = self.step(decision, 0.0, update)
                     nxt_filter_out = self.step(slicer_output, 0.0, update)
                 tap_weights.append(self.tap_weights)
                 last_clock_sample = sum_out
