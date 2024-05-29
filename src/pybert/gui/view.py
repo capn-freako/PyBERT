@@ -30,6 +30,8 @@ from traitsui.api import (  # CloseAction,
 
 from pybert.gui.handler import MyHandler
 
+HIGH_RES = True
+
 # Main window layout definition.
 traits_view = View(
     Group(
@@ -482,33 +484,25 @@ traits_view = View(
                                 show_border=True,
                             ),
                             VGroup(
-                                HGroup(
-                                    Item(
-                                        name="use_dfe",
-                                        label="Use DFE",
-                                        tooltip="Include DFE in simulation.",
-                                    ),
-                                    Item(
-                                        name="sum_ideal",
-                                        label="Ideal",
-                                        tooltip="Use ideal DFE. (performance boost)",
-                                        enabled_when="use_dfe == True",
-                                    ),
-                                ),
+                                Item(label="Use Optimizer tab to configure."),
                                 VGroup(
-                                    Item(name="n_taps", label="Taps", tooltip="# of taps"),
                                     Item(name="gain", label="Gain", tooltip="error feedback gain"),
                                     Item(name="decision_scaler", label="Level", tooltip="target output magnitude"),
-                                    Item(
-                                        name="n_ave", label="Nave.", tooltip="# of CDR adaptations per DFE adaptation"
+                                    Item(name="n_ave", label="Nave.", tooltip="# of CDR adaptations per DFE adaptation"),
+                                    HGroup(
+                                        Item(
+                                            name="sum_bw",
+                                            label="Bandwidth",
+                                            tooltip="summing node bandwidth",
+                                            enabled_when="sum_ideal == False",
+                                        ),
+                                        Item(label="GHz"),
+                                        Item(
+                                            name="sum_ideal",
+                                            label="Ideal",
+                                            tooltip="Use ideal DFE. (performance boost)",
+                                        ),
                                     ),
-                                    Item(
-                                        name="sum_bw",
-                                        label="BW (GHz)",
-                                        tooltip="summing node bandwidth",
-                                        enabled_when="sum_ideal == False",
-                                    ),
-                                    enabled_when="use_dfe == True",
                                 ),
                                 label="DFE",
                                 show_border=True,
@@ -624,7 +618,7 @@ traits_view = View(
             Item(
                 label="Note: Only CTLE boost will be optimized; please, set peak frequency, bandwidth, and mode appropriately.",
             ),
-            Item("plot_h_tune", editor=ComponentEditor(high_resolution=True), show_label=False, springy=True),
+            Item("plot_h_tune", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False, springy=True),
             Item(
                 label="To zoom: Click in the plot, hit `z` (Cursor will change to crosshair.), and click/drag to select horizontal region of interest.",
             ),
@@ -633,22 +627,22 @@ traits_view = View(
         ),
         Group(  # Responses
             Group(
-                Item("plots_h", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_h", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Impulses",
                 id="plots_h",
             ),
             Group(
-                Item("plots_s", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_s", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Steps",
                 id="plots_s",
             ),
             Group(
-                Item("plots_p", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_p", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Pulses",
                 id="plots_p",
             ),
             Group(
-                Item("plots_H", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_H", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Freq. Resp.",
                 id="plots_H",
             ),
@@ -658,22 +652,22 @@ traits_view = View(
         ),
         Group(  # Results
             Group(
-                Item("plots_dfe", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_dfe", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="DFE",
                 id="plots_dfe",
             ),
             Group(
-                Item("plots_out", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_out", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Outputs",
                 id="plots_out",
             ),
             Group(
-                Item("plots_eye", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_eye", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Eyes",
                 id="plots_eye",
             ),
             Group(
-                Item("plots_bathtub", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_bathtub", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Bathtubs",
                 id="plots_bathtub",
             ),
@@ -683,12 +677,12 @@ traits_view = View(
         ),
         Group(  # Jitter
             Group(
-                Item("plots_jitter_dist", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_jitter_dist", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Jitter Dist.",
                 id="plots_jitter_dist",
             ),
             Group(
-                Item("plots_jitter_spec", editor=ComponentEditor(high_resolution=False), show_label=False),
+                Item("plots_jitter_spec", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Jitter Spec.",
                 id="plots_jitter_spec",
             ),

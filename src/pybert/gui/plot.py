@@ -14,6 +14,7 @@ from pybert.models.bert import update_eyes
 
 PLOT_SPACING = 1
 PLOT_PADDING = 75
+PLOT_PADDING_BOT = 50
 
 
 # pylint: disable=too-many-locals,too-many-statements
@@ -28,7 +29,7 @@ def make_plots(self, n_dfe_taps):
     plotdata = self.plotdata
 
     # - DFE tab
-    plot2 = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
+    plot2 = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT)
     plot2.plot(("t_ns", "ui_ests"), type="line", color="blue")
     plot2.title = "CDR Adaptation"
     plot2.index_axis.title = "Time (ns)"
@@ -36,16 +37,21 @@ def make_plots(self, n_dfe_taps):
 
     plot9 = Plot(
         plotdata,
-        auto_colors=["red", "orange", "yellow", "green", "blue", "purple"],
-        padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING,
+        auto_colors=["magenta", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "brown", "black"],
+        padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT,
     )
+    line_styles = ["line", "dash"]
+    plot9.legend.labels = []
     for i in range(n_dfe_taps):
+        name = f"tap{int(i + 1)}"
         plot9.plot(
-            ("tap_weight_index", f"tap{int(i + 1)}_weights"),
+            ("tap_weight_index", name + "_weights"),
             type="line",
             color="auto",
-            name=f"tap{int(i + 1)}",
+            style=line_styles[i // 10],
+            name=name,
         )
+        plot9.legend.labels.append(name)
     plot9.title = "DFE Adaptation"
     plot9.index_axis.title = "Sample Number"
     plot9.tools.append(PanTool(plot9, constrain=True, constrain_key=None, constrain_direction="x"))
@@ -54,13 +60,13 @@ def make_plots(self, n_dfe_taps):
     plot9.legend.visible = True
     plot9.legend.align = "ul"
 
-    plot_clk_per_hist = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
+    plot_clk_per_hist = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT)
     plot_clk_per_hist.plot(("clk_per_hist_bins", "clk_per_hist_vals"), type="line", color="blue")
     plot_clk_per_hist.title = "CDR Clock Period Histogram"
     plot_clk_per_hist.index_axis.title = "Clock Period (ps)"
     plot_clk_per_hist.value_axis.title = "Bin Count"
 
-    plot_clk_per_spec = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
+    plot_clk_per_spec = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT)
     plot_clk_per_spec.plot(("clk_freqs", "clk_spec"), type="line", color="blue")
     plot_clk_per_spec.title = "CDR Clock Period Spectrum"
     plot_clk_per_spec.index_axis.title = "Frequency (bit rate)"

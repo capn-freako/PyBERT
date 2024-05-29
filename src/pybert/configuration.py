@@ -127,12 +127,10 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_use_ibis = the_PyBERT.rx_use_ibis
 
         # DFE
-        self.use_dfe = the_PyBERT.use_dfe
         self.sum_ideal = the_PyBERT.sum_ideal
         self.decision_scaler = the_PyBERT.decision_scaler
         self.gain = the_PyBERT.gain
         self.n_ave = the_PyBERT.n_ave
-        self.n_taps = the_PyBERT.n_taps
         self.sum_bw = the_PyBERT.sum_bw
 
         # CDR

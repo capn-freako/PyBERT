@@ -120,11 +120,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     delta_t = self.delta_t * 1.0e-12
     alpha = self.alpha
     ui = self.ui
-    n_taps = self.n_taps
     gain = self.gain
     n_ave = self.n_ave
     decision_scaler = self.decision_scaler
     n_lock_ave = self.n_lock_ave
+    dfe_tap_tuners = self.dfe_tap_tuners
     rel_lock_tol = self.rel_lock_tol
     lock_sustain = self.lock_sustain
     bandwidth = self.sum_bw * 1.0e9
@@ -345,16 +345,21 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # DFE output and incremental/cumulative responses.
     try:
-        if self.use_dfe:
+        if any(tap.enabled for tap in dfe_tap_tuners):
             _gain = gain
             _ideal = self.sum_ideal
+            _n_taps = len(dfe_tap_tuners)
         else:
             _gain = 0.0
             _ideal = True
+            _n_taps = 0
         limits = []
         for tuner in self.dfe_tap_tuners:
-            limits.append((tuner.min_val, tuner.max_val))
-        dfe = DFE(n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
+            if tuner.enabled:
+                limits.append((tuner.min_val, tuner.max_val))
+            else:
+                limits.append((0., 0.))
+        dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
                   n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
                   lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
                   limits=limits)
@@ -666,7 +671,6 @@ def update_results(self):
     t = self.t
     t_ns = self.t_ns
     t_ns_chnl = self.t_ns_chnl
-    n_taps = self.n_taps
     t_irfft = self.t_irfft
 
     Ts = t[1]
@@ -688,33 +692,9 @@ def update_results(self):
 
     # DFE.
     tap_weights = transpose(array(self.adaptation))
-    i = 1
-    for tap_weight in tap_weights:  # pylint: disable=undefined-loop-variable
-        self.plotdata.set_data(f"tap{i}_weights", tap_weight)
-        i += 1
+    for k, tap_weight in enumerate(tap_weights):  # pylint: disable=undefined-loop-variable
+        self.plotdata.set_data(f"tap{k + 1}_weights", tap_weight)
     self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))  # pylint: disable=undefined-loop-variable
-    if self._old_n_taps != n_taps:  # pylint: disable=undefined-loop-variable
-        new_plot = Plot(
-            self.plotdata,
-            auto_colors=["red", "orange", "yellow", "green", "blue", "purple"],
-            padding_left=75,
-        )
-        for i in range(self.n_taps):
-            new_plot.plot(
-                ("tap_weight_index", f"tap{i + 1}_weights"),
-                type="line",
-                name=f"tap{i + 1}",
-                color="auto")
-        new_plot.title = "DFE Adaptation"
-        new_plot.tools.append(PanTool(new_plot, constrain=True, constrain_key=None, constrain_direction="x"))
-        zoom9 = ZoomTool(new_plot, tool_mode="range", axis="index", always_on=False)
-        new_plot.overlays.append(zoom9)
-        new_plot.legend.visible = True
-        new_plot.legend.align = "ul"
-        self.plots_dfe.remove(self._dfe_plot)
-        self.plots_dfe.insert(1, new_plot)
-        self._dfe_plot = new_plot
-        self._old_n_taps = n_taps
 
     clock_pers = diff(clock_times)
     lockedsTrue = where(self.lockeds)[0]

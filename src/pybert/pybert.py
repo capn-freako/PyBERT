@@ -234,13 +234,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_ibis = Bool(False)  #: (Bool)
 
     # - DFE
-    use_dfe = Bool(gUseDfe)  #: True = use a DFE (Bool).
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
     decision_scaler = Float(0.5)  #: DFE slicer output voltage (V).
     gain = Float(0.2)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
-    n_taps = Range(low=1, high=20, value=gNtaps)  #: DFE # of taps.
-    _old_n_taps = n_taps
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
 
     # - CDR
@@ -1234,7 +1231,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         # Running the simulation will fill in the required data structure.
         my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
         # Once the required data structure is filled in, we can create the plots.
-        make_plots(self, n_dfe_taps=gNtaps)
+        make_plots(self, n_dfe_taps=len(self.dfe_tap_tuners))
 
     def load_configuration(self, filepath: Path):
         """Load in a configuration into pybert.
@@ -1311,7 +1308,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
                     pass
 
         if atleast_one_reference_removed:
-            make_plots(self, n_dfe_taps=gNtaps)
+            make_plots(self, n_dfe_taps=len(self.dfe_tap_tuners))
 
     def log_information(self):
         """Log the system information."""
