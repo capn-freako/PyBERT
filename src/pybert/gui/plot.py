@@ -169,6 +169,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_tx.y_axis.title = "Step Response (V)"
     plot_s_tx.legend.visible = True
     plot_s_tx.legend.align = "lr"
+    plot_s_tx.legend.labels = ["Incremental", "Cumulative"]
     plot_s_tx.index_range = plot_s_chnl.index_range  # Zoom x-axes in tandem.
 
     plot_s_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
@@ -179,6 +180,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_ctle.y_axis.title = "Step Response (V)"
     plot_s_ctle.legend.visible = True
     plot_s_ctle.legend.align = "lr"
+    plot_s_ctle.legend.labels = ["Incremental", "Cumulative"]
     plot_s_ctle.index_range = plot_s_chnl.index_range  # Zoom x-axes in tandem.
 
     plot_s_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
@@ -189,6 +191,7 @@ def make_plots(self, n_dfe_taps):
     plot_s_dfe.y_axis.title = "Step Response (V)"
     plot_s_dfe.legend.visible = True
     plot_s_dfe.legend.align = "lr"
+    plot_s_dfe.legend.labels = ["Incremental", "Cumulative"]
     plot_s_dfe.index_range = plot_s_chnl.index_range  # Zoom x-axes in tandem.
 
     container_s = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
@@ -265,6 +268,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_tx.index_range.low_setting = 0.01
     plot_H_tx.value_range.low_setting = -40.0
     plot_H_tx.legend.visible = True
+    plot_H_tx.legend.labels = ["Incremental", "Cumulative"]
     plot_H_tx.legend.align = "ll"
 
     plot_H_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
@@ -277,6 +281,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_ctle.value_range.low_setting = -40.0
     plot_H_ctle.legend.visible = True
     plot_H_ctle.legend.align = "ll"
+    plot_H_ctle.legend.labels = ["Incremental", "Cumulative"]
 
     plot_H_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_H_dfe.plot(("f_GHz", "dfe_H"), type="line", color="blue", name="Incremental", index_scale="log")
@@ -288,6 +293,7 @@ def make_plots(self, n_dfe_taps):
     plot_H_dfe.value_range.low_setting = -40.0
     plot_H_dfe.legend.visible = True
     plot_H_dfe.legend.align = "ll"
+    plot_H_dfe.legend.labels = ["Incremental", "Cumulative"]
 
     container_H = GridPlotContainer(shape=(2, 2), spacing=(PLOT_SPACING, PLOT_SPACING))
     container_H.add(plot_H_chnl)
@@ -323,7 +329,6 @@ def make_plots(self, n_dfe_taps):
 
     plot_out_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_out_dfe.plot(("t_ns", "dfe_out"), type="line", color="blue")
-    plot_out_dfe.plot(("t_ns", "dbg_out"), type="line", color="gray")
     plot_out_dfe.title = post_dfe_str
     plot_out_dfe.index_axis.title = "Time (ns)"
     plot_out_dfe.y_axis.title = "Output (V)"

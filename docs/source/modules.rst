@@ -2,11 +2,6 @@
 Top Level Modules
 =================
 
-Main Module (`pybert.pybert`)
-*****************************
-
-.. automodule:: pybert.pybert
-
 .. toctree::
    :maxdepth: 1
 

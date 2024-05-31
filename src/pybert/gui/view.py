@@ -128,7 +128,7 @@ traits_view = View(
                     HGroup(
                         Item(
                             name="impulse_length",
-                            label="Impulse Response Length (ns)",
+                            label="Impulse Response Length",
                             tooltip="Manual impulse response length override",
                         ),
                         Item(label="ns"),
@@ -712,12 +712,9 @@ traits_view = View(
                 ),
             ),
             Item(
-                label="Note: Only CTLE boost will be optimized; please, set peak frequency, bandwidth, and mode appropriately.",
-            ),
-            Item("plot_h_tune", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False, springy=True),
-            Item(
                 label="To zoom: Click in the plot, hit `z` (Cursor will change to crosshair.), and click/drag to select horizontal region of interest.",
             ),
+            Item("plot_h_tune", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False, springy=True),
             label="Optimizer",
             id="eq_tune",
         ),

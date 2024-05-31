@@ -17,7 +17,7 @@ The documentation for the *PyBERT* project has 2 parts:
 
 This is the help for developers and importers.
 
-If you're looking for usage instructions, you're in the wrong place.
+If you're looking for help with the GUI application, you're in the wrong place.
 Instead, try:
 
 * Looking at the *Help* tab of the PyBERT GUI.

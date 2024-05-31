@@ -5,21 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "PipBERT"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "5.2.0"
+version = "6.1.0"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           , {name = "David Patterson"}
           ]
-urls = { documentation = "https://github.com/capn-freako/PyBERT/wiki"}
+urls = [
+    {Wiki = "https://github.com/capn-freako/PyBERT/wiki"},
+    {Installation = "https://github.com/capn-freako/PyBERT/wiki/instant_gratification"},
+    {FAQ = "https://github.com/capn-freako/PyBERT/wiki/pybert_faq"},
+    {GitHub = "https://github.com/capn-freako/PyBERT"},
+    {PyPi = "https://pypi.org/project/PipBERT/"}
+]
 readme = "README.md"
 requires-python = ">=3.9,<3.12"
 license = {text = "BSD"}
 dependencies = [
-        "kiwisolver",
-        "PyIBIS-AMI>=5.1.0rc1",
-        "pyside6<6.7",
-        "pyyaml>=6",
-        # "qt>=5",
-        "scikit-rf>=0.29",
+    "kiwisolver",
+    "PyIBIS-AMI>=6.1.0",
+    "pyside6<6.7",
+    "pyyaml>=6",
+    "scikit-rf>=0.29",
 ]
 keywords=["bert", "communication", "simulator"]
 classifiers=[
