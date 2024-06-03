@@ -690,9 +690,14 @@ def update_results(self):
 
     # DFE.
     tap_weights = transpose(array(self.adaptation))
-    for k, tap_weight in enumerate(tap_weights):  # pylint: disable=undefined-loop-variable
-        self.plotdata.set_data(f"tap{k + 1}_weights", tap_weight)
-    self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))  # pylint: disable=undefined-loop-variable
+    if len(tap_weights):
+        for k, tap_weight in enumerate(tap_weights):  # pylint: disable=undefined-loop-variable
+            self.plotdata.set_data(f"tap{k + 1}_weights", tap_weight)
+        self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))  # pylint: disable=undefined-loop-variable
+    else:
+        for k in range(len(self.dfe_tap_tuners)):
+            self.plotdata.set_data(f"tap{k + 1}_weights", zeros(10))
+        self.plotdata.set_data("tap_weight_index", list(range(10)))  # pylint: disable=undefined-loop-variable
 
     clock_pers = diff(clock_times)
     lockedsTrue = where(self.lockeds)[0]
