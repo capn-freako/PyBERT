@@ -1038,7 +1038,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _rx_use_ami_changed(self, new_value):
         if new_value:
-            self.use_dfe = False
+            self._btn_disable_fired()
 
     def check_pat_len(self):
         "Validate chosen pattern length against number of bits being run."

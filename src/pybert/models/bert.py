@@ -10,8 +10,6 @@ from time import perf_counter
 from typing import Callable, Optional
 
 import scipy.signal as sig
-from chaco.api import Plot
-from chaco.tools.api import PanTool, ZoomTool
 from numpy import (  # type: ignore
     arange,
     argmax,

@@ -1,8 +1,15 @@
 include README.md
 include LICENSE
-recursive-include src/pybert/gui/images *.png
-recursive-include docs *
-recursive-include tests *
+include Makefile
+include src/pybert/gui/images/*.png
+include docs/Makefile
+include docs/make.bat
+include docs/source/*
+prune docs/build
+include tests/*.py
+prune tests/__pycache__
+include tox.ini
+recursive-include type_stubs *
 global-exclude *.swp
 global-exclude *.DS_Store
 global-exclude *.buildinfo

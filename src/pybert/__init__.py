@@ -9,6 +9,14 @@ Original Date:   17 June 2014
 Testing by:      Mark Marlett <mark.marlett@gmail.com>
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
+
+ToDo:
+    1. The docs here: https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+        suggest that I've got version determination, below, inverted and that
+        there ought to be a way to determine the version dynamically at build time
+        from a static definition of `__version__` in this file.
+        See this page for more detail: https://packaging.python.org/en/latest/guides/single-sourcing-package-version/#single-sourcing-the-version
+        ==> Check this out and make appropriate changes.
 """
 from importlib.metadata import version as _get_version
 
