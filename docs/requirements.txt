@@ -1,0 +1,4 @@
+m2r2
+parsec
+sphinx
+sphinx_rtd_theme
