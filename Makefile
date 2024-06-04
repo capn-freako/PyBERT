@@ -95,6 +95,7 @@ help:
 	@echo "\tPip Targets"
 	@echo "\t==========="
 	@echo "\ttox: Run all Tox environments."
+	@echo "\tcheck: Validate the 'pyproject.toml' file."
 	@echo "\tformat: Run Tox 'format' environment."
 	@echo "\t\tThis will run EXTREME reformatting on the code. Use with caution!"
 	@echo "\tlint: Run Tox 'lint' environment. (Runs 'pylint' on the source code.)"
