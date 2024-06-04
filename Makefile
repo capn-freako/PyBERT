@@ -34,8 +34,8 @@ flake8:
 type-check:
 	${TOX_EXEC} run -e type-check
 
-docs:
-	${TOX_EXEC} run -e docs
+docs: ${VER_FILE}
+	source $< && ${TOX_EXEC} run -e docs
 
 build:
 	${TOX_EXEC} run -e build
