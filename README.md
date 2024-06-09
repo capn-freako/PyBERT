@@ -6,7 +6,17 @@ PyBERT is a serial communication link bit error rate tester simulator with a gra
 It uses the Traits/UI package of the Enthought Python Distribution (EPD) <http://www.enthought.com/products/epd.php>,
 as well as the NumPy and SciPy packages.
 
-Notice: Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
+**Notice:** Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
+
+User Installation
+-----------------
+
+- <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
+
+Developer Installation
+----------------------
+
+- <https://github.com/capn-freako/PyBERT/wiki/dev_install>
 
 Wiki
 ----
@@ -23,16 +33,6 @@ Email List
 
 - <pybert@freelists.org>
 
-User Installation
------------------
-
-- <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
-
-Developer Installation
-----------------------
-
-- <https://github.com/capn-freako/PyBERT/wiki/dev_install>
-
 Testing
 -------
 
@@ -42,7 +42,7 @@ for any installed/supported of versions and it will skip any missing versions.
 - `pip install tox`
 - `tox -p all`
 
-To run a single environment such as "docs" run: `tox -e docs`
+To run a single environment such as "docs" run: `tox run -e docs`
 
 Documentation
 -------------

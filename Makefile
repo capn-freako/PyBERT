@@ -9,6 +9,7 @@
 
 PROJ_NAME := PipBERT
 PROJ_FILE := pyproject.toml
+PROJ_INFO := src/PipBERT.egg-info/PKG-INFO
 VER_FILE := .proj_ver
 VER_GETTER := get_proj_ver
 PYTHON_EXEC := python
@@ -23,7 +24,7 @@ dflt: help
 check:
 	${TOX_EXEC} exec -e lint -- validate-pyproject ${PROJ_FILE}
 
-${VER_FILE}: ${PROJ_FILE}
+${VER_FILE}: ${PROJ_INFO}
 	${PYTHON_EXEC} -m ${VER_GETTER} ${PROJ_NAME} $@
 
 tox:
