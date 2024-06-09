@@ -1,3 +1,10 @@
+# Makefile for PyBERT project.
+#
+# Original author: David Banas <capn.freako@gmail.com>  
+# Original date:   February 10, 2015
+#
+# Copyright (c) 2015 David Banas; all rights reserved World wide.
+
 .PHONY: dflt help check tox format lint flake8 type-check docs build install upload test clean etags conda-build conda-skeleton chaco enable pyibis-ami pyibis-ami-dev pybert pybert-dev etags
 
 PROJ_NAME := PipBERT
@@ -40,8 +47,8 @@ docs: ${VER_FILE}
 build:
 	${TOX_EXEC} run -e build
 
-install:
-	${TOX_EXEC} run -e install
+install: ${VER_FILE}
+	source $< && ${TOX_EXEC} run -e install
 
 upload: ${VER_FILE}
 	source $< && ${TOX_EXEC} run -e upload
