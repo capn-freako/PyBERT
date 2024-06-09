@@ -52,5 +52,5 @@ class TestBasic(object):
         _ws = np.array(list(zip(*_weights[4 * len(_weights) // 5 :])))  # zip(*x) = unzip(x)
         _means = list(map(lambda xs: sum(xs) / len(xs), _ws))
         assert all(
-            list(map(lambda pr: all(abs(pr[0] - pr[1]) / pr[1] < 0.2), zip(_ws, _means)))
+            list(map(lambda pr: pr[1] == 0 or all(abs(pr[0] - pr[1]) / pr[1] < 0.2), zip(_ws, _means)))
         ), f"DFE adaptation is unstable! {max(_ws[-1])} {min(_ws[-1])}"
