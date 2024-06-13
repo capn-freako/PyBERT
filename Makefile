@@ -12,7 +12,7 @@ PROJ_FILE := pyproject.toml
 PROJ_INFO := src/PipBERT.egg-info/PKG-INFO
 VER_FILE := .proj_ver
 VER_GETTER := get_proj_ver
-PYTHON_EXEC := python
+PYTHON_EXEC := python -I
 TOX_EXEC := tox
 TOX_SKIP_ENV := format
 PYVERS := 39 310 311 312
@@ -22,7 +22,7 @@ PLATFORMS := lin mac win
 dflt: help
 
 check:
-	${TOX_EXEC} exec -e lint -- validate-pyproject ${PROJ_FILE}
+	${TOX_EXEC} run -e check
 
 ${VER_FILE}: ${PROJ_INFO}
 	${PYTHON_EXEC} -m ${VER_GETTER} ${PROJ_NAME} $@
