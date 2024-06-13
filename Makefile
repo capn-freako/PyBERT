@@ -5,7 +5,7 @@
 #
 # Copyright (c) 2015 David Banas; all rights reserved World wide.
 
-.PHONY: dflt help check tox format lint flake8 type-check docs build install upload test clean etags conda-build conda-skeleton chaco enable pyibis-ami pyibis-ami-dev pybert pybert-dev etags
+.PHONY: dflt help check tox format lint flake8 type-check docs build upload test clean etags conda-build conda-skeleton chaco enable pyibis-ami pyibis-ami-dev pybert pybert-dev etags
 
 PROJ_NAME := PipBERT
 PROJ_FILE := pyproject.toml
@@ -28,7 +28,7 @@ ${VER_FILE}: ${PROJ_INFO}
 	${PYTHON_EXEC} -m ${VER_GETTER} ${PROJ_NAME} $@
 
 tox:
-	TOX_SKIP_ENV="${TOX_SKIP_ENV}" ${TOX_EXEC}
+	TOX_SKIP_ENV="${TOX_SKIP_ENV}" ${TOX_EXEC} -m test
 
 format:
 	${TOX_EXEC} run -e format
@@ -47,9 +47,6 @@ docs: ${VER_FILE}
 
 build:
 	${TOX_EXEC} run -e build
-
-install: ${VER_FILE}
-	source $< && ${TOX_EXEC} run -e install
 
 upload: ${VER_FILE}
 	source $< && ${TOX_EXEC} run -e upload
@@ -113,7 +110,6 @@ help:
 	@echo "\t\tTo view the resultant API documentation, open 'docs/build/index.html' in a browser."
 	@echo "\tbuild: Run Tox 'build' environment."
 	@echo "\t\tBuilds source tarball and wheel, for installing or uploading to PyPi."
-	@echo "\tinstall: Run Tox 'install' environment."
 	@echo "\t\tTests installation before uploading to PyPi."
 	@echo "\tupload: Run Tox 'upload' environment."
 	@echo "\t\tUploads source tarball and wheel to PyPi."
