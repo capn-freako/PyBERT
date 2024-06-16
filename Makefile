@@ -27,6 +27,10 @@ check:
 ${VER_FILE}: ${PROJ_INFO}
 	${PYTHON_EXEC} -m ${VER_GETTER} ${PROJ_NAME} $@
 
+${PROJ_INFO}: ${PROJ_FILE}
+	${PYTHON_EXEC} -m build
+	${PYTHON_EXEC} -m pip install -e .
+
 tox:
 	TOX_SKIP_ENV="${TOX_SKIP_ENV}" ${TOX_EXEC} -m test
 
