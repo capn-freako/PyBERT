@@ -1,6 +1,6 @@
 # Makefile for PyBERT project.
 #
-# Original author: David Banas <capn.freako@gmail.com>  
+# Original author: David Banas <capn.freako@gmail.com>
 # Original date:   February 10, 2015
 #
 # Copyright (c) 2015 David Banas; all rights reserved World wide.
