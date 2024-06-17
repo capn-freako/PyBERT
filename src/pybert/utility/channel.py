@@ -1,7 +1,7 @@
 """
 Channel modeling utilities for PyBERT.
 
-Original author: David Banas <capn.freako@gmail.com>
+Original author: David Banas <capn.freako@gmail.com>  
 Original date:   June 16, 2024
 
 Copyright (c) 2024 David Banas; all rights reserved World wide.
