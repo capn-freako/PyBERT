@@ -11,25 +11,31 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 from numpy import array, pi, power, sqrt  # type: ignore
 
+from ..common import Rvec, Cvec
 
-def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):  # pylint: disable=too-many-arguments
-    """Calculates propagation constant from cross-sectional parameters.
+
+# pylint: disable=too-many-arguments
+def calc_gamma(R0: float, w0: float, Rdc: float, Z0: float,
+               v0: float, Theta0: float, ws: Rvec) -> tuple[Cvec, Cvec]:  # pylint: disable=too-many-arguments
+    """
+    Calculates the propagation constant from cross-sectional parameters.
 
     The formula's applied are taken from Howard Johnson's "Metallic Transmission Model"
     (See "High Speed Signal Propagation", Sec. 3.1.)
 
-    Inputs:
-      - R0          skin effect resistance (Ohms/m)
-      - w0          cross-over freq.
-      - Rdc         d.c. resistance (Ohms/m)
-      - Z0          characteristic impedance in LC region (Ohms)
-      - v0          propagation velocity (m/s)
-      - Theta0      loss tangent
-      - ws          frequency sample points vector
+    Args:
+        R0: skin effect resistance (Ohms/m)
+        w0: cross-over freq. (rads./s)
+        Rdc: d.c. resistance (Ohms/m)
+        Z0: characteristic impedance in LC region (Ohms)
+        v0: propagation velocity (m/s)
+        Theta0: loss tangent
+        ws: frequency sample points vector (rads./s)
 
-    Outputs:
-      - gamma       frequency dependent propagation constant
-      - Zc          frequency dependent characteristic impedance
+    Returns:
+        (gamma, Zc): A pair consisting of frequency dependent:
+            - propagation constant, and
+            - characteristic impedance
     """
 
     w = array(ws).copy()
@@ -50,19 +56,21 @@ def calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, ws):  # pylint: disable=too-many-arg
     return (gamma, Zc)
 
 
-def calc_gamma_RLGC(R, L, G, C, ws):
-    """Calculates propagation constant from R, L, G, and C.
+def calc_gamma_RLGC(R: float, L: float, G: float, C: float, ws: Rvec) -> tuple[Cvec, Cvec]:
+    """
+    Calculates the propagation constant from R, L, G, and C.
 
-    Inputs:
-      - R           resistance per unit length (Ohms/m)
-      - L           inductance per unit length (Henrys/m)
-      - G           conductance per unit length (Siemens/m)
-      - C           capacitance per unit length (Farads/m)
-      - ws          frequency sample points vector
+    Args:
+        R: resistance per unit length (Ohms/m)
+        L: inductance per unit length (Henrys/m)
+        G: conductance per unit length (Siemens/m)
+        C: capacitance per unit length (Farads/m)
+        ws: frequency sample points vector (rads./s)
 
-    Outputs:
-      - gamma       frequency dependent propagation constant
-      - Zc          frequency dependent characteristic impedance
+    Returns:
+        (gamma, Zc): A pair consisting of frequency dependent:
+            - propagation constant, and
+            - characteristic impedance
     """
 
     w = array(ws).copy()
@@ -77,20 +85,21 @@ def calc_gamma_RLGC(R, L, G, C, ws):
     return (gamma, Zc)
 
 
-def calc_G(H, Rs, Cs, Zc, RL, Cp, ws):  # pylint: disable=too-many-arguments
-    """Calculates fully loaded transfer function of complete channel.
+def calc_G(H: Cvec, Rs: float, Cs: float, Zc: Cvec, RL: float, Cp: float, ws: Rvec) -> Cvec:  # pylint: disable=too-many-arguments
+    """
+    Calculates fully loaded transfer function of complete channel.
 
-    Inputs:
-      - H     unloaded transfer function of interconnect
-      - Rs    source series resistance (differential)
-      - Cs    source parallel (parasitic) capacitance (single ended)
-      - Zc    frequency dependent characteristic impedance of the interconnect
-      - RL    load resistance (differential)
-      - Cp    load parallel (parasitic) capacitance (single ended)
-      - ws    frequency sample points vector
+    Args:
+        H: unloaded transfer function of interconnect
+        Rs: source series resistance (differential) (Ohms)
+        Cs: source parallel (parasitic) capacitance (single ended) (Farads)
+        Zc: frequency dependent characteristic impedance of the interconnect (Ohms)
+        RL: load resistance (differential) (Ohms)
+        Cp: load parallel (parasitic) capacitance (single ended) (Farads)
+        ws: frequency sample points vector (rads./s)
 
-    Outputs:
-      - G     transfer function of fully loaded channel
+    Returns:
+        G: transfer function of fully loaded channel
     """
 
     w = array(ws).copy()

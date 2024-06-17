@@ -14,17 +14,18 @@ from numpy import append, array, convolve  # type: ignore
 from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from pyibisami.ami.parser import AMIParamConfigurator
 
-from pybert.common import *  # pylint: disable=wildcard-import,unused-wildcard-import  # noqa: F403
+from ..common import Rvec
 
 
-def getwave_step_resp(ami_model):
-    """Use a model's AMI_GetWave() function to extract its step response.
+def getwave_step_resp(ami_model: AMIModel) -> Rvec:
+    """
+    Use a model's AMI_GetWave() function to extract its step response.
 
     Args:
-        ami_model (): The AMI model to use.
+        ami_model: The AMI model to use.
 
     Returns:
-        NumPy 1-D array: The model's step response.
+        s: The model's step response.
 
     Raises:
         RuntimeError: When no step rise is detected.
@@ -49,14 +50,15 @@ def getwave_step_resp(ami_model):
     return s - s[0]
 
 
-def init_imp_resp(ami_model):
-    """Use a model's AMI_Init() function to extract its impulse response.
+def init_imp_resp(ami_model: AMIModel) -> Rvec:
+    """
+    Use a model's ``AMI_Init()`` function to extract its impulse response.
 
     Args:
-        ami_model (): The AMI model to use.
+        ami_model: The AMI model to use.
 
     Returns:
-        NumPy 1-D array: The model's impulse response.
+        h: The model's impulse response.
     """
 
     # Delay the input edge slightly, in order to minimize high
@@ -96,7 +98,7 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
         x: Input waveform.
 
     Keyword Args:
-        bits_per_call: Number of bits per call of `GetWave()`.
+        bits_per_call: Number of bits per call of ``GetWave()``.
             Default: 0 (Means "Use existing value.")
 
     Returns:

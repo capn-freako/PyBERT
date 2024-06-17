@@ -11,32 +11,37 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 import re
 
+from typing import Optional
+
 from numpy import (  # type: ignore
     arange, argmax, array, convolve, cos, cumsum, diff,
     mean, ones, pad, pi, roll, sign, where, zeros
 )
 from numpy.fft import rfft  # type: ignore
+from numpy.typing import NDArray  # type: ignore
 from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
 
-from pybert.common import *  # pylint: disable=wildcard-import,unused-wildcard-import  # noqa: F403
+from ..common import Rvec, Cvec
 
 
-def moving_average(a, n=3):
-    """Calculates a sliding average over the input vector.
+def moving_average(a: Rvec, n: int = 3) -> Rvec:
+    """
+    Calculates a sliding average over the input vector.
 
     Uses a weighted averaging kernel, to preserve singularity
     of peak location in input data.
 
     Args:
-        a([float]): Input vector to be averaged.
-        n(int): Width of averaging window, in vector samples.
+        a: Input vector to be averaged.
+
+    Keyword Args:
+        n: Width of averaging window, in vector samples.
             Odd numbers work best.
-            (Optional; default = 3.)
+            Default: 3
 
     Returns:
-        [float]: the moving average of the input vector, leaving the input
-            vector unchanged.
+        rslt: the moving average of the input vector, leaving the input vector unchanged.
 
     Notes:
         1. The odd code is intended to "protect" the first/last elements
@@ -53,31 +58,33 @@ def moving_average(a, n=3):
     return array([a[0]] + list(res) + [a[-1]])
 
 
-def interp_time(ts, xs, sample_per):
-    """Resample time domain data, using linear interpolation.
+def interp_time(ts: Rvec, xs: Rvec, sample_per: float) -> Rvec:
+    """
+    Resample time domain data, using linear interpolation.
 
     Args:
-        ts([float]): Original time values.
-        xs([float]): Original signal values.
-        sample_per(float): System sample period.
+        ts: Original time values.
+        xs: Original signal values.
+        sample_per: System sample period (ts).
 
     Returns:
-        [float]: Resampled waveform.
+        rslt: Resampled waveform.
     """
     krnl = interp1d(ts, xs, kind="cubic", bounds_error=False, fill_value=0, assume_sorted=True)
     return krnl(arange(0, ts[-1], sample_per))
 
 
-def import_time(filename, sample_per):
-    """Read in a time domain waveform file, resampling as appropriate, via
+def import_time(filename: str, sample_per: float) -> Rvec:
+    """
+    Read in a time domain waveform file, resampling as appropriate, via
     linear interpolation.
 
     Args:
-        filename(str): Name of waveform file to read in.
-        sample_per(float): New sample interval
+        filename: Name of waveform file to read in.
+        sample_per: New sample interval
 
     Returns:
-        [float]: Resampled waveform.
+        rslt: Resampled waveform.
     """
     ts = []
     xs = []
@@ -95,18 +102,19 @@ def import_time(filename, sample_per):
     return interp_time(ts, xs, sample_per)
 
 
-def pulse_center(p, nspui):
-    """Determines the center of the pulse response, using the "Hula Hoop"
+def pulse_center(p: Rvec, nspui: int) -> tuple[int, float]:
+    """
+    Determines the center of the pulse response, using the "Hula Hoop"
     algorithm (See SiSoft/Tellian's DesignCon 2016 paper.)
 
     Args:
-        p([Float]): The single bit pulse response.
-        nspui(Int): The number of vector elements per unit interval.
+        p: The single bit pulse response.
+        nspui: The number of vector elements per unit interval.
 
     Returns:
-        (Int, float): The estimated index at which the clock will
-            sample the main lobe, and the vertical threshold at which
-            the main lobe is UI wide.
+        (clock_pos, thresh): The estimated index at which the clock will
+            sample the main lobe, and
+            the vertical threshold at which the main lobe is one UI wide.
     """
     div = 2.0
     p_max = p.max()
@@ -129,9 +137,8 @@ def pulse_center(p, nspui):
     return (clock_pos, thresh)
 
 
-def raised_cosine(x):
-    """Apply raised cosine window to input.
-    """
+def raised_cosine(x: Cvec) -> Cvec:
+    "Apply raised cosine window to input."
     len_x = len(x)
     w = (array([cos(pi * n / len_x) for n in range(len_x)]) + 1) / 2
     return w * x
@@ -197,29 +204,31 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,  # noqa: F405
 
 
 # pylint: disable=too-many-locals
-def trim_impulse(g, min_len=0, max_len=1000000, front_porch=True, kept_energy=0.999):
-    """Trim impulse response, for more useful display, by:
+def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000,
+                 front_porch: bool = True, kept_energy: float = 0.999) -> tuple[Rvec, int]:
+    """
+    Trim impulse response, for more useful display, by:
 
-        - clipping off the tail, after 99.99% of the total first
+        - clipping off the tail, after 99.9% of the total first
             derivative power has been captured, and
         - setting the "front porch" length equal to 20% of the total length.
 
     Args:
-        g([real]): Response to trim.
+        g: Response to trim.
 
     KeywordArgs:
-        min_len(int): Minimum length of returned vector.
+        min_len: Minimum length of returned vector.
             Default: 0
-        max_len(int): Maximum length of returned vector.
+        max_len: Maximum length of returned vector.
             Default: 1000000
-        front_porch(bool): Adjust "front porch" when True.
+        front_porch: Adjust "front porch" when True.
             Set to False if accurate delay is required.
             Default: True
-        kept_energy(float): The portion of first derivative "energy" retained.
+        kept_energy: The portion of first derivative "energy" retained.
             Default: 99.9%
 
     Returns:
-        ([real], int): A pair consisting of:
+        (trimmed_resp, start_ix): A pair consisting of:
             - the trimmed response, and
             - the index of the chosen starting position.
     """
@@ -313,27 +322,30 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
     return (w, H)
 
 
-def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):  # pylint: disable=too-many-arguments,too-many-locals
-    """Calculates the "eye" diagram of the input signal vector.
+# pylint: disable=too-many-arguments,too-many-locals
+def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: float,
+             clock_times: Optional[Rvec] = None) -> NDArray:
+    """
+    Calculates the "eye" diagram of the input signal vector.
 
     Args:
-        ui(float): unit interval (s)
-        samps_per_ui(int): # of samples per unit interval
-        height(int): height of output image data array
-        ys([float]): signal vector of interest
-        y_max(float): max. +/- vertical extremity of plot
+        ui: unit interval (s)
+        samps_per_ui: # of samples per unit interval
+        height: height of output image data array
+        ys: signal vector of interest
+        y_max: max. +/- vertical extremity of plot
 
     Keyword Args:
-        clock_times([float]): (optional) vector of clock times to use
-            for eye centers. If not provided, just use mean
-            zero-crossing and assume constant UI and no phase jumps.
+        clock_times: Vector of clock times to use for eye centers.
+            If not provided, just use mean zero-crossing and assume constant UI and no phase jumps.
             (This allows the same function to be used for eye diagram
             creation, for both pre and post-CDR signals.)
+            Default: None
 
     Returns:
-        2D *NumPy* array: The "heat map" representing the eye diagram. Each grid
-            location contains a value indicating the number of times the
-            signal passed through that location.
+        eye: The "heat map" representing the eye diagram.
+            Each grid location contains a value indicating the number
+            of times the signal passed through that location.
     """
 
     # List/array necessities.
@@ -377,29 +389,25 @@ def calc_eye(ui, samps_per_ui, height, ys, y_max, clock_times=None):  # pylint: 
     return img_array
 
 
-def make_uniform(t, jitter, ui, nbits):
-    """Make the jitter vector uniformly sampled in time, by zero-filling where
+def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, list[int]]:
+    """
+    Make the jitter vector uniformly sampled in time, by zero-filling where
     necessary.
 
     The trick, here, is creating a uniformly sampled input vector for the FFT operation,
     since the jitter samples are almost certainly not uniformly sampled.
     We do this by simply zero padding the missing samples.
 
-    Inputs:
+    Args:
+        t: The sample times for the 'jitter' vector.
+        jitter: The input jitter samples.
+        ui: The nominal unit interval.
+        nbits: The desired number of unit intervals, in the time domain.
 
-    - t      : The sample times for the 'jitter' vector.
-
-    - jitter : The input jitter samples.
-
-    - ui     : The nominal unit interval.
-
-    - nbits  : The desired number of unit intervals, in the time domain.
-
-    Output:
-
-    - y      : The uniformly sampled, zero padded jitter vector.
-
-    - y_ix   : The indices where y is valid (i.e. - not zero padded).
+    Returns:
+        (y, y_vld): A pair consisting of:
+            - The uniformly sampled, zero padded jitter vector.
+            - The indices where y is valid (i.e. - not zero padded).
     """
 
     if len(t) < len(jitter):

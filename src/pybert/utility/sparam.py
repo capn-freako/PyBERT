@@ -19,19 +19,22 @@ from scipy.linalg import inv
 from skrf import Network
 from skrf.network import one_port_2_two_port
 
+from ..common import Rvec, Cvec
+
 from .channel import calc_G
 from .sigproc import import_time
 
 
-def cap_mag(zs, maxMag=1.0):
-    """Cap the magnitude of a list of complex values, leaving the phase
-    unchanged.
+def cap_mag(zs: Cvec, maxMag: float = 1.0) -> Cvec:
+    """
+    Cap the magnitude of a list of complex values, leaving the phase unchanged.
 
     Args:
-        zs([complex]): The complex values to be capped.
+        zs: The complex values to be capped.
 
-    KeywordArgs:
-        maxMag(real): The maximum allowed magnitude. (Default = 1)
+    Keyword Args:
+        maxMag: The maximum allowed magnitude.
+            Default: 1
 
     Notes:
         1. Any pre-existing shape of the input will be preserved.
@@ -41,12 +44,12 @@ def cap_mag(zs, maxMag=1.0):
     return where(abs(zs_flat) > maxMag, subs, zs_flat).reshape(zs.shape)  # pylint: disable=no-member
 
 
-def mon_mag(zs):
+def mon_mag(zs: Cvec) -> Cvec:
     """Enforce monotonically decreasing magnitude in list of complex values,
     leaving the phase unchanged.
 
     Args:
-        zs([complex]): The complex values to be adjusted.
+        zs: The complex values to be adjusted.
 
     Notes:
         1. Any pre-existing shape of the input will be preserved.
@@ -58,35 +61,39 @@ def mon_mag(zs):
 
 
 # ToDo: Are there SciKit-RF alternatives to these next two functions?  # pylint: disable=fixme
-def sdd_21(ntwk, renumber=False):
-    """Given a 4-port single-ended network, return its differential 2-port
-    network.
+def sdd_21(ntwk: Network, renumber: bool = False) -> Network:
+    """
+    Given a 4-port single-ended network, return its differential 2-port network.
 
     Args:
-        ntwk(skrf.Network): 4-port single ended network.
+        ntwk: 4-port single ended network.
 
-    KeywordArgs:
-        renumber(bool): Automatically fix "1=>3/2=>4" port numbering when True.
+    Keyword Args:
+        renumber: Automatically fix "1=>3/2=>4" port numbering when True.
+            Default: False
 
     Returns:
-        skrf.Network: Sdd (2-port).
+        Sdd: 2-port differential network.
     """
     mm = se2mm(ntwk, renumber=renumber)
     return Network(frequency=ntwk.f, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
 
 
-def se2mm(ntwk, scale=0.5, renumber=False):
-    """Given a 4-port single-ended network, return its mixed mode equivalent.
+def se2mm(ntwk: Network, scale: float = 0.5, renumber: bool = False) -> Network:
+    """
+    Given a 4-port single-ended network, return its mixed mode equivalent.
 
     Args:
-        ntwk(skrf.Network): 4-port single ended network.
+        ntwk: 4-port single ended network.
 
-    KeywordArgs:
-        scale(real): Normalization factor. (Default = 0.5)
-        renumber(bool): Automatically fix "1=>3/2=>4" port numbering when True.
+    Keyword Args:
+        scale: Normalization factor.
+            Default: 0.5
+        renumber: Automatically fix "1=>3/2=>4" port numbering when True.
+            Default: False
 
     Returns:
-        skrf.Network: Mixed mode equivalent network, in the following format:
+        Smm: Mixed mode equivalent network, in the following format:
             Sdd11  Sdd12  Sdc11  Sdc12
             Sdd21  Sdd22  Sdc21  Sdc22
             Scd11  Scd12  Scc11  Scc12
@@ -133,16 +140,17 @@ def se2mm(ntwk, scale=0.5, renumber=False):
     return Network(frequency=f, s=s, z0=z)
 
 
-def interp_s2p(ntwk, f):
-    """Safely interpolate a 2-port network, by applying certain constraints to
+def interp_s2p(ntwk: Network, f: Rvec) -> Network:
+    """
+    Safely interpolate a 2-port network, by applying certain constraints to
     any necessary extrapolation.
 
     Args:
-        ntwk(skrf.Network): The 2-port network to be interpolated.
-        f([real]): The list of new frequency sampling points (Hz).
+        ntwk: The 2-port network to be interpolated.
+        f: The list of new frequency sampling points (Hz).
 
     Returns:
-        skrf.Network: The interpolated/extrapolated 2-port network.
+        Sint: The interpolated/extrapolated 2-port network.
 
     Raises:
         ValueError: If `ntwk` is _not_ a 2-port network.
@@ -164,8 +172,9 @@ def interp_s2p(ntwk, f):
 
 
 # ToDo: Are there any uses of this function remaining? Can we eliminate them?  # pylint: disable=fixme
-def renorm_s2p(ntwk, zs):
-    """Renormalize a simple 2-port network to a new set of port impedances.
+def renorm_s2p(ntwk: Network, zs: Cvec) -> Network:
+    """
+    Renormalize a simple 2-port network to a new set of port impedances.
 
     This function was originally written as a check on the
     `skrf.Network.renormalize()` function, which I was attempting to use
@@ -179,15 +188,12 @@ def renorm_s2p(ntwk, zs):
     So, I wrote this function as a check on that.
 
     Args:
-        ntwk(skrf.Network): A 2-port network, which must use the same
-        (singular) impedance at both ports.
-
-        zs(complex array-like): The set of new port impedances to be
-        used. This set of frequencies may be unique for each port and at
-        each frequency.
+        ntwk: A 2-port network, which must use the same (singular) impedance at both ports.
+        zs: The set of new port impedances to be used.
+            This set of frequencies may be unique for each port and at each frequency.
 
     Returns:
-        skrf.Network: The renormalized 2-port network.
+        Srenorm: The renormalized 2-port network.
     """
     (Nf, Nr, Nc) = ntwk.s.shape
     assert Nr == 2 and Nc == 2, "May only be used to renormalize a 2-port network!"
@@ -218,19 +224,21 @@ def renorm_s2p(ntwk, zs):
     return Network(s=Sn, f=ntwk.f / 1e9, z0=zs)
 
 
-def H_2_s2p(H, Zc, fs, Zref=50):
-    """Convert transfer function to 2-port network.
+def H_2_s2p(H: Cvec, Zc: Cvec, fs: Rvec, Zref: float = 50) -> Network:
+    """
+    Convert transfer function to 2-port network.
 
     Args:
-        H([complex]): transfer function of medium alone.
-        Zc([complex]): complex impedance of medium.
-        fs([real]): frequencies at which `H` and `Zc` were sampled (Hz).
+        H: Transfer function of medium alone.
+        Zc: Complex impedance of medium.
+        fs: Frequencies at which `H` and `Zc` were sampled (Hz).
 
-    KeywordArgs:
-        Zref(real): reference (i.e. - port) impedance to be used in constructing the network (Ohms). (Default: 50)
+    Keyword Args:
+        Zref: Reference (i.e. - port) impedance to be used in constructing the network (Ohms).
+            Default: 50
 
     Returns:
-        skrf.Network: 2-port network representing the channel to which `H` and `Zc` pertain.
+        s2p: 2-port network representing the channel to which `H` and `Zc` pertain.
     """
     # ToDo: Fix this code.  # pylint: disable=fixme
     ws = 2 * pi * fs
@@ -250,19 +258,19 @@ def H_2_s2p(H, Zc, fs, Zref=50):
     return Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_freq(filename, renumber=False):
-    """Read in a 1, 2, or 4-port Touchstone file, and return an equivalent
-    2-port network.
+def import_freq(filename: str, renumber: bool = False) -> Network:
+    """
+    Read in a 1, 2, or 4-port Touchstone file, and return an equivalent 2-port network.
 
     Args:
-        filename(str): Name of Touchstone file to read in.
+        filename: Name of Touchstone file to read in.
 
-    KeywordArgs:
-        renumber(bool): Automatically detect/fix "1=>3/2=>4" port numbering, when True.
+    Keyword Args:
+        renumber: Automatically detect/fix "1=>3/2=>4" port numbering, when True.
             Default = False
 
     Returns:
-        skrf.Network: 2-port network.
+        s2p_DD: 2-port network.
 
     Raises:
         ValueError: If Touchstone file is not 1, 2, or 4-port.
@@ -285,20 +293,24 @@ def import_freq(filename, renumber=False):
     return one_port_2_two_port(ntwk)
 
 
-def import_channel(filename, sample_per, fs, zref=100, renumber=False):
-    """Read in a channel description file.
+def import_channel(filename: str, sample_per: float, fs: Rvec,
+                   zref: float = 100, renumber: bool = False) -> Network:
+    """
+    Read in a channel description file.
 
     Args:
-        filename(str): Name of file from which to import channel description.
-        sample_per(real): Sample period of system signal vector (s).
-        fs([real]): (Positive only) frequency values being used by caller (Hz).
+        filename: Name of file from which to import channel description.
+        sample_per: Sample period of system signal vector (s).
+        fs: (Positive only) frequency values being used by caller (Hz).
 
-    KeywordArgs:
-        zref(real): Reference impedance (Ohms), for time domain files. (Default = 100)
-        renumber(bool): Automatically fix "1=>3/2=>4" port numbering when True.
+    Keyword Args:
+        zref: Reference impedance for time domain files (Ohms).
+            Default: 100
+        renumber: Automatically fix "1=>3/2=>4" port numbering when True.
+            Default: False
 
     Returns:
-        skrf.Network: 2-port network description of channel.
+        s2p: 2-port network description of channel.
 
     Notes:
         1. When a time domain (i.e. - impulse or step response) file is being imported,

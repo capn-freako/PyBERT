@@ -9,6 +9,8 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
+from typing import Optional
+
 from numpy import (  # type: ignore
     argmax, array, concatenate, diag, diff, flip,
     histogram, mean, ones, real, reshape, resize, sign,
@@ -18,6 +20,8 @@ from numpy.fft import fft, ifft  # type: ignore
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 
+from ..common import Rvec
+
 from .math import gaus_pdf
 from .sigproc import moving_average
 
@@ -25,36 +29,38 @@ debug          = False
 
 
 def find_crossing_times(  # pylint: disable=too-many-arguments
-    t,
-    x,
+    t: Rvec,
+    x: Rvec,
     min_delay: float = 0.0,
     rising_first: bool = True,
     min_init_dev: float = 0.1,
     thresh: float = 0.0,
-):
-    """Finds the threshold crossing times of the input signal.
+) -> Rvec:
+    """
+    Finds the threshold crossing times of the input signal.
 
     Args:
-        t([float]): Vector of sample times. Intervals do NOT need to be
-            uniform.
-        x([float]): Sampled input vector.
-        min_delay(float): Minimum delay required, before allowing
-            crossings. (Helps avoid false crossings at beginning of
-            signal.) (Optional; default = 0.)
-        rising_first(bool): When True, start with the first rising edge
-            found. (Optional; default = True.) When this option is True,
-            the first rising edge crossing is the first crossing returned.
+        t: Vector of sample times. Intervals do NOT need to be uniform.
+        x: Sampled input vector.
+
+    Keyword Args:
+        min_delay: Minimum delay required, before allowing crossings.
+            (Helps avoid false crossings at beginning of signal.)
+            Default: 0
+        rising_first: When True, start with the first rising edge found.
+            When this option is True, the first rising edge crossing is the first crossing returned.
             This is the desired behavior for PyBERT, because we always
             initialize the bit stream with [0, 0, 1, 1], in order to
             provide a known synchronization point for jitter analysis.
-        min_init_dev(float): The minimum initial deviation from zero,
-            which must be detected, before searching for crossings.
+            Default: True
+        min_init_dev: The minimum initial deviation from zero,
+            which must be detected before searching for crossings.
             Normalized to maximum input signal magnitude.
-            (Optional; default = 0.1.)
-        thresh(float): Vertical crossing threshold.
+            Default: 0.1
+        thresh: Vertical crossing threshold.
 
     Returns:
-        [float]: Array of signal threshold crossing times.
+        xing_times: Array of signal threshold crossing times.
     """
 
     if len(t) != len(x):
@@ -113,41 +119,44 @@ def find_crossing_times(  # pylint: disable=too-many-arguments
 
 
 def find_crossings(  # pylint: disable=too-many-arguments
-    t,
-    x,
-    amplitude=1.0,
+    t: Rvec,
+    x: Rvec,
+    amplitude: float = 1.0,
     min_delay: float = 0.0,
     rising_first: bool = True,
-    min_init_dev=0.1,
-    mod_type=0,
-):
-    """Finds the crossing times in a signal, according to the modulation type.
+    min_init_dev: float = 0.1,
+    mod_type: int = 0
+) -> Rvec:
+    """
+    Find the crossing times in a signal, according to the modulation type.
 
     Args:
-        t([float]): The times associated with each signal sample.
-        x([float]): The signal samples.
-        amplitude(float): The nominal signal amplitude. (Used for
-            determining thresholds, in the case of some modulation
-            types.)
-        min_delay(float): The earliest possible sample time we want
-            returned. (Optional; default = 0.)
-        rising_first(bool): When True, start with the first rising edge
-            found. When this option is True, the first rising edge
+        t: The times associated with each signal sample.
+        x: The signal samples.
+
+    Keyword Args:
+        amplitude: The nominal signal amplitude.
+            (Used for determining thresholds, in the case of some modulation types.)
+            Default: 1.0
+        min_delay(float): The earliest possible sample time we want returned.
+            Default: 0
+        rising_first: When True, start with the first rising edgefound.
+            When this option is True, the first rising edge
             crossing is the first crossing returned. This is the desired
             behavior for PyBERT, because we always initialize the bit
             stream with [0, 0, 1, 1], in order to provide a known
             synchronization point for jitter analysis.
-            (Optional; default = True.)
-        min_init_dev(float): The minimum initial deviation from zero,
-            which must be detected, before searching for crossings.
+            Default: True
+        min_init_dev: The minimum initial deviation from zero,
+            which must be detected before searching for crossings.
             Normalized to maximum input signal magnitude.
-            (Optional; default = 0.1.)
-        mod_type(int): The modulation type. Allowed values are:
+            Default: 0.1
+        mod_type: The modulation type. Allowed values are:
             {0: NRZ, 1: Duo-binary, 2: PAM-4}
-            (Optional; default = 0.)
+            Default: 0
 
     Returns:
-        [float]: The signal threshold crossing times.
+        xing_times: The signal threshold crossing times.
     """
 
     # assert mod_type >= 0 and mod_type <= 2, f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}"
@@ -197,47 +206,50 @@ def find_crossings(  # pylint: disable=too-many-arguments
 
 
 def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
-    ui, nui, pattern_len, ideal_xings, actual_xings,
-    rel_thresh=3.0, num_bins=101, zero_mean=True, dbg_obj=None, smooth_width=5
-):
+    ui: float, nui: int, pattern_len: int, ideal_xings: Rvec, actual_xings: Rvec,
+    rel_thresh: float = 3.0, num_bins: int = 101,
+    zero_mean: bool = True, dbg_obj: Optional[object] = None, smooth_width: int = 5
+) -> tuple[Rvec, Rvec, float, float, float, float, float, float, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec]:
     """
     Calculate the jitter in a set of actual zero crossings,
     given the ideal crossings and unit interval.
 
     Args:
-        ui(float): The nominal unit interval.
-        nui(int): The number of unit intervals spanned by the input signal.
-        pattern_len(int): The number of unit intervals, before input symbol stream repeats.
-        ideal_xings([float]): The ideal zero crossing locations of the edges.
-        actual_xings([float]): The actual zero crossing locations of the edges.
+        ui: The nominal unit interval (s).
+        nui: The number of unit intervals spanned by the input signal.
+        pattern_len: The number of unit intervals, before input symbol stream repeats.
+        ideal_xings: The ideal zero crossing locations of the edges (s).
+        actual_xings: The actual zero crossing locations of the edges (s).
 
-    KeywordArgs:
-        rel_thresh(float): The threshold for determining periodic jitter spectral components (sigma).
-            (Default: 3.0)
-        num_bins(int): The number of bins to use, when forming histograms.
-            (Default: 101)
-        zero_mean(bool): Force the mean jitter to zero, when True.
-            (Default: True)
-        dbg_obj(object): Object for stashing debugging info.
-            (Default: None)
-        smooth_width(int): Width of smoothing window to use when calculating moving averages.
-            (Default: 5)
+    Keyword Args:
+        rel_thresh: The threshold for determining periodic jitter spectral components (sigma).
+            Default: 3.0
+        num_bins: The number of bins to use, when forming histograms.
+            Default: 101
+        zero_mean: Force the mean jitter to zero, when True.
+            Default: True
+        dbg_obj: Object for stashing debugging info.
+            Default: None
+        smooth_width: Width of smoothing window to use when calculating moving averages.
+            Default: 5
 
     Returns:
-        ( [real]: The total jitter.
-        , [real]: The times (taken from 'ideal_xings') corresponding to the returned jitter values.
-        , real: The peak to peak jitter due to intersymbol interference (ISI).
-        , real: The peak to peak jitter due to duty cycle distortion (DCD).
-        , real: The peak to peak jitter due to uncorrelated periodic sources (Pj).
-        , real: The standard deviation of the jitter due to uncorrelated unbounded random sources (Rj).
-        , [real]: The data independent jitter.
-        , [real]: Threshold for determining periodic components.
-        , [real]: The spectral magnitude of the total jitter.
-        , [real]: The spectral magnitude of the data independent jitter.
-        , [real]: The frequencies corresponding to the spectrum components.
-        , [real]: The smoothed histogram of the total jitter.
-        , [real]: The smoothed histogram of the data-independent jitter.
-        , [real]: The bin center values for both histograms.
+        ( Jtot: The total jitter.
+        , times: The times (taken from 'ideal_xings') corresponding to the returned jitter values.
+        , jISI: The peak to peak jitter due to intersymbol interference (ISI).
+        , jDCD: The peak to peak jitter due to duty cycle distortion (DCD).
+        , jPj: The peak to peak jitter due to uncorrelated periodic sources (Pj).
+        , jRj: The standard deviation of the jitter due to uncorrelated unbounded random sources (Rj).
+        , jPjDD: Dual-Dirac peak to peak jitter.
+        , jRjDD: Dual-Dirac random jitter.
+        , Jind: The data independent jitter.
+        , thresh: Threshold for determining periodic components.
+        , Stot: The spectral magnitude of the total jitter.
+        , Sind: The spectral magnitude of the data independent jitter.
+        , freqs: The frequencies corresponding to the spectrum components.
+        , histTOT: The smoothed histogram of the total jitter.
+        , histIND: The smoothed histogram of the data-independent jitter.
+        , centers: The bin center values for both histograms.
         )
 
     Raises:
@@ -310,10 +322,10 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # Do the jitter decomposition.
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))
-    tie_fallings = jitter.take(list(range(1, len(jitter), 2)))
-    tie_risings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
-    tie_fallings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)
+    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))  # type: ignore
+    tie_fallings = jitter.take(list(range(1, len(jitter), 2)))  # type: ignore
+    tie_risings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)  # type: ignore
+    tie_fallings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)  # type: ignore
     tie_risings  = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))
     tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
 
@@ -326,7 +338,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
     _jitter = jitter.copy()
-    _jitter.resize(num_patterns * xings_per_pattern, refcheck=False)  # Accommodating Tox.
+    # "refcheck=False": accommodating Tox:
+    _jitter.resize(num_patterns * xings_per_pattern, refcheck=False)  # type: ignore
     tie_ave = resize(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
     tie_ind = jitter - tie_ave
     if zero_mean:
@@ -435,12 +448,12 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # --- Stash debugging info if an object was provided.
     if dbg_obj:
-        dbg_obj.hist_ind_smooth = hist_ind_smooth
-        dbg_obj.centers         = centers
-        dbg_obj.hist_ind        = hist_ind
-        dbg_obj.peak_ixs        = peak_ixs
-        dbg_obj.neg_peak_ixs    = neg_peak_ixs
-        dbg_obj.pos_peak_ixs    = pos_peak_ixs
+        dbg_obj.hist_ind_smooth = hist_ind_smooth  # type: ignore
+        dbg_obj.centers         = centers  # type: ignore
+        dbg_obj.hist_ind        = hist_ind  # type: ignore
+        dbg_obj.peak_ixs        = peak_ixs  # type: ignore
+        dbg_obj.neg_peak_ixs    = neg_peak_ixs  # type: ignore
+        dbg_obj.pos_peak_ixs    = pos_peak_ixs  # type: ignore
 
     # --- Fit the tails and average the results, to determine Rj.
     pos_max     = hist_dd[pos_peak_loc]
@@ -470,7 +483,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         sigma_neg = 0
     rjDD = (sigma_pos + sigma_neg) / 2
     if dbg_obj:
-        dbg_obj.dd_soltn = dd_soltn
+        dbg_obj.dd_soltn = dd_soltn  # type: ignore
 
     return (  # pylint: disable=duplicate-code
         jitter,
@@ -486,9 +499,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         jitter_spectrum,
         tie_ind_spectrum,
         jitter_freqs,
-        # hist_tot,
         hist_tot_smooth,
-        # hist_ind,
         hist_ind_smooth,
         centers,  # Returning just one requires `use_my_hist` True.
     )

@@ -10,20 +10,25 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
 from functools import reduce
+from typing import Iterator
+
 from numpy import (  # type: ignore
     append, array, cumsum, exp, log, log10,
     mean, ones, pi, roll, sqrt, where
 )
 from numpy.fft import fftshift  # type: ignore
 
+from ..common import Rvec
 
-def lfsr_bits(taps, seed):
-    """Given a set of tap indices and a seed, generate a PRBS.
+
+def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:
+    """
+    Given a set of tap indices and a seed, generate a PRBS.
 
     Args:
-        taps([int]): The set of fed back taps.
-                     (Largest determines order of generator.)
-        seed(int): The initial value of the shift register.
+        taps: The set of fed back taps.
+            (Largest determines order of generator.)
+        seed: The initial value of the shift register.
 
     Returns:
         generator: A PRBS generator object with a next() method, for retrieving
@@ -42,7 +47,7 @@ def lfsr_bits(taps, seed):
 
 
 def safe_log10(x):
-    """Guards against pesky 'Divide by 0' error messages."""
+    "Guards against pesky 'Divide by 0' error messages."
 
     if hasattr(x, "__len__"):
         x = where(x == 0, 1.0e-20 * ones(len(x)), x)
@@ -53,23 +58,26 @@ def safe_log10(x):
     return log10(x)
 
 
-def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: disable=too-many-locals
-    """Generate the "bathtub" curve associated with a particular jitter PDF.
+# pylint: disable=too-many-locals
+def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
+                 rj: float = 0, extrap: bool = False) -> tuple[Rvec, tuple[int, int]]:
+    """
+    Generate the "bathtub" curve associated with a particular jitter PDF.
 
     Args:
-        centers([real]): List of uniformly spaced bin centers (s).
-        jit_pdf([real]): PDF of jitter.
+        centers: List of uniformly spaced bin centers (s).
+        jit_pdf: PDF of jitter.
 
-    KeywordArgs:
-        min_val(real): Minimum value allowed in returned bathtub vector.
+    Keyword Args:
+        min_val: Minimum value allowed in returned bathtub vector.
             Default: 0
-        rj(real): Standard deviation of Gaussian PDF characterizing random jitter.
+        rj: Standard deviation of Gaussian PDF characterizing random jitter.
             Default: 0
-        extrap(bool): Extrapolate bathtub tails, using `rj`, if True.
+        extrap: Extrapolate bathtub tails, using `rj`, if True.
             Default: False
 
     Returns:
-        ([real], (int,int)): A pair consisting of:
+        (bathtub, (ext_beg, ext_end)): A pair consisting of:
             - the vector of probabilities forming the bathtub curve, and
             - a pair consisting of the beginning/end indices of the extrapolated region.
     """
@@ -99,13 +107,11 @@ def make_bathtub(centers, jit_pdf, min_val=0, rj=0, extrap=False):  # pylint: di
     bathtub  = list(cumsum(jit_pdf[-1: -(half_len + 1): -1]))
     bathtub.reverse()
     bathtub  = array(bathtub + list(cumsum(jit_pdf[: half_len + 1]))) * 2 * dt
-    bathtub  = where(bathtub < min_val, min_val * ones(len(bathtub)), bathtub)
+    bathtub  = where(bathtub < min_val, min_val * ones(len(bathtub)), bathtub)  # type: ignore
     return (bathtub, (ext_first, ext_last))
 
 
-def gaus_pdf(x, mu, sigma):
-    """
-    Gaussian probability density function.
-    """
+def gaus_pdf(x: Rvec, mu: float, sigma: float) -> Rvec:
+    "Gaussian probability density function."
     sqrt_2pi = sqrt(2 * pi)
     return exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * sqrt_2pi)
