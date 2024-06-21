@@ -852,18 +852,22 @@ def update_results(self):
     xs = linspace(-ui * 1.0e12, ui * 1.0e12, width)
     height = 1000
     tiny_noise = normal(scale=1e-3, size=len(chnl_out[ignore_samps:]))  # to make channel eye easier to view.
-    y_max = 1.1 * max(abs(array(self.chnl_out)))
+    y_max = 1.1 * max(abs(array(self.chnl_out[ignore_samps:])))
     eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[ignore_samps:] + tiny_noise, y_max)
-    y_max = 1.1 * max(abs(array(self.rx_in)))
+    y_max = 1.1 * max(abs(array(self.rx_in[ignore_samps:])))
     eye_tx = calc_eye(ui, samps_per_ui, height, self.rx_in[ignore_samps:], y_max)
-    y_max = 1.1 * max(abs(array(self.ctle_out)))
+    y_max = 1.1 * max(abs(array(self.ctle_out[ignore_samps:])))
     eye_ctle = calc_eye(ui, samps_per_ui, height, self.ctle_out[ignore_samps:], y_max)
+    y_max = 1.1 * max(abs(array(self.dfe_out[ignore_samps:])))
     i = 0
-    while clock_times[i] <= ignore_until:
+    len_clock_times = len(clock_times)
+    while i < len_clock_times and clock_times[i] < ignore_until:
         i += 1
-        assert i < len(clock_times), "ERROR: Insufficient coverage in 'clock_times' vector."
-    y_max = 1.1 * max(abs(array(self.dfe_out)))
-    eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out[ignore_samps:], y_max, clock_times[i:])
+    if i >= len(clock_times):
+        self.log("ERROR: Insufficient coverage in 'clock_times' vector.")
+        eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out[ignore_samps:], y_max)
+    else:
+        eye_dfe = calc_eye(ui, samps_per_ui, height, self.dfe_out[ignore_samps:], y_max, array(clock_times[i:]) - ignore_until)
     self.plotdata.set_data("eye_index", xs)
     self.plotdata.set_data("eye_chnl", eye_chnl)
     self.plotdata.set_data("eye_tx", eye_tx)
