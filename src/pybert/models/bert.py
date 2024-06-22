@@ -534,7 +534,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
         self.isi_tx  = isi
         self.dcd_tx  = dcd
         self.pj_tx   = pj
@@ -609,7 +609,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             hist,
             hist_synth,
             bin_centers,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self)
         self.isi_dfe  = isi
         self.dcd_dfe  = dcd
         self.pj_dfe   = pj
