@@ -14,7 +14,7 @@ from typing import Iterator
 
 from numpy import (  # type: ignore
     append, array, cumsum, exp, log, log10,
-    mean, ones, pi, roll, sqrt, where
+    ones, pi, sqrt, where
 )
 from numpy.fft import fftshift  # type: ignore
 

@@ -9,8 +9,6 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
-from typing import Optional
-
 from numpy import (  # type: ignore
     argmax, array, concatenate, diag, diff, flip,
     histogram, mean, ones, real, reshape, resize, sign,
@@ -19,6 +17,7 @@ from numpy import (  # type: ignore
 from numpy.fft import fft, ifft  # type: ignore
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
+from typing import Any, Optional
 
 from ..common import Rvec
 
@@ -460,29 +459,27 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     neg_max     = hist_dd[neg_peak_loc]
     pos_tail_ix = where(hist_dd[pos_peak_loc:] < pos_max / 2)[0] + pos_peak_loc
     neg_tail_ix = where(hist_dd[:neg_peak_loc] < neg_max / 2)[0]
-    dd_soltn    = ([pos_max, neg_max, pos_tail_ix[0], neg_tail_ix[-1]],)
+    dd_soltn    = [[pos_max, neg_max, pos_tail_ix[0], neg_tail_ix[-1]],]
     try:
-        popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix] * 1e12,
-                                        hist_dd[pos_tail_ix] * 1e-12)
+        popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix] * 1e12, hist_dd[pos_tail_ix] * 1e-12)
         mu_pos, sigma_pos = popt
         mu_pos    *= 1e-12  # back to (s)
         sigma_pos *= 1e-12
         err_pos    = sqrt(diag(pcov)) * 1e-12
-        dd_soltn  += ([mu_pos, sigma_pos, err_pos],)
+        dd_soltn  += [[mu_pos, sigma_pos, err_pos],]
     except Exception as err:  # pylint: disable=broad-exception-caught
         sigma_pos = 0
-        dd_soltn += (err,)
+        dd_soltn += [[err],]
     try:
-        popt, pcov = curve_fit(gaus_pdf, centers[neg_tail_ix] * 1e12,
-                                        hist_dd[neg_tail_ix] * 1e-12)
+        popt, pcov = curve_fit(gaus_pdf, centers[neg_tail_ix] * 1e12, hist_dd[neg_tail_ix] * 1e-12)
         mu_neg, sigma_neg = popt
         mu_neg    *= 1e-12  # back to (s)
         sigma_neg *= 1e-12
         err_neg    = sqrt(diag(pcov)) * 1e-12
-        dd_soltn  += ([mu_neg, sigma_neg, err_neg],)
+        dd_soltn  += [[mu_neg, sigma_neg, err_neg],]
     except Exception as err:  # pylint: disable=broad-exception-caught
         sigma_neg = 0
-        dd_soltn += (err,)
+        dd_soltn += [[err],]
     rjDD = (sigma_pos + sigma_neg) / 2
     if dbg_obj:
         dbg_obj.dd_soltn = dd_soltn  # type: ignore
