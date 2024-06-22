@@ -361,7 +361,7 @@ def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: float,
 
     # Generate the "heat" picture array.
     img_array = zeros([height, width])
-    if clock_times:
+    if clock_times is not None:
         for clock_time in clock_times:
             start_time = clock_time - ui
             start_ix = int(start_time / tsamp)

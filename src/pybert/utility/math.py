@@ -83,13 +83,7 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
     """
     half_len  = len(jit_pdf) // 2
     dt        = centers[1] - centers[0]  # Bins assumed to be uniformly spaced!
-    try:
-        jit_pdf_center_of_mass = int(mean([k * pk for (k, pk) in enumerate(jit_pdf)]))
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        print(f"Error finding jitter PDF center of mass: {err}", flush=True)
-        jit_pdf_center_of_mass = half_len
-    _jit_pdf = roll(jit_pdf, half_len - jit_pdf_center_of_mass)
-    zero_locs = where(fftshift(_jit_pdf) == 0)[0]
+    zero_locs = where(fftshift(jit_pdf) == 0)[0]
     ext_first = 0
     ext_last  = len(jit_pdf)
     if (extrap and len(zero_locs)):
