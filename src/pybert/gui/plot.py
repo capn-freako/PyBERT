@@ -22,9 +22,9 @@ def make_plots(self, n_dfe_taps):
     """Create the plots used by the PyBERT GUI."""
 
     post_chnl_str = "Channel"
-    post_tx_str = "Channel + Tx Preemphasis"
-    post_ctle_str = "Channel + Tx Preemphasis + CTLE (+ AMI DFE)"
-    post_dfe_str = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + PyBERT DFE"
+    post_tx_str = "+ Tx Preemphasis & Noise"
+    post_ctle_str = "+ CTLE (& IBIS-AMI DFE if apropos)"
+    post_dfe_str = "+ PyBERT Native DFE if enabled"
 
     plotdata = self.plotdata
 
@@ -549,7 +549,7 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_chnl.plot(("jitter_bins", "bathtub_chnl"), type="line", color="blue")
     plot_bathtub_chnl.value_range.high_setting = 0
-    plot_bathtub_chnl.value_range.low_setting = -18
+    plot_bathtub_chnl.value_range.low_setting = -12
     plot_bathtub_chnl.value_axis.tick_interval = 3
     plot_bathtub_chnl.title = post_chnl_str
     plot_bathtub_chnl.index_axis.title = "Time (ps)"
@@ -558,7 +558,7 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_tx = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_tx.plot(("jitter_bins", "bathtub_tx"), type="line", color="blue")
     plot_bathtub_tx.value_range.high_setting = 0
-    plot_bathtub_tx.value_range.low_setting = -18
+    plot_bathtub_tx.value_range.low_setting = -12
     plot_bathtub_tx.value_axis.tick_interval = 3
     plot_bathtub_tx.title = post_tx_str
     plot_bathtub_tx.index_axis.title = "Time (ps)"
@@ -567,7 +567,7 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_ctle = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_ctle.plot(("jitter_bins", "bathtub_ctle"), type="line", color="blue")
     plot_bathtub_ctle.value_range.high_setting = 0
-    plot_bathtub_ctle.value_range.low_setting = -18
+    plot_bathtub_ctle.value_range.low_setting = -12
     plot_bathtub_ctle.value_axis.tick_interval = 3
     plot_bathtub_ctle.title = post_ctle_str
     plot_bathtub_ctle.index_axis.title = "Time (ps)"
@@ -576,7 +576,7 @@ def make_plots(self, n_dfe_taps):
     plot_bathtub_dfe = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_bathtub_dfe.plot(("jitter_bins", "bathtub_dfe"), type="line", color="blue")
     plot_bathtub_dfe.value_range.high_setting = 0
-    plot_bathtub_dfe.value_range.low_setting = -18
+    plot_bathtub_dfe.value_range.low_setting = -12
     plot_bathtub_dfe.value_axis.tick_interval = 3
     plot_bathtub_dfe.title = post_dfe_str
     plot_bathtub_dfe.index_axis.title = "Time (ps)"

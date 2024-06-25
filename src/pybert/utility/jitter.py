@@ -9,6 +9,8 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
+from typing import Optional
+
 from numpy import (  # type: ignore
     argmax, array, concatenate, diag, diff, flip,
     histogram, mean, ones, real, reshape, resize, sign,
@@ -17,7 +19,6 @@ from numpy import (  # type: ignore
 from numpy.fft import fft, ifft  # type: ignore
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
-from typing import Any, Optional
 
 from ..common import Rvec
 
@@ -208,7 +209,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     ui: float, nui: int, pattern_len: int, ideal_xings: Rvec, actual_xings: Rvec,
     rel_thresh: float = 3.0, num_bins: int = 101,
     zero_mean: bool = True, dbg_obj: Optional[object] = None, smooth_width: int = 5
-) -> tuple[Rvec, Rvec, float, float, float, float, float, float, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec]:
+) -> tuple[Rvec, Rvec, float, float, float, float, float, float,
+           Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, float, float]:
     """
     Calculate the jitter in a set of actual zero crossings,
     given the ideal crossings and unit interval.
@@ -249,6 +251,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         , histTOT: The smoothed histogram of the total jitter.
         , histIND: The smoothed histogram of the data-independent jitter.
         , centers: The bin center values for both histograms.
+        , mu_pos: The mean of the Gaussian distribution best fitted to the right tail.
+        , mu_neg: The mean of the Gaussian distribution best fitted to the left tail.
         )
 
     Raises:
@@ -416,12 +420,12 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         hist        = hist / hist.sum()  # PMF
         if density:
             hist /= diff(bin_edges)
-        return (hist, bin_centers)
+        return (hist, bin_centers, bin_edges)
 
     if use_my_hist:
-        hist_ind, centers = my_hist(tie_ind, density=True)
-        hist_tot, _       = my_hist(jitter,  density=True)
-        centers           = array(centers)
+        hist_ind, centers, edges = my_hist(tie_ind, density=True)
+        hist_tot, _, _ = my_hist(jitter,  density=True)
+        centers = array(centers)
     else:
         hist_ind, edges = histogram(tie_ind, bins=num_bins, density=True)
         hist_tot, _     = histogram(jitter,  bins=num_bins, density=True)
@@ -429,6 +433,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     hist_ind_smooth = array(moving_average(hist_ind, n=smooth_width))
     hist_tot_smooth = array(moving_average(hist_tot, n=smooth_width))
     hist_dd = hist_tot_smooth
+
     # Trying to avoid any residual peak at zero, which can confuse the algorithm:
     center_ix = (num_bins - 1) / 2  # May be fractional.
     peak_ixs  = array(list(filter(lambda x: abs(x - center_ix) > 1,
@@ -455,31 +460,44 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         dbg_obj.pos_peak_ixs    = pos_peak_ixs  # type: ignore
 
     # --- Fit the tails and average the results, to determine Rj.
-    pos_max     = hist_dd[pos_peak_loc]
-    neg_max     = hist_dd[neg_peak_loc]
-    pos_tail_ix = where(hist_dd[pos_peak_loc:] < pos_max / 2)[0] + pos_peak_loc
-    neg_tail_ix = where(hist_dd[:neg_peak_loc] < neg_max / 2)[0]
-    dd_soltn    = [[pos_max, neg_max, pos_tail_ix[0], neg_tail_ix[-1]],]
-    try:
-        popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix] * 1e12, hist_dd[pos_tail_ix] * 1e-12)
-        mu_pos, sigma_pos = popt
-        mu_pos    *= 1e-12  # back to (s)
-        sigma_pos *= 1e-12
-        err_pos    = sqrt(diag(pcov)) * 1e-12
-        dd_soltn  += [[mu_pos, sigma_pos, err_pos],]
-    except Exception as err:  # pylint: disable=broad-exception-caught
+    pos_max = hist_dd[pos_peak_loc]
+    neg_max = hist_dd[neg_peak_loc]
+    dd_soltn = [[pos_max, neg_max],]
+    pos_tail_ixs = where(hist_dd[pos_peak_loc:] < pos_max / 2)[0]
+    neg_tail_ixs = where(hist_dd[:neg_peak_loc] < neg_max / 2)[0]
+    if len(pos_tail_ixs) > 0 and len(neg_tail_ixs) > 0:
+        pos_tail_ix = pos_tail_ixs[0] + pos_peak_loc  # index of first  piece of right tail
+        neg_tail_ix = neg_tail_ixs[-1]                # index of last piece of left tail
+        dd_soltn[0].append(pos_tail_ix)
+        dd_soltn[0].append(neg_tail_ix)
+        # Don't send first or last histogram elements to curve fitter, due to their special nature.
+        try:
+            popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix:-1] * 1e12, hist_dd[pos_tail_ix:-1] * 1e-12)
+            mu_pos, sigma_pos = popt
+            mu_pos    *= 1e-12  # back to (s)
+            sigma_pos *= 1e-12
+            err_pos    = sqrt(diag(pcov)) * 1e-12
+            dd_soltn  += [[mu_pos, sigma_pos, err_pos],]
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            mu_pos = 0
+            sigma_pos = 0
+            dd_soltn += [[err],]
+        try:
+            popt, pcov = curve_fit(gaus_pdf, centers[1:neg_tail_ix] * 1e12, hist_dd[1:neg_tail_ix] * 1e-12)
+            mu_neg, sigma_neg = popt
+            mu_neg    *= 1e-12  # back to (s)
+            sigma_neg *= 1e-12
+            err_neg    = sqrt(diag(pcov)) * 1e-12
+            dd_soltn  += [[mu_neg, sigma_neg, err_neg],]
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            mu_neg = 0
+            sigma_neg = 0
+            dd_soltn += [[err],]
+    else:
+        mu_pos = 0
         sigma_pos = 0
-        dd_soltn += [[err],]
-    try:
-        popt, pcov = curve_fit(gaus_pdf, centers[neg_tail_ix] * 1e12, hist_dd[neg_tail_ix] * 1e-12)
-        mu_neg, sigma_neg = popt
-        mu_neg    *= 1e-12  # back to (s)
-        sigma_neg *= 1e-12
-        err_neg    = sqrt(diag(pcov)) * 1e-12
-        dd_soltn  += [[mu_neg, sigma_neg, err_neg],]
-    except Exception as err:  # pylint: disable=broad-exception-caught
+        mu_neg = 0
         sigma_neg = 0
-        dd_soltn += [[err],]
     rjDD = (sigma_pos + sigma_neg) / 2
     if dbg_obj:
         dbg_obj.dd_soltn = dd_soltn  # type: ignore
@@ -501,4 +519,6 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         hist_tot_smooth,
         hist_ind_smooth,
         centers,  # Returning just one requires `use_my_hist` True.
+        mu_pos,
+        mu_neg
     )

@@ -11,7 +11,7 @@ PROJ_NAME := PipBERT
 PROJ_FILE := pyproject.toml
 PROJ_INFO := src/PipBERT.egg-info/PKG-INFO
 VER_FILE := .proj_ver
-VER_GETTER := get_proj_ver
+VER_GETTER := ./get_proj_ver.py
 PYTHON_EXEC := python -I
 TOX_EXEC := tox
 TOX_SKIP_ENV := format
@@ -25,7 +25,7 @@ check:
 	${TOX_EXEC} run -e check
 
 ${VER_FILE}: ${PROJ_INFO}
-	${PYTHON_EXEC} -m ${VER_GETTER} ${PROJ_NAME} $@
+	${PYTHON_EXEC} ${VER_GETTER} ${PROJ_NAME} $@
 
 ${PROJ_INFO}: ${PROJ_FILE}
 	${PYTHON_EXEC} -m build
@@ -49,7 +49,7 @@ type-check:
 docs: ${VER_FILE}
 	source $< && ${TOX_EXEC} run -e docs
 
-build:
+build: ${VER_FILE}
 	${TOX_EXEC} run -e build
 
 upload: ${VER_FILE}

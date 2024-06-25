@@ -13,10 +13,12 @@ from functools import reduce
 from typing import Iterator
 
 from numpy import (  # type: ignore
-    append, array, cumsum, exp, log, log10,
-    ones, pi, sqrt, where
+    append, array, cumsum, exp, log10,
+    maximum, ones, pi, sqrt, where
 )
 from numpy.fft import fftshift  # type: ignore
+
+from pybert.utility.sigproc import moving_average
 
 from ..common import Rvec
 
@@ -58,14 +60,16 @@ def safe_log10(x):
     return log10(x)
 
 
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals,too-many-arguments
 def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
-                 rj: float = 0, extrap: bool = False) -> tuple[Rvec, tuple[int, int]]:
+                 rj: float = 0, mu_r: float = 0, mu_l: float = 0,
+                 extrap: bool = False) -> tuple[Rvec, tuple[int, int]]:
     """
     Generate the "bathtub" curve associated with a particular jitter PDF.
 
     Args:
         centers: List of uniformly spaced bin centers (s).
+            Note: First and last elements are exceptions.
         jit_pdf: PDF of jitter.
 
     Keyword Args:
@@ -73,36 +77,37 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
             Default: 0
         rj: Standard deviation of Gaussian PDF characterizing random jitter.
             Default: 0
+        mu_r: Mean of Gaussian PDF best fit to right tail.
+            Default: 0
+        mu_l: Mean of Gaussian PDF best fit to left tail.
+            Default: 0
         extrap: Extrapolate bathtub tails, using `rj`, if True.
             Default: False
 
     Returns:
-        (bathtub, (ext_beg, ext_end)): A pair consisting of:
-            - the vector of probabilities forming the bathtub curve, and
-            - a pair consisting of the beginning/end indices of the extrapolated region.
+        bathtub: the vector of probabilities forming the bathtub curve
     """
+
     half_len  = len(jit_pdf) // 2
-    dt        = centers[1] - centers[0]  # Bins assumed to be uniformly spaced!
-    zero_locs = where(fftshift(jit_pdf) == 0)[0]
-    ext_first = 0
-    ext_last  = len(jit_pdf)
-    if (extrap and len(zero_locs)):
-        ext_first = min(zero_locs)
-        ext_last  = max(zero_locs)
-        if ext_first < half_len < ext_last:
-            sqrt_2pi = sqrt(2 * pi)
-            ix_r = ext_first + half_len - 1
-            mu_r = centers[ix_r] - sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_r]))
-            ix_l = ext_last - half_len + 1
-            mu_l = centers[ix_l] + sqrt(2) * rj * sqrt(-log(rj * sqrt_2pi * jit_pdf[ix_l]))
-            jit_pdf = append(append(gaus_pdf(centers[:ix_l], mu_l, rj),
-                                    jit_pdf[ix_l: ix_r + 1]),
-                             gaus_pdf(centers[ix_r + 1:], mu_r, rj))
-    bathtub  = list(cumsum(jit_pdf[-1: -(half_len + 1): -1]))
-    bathtub.reverse()
-    bathtub  = array(bathtub + list(cumsum(jit_pdf[: half_len + 1]))) * 2 * dt
-    bathtub  = where(bathtub < min_val, min_val * ones(len(bathtub)), bathtub)  # type: ignore
-    return (bathtub, (ext_first, ext_last))
+    dt = centers[2] - centers[1]  # Avoiding `centers[0]`, due to its special nature.
+
+    if jit_pdf[0] or jit_pdf[-1]:  # Closed eye?
+        half_ui = centers[-1]
+        jit_pmf = [jit_pdf[0] * half_ui] + list(array(jit_pdf[1:-1]) * dt) + [jit_pdf[-1] * half_ui]
+    else:
+        if extrap:
+            # The weird scaling is meant to improve numerical precision through `gaus_pdf()`.
+            gaus_fit  = append(gaus_pdf(centers[:half_len] * 1e12, mu_l * 1e12, rj * 1e12),
+                               gaus_pdf(centers[half_len:] * 1e12, mu_r * 1e12, rj * 1e12)) * 1e-12
+            jit_pdf_ext = moving_average(where(jit_pdf == 0, gaus_fit, jit_pdf), n=5)
+        else:
+            jit_pdf_ext = jit_pdf
+        jit_pmf = array(jit_pdf_ext) * dt
+
+    jit_cdf = cumsum(jit_pmf) * 2
+    jit_cdf[half_len:] -= 2 * (jit_cdf[half_len:] - 1)
+    jit_cdf[-1] = jit_cdf[0]
+    return maximum(min_val, fftshift(jit_cdf))
 
 
 def gaus_pdf(x: Rvec, mu: float, sigma: float) -> Rvec:

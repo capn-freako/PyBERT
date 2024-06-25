@@ -48,7 +48,7 @@ from pybert.utility import (
 clock = perf_counter
 
 DEBUG           = False
-MIN_BATHTUB_VAL = 1.0e-18
+MIN_BATHTUB_VAL = 1.0e-12
 gFc             = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
 
 
@@ -494,6 +494,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             hist,
             hist_synth,
             bin_centers,
+            mu_pos,
+            mu_neg,
         ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
         self.t_jitter  = t_jitter
         self.isi_chnl  = isi
@@ -502,6 +504,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rj_chnl   = rj
         self.pjDD_chnl = pjDD
         self.rjDD_chnl = rjDD
+        self.mu_pos_chnl = mu_pos
+        self.mu_neg_chnl = mu_neg
         self.thresh_chnl = thresh
         self.jitter_chnl = hist
         self.jitter_ext_chnl = hist_synth
@@ -534,6 +538,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             hist,
             hist_synth,
             bin_centers,
+            mu_pos,
+            mu_neg,
         ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
         self.isi_tx  = isi
         self.dcd_tx  = dcd
@@ -541,6 +547,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rj_tx   = rj
         self.pjDD_tx = pjDD
         self.rjDD_tx = rjDD
+        self.mu_pos_tx = mu_pos
+        self.mu_neg_tx = mu_neg
         self.thresh_tx = thresh
         self.jitter_tx = hist
         self.jitter_ext_tx = hist_synth
@@ -573,6 +581,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             hist,
             hist_synth,
             bin_centers,
+            mu_pos,
+            mu_neg,
         ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
         self.isi_ctle  = isi
         self.dcd_ctle  = dcd
@@ -580,6 +590,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rj_ctle   = rj
         self.pjDD_ctle = pjDD
         self.rjDD_ctle = rjDD
+        self.mu_pos_ctle = mu_pos
+        self.mu_neg_ctle = mu_neg
         self.thresh_ctle = thresh
         self.jitter_ctle = hist
         self.jitter_ext_ctle = hist_synth
@@ -609,6 +621,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             hist,
             hist_synth,
             bin_centers,
+            mu_pos,
+            mu_neg,
         ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self)
         self.isi_dfe  = isi
         self.dcd_dfe  = dcd
@@ -616,6 +630,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rj_dfe   = rj
         self.pjDD_dfe = pjDD
         self.rjDD_dfe = rjDD
+        self.mu_pos_dfe = mu_pos
+        self.mu_neg_dfe = mu_neg
         self.thresh_dfe = thresh
         self.jitter_dfe = hist
         self.jitter_ext_dfe = hist_synth
@@ -830,18 +846,18 @@ def update_results(self):
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
     # Bathtubs
-    bathtub_chnl, (_, _) = make_bathtub(
+    bathtub_chnl = make_bathtub(
         jitter_bins, jitter_chnl, min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rj_chnl, extrap=True)
-    bathtub_tx,   (_,  _) = make_bathtub(
+        rj=self.rjDD_chnl, mu_r=self.mu_pos_chnl, mu_l=self.mu_neg_chnl, extrap=True)
+    bathtub_tx = make_bathtub(
         jitter_bins, jitter_tx,   min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rj_tx,   extrap=True)
-    bathtub_ctle, (_, _) = make_bathtub(
+        rj=self.rjDD_tx, mu_r=self.mu_pos_tx, mu_l=self.mu_neg_tx, extrap=True)
+    bathtub_ctle = make_bathtub(
         jitter_bins, jitter_ctle, min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rj_ctle, extrap=True)
-    bathtub_dfe,  (_,  _) = make_bathtub(
+        rj=self.rjDD_ctle, mu_r=self.mu_pos_ctle, mu_l=self.mu_neg_ctle, extrap=True)
+    bathtub_dfe = make_bathtub(
         jitter_bins, jitter_dfe,  min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rj_dfe,  extrap=True)
+        rj=self.rjDD_dfe, mu_r=self.mu_pos_dfe, mu_l=self.mu_neg_dfe, extrap=True)
     self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))
     self.plotdata.set_data("bathtub_tx",   safe_log10(bathtub_tx))
     self.plotdata.set_data("bathtub_ctle", safe_log10(bathtub_ctle))
