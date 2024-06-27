@@ -22,7 +22,7 @@ def make_plots(self, n_dfe_taps):
     """Create the plots used by the PyBERT GUI."""
 
     post_chnl_str = "Channel"
-    post_tx_str = "+ Tx Preemphasis & Noise"
+    post_tx_str = "+ Tx De-emphasis & Noise"
     post_ctle_str = "+ CTLE (& IBIS-AMI DFE if apropos)"
     post_dfe_str = "+ PyBERT Native DFE if enabled"
 
@@ -110,7 +110,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue", name="Incremental")
     plot_h_chnl.title = post_chnl_str
     plot_h_chnl.index_axis.title = "Time (ns)"
-    plot_h_chnl.y_axis.title = "Impulse Response (V/ns)"
+    plot_h_chnl.y_axis.title = "Impulse Response (V/samp.)"
     plot_h_chnl.legend.visible = True
     plot_h_chnl.legend.align = "ur"
     zoom_h = ZoomTool(plot_h_chnl, tool_mode="range", axis="index", always_on=False)
@@ -120,7 +120,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_tx.plot(("t_ns_chnl", "tx_out_h"), type="line", color="red", name="Cumulative")
     plot_h_tx.title = post_tx_str
     plot_h_tx.index_axis.title = "Time (ns)"
-    plot_h_tx.y_axis.title = "Impulse Response (V/ns)"
+    plot_h_tx.y_axis.title = "Impulse Response (V/samp.)"
     plot_h_tx.legend.visible = True
     plot_h_tx.legend.align = "ur"
     plot_h_tx.index_range = plot_h_chnl.index_range  # Zoom x-axes in tandem.
@@ -129,7 +129,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_ctle.plot(("t_ns_chnl", "ctle_out_h"), type="line", color="red", name="Cumulative")
     plot_h_ctle.title = post_ctle_str
     plot_h_ctle.index_axis.title = "Time (ns)"
-    plot_h_ctle.y_axis.title = "Impulse Response (V/ns)"
+    plot_h_ctle.y_axis.title = "Impulse Response (V/samp.)"
     plot_h_ctle.legend.visible = True
     plot_h_ctle.legend.align = "ur"
     plot_h_ctle.index_range = plot_h_chnl.index_range  # Zoom x-axes in tandem.
@@ -138,7 +138,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_dfe.plot(("t_ns_chnl", "dfe_out_h"), type="line", color="red", name="Cumulative")
     plot_h_dfe.title = post_dfe_str
     plot_h_dfe.index_axis.title = "Time (ns)"
-    plot_h_dfe.y_axis.title = "Impulse Response (V/ns)"
+    plot_h_dfe.y_axis.title = "Impulse Response (V/samp.)"
     plot_h_dfe.legend.visible = True
     plot_h_dfe.legend.align = "ur"
     plot_h_dfe.index_range = plot_h_chnl.index_range  # Zoom x-axes in tandem.

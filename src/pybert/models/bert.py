@@ -210,22 +210,20 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     def get_ctle_h():
         "Return the impulse response of the PyBERT native CTLE model."
         if self.use_ctle_file:
-            # FIXME: The new import_channel() implementation breaks this:  # pylint: disable=fixme
+            # FIXME: The new import_channel() implementation breaks this.
             ctle_h = import_channel(self.ctle_file, ts, f)
             if max(abs(ctle_h)) < 100.0:  # step response?
                 ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
             else:
                 ctle_h *= ts  # Normalize to (V/sample)
             ctle_h.resize(len(t))
-            ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.  # pylint: disable=fixme
-            # ctle_H *= sum(ctle_h) / ctle_H[0]
+            ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.
         else:
             if ctle_enable:
                 _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w)
                 _ctle_h = irfft(ctle_H)
                 krnl = interp1d(t_irfft, _ctle_h, bounds_error=False, fill_value=0)
                 ctle_h = krnl(t)
-                # ctle_h *= t[1] / t_irfft[1]
                 ctle_h *= sum(_ctle_h) / sum(ctle_h)
                 ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
             else:
@@ -458,7 +456,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         Args:
             xings([float]): List of crossings.
 
-        KeywordArgs:
+        Keyword Args:
             ofst(float): Time offset to be subtracted from all crossings.
 
         Returns:
@@ -687,7 +685,6 @@ def update_results(self):
     t_ns_chnl = self.t_ns_chnl
     t_irfft = self.t_irfft
 
-    Ts = t[1]
     ignore_until = (num_ui - eye_uis) * ui
     ignore_samps = (num_ui - eye_uis) * samps_per_ui
 
@@ -743,13 +740,13 @@ def update_results(self):
     self.plotdata.set_data("ui_ests", ui_ests_plot)
 
     # Impulse responses
-    self.plotdata.set_data("chnl_h", self.chnl_h * 1.0e-9 / Ts)  # Re-normalize to (V/ns), for plotting.
-    self.plotdata.set_data("tx_h", self.tx_h * 1.0e-9 / Ts)
-    self.plotdata.set_data("tx_out_h", self.tx_out_h * 1.0e-9 / Ts)
-    self.plotdata.set_data("ctle_h", self.ctle_h * 1.0e-9 / Ts)
-    self.plotdata.set_data("ctle_out_h", self.ctle_out_h * 1.0e-9 / Ts)
-    self.plotdata.set_data("dfe_h", self.dfe_h * 1.0e-9 / Ts)
-    self.plotdata.set_data("dfe_out_h", self.dfe_out_h * 1.0e-9 / Ts)
+    self.plotdata.set_data("chnl_h", self.chnl_h)
+    self.plotdata.set_data("tx_h", self.tx_h)
+    self.plotdata.set_data("tx_out_h", self.tx_out_h)
+    self.plotdata.set_data("ctle_h", self.ctle_h)
+    self.plotdata.set_data("ctle_out_h", self.ctle_out_h)
+    self.plotdata.set_data("dfe_h", self.dfe_h)
+    self.plotdata.set_data("dfe_out_h", self.dfe_out_h)
 
     # Step responses
     self.plotdata.set_data("chnl_s", self.chnl_s)

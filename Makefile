@@ -114,7 +114,6 @@ help:
 	@echo "\t\tTo view the resultant API documentation, open 'docs/build/index.html' in a browser."
 	@echo "\tbuild: Run Tox 'build' environment."
 	@echo "\t\tBuilds source tarball and wheel, for installing or uploading to PyPi."
-	@echo "\t\tTests installation before uploading to PyPi."
 	@echo "\tupload: Run Tox 'upload' environment."
 	@echo "\t\tUploads source tarball and wheel to PyPi."
 	@echo "\t\t(Only David Banas can do this.)"

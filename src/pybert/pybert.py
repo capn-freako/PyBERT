@@ -1135,7 +1135,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
                 s2p(skrf.Network): initial 2-port network.
                 ts4f(string): on-die S-parameter file name.
 
-            KeywordArgs:
+            Keyword Args:
                 isRx(bool): True when Rx on-die S-params. are being added. (Default = False).
 
             Returns:
@@ -1180,14 +1180,16 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         self.ch_s2p = ch_s2p
 
         # Calculate channel impulse response.
-        # ToDo: Incorporate Tx output impedance.  # pylint: disable=fixme
+        Zs = Rs / (1 + 1j * w * Rs * Cs)  # Tx termination impedance
         Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
         ch_s2p_term = ch_s2p.copy()
         ch_s2p_term_z0 = ch_s2p.z0.copy()
+        ch_s2p_term_z0[:, 0] = Zs
         ch_s2p_term_z0[:, 1] = Zt
         ch_s2p_term.renormalize(ch_s2p_term_z0)
         ch_s2p_term.name = "ch_s2p_term"
         self.ch_s2p_term = ch_s2p_term
+
         # We take the transfer function, H, to be a ratio of voltages.
         # So, we must normalize our (now generalized) S-parameters.
         chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])

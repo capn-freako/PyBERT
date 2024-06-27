@@ -1,10 +1,10 @@
-from typing import TypeAlias, TypeVar
-import numpy.typing as npt  # type: ignore
+from _typeshed import Incomplete
+from typing import TypeVar
 
 Real = TypeVar('Real', float, float)
 Comp = TypeVar('Comp', complex, complex)
-Rvec: TypeAlias = npt.NDArray[Real]
-Cvec: TypeAlias = npt.NDArray[Comp]
+Rvec: Incomplete
+Cvec: Incomplete
 PI: float
 TWOPI: float
 

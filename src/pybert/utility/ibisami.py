@@ -19,7 +19,7 @@ from ..common import Rvec
 
 def getwave_step_resp(ami_model: AMIModel) -> Rvec:
     """
-    Use a model's AMI_GetWave() function to extract its step response.
+    Use a model's ``AMI_GetWave()`` function to extract its step response.
 
     Args:
         ami_model: The AMI model to use.
@@ -34,18 +34,18 @@ def getwave_step_resp(ami_model: AMIModel) -> Rvec:
     # frequency artifactual energy sometimes introduced near
     # the signal edges by frequency domain processing in some models.
     tmp = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
-    s, _ = ami_model.getWave(tmp)
+    s, _, _ = ami_model.getWave(tmp)
     # Some models delay signal flow through GetWave() arbitrarily.
     tmp = array([0.5] * 1024)
     max_tries = 10
     n_tries = 0
     while max(s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-        s, _ = ami_model.getWave(tmp)
+        s, _, _ = ami_model.getWave(tmp)
         n_tries += 1
     if n_tries == max_tries:
         raise RuntimeError("No step rise detected!")
     # Make one more call, just to ensure a sufficient "tail".
-    tmp, _ = ami_model.getWave(tmp)
+    tmp, _, _ = ami_model.getWave(tmp)
     s = append(s, tmp)
     return s - s[0]
 
@@ -65,18 +65,18 @@ def init_imp_resp(ami_model: AMIModel) -> Rvec:
     # frequency artifactual energy sometimes introduced near
     # the signal edges by frequency domain processing in some models.
     tmp = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
-    s, _ = ami_model.getWave(tmp)
+    s, _, _ = ami_model.getWave(tmp)
     # Some models delay signal flow through GetWave() arbitrarily.
     tmp = array([0.5] * 1024)
     max_tries = 10
     n_tries = 0
     while max(s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-        s, _ = ami_model.getWave(tmp)
+        s, _, _ = ami_model.getWave(tmp)
         n_tries += 1
     if n_tries == max_tries:
         raise RuntimeError("No step rise detected!")
     # Make one more call, just to ensure a sufficient "tail".
-    tmp, _ = ami_model.getWave(tmp)
+    tmp, _, _ = ami_model.getWave(tmp)
     s = append(s, tmp)
     return s - s[0]
 
@@ -146,7 +146,9 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
 
     # Generate model's output.
     if use_getwave:
-        y, clks = model.getWave(x, bits_per_call=bits_per_call)
+        y, clks, params_out = model.getWave(x, bits_per_call=bits_per_call)
+        pout_str = "\n".join(map(lambda s: s.decode('utf-8'), params_out))
+        msg += f"\nOutput parameters:\n{pout_str}"
     else:
         y = convolve(x, out_h)[:len(x)]
         clks = None

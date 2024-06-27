@@ -93,7 +93,10 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
 
     if jit_pdf[0] or jit_pdf[-1]:  # Closed eye?
         half_ui = centers[-1]
-        jit_pmf = [jit_pdf[0] * half_ui] + list(array(jit_pdf[1:-1]) * dt) + [jit_pdf[-1] * half_ui]
+        # The following line works in conjunction w/ the line just before `return ...`,
+        # to eliminate artifactual "spikes" near the center of the final plot,
+        # which can occur in closed eye situations, due to slight mis-centering of the jitter PDF.
+        jit_pmf = [(jit_pdf[0] + jit_pdf[-1]) * half_ui] + list(array(jit_pdf[1:-1]) * dt) + [0]
     else:
         if extrap:
             # The weird scaling is meant to improve numerical precision through `gaus_pdf()`.
@@ -105,8 +108,8 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
         jit_pmf = array(jit_pdf_ext) * dt
 
     jit_cdf = cumsum(jit_pmf) * 2
-    jit_cdf[half_len:] -= 2 * (jit_cdf[half_len:] - 1)
-    jit_cdf[-1] = jit_cdf[0]
+    jit_cdf -= (jit_cdf[0] + jit_cdf[-1]) / 2 - 1       # Forcing mid-point to 1, because we're going to...
+    jit_cdf[half_len:] -= 2 * (jit_cdf[half_len:] - 1)  # ...fold the second half vertically about the horizontal line: y=1.
     return maximum(min_val, fftshift(jit_cdf))
 
 
