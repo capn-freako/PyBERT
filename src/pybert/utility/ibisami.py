@@ -84,7 +84,7 @@ def init_imp_resp(ami_model: AMIModel) -> Rvec:
 # pylint: disable=too-many-arguments,too-many-locals
 def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
                   ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0  # noqa: F405
-                  ) -> tuple[Rvec, Rvec, Rvec, Rvec, str]:  # noqa: F405
+                  ) -> tuple[Rvec, Rvec, Rvec, Rvec, str, list[str]]:  # noqa: F405
     """
     Run a simulation of an IBIS-AMI model.
 
@@ -102,12 +102,13 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
             Default: 0 (Means "Use existing value.")
 
     Returns:
-        y, clks, h, out_h, params_out: A tuple consisting of:
+        y, clks, h, out_h, msg, params_out: A tuple consisting of:
             - the model output convolved w/ any channel impulse response given in `chnl_h`,
             - the model determined sampling instants (a.k.a. - "clock times"), if appropriate,
             - the model's impulse response (V/sample),
-            - the impulse response of the model concatenated w/ the given channel (V/sample), and
-            - input parameters, and any output parameters and/or message returned by the model.
+            - the impulse response of the model concatenated w/ the given channel (V/sample),
+            - input parameters, and any message returned by the model's AMI_Init() function, and
+            - any output parameters from GetWave() if apropos.
 
     Raises:
         IOError: if the given file name cannot be found/opened.
@@ -147,10 +148,8 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     # Generate model's output.
     if use_getwave:
         y, clks, params_out = model.getWave(x, bits_per_call=bits_per_call)
-        pout_str = "\n".join(map(lambda s: s.decode('utf-8'), params_out))
-        msg += f"\nOutput parameters:\n{pout_str}"
+        return (y, clks, h, out_h, msg, list(map(lambda p: p.decode('utf-8'), params_out)))
     else:
         y = convolve(x, out_h)[:len(x)]
         clks = None
-
-    return (y, clks, h, out_h, msg)
+        return (y, clks, h, out_h, msg, [])

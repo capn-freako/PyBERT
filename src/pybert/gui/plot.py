@@ -69,8 +69,9 @@ def make_plots(self, n_dfe_taps):
     plot_clk_per_spec = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT)
     plot_clk_per_spec.plot(("clk_freqs", "clk_spec"), type="line", color="blue")
     plot_clk_per_spec.title = "CDR Clock Period Spectrum"
-    plot_clk_per_spec.index_axis.title = "Frequency (bit rate)"
-    plot_clk_per_spec.value_axis.title = "|H(f)| (dB mean)"
+    plot_clk_per_spec.index_axis.title = "Frequency (symbol rate)"
+    plot_clk_per_spec.value_axis.title = "|H(f)| (dB norm.)"
+    plot_clk_per_spec.index_range.high_setting = 0.5
     plot_clk_per_spec.value_range.low_setting = -10
     zoom_clk_per_spec = ZoomTool(plot_clk_per_spec, tool_mode="range", axis="index", always_on=False)
     plot_clk_per_spec.overlays.append(zoom_clk_per_spec)

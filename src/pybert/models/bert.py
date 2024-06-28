@@ -31,6 +31,8 @@ from numpy.random import normal  # type: ignore
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
+from pyibisami.ami.parser import ami_defs
+
 from pybert.models.dfe import DFE
 from pybert.utility import (
     calc_eye,
@@ -142,6 +144,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         nspb = nspui // 2
     else:
         nspb = nspui
+
     # Generate the ideal over-sampled signal.
     #
     # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
@@ -232,9 +235,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     try:
         if self.tx_use_ami and self.tx_use_getwave:
-            tx_out, _, tx_h, tx_out_h, msg = run_ami_model(
+            tx_out, _, tx_h, tx_out_h, msg, params = run_ami_model(
                 self.tx_dll_file, self._tx_cfg, True, ui, ts, chnl_h, x)
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
+            tx_getwave_params = ami_defs.parse(params)
+            self.log(f"Tx IBIS-AMI model GetWave() output parameters:\n{tx_getwave_params}")
             rx_in = convolve(tx_out + noise, chnl_h)[:len(tx_out)]
             # Calculate the remaining responses from the impulse responses.
             tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, f)
@@ -243,12 +248,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             split_time = clock()
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
-                ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
+                ctle_out, _, ctle_h, ctle_out_h, msg, params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
+                rx_getwave_params = ami_defs.parse(params)
+                self.log(f"Rx IBIS-AMI model GetWave() output parameters:\n{rx_getwave_params}")
             else:  # Rx is either AMI_Init() or PyBERT native.
                 if self.rx_use_ami:  # Rx Init()
-                    _, _, ctle_h, ctle_out_h, msg = run_ami_model(
+                    _, _, ctle_h, ctle_out_h, msg, _ = run_ami_model(
                         self.rx_dll_file, self._rx_cfg, False, ui, ts, chnl_h, tx_out)
                     self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                     ctle_out = convolve(tx_out, ctle_out_h)[:len(tx_out)]
@@ -258,7 +265,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     ctle_out = convolve(tx_out, convolve(ctle_h, chnl_h))[:len(tx_out)]
         else:  # Tx is either AMI_Init() or PyBERT native.
             if self.tx_use_ami:  # Tx is AMI_Init().
-                rx_in, _, tx_h, tx_out_h, msg = run_ami_model(
+                rx_in, _, tx_h, tx_out_h, msg, _ = run_ami_model(
                     self.tx_dll_file, self._tx_cfg, False, ui, ts, chnl_h, x)
                 self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
                 rx_in += noise
@@ -275,12 +282,27 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             split_time = clock()
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
-                ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
+                ctle_out, clock_times, ctle_h, ctle_out_h, msg, params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
+                rx_getwave_params = list(map(lambda p: ami_defs.parse(p), params))
+                self.log(f"Rx IBIS-AMI model GetWave() output parameters:\n{rx_getwave_params}")
+                param_vals = {}
+                for (pname, vals) in rx_getwave_params[0][1]:
+                    param_vals[pname] = list(map(float, vals))
+                for rslt in rx_getwave_params[1:]:
+                    for (pname, vals) in rslt[1]:
+                        param_vals[pname].extend(list(map(float, vals)))
+                tap_weights = array([param_vals["dfe_tap1"], param_vals["dfe_tap2"], param_vals["dfe_tap3"], param_vals["dfe_tap4"]]).transpose()
+                lockeds = array(param_vals["cdr_locked"])
+                lockeds = lockeds.repeat(len(t) // len(lockeds))
+                lockeds.resize(len(t))
+                ui_ests = array(param_vals["cdr_ui"])
+                ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
+                ui_ests.resize(len(t))
             else:  # Rx is either AMI_Init() or PyBERT native.
                 if self.rx_use_ami:  # Rx Init()
-                    ctle_out, _, ctle_h, ctle_out_h, msg = run_ami_model(
+                    ctle_out, _, ctle_h, ctle_out_h, msg, _ = run_ami_model(
                         self.rx_dll_file, self._rx_cfg, False, ui, ts, tx_out_h, x)
                     self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                     ctle_out += noise
@@ -340,78 +362,84 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     _check_sim_status()
 
     # DFE output and incremental/cumulative responses.
-    try:
-        if any(tap.enabled for tap in dfe_tap_tuners):
-            _gain = gain
-            _ideal = self.sum_ideal
-            _n_taps = len(dfe_tap_tuners)
+    if any(tap.enabled for tap in dfe_tap_tuners):
+        _gain = gain
+        _ideal = self.sum_ideal
+        _n_taps = len(dfe_tap_tuners)
+    else:
+        _gain = 0.0
+        _ideal = True
+        _n_taps = 0
+    limits = []
+    for tuner in self.dfe_tap_tuners:
+        if tuner.enabled:
+            limits.append((tuner.min_val, tuner.max_val))
         else:
-            _gain = 0.0
-            _ideal = True
-            _n_taps = 0
-        limits = []
-        for tuner in self.dfe_tap_tuners:
-            if tuner.enabled:
-                limits.append((tuner.min_val, tuner.max_val))
-            else:
-                limits.append((0., 0.))
-        dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
-                  n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
-                  lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
-                  limits=limits)
-        (dfe_out, tap_weights, ui_ests, clocks,
-            lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
-        dfe_out = array(dfe_out)
+            limits.append((0., 0.))
+    dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
+              n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
+              lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
+              limits=limits)
+    if not (self.rx_use_ami and self.rx_use_getwave):
+        (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
+    else:
+        dfe_out = array(ctle_out)
         dfe_out.resize(len(t))
-        bits_out = array(bits_out)
-        start_ix = len(bits_out) - eye_bits
-        assert start_ix >= 0, "`start_ix` is negative!"
-        end_ix = len(bits_out)
-        auto_corr = (
-            1.0 * correlate(bits_out[start_ix: end_ix], bits[start_ix: end_ix], mode="same") /  # noqa: W504
-            sum(bits[start_ix: end_ix])
-        )
-        auto_corr = auto_corr[len(auto_corr) // 2:]
-        self.auto_corr = auto_corr
-        bit_dly = where(auto_corr == max(auto_corr))[0][0]
-        bits_ref = bits[(nbits - eye_bits):]
-        bits_tst = bits_out[(nbits + bit_dly - eye_bits):]
-        if len(bits_ref) > len(bits_tst):
-            bits_ref = bits_ref[: len(bits_tst)]
-        elif len(bits_tst) > len(bits_ref):
-            bits_tst = bits_tst[: len(bits_ref)]
-        bit_errs = where(bits_tst ^ bits_ref)[0]
-        self.bit_errs = len(bit_errs)
+        t_ix = 0
+        bits_out = []
+        clocks = zeros(len(t))
+        for clock_time in clock_times:
+            while t_ix < len(t) and t[t_ix] < clock_time:
+                t_ix += 1
+            if t_ix >= len(t):
+                break
+            _, _bits = dfe.decide(ctle_out[t_ix])
+            bits_out.extend(_bits)
+            clocks[t_ix] = 1
+    bits_out = array(bits_out)
+    start_ix = len(bits_out) - eye_bits
+    assert start_ix >= 0, "`start_ix` is negative!"
+    end_ix = len(bits_out)
+    auto_corr = (
+        1.0 * correlate(bits_out[start_ix: end_ix], bits[start_ix: end_ix], mode="same") /  # noqa: W504
+        sum(bits[start_ix: end_ix])
+    )
+    auto_corr = auto_corr[len(auto_corr) // 2:]
+    self.auto_corr = auto_corr
+    bit_dly = where(auto_corr == max(auto_corr))[0][0]
+    bits_ref = bits[(nbits - eye_bits):]
+    bits_tst = bits_out[(nbits + bit_dly - eye_bits):]
+    if len(bits_ref) > len(bits_tst):
+        bits_ref = bits_ref[: len(bits_tst)]
+    elif len(bits_tst) > len(bits_ref):
+        bits_tst = bits_tst[: len(bits_ref)]
+    bit_errs = where(bits_tst ^ bits_ref)[0]
+    self.bit_errs = len(bit_errs)
 
-        dfe_h = array(
-            [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
-            sum([[-x] + list(zeros(nspui - 1)) for x in tap_weights[-1]], []))  # sum as concat
-        dfe_h.resize(len(ctle_out_h), refcheck=False)
-        dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
+    dfe_h = array(
+        [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
+        sum([[-x] + list(zeros(nspui - 1)) for x in tap_weights[-1]], []))  # sum as concat
+    dfe_h.resize(len(ctle_out_h), refcheck=False)
+    dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
 
-        # Calculate the remaining responses from the impulse responses.
-        dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
-        dfe_out_s, dfe_out_p, dfe_out_H = calc_resps(t, dfe_out_h, ui, f)
+    # Calculate the remaining responses from the impulse responses.
+    dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
+    dfe_out_s, dfe_out_p, dfe_out_H = calc_resps(t, dfe_out_h, ui, f)
 
-        self.dfe_h = dfe_h
-        self.dfe_s = dfe_s
-        self.dfe_p = dfe_p
-        self.dfe_H = dfe_H
-        self.dfe_out_h = dfe_out_h
-        self.dfe_out_s = dfe_out_s
-        self.dfe_out_p = dfe_out_p
-        self.dfe_out_H = dfe_out_H
-        self.dfe_out = dfe_out
-        self.lockeds = lockeds
+    self.dfe_h = dfe_h
+    self.dfe_s = dfe_s
+    self.dfe_p = dfe_p
+    self.dfe_H = dfe_H
+    self.dfe_out_h = dfe_out_h
+    self.dfe_out_s = dfe_out_s
+    self.dfe_out_p = dfe_out_p
+    self.dfe_out_H = dfe_out_H
+    self.dfe_out = dfe_out
+    self.lockeds = lockeds
 
-        self.dfe_perf = nbits * nspb / (clock() - split_time)
-        split_time = clock()
-        self.status = "Analyzing jitter..."
-    except Exception:
-        self.status = "Exception: DFE"
-        print(f"len(bits_out): {len(bits_out)}\nnbits: {nbits}\neye_bits: {eye_bits}")
-        print(f"len(t): {len(t)}, len(ctle_out): {len(ctle_out)}")
-        raise
+    self.dfe_perf = nbits * nspb / (clock() - split_time)
+    split_time = clock()
+    self.status = "Analyzing jitter..."
 
     _check_sim_status()
 
@@ -679,6 +707,7 @@ def update_results(self):
     eye_uis = self.eye_uis
     num_ui = self.nui
     clock_times = self.clock_times
+    ui_ests = self.ui_ests
     f = self.f
     t = self.t
     t_ns = self.t_ns
@@ -712,23 +741,28 @@ def update_results(self):
             self.plotdata.set_data(f"tap{k + 1}_weights", zeros(10))
         self.plotdata.set_data("tap_weight_index", list(range(10)))  # pylint: disable=undefined-loop-variable
 
-    clock_pers = diff(clock_times)
-    lockedsTrue = where(self.lockeds)[0]
-    if lockedsTrue.any():
-        start_t = t[lockedsTrue[0]]
-    else:
-        start_t = 0
-    start_ix = where(array(clock_times) > start_t)[0][0]
-    (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
+    # clock_pers = diff(clock_times)
+    # lockedsTrue = where(self.lockeds)[0]
+    # if lockedsTrue.any():
+    #     start_t = t[lockedsTrue[0]]
+    # else:
+    #     start_t = 0
+    # start_ix = where(array(clock_times) > start_t)[0][0]
+    # (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
+    (bin_counts, bin_edges) = histogram(ui_ests, bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
-    clock_spec = rfft(clock_pers[start_ix:])
-    clock_spec = abs(clock_spec[: len(clock_spec) // 2])
-    spec_freqs = arange(len(clock_spec)) / (2.0 * len(clock_spec))  # In this case, fNyquist = half the bit rate.
-    clock_spec /= clock_spec[1:].mean()  # Normalize the mean non-d.c. value to 0 dB.
-    self.plotdata.set_data("clk_per_hist_bins", bin_centers * 1.0e12)  # (ps)
+    # clock_spec = rfft(clock_pers[start_ix:])
+    clock_spec = rfft(ui_ests)
+    # clock_spec = abs(clock_spec[: len(clock_spec) // 2])
+    # clock_spec /= abs(clock_spec[1])  # Normalize to magnitude of fundamental.
+    _f0 = 1 / (t[1] * len(t))
+    # spec_freqs = arange(len(clock_spec)) / (2.0 * len(clock_spec))  # In this case, fNyquist = half the bit rate.
+    spec_freqs = [_f0 * k for k in range(len(t) // 2 + 1)]
+    # self.plotdata.set_data("clk_per_hist_bins", bin_centers * 1.0e12)  # (ps)
+    self.plotdata.set_data("clk_per_hist_bins", bin_centers)
     self.plotdata.set_data("clk_per_hist_vals", bin_counts)
-    self.plotdata.set_data("clk_spec", 10.0 * safe_log10(clock_spec[1:]))  # Omit the d.c. value.
-    self.plotdata.set_data("clk_freqs", spec_freqs[1:])
+    self.plotdata.set_data("clk_spec", safe_log10(abs(clock_spec[1:]) / abs(clock_spec[1])))  # Omit the d.c. value and normalize to fundamental magnitude.
+    self.plotdata.set_data("clk_freqs", array(spec_freqs[1:]) * ui)
     self.plotdata.set_data("dfe_out", self.dfe_out)
     self.plotdata.set_data("clocks", self.clocks)
     self.plotdata.set_data("lockeds", self.lockeds)
