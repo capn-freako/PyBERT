@@ -712,7 +712,7 @@ traits_view = View(
                 ),
             ),
             Item(
-                label="To zoom: Click in the plot, hit `z` (Cursor will change to crosshair.), and click/drag to select horizontal region of interest.",
+                label="To zoom: Click in the plot, hit `z` (Cursor will change to crosshair.), and click/drag to select region of interest. Hit <ESC> to exit zoom.",
             ),
             Item("plot_h_tune", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False, springy=True),
             label="Optimizer",

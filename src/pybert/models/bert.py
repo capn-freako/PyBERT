@@ -26,7 +26,7 @@ from numpy import (  # type: ignore
     where,
     zeros,
 )
-from numpy.fft import rfft, irfft  # type: ignore
+from numpy.fft import rfft, irfft, fftshift  # type: ignore
 from numpy.random import normal  # type: ignore
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
@@ -149,7 +149,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     #
     # Duo-binary is problematic, in that it requires convolution with the ideal duobinary
     # impulse response, in order to produce the proper ideal signal.
-    x = repeat(symbols, nspui)
+    x = 0.5 * repeat(symbols, nspui)
     ideal_signal = x
     if mod_type == 1:  # Handle duo-binary case.
         duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
@@ -224,14 +224,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:
             if ctle_enable:
                 _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w)
-                _ctle_h = irfft(ctle_H)
+                _ctle_h = fftshift(irfft(ctle_H))  # Shift peak to center, as guard against non-causality.
                 krnl = interp1d(t_irfft, _ctle_h, bounds_error=False, fill_value=0)
-                ctle_h = krnl(t)
-                ctle_h *= sum(_ctle_h) / sum(ctle_h)
-                ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
+                ctle_h = krnl(t) * t[1] / t_irfft[1]
+                ctle_h, _ = trim_impulse(ctle_h, front_porch=0, min_len=min_len, max_len=max_len)
             else:
                 ctle_h = array([1.] + [0. for _ in range(min_len - 1)])
-        return ctle_h
+        return ctle_h, ctle_H
 
     try:
         if self.tx_use_ami and self.tx_use_getwave:
@@ -260,7 +259,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                     ctle_out = convolve(tx_out, ctle_out_h)[:len(tx_out)]
                 else:                # PyBERT native Rx
-                    ctle_h = get_ctle_h()
+                    ctle_h, ctle_H = get_ctle_h()
                     ctle_out_h = convolve(ctle_h, tx_out_h)[:len(ctle_h)]
                     ctle_out = convolve(tx_out, convolve(ctle_h, chnl_h))[:len(tx_out)]
         else:  # Tx is either AMI_Init() or PyBERT native.
@@ -271,7 +270,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 rx_in += noise
             else:                # Tx is PyBERT native.
                 # Using `sum` to concatenate:
-                tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
+                tx_h = array(sum([[b] + list(zeros(nspui - 1)) for b in ffe], []))
                 tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
                 tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
                 rx_in = convolve(x, tx_out_h)[:len(x)] + noise
@@ -308,7 +307,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     ctle_out += noise
                 else:                # PyBERT native Rx
                     if ctle_enable:
-                        ctle_h = get_ctle_h()
+                        ctle_h, ctle_H = get_ctle_h()
                         ctle_out_h = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
                         ctle_out = convolve(x + noise, ctle_out_h)[:len(x)]
                     else:
@@ -320,7 +319,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         raise
 
     # Calculate the remaining responses from the impulse responses.
-    ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, f)
+    ctle_s, ctle_p, _ = calc_resps(t, ctle_h, ui, f)
     ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, f)
 
     # Calculate convolutional delay.

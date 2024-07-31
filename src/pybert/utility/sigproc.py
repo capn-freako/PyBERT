@@ -204,14 +204,14 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,  # noqa: F405
 
 
 # pylint: disable=too-many-locals
-def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000,
-                 front_porch: bool = True, kept_energy: float = 0.999) -> tuple[Rvec, int]:
+def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000, front_porch: int = 0,
+                 kept_energy: float = 0.999) -> tuple[Rvec, int]:
     """
     Trim impulse response, for more useful display, by:
 
-        - clipping off the tail, after 99.9% of the total first
-            derivative power has been captured, and
-        - setting the "front porch" length equal to 20% of the total length.
+        - clipping off the tail, after given portion of the total
+            first derivative power has been captured, and
+        - enforcing a minimum "front porch" length if requested.
 
     Args:
         g: Response to trim.
@@ -221,9 +221,8 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000,
             Default: 0
         max_len: Maximum length of returned vector.
             Default: 1000000
-        front_porch: Adjust "front porch" when True.
-            Set to False if accurate delay is required.
-            Default: True
+        front_porch: Minimum allowed "front porch" length.
+            Default: 0
         kept_energy: The portion of first derivative "energy" retained.
             Default: 99.9%
 
@@ -236,11 +235,14 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000,
     # Move main lobe to center, in case of any non-causality.
     len_g = len(g)
     half_len = len_g // 2
-    _g = roll(g, half_len)
+    if argmax(g) < len_g // 4:
+        _g = roll(g, half_len)
+    else:
+        _g = g
     max_ix = argmax(_g)
 
-    # Capture 99.9% of the total first derivative energy.
-    diff_g = diff(g)
+    # Capture `kept_energy` of the total first derivative energy.
+    diff_g = diff(_g)
     Ptot = sum(diff_g ** 2)
     half_residual_energy = 0.5 * (1 - kept_energy)
     Pbeg = half_residual_energy * Ptot
@@ -256,21 +258,17 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000,
         P      += diff_g[ix_end] ** 2
         ix_end += 1
 
-    # Return trimmed original if no front porch requested.
-    trimmed_len = min(max_len, max(min_len, ix_end - ix_beg))
-    if not front_porch:
-        res = g[:trimmed_len].copy()
-        start_ix = 0
-    else:
-        start_ix = max(0, int(max_ix - 0.2 * trimmed_len))
-        stop_ix = min(len_g, start_ix + trimmed_len)
-        try:
-            res = _g[start_ix:stop_ix].copy()
-        except Exception:  # pylint: disable=broad-exception-caught
-            print(f"start_ix: {start_ix}, stop_ix: {stop_ix}")
-            raise
-        start_ix -= half_len
-    return (res, start_ix)
+    # Enforce minimum "front porch".
+    if (max_ix - ix_beg) < front_porch:
+        ix_beg = max(0, max_ix - front_porch)
+    # Enforce minimum length.
+    if (ix_end - ix_beg) < min_len:
+        ix_end = min(len_g, ix_beg + min_len)
+    # Enforce maximum length.
+    if (ix_end - ix_beg) > max_len:
+        ix_end = ix_beg + max_len
+
+    return (_g[ix_beg:ix_end], ix_beg - half_len)
 
 
 def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments  # noqa: F405
