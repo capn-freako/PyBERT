@@ -139,7 +139,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     min_len =  30 * nspui
     max_len = 100 * nspui
     if impulse_length:
-        min_len = max_len = impulse_length / ts
+        min_len = max_len = round(impulse_length / ts)
     if mod_type == 2:  # PAM-4
         nspb = nspui // 2
     else:
@@ -233,6 +233,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 ctle_h = array([1.] + [0. for _ in range(min_len - 1)])
         return ctle_h
 
+    ctle_s = None
     try:
         if self.tx_use_ami and self.tx_use_getwave:
             tx_out, _, tx_h, tx_out_h, msg, params = run_ami_model(
@@ -286,20 +287,30 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                 rx_getwave_params = list(map(lambda p: ami_defs.parse(p), params))
-                self.log(f"Rx IBIS-AMI model GetWave() output parameters:\n{rx_getwave_params}")
                 param_vals = {}
                 for (pname, vals) in rx_getwave_params[0][1]:
                     param_vals[pname] = list(map(float, vals))
                 for rslt in rx_getwave_params[1:]:
                     for (pname, vals) in rslt[1]:
                         param_vals[pname].extend(list(map(float, vals)))
-                tap_weights = array([param_vals["dfe_tap1"], param_vals["dfe_tap2"], param_vals["dfe_tap3"], param_vals["dfe_tap4"]]).transpose()
-                lockeds = array(param_vals["cdr_locked"])
-                lockeds = lockeds.repeat(len(t) // len(lockeds))
-                lockeds.resize(len(t))
-                ui_ests = array(param_vals["cdr_ui"])
-                ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
-                ui_ests.resize(len(t))
+                tap_weights = []
+                dfe_tap_keys = list(filter(lambda s: s.startswith("dfe_tap"), param_vals.keys()))
+                dfe_tap_keys.sort()
+                for dfe_tap_key in dfe_tap_keys:
+                    tap_weights.append(param_vals[dfe_tap_key])
+                tap_weights = array(tap_weights).transpose()
+                if "cdr_locked" in param_vals.keys():
+                    lockeds = array(param_vals["cdr_locked"])
+                    lockeds = lockeds.repeat(len(t) // len(lockeds))
+                    lockeds.resize(len(t))
+                else:
+                    lockeds = zeros(len(t))
+                if "cdr_ui" in param_vals.keys():
+                    ui_ests = array(param_vals["cdr_ui"])
+                    ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
+                    ui_ests.resize(len(t))
+                else:
+                    ui_ests = zeros(len(t))
             else:  # Rx is either AMI_Init() or PyBERT native.
                 if self.rx_use_ami:  # Rx Init()
                     ctle_out, _, ctle_h, ctle_out_h, msg, _ = run_ami_model(
@@ -320,7 +331,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         raise
 
     # Calculate the remaining responses from the impulse responses.
-    ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, f)
+    if ctle_s is None:
+        ctle_s, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, f)
+    else:
+        _, ctle_p, ctle_H = calc_resps(t, ctle_h, ui, f)
     ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, f)
 
     # Calculate convolutional delay.
@@ -380,22 +394,45 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
-    if not (self.rx_use_ami and self.rx_use_getwave):
-        (dfe_out, tap_weights, ui_ests, clocks, lockeds, clock_times, bits_out) = dfe.run(t, ctle_out)
-    else:
-        dfe_out = array(ctle_out)
+    if not (self.rx_use_ami and self.rx_use_getwave):  # Use PyBERT native DFE/CDR.
+        (dfe_out, tap_weights, ui_ests, clocks, lockeds, sample_times, bits_out) = dfe.run(t, ctle_out)
+    else:                                              # Process Rx IBIS-AMI GetWave() output.
+        # Process any valid clock times returned by Rx IBIS-AMI model's GetWave() function if apropos.
+        dfe_out = array(ctle_out)  # In this case, `ctle_out` includes the effects of IBIS-AMI DFE.
         dfe_out.resize(len(t))
         t_ix = 0
         bits_out = []
         clocks = zeros(len(t))
-        for clock_time in clock_times:
-            while t_ix < len(t) and t[t_ix] < clock_time:
-                t_ix += 1
-            if t_ix >= len(t):
-                break
-            _, _bits = dfe.decide(ctle_out[t_ix])
-            bits_out.extend(_bits)
-            clocks[t_ix] = 1
+        print(f"clock_times[0]: {clock_times[0]}", flush=True)  # temporary debugging
+        sample_times = []
+        if self.rx_use_clocks:
+            for clock_time in clock_times:
+                if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
+                    break
+                sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
+                while t_ix < len(t) and t[t_ix] < sample_time:
+                    t_ix += 1
+                if t_ix >= len(t):
+                    self.log("Went beyond system time vector end searching for next clock time!")
+                    break
+                _, _bits = dfe.decide(ctle_out[t_ix])
+                bits_out.extend(_bits)
+                clocks[t_ix] = 1
+                sample_times.append(sample_time)
+        print(f"pybert.models.bert.my_run_simulation(): Last clocked index: {t_ix}", flush=True)
+        # Process any remaining output, using inferred sampling instants.
+        if t_ix < (len(t) - 5 * nspui / 4):
+            # Starting at `nspui/4` handles either case:
+            #   - starting at UI boundary, or
+            #   - starting at last sampling instant.
+            next_sample_ix = t_ix + nspui // 4 + argmax([sum(abs(ctle_out[t_ix + nspui // 4 + k::nspui]))
+                                                         for k in range(nspui)])
+            print(f"pybert.models.bert.my_run_simulation(): First inferred index: {next_sample_ix}", flush=True)
+            for t_ix in range(next_sample_ix, len(t), nspui):
+                _, _bits = dfe.decide(ctle_out[t_ix])
+                bits_out.extend(_bits)
+                clocks[t_ix] = 1
+                sample_times.append(t[t_ix])
     bits_out = array(bits_out)
     start_ix = len(bits_out) - eye_bits
     assert start_ix >= 0, "`start_ix` is negative!"
@@ -414,12 +451,19 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     elif len(bits_tst) > len(bits_ref):
         bits_tst = bits_tst[: len(bits_ref)]
     bit_errs = where(bits_tst ^ bits_ref)[0]
-    self.bit_errs = len(bit_errs)
+    n_errs = len(bit_errs)
+    if n_errs:
+        debug(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.",
+            flush=True)
+    self.bit_errs = n_errs
 
-    dfe_h = array(
-        [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
-        sum([[-x] + list(zeros(nspui - 1)) for x in tap_weights[-1]], []))  # sum as concat
-    dfe_h.resize(len(ctle_out_h), refcheck=False)
+    if len(tap_weights) > 0:
+        dfe_h = array(
+            [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
+            sum([[-x] + list(zeros(nspui - 1)) for x in tap_weights[-1]], []))  # sum as concat
+        dfe_h.resize(len(ctle_out_h), refcheck=False)
+    else:
+        dfe_h = array([1.0] + list(zeros(nspui - 1)))
     dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
 
     # Calculate the remaining responses from the impulse responses.
@@ -448,7 +492,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.ui_ests = array(ui_ests) * 1.0e12  # (ps)
     self.clocks = clocks
     self.lockeds = lockeds
-    self.clock_times = clock_times
+    # self.clock_times = clock_times
+    self.clock_times = sample_times
 
     # Analyze the jitter.
     self.thresh_tx = array([])

@@ -226,6 +226,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_ts4 = Bool(False)  #: (Bool)
     rx_use_getwave = Bool(False)  #: (Bool)
     rx_has_getwave = Bool(False)  #: (Bool)
+    rx_use_clocks = Bool(False)  #: (Bool)
     rx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
     rx_ami_valid = Bool(False)  #: (Bool)
     rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
@@ -1206,7 +1207,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
         min_len = 20 * nspui
         max_len = 100 * nspui
         if impulse_length:
-            min_len = max_len = impulse_length / ts
+            min_len = max_len = int(impulse_length / ts)
         chnl_h, start_ix = trim_impulse(chnl_h, min_len=min_len, max_len=max_len,
                                         front_porch=True, kept_energy=0.999)
         krnl = interp1d(t[:len(chnl_h)], chnl_h, kind="cubic",
