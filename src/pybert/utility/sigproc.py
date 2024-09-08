@@ -121,7 +121,7 @@ def pulse_center(p: Rvec, nspui: int) -> tuple[int, float]:
     thresh = p_max / div
     main_lobe_ixs = where(p > thresh)[0]
     if not main_lobe_ixs.size:  # Sometimes, the optimizer really whacks out.
-        return (-1, 0)  # Flag this, by returning an impossible index.
+        return (-1, 0)          # Flag this, by returning an impossible index.
 
     err = main_lobe_ixs[-1] - main_lobe_ixs[0] - nspui
     while err and div < 5000:
@@ -357,34 +357,23 @@ def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: float,
     # Adjust the scaling.
     width = 2 * samps_per_ui
     y_scale = height // (2 * y_max)  # (pixels/V)
-    y_offset = height // 2  # (pixels)
+    y_offset = height // 2           # (pixels)
 
     # Generate the "heat" picture array.
     img_array = zeros([height, width])
     if clock_times is not None:
         for clock_time in clock_times:
-            start_time = clock_time - ui
-            start_ix = int(start_time / tsamp)
-            if start_ix + 2 * samps_per_ui > len(ys):
+            first_ix = int(clock_time // tsamp)
+            if first_ix + 2 * samps_per_ui > len(ys):
                 break
-            interp_fac = (start_time - start_ix * tsamp) // tsamp
-            i = 0
-            for samp1, samp2 in zip(
-                ys[start_ix: start_ix + 2 * samps_per_ui],
-                ys[start_ix + 1: start_ix + 1 + 2 * samps_per_ui],
-            ):
-                y = samp1 + (samp2 - samp1) * interp_fac
+            for i, y in enumerate(ys[first_ix: first_ix + 2 * samps_per_ui]):
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-                i += 1
     else:
         start_ix = where(diff(sign(ys)))[0][0] + samps_per_ui // 2
-        last_start_ix = len(ys) - 2 * samps_per_ui
-        while start_ix < last_start_ix:
-            i = 0
-            for y in ys[start_ix: start_ix + 2 * samps_per_ui]:
+        last_first_ix = len(ys) - 2 * samps_per_ui
+        for first_ix in range(start_ix, last_first_ix, samps_per_ui):
+            for i, y in enumerate(ys[first_ix: first_ix + 2 * samps_per_ui]):
                 img_array[int(y * y_scale + 0.5) + y_offset, i] += 1
-                i += 1
-            start_ix += samps_per_ui
 
     return img_array
 

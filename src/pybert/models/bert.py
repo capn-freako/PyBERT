@@ -6,12 +6,14 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
+
+# pylint: disable=too-many-lines
+
 from time import perf_counter
 from typing import Callable, Optional
 
 import scipy.signal as sig
 from numpy import (  # type: ignore
-    arange,
     argmax,
     array,
     convolve,
@@ -28,6 +30,7 @@ from numpy import (  # type: ignore
 )
 from numpy.fft import rfft, irfft  # type: ignore
 from numpy.random import normal  # type: ignore
+from numpy.typing import NDArray  # type: ignore
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
@@ -93,7 +96,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     start_time = clock()
     self.status = "Running channel..."
 
-    if not self.seed:  # The user sets `seed` to zero to indicate that she wants new bits generated for each run.
+    # The user sets `seed` to zero to indicate that she wants new bits generated for each run.
+    if not self.seed:
         self.run_count += 1  # Force regeneration of bit stream.
 
     # Pull class variables into local storage, performing unit conversion where necessary.
@@ -234,6 +238,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         return ctle_h
 
     ctle_s = None
+    clock_times = None
     try:
         if self.tx_use_ami and self.tx_use_getwave:
             tx_out, _, tx_h, tx_out_h, msg, params = run_ami_model(
@@ -286,7 +291,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 ctle_out, clock_times, ctle_h, ctle_out_h, msg, params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
-                rx_getwave_params = list(map(lambda p: ami_defs.parse(p), params))
+                rx_getwave_params = list(map(ami_defs.parse, params))
                 param_vals = {}
                 for (pname, vals) in rx_getwave_params[0][1]:
                     param_vals[pname] = list(map(float, vals))
@@ -299,13 +304,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 for dfe_tap_key in dfe_tap_keys:
                     tap_weights.append(param_vals[dfe_tap_key])
                 tap_weights = array(tap_weights).transpose()
-                if "cdr_locked" in param_vals.keys():
+                if "cdr_locked" in param_vals:
                     lockeds = array(param_vals["cdr_locked"])
                     lockeds = lockeds.repeat(len(t) // len(lockeds))
                     lockeds.resize(len(t))
                 else:
                     lockeds = zeros(len(t))
-                if "cdr_ui" in param_vals.keys():
+                if "cdr_ui" in param_vals:
                     ui_ests = array(param_vals["cdr_ui"])
                     ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
                     ui_ests.resize(len(t))
@@ -403,9 +408,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         t_ix = 0
         bits_out = []
         clocks = zeros(len(t))
-        print(f"clock_times[0]: {clock_times[0]}", flush=True)  # temporary debugging
         sample_times = []
-        if self.rx_use_clocks:
+        if self.rx_use_clocks and clock_times is not None:
             for clock_time in clock_times:
                 if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
                     break
@@ -419,7 +423,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 bits_out.extend(_bits)
                 clocks[t_ix] = 1
                 sample_times.append(sample_time)
-        print(f"pybert.models.bert.my_run_simulation(): Last clocked index: {t_ix}", flush=True)
         # Process any remaining output, using inferred sampling instants.
         if t_ix < (len(t) - 5 * nspui / 4):
             # Starting at `nspui/4` handles either case:
@@ -427,7 +430,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             #   - starting at last sampling instant.
             next_sample_ix = t_ix + nspui // 4 + argmax([sum(abs(ctle_out[t_ix + nspui // 4 + k::nspui]))
                                                          for k in range(nspui)])
-            print(f"pybert.models.bert.my_run_simulation(): First inferred index: {next_sample_ix}", flush=True)
             for t_ix in range(next_sample_ix, len(t), nspui):
                 _, _bits = dfe.decide(ctle_out[t_ix])
                 bits_out.extend(_bits)
@@ -453,8 +455,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     bit_errs = where(bits_tst ^ bits_ref)[0]
     n_errs = len(bit_errs)
     if n_errs:
-        debug(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.",
-            flush=True)
+        self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
     self.bit_errs = n_errs
 
     if len(tap_weights) > 0:
@@ -492,7 +493,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.ui_ests = array(ui_ests) * 1.0e12  # (ps)
     self.clocks = clocks
     self.lockeds = lockeds
-    # self.clock_times = clock_times
     self.clock_times = sample_times
 
     # Analyze the jitter.
@@ -522,7 +522,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     len_x_m1 = len(x) - 1
     xing_min_t = (nui - eye_uis) * ui
 
-    def eye_xings(xings, ofst=0):
+    def eye_xings(xings, ofst=0) -> NDArray[float]:
         """
         Return crossings from that portion of the signal used to generate the eye.
 
@@ -786,24 +786,11 @@ def update_results(self):
             self.plotdata.set_data(f"tap{k + 1}_weights", zeros(10))
         self.plotdata.set_data("tap_weight_index", list(range(10)))  # pylint: disable=undefined-loop-variable
 
-    # clock_pers = diff(clock_times)
-    # lockedsTrue = where(self.lockeds)[0]
-    # if lockedsTrue.any():
-    #     start_t = t[lockedsTrue[0]]
-    # else:
-    #     start_t = 0
-    # start_ix = where(array(clock_times) > start_t)[0][0]
-    # (bin_counts, bin_edges) = histogram(clock_pers[start_ix:], bins=100)
     (bin_counts, bin_edges) = histogram(ui_ests, bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
-    # clock_spec = rfft(clock_pers[start_ix:])
     clock_spec = rfft(ui_ests)
-    # clock_spec = abs(clock_spec[: len(clock_spec) // 2])
-    # clock_spec /= abs(clock_spec[1])  # Normalize to magnitude of fundamental.
     _f0 = 1 / (t[1] * len(t))
-    # spec_freqs = arange(len(clock_spec)) / (2.0 * len(clock_spec))  # In this case, fNyquist = half the bit rate.
     spec_freqs = [_f0 * k for k in range(len(t) // 2 + 1)]
-    # self.plotdata.set_data("clk_per_hist_bins", bin_centers * 1.0e12)  # (ps)
     self.plotdata.set_data("clk_per_hist_bins", bin_centers)
     self.plotdata.set_data("clk_per_hist_vals", bin_counts)
     self.plotdata.set_data("clk_spec", safe_log10(abs(clock_spec[1:]) / abs(clock_spec[1])))  # Omit the d.c. value and normalize to fundamental magnitude.

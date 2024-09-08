@@ -9,9 +9,7 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
-from typing import Optional
-
-from numpy import append, array, convolve  # type: ignore
+from numpy import convolve  # type: ignore
 
 from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from pyibisami.ami.parser import AMIParamConfigurator
@@ -21,8 +19,7 @@ from ..common import Rvec
 
 # pylint: disable=too-many-arguments,too-many-locals
 def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
-                  ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0,
-                  dbg_obj: Optional[object] = None  # noqa: F405
+                  ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0  # noqa: F405
                   ) -> tuple[Rvec, Rvec, Rvec, Rvec, str, list[str]]:  # noqa: F405
     """
     Run a simulation of an IBIS-AMI model.
@@ -39,8 +36,6 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     Keyword Args:
         bits_per_call: Number of bits per call of ``GetWave()``.
             Default: 0 (Means "Use existing value.")
-        dbg_obj: Debugging object.
-            Default: None
 
     Returns:
         y, clks, h, out_h, msg, params_out: A tuple consisting of:
@@ -90,7 +85,6 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     if use_getwave:
         y, clks, params_out = model.getWave(x, bits_per_call=bits_per_call)
         return (y, clks, h, out_h, msg, list(map(lambda p: p.decode('utf-8'), params_out)))
-    else:
-        y = convolve(x, out_h)[:len(x)]
-        clks = None
-        return (y, clks, h, out_h, msg, [])
+    y = convolve(x, out_h)[:len(x)]
+    clks = None
+    return (y, clks, h, out_h, msg, [])
