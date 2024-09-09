@@ -476,6 +476,12 @@ traits_view = View(
                                 enabled_when="rx_use_ami and rx_has_getwave",
                             ),
                             Item(
+                                name="rx_use_clocks",
+                                label="Use Clocks",
+                                tooltip="Use the clock times returned by the model's GetWave() function.",
+                                enabled_when="rx_use_getwave",
+                            ),
+                            Item(
                                 "btn_cfg_rx",
                                 show_label=False,
                                 tooltip="Configure Rx AMI parameters.",

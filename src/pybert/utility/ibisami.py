@@ -9,76 +9,12 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
-from numpy import append, array, convolve  # type: ignore
+from numpy import convolve  # type: ignore
 
 from pyibisami.ami.model import AMIModel, AMIModelInitializer
 from pyibisami.ami.parser import AMIParamConfigurator
 
 from ..common import Rvec
-
-
-def getwave_step_resp(ami_model: AMIModel) -> Rvec:
-    """
-    Use a model's ``AMI_GetWave()`` function to extract its step response.
-
-    Args:
-        ami_model: The AMI model to use.
-
-    Returns:
-        s: The model's step response.
-
-    Raises:
-        RuntimeError: When no step rise is detected.
-    """
-    # Delay the input edge slightly, in order to minimize high
-    # frequency artifactual energy sometimes introduced near
-    # the signal edges by frequency domain processing in some models.
-    tmp = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
-    s, _, _ = ami_model.getWave(tmp)
-    # Some models delay signal flow through GetWave() arbitrarily.
-    tmp = array([0.5] * 1024)
-    max_tries = 10
-    n_tries = 0
-    while max(s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-        s, _, _ = ami_model.getWave(tmp)
-        n_tries += 1
-    if n_tries == max_tries:
-        raise RuntimeError("No step rise detected!")
-    # Make one more call, just to ensure a sufficient "tail".
-    tmp, _, _ = ami_model.getWave(tmp)
-    s = append(s, tmp)
-    return s - s[0]
-
-
-def init_imp_resp(ami_model: AMIModel) -> Rvec:
-    """
-    Use a model's ``AMI_Init()`` function to extract its impulse response.
-
-    Args:
-        ami_model: The AMI model to use.
-
-    Returns:
-        h: The model's impulse response.
-    """
-
-    # Delay the input edge slightly, in order to minimize high
-    # frequency artifactual energy sometimes introduced near
-    # the signal edges by frequency domain processing in some models.
-    tmp = array([-0.5] * 128 + [0.5] * 896)  # Stick w/ 2^n, for freq. domain models' sake.
-    s, _, _ = ami_model.getWave(tmp)
-    # Some models delay signal flow through GetWave() arbitrarily.
-    tmp = array([0.5] * 1024)
-    max_tries = 10
-    n_tries = 0
-    while max(s) < 0 and n_tries < max_tries:  # Wait for step to rise, but not indefinitely.
-        s, _, _ = ami_model.getWave(tmp)
-        n_tries += 1
-    if n_tries == max_tries:
-        raise RuntimeError("No step rise detected!")
-    # Make one more call, just to ensure a sufficient "tail".
-    tmp, _, _ = ami_model.getWave(tmp)
-    s = append(s, tmp)
-    return s - s[0]
 
 
 # pylint: disable=too-many-arguments,too-many-locals
@@ -137,7 +73,7 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
         f"Message: {model.msg.decode('utf-8')}"])
 
     # Capture model's responses.
-    resps = model.get_responses()
+    resps = model.get_responses(bits_per_call=40)
     if use_getwave:
         h = resps["imp_resp_getw"]
         out_h = resps["out_resp_getw"]
@@ -149,7 +85,6 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     if use_getwave:
         y, clks, params_out = model.getWave(x, bits_per_call=bits_per_call)
         return (y, clks, h, out_h, msg, list(map(lambda p: p.decode('utf-8'), params_out)))
-    else:
-        y = convolve(x, out_h)[:len(x)]
-        clks = None
-        return (y, clks, h, out_h, msg, [])
+    y = convolve(x, out_h)[:len(x)]
+    clks = None
+    return (y, clks, h, out_h, msg, [])
