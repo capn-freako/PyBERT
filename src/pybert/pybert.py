@@ -96,7 +96,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # Independent variables
 
     # - Simulation Control
-    bit_rate = Range(low=0.1, high=120.0, value=10.0)    #: (Gbps)
+    bit_rate = Range(low=0.1, high=250.0, value=10.0)    #: (Gbps)
     nbits = Range(low=1000, high=10000000, value=15000)  #: Number of bits to simulate.
     eye_bits = Int(10160)                                #: Number of bits used to form eye.
     pattern = Map(
@@ -1160,7 +1160,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             self.Rs = Rs  # Primarily for debugging.
             self.Cs = Cs
             if self.tx_use_ts4:
-                fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"])[0])
+                fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]))
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
                 self.ts4N = ts4N
                 self.ntwk = ntwk
@@ -1173,7 +1173,7 @@ Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
             if self.debug:
                 self.log(f"RL: {RL}, Cp: {Cp}")
             if self.rx_use_ts4:
-                fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"])[0])
+                fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]))
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
                 self.ts4N = ts4N
                 self.ntwk = ntwk
