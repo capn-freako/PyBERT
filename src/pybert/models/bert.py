@@ -931,8 +931,9 @@ def update_results(self):
     xs = linspace(-ui * 1.0e12, ui * 1.0e12, width)
     height = 1000
     tiny_noise = normal(scale=1e-3, size=len(chnl_out[ignore_samps:]))  # to make channel eye easier to view.
-    y_max = 1.1 * max(abs(array(self.chnl_out[ignore_samps:])))
-    eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[ignore_samps:] + tiny_noise, y_max)
+    chnl_out_noisy = self.chnl_out[ignore_samps:] + tiny_noise
+    y_max = 1.1 * max(abs(array(chnl_out_noisy)))
+    eye_chnl = calc_eye(ui, samps_per_ui, height, chnl_out_noisy, y_max)
     y_max = 1.1 * max(abs(array(self.rx_in[ignore_samps:])))
     eye_tx = calc_eye(ui, samps_per_ui, height, self.rx_in[ignore_samps:], y_max)
     y_max = 1.1 * max(abs(array(self.ctle_out[ignore_samps:])))
