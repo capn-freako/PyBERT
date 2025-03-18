@@ -18,7 +18,7 @@ from scipy.interpolate import interp1d
 
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
-from pybert.utility import make_ctle, trim_impulse, calc_resps
+from pybert.utility import make_ctle, calc_resps
 
 gDebugOptimize = False
 
@@ -78,7 +78,7 @@ def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int
     return mk_tx_weights(new_weightss, tail)
 
 
-def coopt(pybert) -> tuple[list[float], float, float, bool]:  # pylint: disable=too-many-locals,too-many-statements
+def coopt(pybert) -> tuple[list[float], float, float, bool]:  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
     """
     Co-optimize the Tx/Rx linear equalization, assuming ideal bounded DFE.
 
@@ -93,7 +93,6 @@ def coopt(pybert) -> tuple[list[float], float, float, bool]:  # pylint: disable=
     """
 
     # Grab needed quantities from PyBERT instance.
-    t_irfft   = pybert.t_irfft
     min_mag   = pybert.min_mag_tune
     max_mag   = pybert.max_mag_tune
     step_mag  = pybert.step_mag_tune
@@ -101,7 +100,6 @@ def coopt(pybert) -> tuple[list[float], float, float, bool]:  # pylint: disable=
     peak_freq = pybert.peak_freq_tune * 1e9
     dfe_taps  = pybert.dfe_tap_tuners
     tx_taps   = pybert.tx_tap_tuners
-    min_len   = 20 * pybert.nspui
     max_len   = 100 * pybert.nspui
 
     # Calculate time/frequency vectors for CTLE.
@@ -130,7 +128,7 @@ def coopt(pybert) -> tuple[list[float], float, float, bool]:  # pylint: disable=
     if pybert.ctle_enable_tune:
         peak_mags = arange(min_mag, max_mag + step_mag, step_mag)
     else:
-        peak_mags = [0]
+        peak_mags = array([0])
 
     # Calculate and report the total number of trials, as well as some other misc. info.
     n_trials = len(peak_mags) * len(tx_weightss)

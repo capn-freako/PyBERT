@@ -23,7 +23,7 @@ class Solver(ABC):  # pylint: disable=too-few-public-methods
     solver."""
 
     @abstractmethod
-    def solve(  # pylint: disable=too-many-arguments
+    def solve(  # pylint: disable=too-many-arguments,dangerous-default-value
         self,
         ch_type: str = "microstrip_se",  #: Channel cross-sectional configuration.
         diel_const: float = 4.3,  #: Dielectric constant of substrate at ``des_freq`` (rel.).

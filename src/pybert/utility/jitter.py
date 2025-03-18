@@ -11,6 +11,7 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 from typing import Optional
 
+import numpy as np
 from numpy import (  # type: ignore
     argmax, array, concatenate, diag, diff, flip,
     histogram, mean, ones, real, reshape, resize, sign,
@@ -70,7 +71,7 @@ def find_crossing_times(  # pylint: disable=too-many-arguments
     x = array(x)
 
     try:
-        max_mag_x = max(abs(x))
+        max_mag_x = np.max(abs(x))
     except Exception:  # pylint: disable=broad-exception-caught
         print("len(x):", len(x))
         raise
@@ -279,7 +280,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # Assemble the TIE track.
     i = 0
-    jitter = []
+    jitterL = []
     t_jitter = []
     skip_next_ideal_xing = False
     for ideal_xing in ideal_xings:
@@ -297,8 +298,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         if i == len(actual_xings):  # We've exhausted the list of actual crossings; we're done.
             break
         if actual_xings[i] > max_t:  # Means the xing we're looking for didn't occur, in the actual signal.
-            jitter.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.  # noqa: E201
-            jitter.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
+            jitterL.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.  # noqa: E201
+            jitterL.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
             skip_next_ideal_xing = True  # If we missed one, we missed two.
         else:  # Noise may produce several crossings.
             xings = []  # We find all those within the interval [-UI/2, +UI/2]
@@ -307,9 +308,9 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
                 xings.append(actual_xings[j])
                 j += 1
             tie = mean(xings) - ideal_xing
-            jitter.append(tie)
+            jitterL.append(tie)
         t_jitter.append(ideal_xing)
-    jitter = array(jitter)
+    jitter = array(jitterL)
 
     # ToDo: Report this in the status bar.
     # assert len(jitter) > 0 and len(t_jitter) > 0, "No crossings found!"
@@ -354,8 +355,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     t0  = ui / osf                                      # jitter sampling period
     t   = array([n * t0 for n in range(nui * osf)])  # jitter samples time vector
     f0  = 1.0 / (ui * nui)                              # jitter samples fundamental frequency
-    f   = [n * f0 for n in range(len(t) // 2)]          # [0:f0:fNyquist)
-    f   = array(f + [1 / (2 * t0)] + list(-1 * flip(array(f[1:]))))  # [0:f0:fN) ++ [fN:-f0:0)
+    _f   = [n * f0 for n in range(len(t) // 2)]          # [0:f0:fNyquist)
+    f   = array(_f + [1 / (2 * t0)] + list(-1 * flip(array(_f[1:]))))  # [0:f0:fN) ++ [fN:-f0:0)
     half_len = len(f) // 2                              # for spectrum plotting convenience
 
     # -- Make TIE vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
@@ -383,7 +384,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         print(f"t_jitter: {t_jitter}")
         print(f"tie_ind: {tie_ind}")
         print(f"Error calculating data independent TIE: {err}", flush=True)
-        y = zeros(half_len)
+        y = zeros(half_len)  # type: ignore
         y_mag = zeros(half_len)
         tie_ind_spectrum = zeros(half_len)
 
@@ -397,7 +398,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     y_per     = where(y_mag > thresh, y, zeros(len(y)))  # Periodic components are those lying above the threshold.
     y_rnd     = where(y_mag > thresh, zeros(len(y)), y)  # Random components are those lying below.
     tie_per   = real(ifft(y_per))
-    pj        = tie_per.ptp()
+    pj        = np.ptp(tie_per)
     tie_rnd   = real(ifft(y_rnd))
     rj        = sqrt(mean((tie_rnd - tie_rnd.mean())**2))
 
@@ -504,10 +505,10 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     return (  # pylint: disable=duplicate-code
         jitter,
-        t_jitter,
+        array(t_jitter),
         isi,
         dcd,
-        pj,
+        float(pj),
         rj,
         pjDD,
         rjDD,

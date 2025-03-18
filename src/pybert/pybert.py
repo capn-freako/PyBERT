@@ -403,6 +403,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _btn_cfg_rx_fired(self):
         self._rx_cfg()
+        if self.debug:
+            self.log(f"User configuration resulted in the following `In`/`InOut` parameter dictionary:\n{self._rx_cfg.input_ami_params}")
 
     def _btn_sel_tx_fired(self):
         self._tx_ibis()
@@ -1011,7 +1013,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             if new_value:
                 with open(new_value, mode="r", encoding="utf-8") as pfile:
                     pcfg = AMIParamConfigurator(pfile.read())
-                self.log(f"Parsing Rx AMI file, '{new_value}'...\n{pcfg.ami_parsing_errors}")
+                self.log(f"Parsing Rx AMI file, '{new_value}'...")
+                if pcfg.ami_parsing_errors:
+                    self.log(f"Encountered the following errors:\n{pcfg.ami_parsing_errors}")
+                else:
+                    self.log("Success!")
                 self.rx_has_getwave = pcfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"])
                 _rx_returns_impulse = pcfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"])
                 if not _rx_returns_impulse:

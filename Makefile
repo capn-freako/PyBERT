@@ -7,16 +7,20 @@
 
 .PHONY: dflt help check tox format lint flake8 type-check docs build upload test clean etags conda-build conda-skeleton chaco enable pyibis-ami pyibis-ami-dev pybert pybert-dev etags
 
-PROJ_NAME := PipBERT
+PROJ_NAME := pipbert
 PROJ_FILE := pyproject.toml
-PROJ_INFO := src/PipBERT.egg-info/PKG-INFO
-VER_FILE := .proj_ver
+PROJ_INFO := src/${PROJ_NAME}.egg-info/PKG-INFO
+VER_FILE := "./.proj_ver"
 VER_GETTER := ./get_proj_ver.py
 PYTHON_EXEC := python -I
 TOX_EXEC := tox
 TOX_SKIP_ENV := format
-PYVERS := 39 310 311 312
+PYVERS := 310 311 312
 PLATFORMS := lin mac win
+TYPE_STUB_INFO := type_stubs.info
+TYPE_STUB_SRC_DIRS := PyAMI/src
+TYPE_STUB_SRCS := $(shell for DIR in ${TYPE_STUB_SRC_DIRS}; do find $${DIR} -name '*.py' 2>/dev/null; done)
+TYPE_STUB_DIR := type_stubs
 
 # Put it first so that "make" without arguments is like "make help".
 dflt: help
@@ -43,8 +47,12 @@ lint:
 flake8:
 	${TOX_EXEC} run -e flake8
 
-type-check:
+type-check: ${TYPE_STUB_INFO}
 	${TOX_EXEC} run -e type-check
+
+${TYPE_STUB_INFO}: ${TYPE_STUB_SRCS}
+	echo "" >${TYPE_STUB_INFO}
+	for FILE in ${TYPE_STUB_SRCS}; do stubgen -o ${TYPE_STUB_DIR} $${FILE} >> ${TYPE_STUB_INFO}; done
 
 docs: ${VER_FILE}
 	source $< && ${TOX_EXEC} run -e docs
