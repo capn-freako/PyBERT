@@ -10,7 +10,8 @@
 PROJ_NAME := pipbert
 PROJ_FILE := pyproject.toml
 PROJ_INFO := src/${PROJ_NAME}.egg-info/PKG-INFO
-VER_FILE := "./.proj_ver"
+# VER_FILE := "./.proj_ver"  # This gets around the issue w/ `sh`, but breaks the building of `.proj_ver`.
+VER_FILE := .proj_ver
 VER_GETTER := ./get_proj_ver.py
 PYTHON_EXEC := python -I
 TOX_EXEC := tox
@@ -71,7 +72,10 @@ test:
 	done
 
 clean:
-	rm -rf .tox docs/build/ .mypy_cache .pytest_cache .venv
+	rm -rf .tox build/ docs/build/ .mypy_cache .pytest_cache .venv src/*.egg-info
+
+distclean: clean
+	rm -rf dist/
 
 conda-skeleton:
 	rm -rf conda.recipe/pybert/ conda.recipe/pyibis-ami/
