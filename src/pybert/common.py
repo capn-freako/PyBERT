@@ -14,11 +14,8 @@ import numpy.typing as npt  # type: ignore
 
 Real = TypeVar('Real', float, float)
 Comp = TypeVar('Comp', complex, complex)
-# Rvec: TypeAlias = npt.NDArray[Real]
-# Cvec: TypeAlias = npt.NDArray[Comp]
 Rvec = npt.NDArray[Real]
 Cvec = npt.NDArray[Comp]
 
-# PI: float = np.pi
 PI: float = 3.14159265359
 TWOPI: float = 2. * PI
