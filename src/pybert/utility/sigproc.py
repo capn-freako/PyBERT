@@ -99,7 +99,7 @@ def import_time(filename: str, sample_per: float) -> Rvec:
             except Exception:  # pylint: disable=broad-exception-caught
                 continue
 
-    return interp_time(ts, xs, sample_per)
+    return interp_time(array(ts), array(xs), sample_per)
 
 
 def pulse_center(p: Rvec, nspui: int) -> tuple[int, float]:
@@ -260,7 +260,7 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000, front_porch:
 
     # Enforce minimum "front porch".
     if (max_ix - ix_beg) < front_porch:
-        ix_beg = max(0, max_ix - front_porch)
+        ix_beg = max(0, int(max_ix - front_porch))  # `int(...)` is for `mypy`.
     # Enforce minimum length.
     if (ix_end - ix_beg) < min_len:
         ix_end = min(len_g, ix_beg + min_len)
@@ -405,16 +405,16 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
     valid_ix = [x for x in valid_ix if x < nbits]
     missing = where(array(run_lengths) > 1)[0]
     num_insertions = 0
-    jitter = list(jitter)  # Because we use 'insert'.
+    _jitter = list(jitter)  # Because we use 'insert'.
 
     for i in missing:
         for _ in range(run_lengths[i] - 1):
-            jitter.insert(i + 1 + num_insertions, 0.0)
+            _jitter.insert(i + 1 + num_insertions, 0.0)
             num_insertions += 1
 
-    if len(jitter) < nbits:
-        jitter.extend([0.0] * (nbits - len(jitter)))
-    if len(jitter) > nbits:
-        jitter = jitter[:nbits]
+    if len(_jitter) < nbits:
+        _jitter.extend([0.0] * (nbits - len(_jitter)))
+    if len(_jitter) > nbits:
+        _jitter = _jitter[:nbits]
 
-    return jitter, valid_ix
+    return array(_jitter), valid_ix

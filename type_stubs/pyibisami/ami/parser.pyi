@@ -1,10 +1,33 @@
+import numpy as np
+from .model import AMIModelInitializer
+from .parameter                 import AMIParamError, AMIParameter
+from .reserved_parameter_names  import AmiReservedParameterName, RESERVED_PARAM_NAMES
 from _typeshed import Incomplete
-from collections.abc import Generator
-from pyibisami.ami.parameter import AMIParamError as AMIParamError, AMIParameter as AMIParameter
+from numpy.typing import NDArray
 from traits.api import HasTraits
+from typing import Any, Callable, NewType, TypeAlias
+
+__all__ = ['ParamName', 'ParamValue', 'Parameters', 'ParamValues', 'AmiName', 'AmiAtom', 'AmiExpr', 'AmiNode', 'AmiNodeParser', 'AmiParser', 'ami_parse', 'AMIParamConfigurator']
+
+ParamName  = NewType("ParamName", str)
+ParamValue:  TypeAlias = int | float | str | list["ParamValue"]
+Parameters:  TypeAlias = dict[ParamName, "AMIParameter | 'Parameters'"]
+ParamValues: TypeAlias = dict[ParamName, "ParamValue   | 'ParamValues'"]
+
+AmiName = NewType("AmiName", str)
+AmiAtom: TypeAlias = bool | int | float | str
+AmiExpr: TypeAlias = "AmiAtom | 'AmiNode'"
+AmiNode: TypeAlias = tuple[AmiName, list[AmiExpr]]
+AmiNodeParser: TypeAlias = Callable[[str], AmiNode]
+AmiParser:     TypeAlias = Callable[[str], tuple[AmiName, list[AmiNode]]]  # Atoms may not exist at the root level.
+
+ParseErrMsg = NewType("ParseErrMsg", str)
+AmiRootName = NewType("AmiRootName", str)
+ReservedParamDict: TypeAlias = dict[AmiReservedParameterName, AMIParameter]
+ModelSpecificDict: TypeAlias = dict[ParamName, "AMIParameter | 'ModelSpecificDict'"]
 
 class AMIParamConfigurator(HasTraits):
-    def __init__(self, ami_file_contents_str) -> None: ...
+    def __init__(self, ami_file_contents_str: str) -> None: ...
     def __call__(self) -> None: ...
     def open_gui(self) -> None: ...
     def default_traits_view(self): ...
@@ -14,38 +37,13 @@ class AMIParamConfigurator(HasTraits):
     @property
     def ami_parsing_errors(self): ...
     @property
-    def ami_param_defs(self): ...
+    def ami_param_defs(self) -> dict[str, ReservedParamDict | ModelSpecificDict]: ...
     @property
-    def input_ami_params(self): ...
-    def input_ami_param(self, params, pname): ...
+    def input_ami_params(self) -> ParamValues: ...
+    def input_ami_param(self, params: Parameters, pname: ParamName, prefix: str = '') -> ParamValues: ...
     @property
     def info_ami_params(self): ...
-
-whitespace: Incomplete
-comment: Incomplete
-ignore: Incomplete
-
-def lexeme(p): ...
-def int2tap(x): ...
-
-lparen: Incomplete
-rparen: Incomplete
-number: Incomplete
-integ: Incomplete
-nat: Incomplete
-tap_ix: Incomplete
-symbol: Incomplete
-true: Incomplete
-false: Incomplete
-ami_string: Incomplete
-atom: Incomplete
-node_name: Incomplete
-
-def node() -> Generator[Incomplete, Incomplete, Incomplete]: ...
-
-expr: Incomplete
-ami_defs: Incomplete
-
-def proc_branch(branch): ...
-def parse_ami_param_defs(param_str): ...
-def make_gui_items(pname, param, first_call: bool = ...): ...
+    def get_init(self, bit_time: float, sample_interval: float, channel_response: NDArray[np.longdouble], ami_params: dict[str, Any] | None = None) -> AMIModelInitializer: ...
+# atom = number | symbol | ami_string | true | false
+# expr = atom | node
+ami_parse: AmiParser

@@ -171,59 +171,6 @@ def interp_s2p(ntwk: Network, f: Rvec) -> Network:
     return Network(f=f, s=s, z0=extrap.z0, name=(ntwk.name + "_interp"), f_unit="Hz")
 
 
-# ToDo: Are there any uses of this function remaining? Can we eliminate them?  # pylint: disable=fixme
-def renorm_s2p(ntwk: Network, zs: Cvec) -> Network:
-    """
-    Renormalize a simple 2-port network to a new set of port impedances.
-
-    This function was originally written as a check on the
-    `skrf.Network.renormalize()` function, which I was attempting to use
-    to model the Rx termination when calculating the channel impulse
-    response. (See lines 1640-1650'ish of `pybert.py`.)
-
-    In my original specific case, I was attempting to model an open
-    circuit termination. And when I did the magnitude of my resultant
-    S21 dropped from 0 to -44 dB!
-    I didn't think that could possibly be correct.
-    So, I wrote this function as a check on that.
-
-    Args:
-        ntwk: A 2-port network, which must use the same (singular) impedance at both ports.
-        zs: The set of new port impedances to be used.
-            This set of frequencies may be unique for each port and at each frequency.
-
-    Returns:
-        Srenorm: The renormalized 2-port network.
-    """
-    (Nf, Nr, Nc) = ntwk.s.shape
-    assert Nr == 2 and Nc == 2, "May only be used to renormalize a 2-port network!"
-    assert all(ntwk.z0[:, 0] == ntwk.z0[0, 0]) and all(
-        ntwk.z0[:, 0] == ntwk.z0[:, 1]
-    ), f"May only be used to renormalize a network with equal (singular) reference impedances! z0: {ntwk.z0}"
-    assert zs.shape in ((2,), (len(ntwk.f), 2)), ValueError(
-        "The list of new impedances must have shape (2,) or (len(ntwk.f), 2)!")
-
-    if zs.shape == (2,):
-        zt = zs.repeat(len(Nf))
-    else:
-        zt = array(zs)
-    z0 = ntwk.z0[0, 0]
-    S = ntwk.s
-    Id = identity(2)
-    Z = []
-    for s in S:
-        Z.append(inv(Id - s).dot(Id + s))  # Resultant values are normalized to z0.
-    Z = array(Z)
-    Zn = []
-    for z, zn in zip(Z, zt):  # Iterration is over frequency and yields: (2x2 array, 2-element vector).
-        Zn.append(z.dot(z0 / zn))
-    Zn = array(Zn)
-    Sn = []
-    for z in Zn:
-        Sn.append(inv(z + Id).dot(z - Id))
-    return Network(s=Sn, f=ntwk.f / 1e9, z0=zs)
-
-
 def H_2_s2p(H: Cvec, Zc: Cvec, fs: Rvec, Zref: float = 50) -> Network:
     """
     Convert transfer function to 2-port network.

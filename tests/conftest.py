@@ -49,7 +49,7 @@ def ibisami_rx_getwave():
 def ibisami_rx_getwave_clocked():
     """
     Return an initialized pybert object configured to use
-    an Rx IBIS-AMI model in bit-by-bit mode.
+    an Rx IBIS-AMI model in bit-by-bit mode and making use of clock times.
     """
     dut = PyBERT(run_simulation=False, gui=False)
     dut.rx_ibis_file = "models/ibisami/example_rx.ibs"

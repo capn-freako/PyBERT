@@ -3,7 +3,6 @@ from _typeshed import Incomplete
 class AMIParamError(Exception): ...
 
 class AMIParameter:
-    RESERVED_PARAM_NAMES: Incomplete
     pname: Incomplete
     pusage: Incomplete
     ptype: Incomplete

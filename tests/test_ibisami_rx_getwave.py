@@ -1,6 +1,6 @@
 """
 Run some basic tests on a PyBERT instance w/
-an Rx IBIS-AMI model run in statistical mode.
+an Rx IBIS-AMI model run in bit-by-bit mode.
 """
 
 import numpy as np

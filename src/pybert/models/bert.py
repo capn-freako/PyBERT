@@ -10,8 +10,10 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from time import perf_counter
-from typing import Callable, Optional
+from typing import Callable, NewType, Optional, TypeAlias
 
+import numpy        as np
+import numpy.typing as npt
 import scipy.signal as sig
 from numpy import (  # type: ignore
     argmax,
@@ -19,6 +21,7 @@ from numpy import (  # type: ignore
     convolve,
     correlate,
     diff,
+    float64,
     histogram,
     linspace,
     mean,
@@ -34,7 +37,8 @@ from numpy.typing import NDArray  # type: ignore
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
-from pyibisami.ami.parser import ami_defs
+from pyibisami.ami.parser import AmiAtom, AmiExpr, AmiName, AmiNode, AmiNodeParser, ParamName, ParamValue, ami_parse
+# from pyibisami.ami.parser import ParamName, ParamValue, ami_defs
 
 from pybert.models.dfe import DFE
 from pybert.utility import (
@@ -51,6 +55,8 @@ from pybert.utility import (
 )
 
 clock = perf_counter
+
+AmiFloats: TypeAlias = tuple[AmiName, list["float | 'AmiFloats'"]]
 
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.0e-12
@@ -240,11 +246,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ctle_s = None
     clock_times = None
     try:
+        params: list[str] = []
         if self.tx_use_ami and self.tx_use_getwave:
-            tx_out, _, tx_h, tx_out_h, msg, params = run_ami_model(
+            tx_out, _, tx_h, tx_out_h, msg, _params = run_ami_model(
                 self.tx_dll_file, self._tx_cfg, True, ui, ts, chnl_h, x)
+            params = _params
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
-            tx_getwave_params = ami_defs.parse(params)
+            tx_getwave_params = list(map(ami_parse, params))
             self.log(f"Tx IBIS-AMI model GetWave() output parameters:\n{tx_getwave_params}")
             rx_in = convolve(tx_out + noise, chnl_h)[:len(tx_out)]
             # Calculate the remaining responses from the impulse responses.
@@ -254,11 +262,12 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             split_time = clock()
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
-                ctle_out, _, ctle_h, ctle_out_h, msg, params = run_ami_model(
+                ctle_out, _, ctle_h, ctle_out_h, msg, _params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
+                params = _params
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
-                rx_getwave_params = ami_defs.parse(params)
-                self.log(f"Rx IBIS-AMI model GetWave() output parameters:\n{rx_getwave_params}")
+                _rx_getwave_params = list(map(ami_parse, params))
+                self.log(f"Rx IBIS-AMI model GetWave() output parameters:\n{_rx_getwave_params}")
             else:  # Rx is either AMI_Init() or PyBERT native.
                 if self.rx_use_ami:  # Rx Init()
                     _, _, ctle_h, ctle_out_h, msg, _ = run_ami_model(
@@ -288,30 +297,61 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             split_time = clock()
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
-                ctle_out, clock_times, ctle_h, ctle_out_h, msg, params = run_ami_model(
+                ctle_out, clock_times, ctle_h, ctle_out_h, msg, _params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
+                params = _params
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
-                rx_getwave_params = list(map(ami_defs.parse, params))
+                # Time evolution of (<root_name>: AmiName, <param_vals>: list[AmiNode]):
+                # (i.e. - There can be no `AmiAtom`s in the root tuple's second member.)
+                rx_getwave_params: list[tuple[AmiName, list[AmiNode]]] = list(map(ami_parse, params))
                 param_vals = {}
-                for (pname, vals) in rx_getwave_params[0][1]:
-                    param_vals[pname] = list(map(float, vals))
+
+                def isnumeric(x):
+                    try:
+                        y = float(x)
+                        return True
+                    except:
+                        return False
+
+                def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[np.float64]]:
+                    "Retrieve all numeric values from an AMI node, encoding hierarchy in key names."
+                    pname = node[0]
+                    vals  = node[1]
+                    pname_hier = AmiName(prefix + pname)
+                    first_val = vals[0]
+                    if isnumeric(first_val):
+                        return {pname_hier: list(map(float, vals))}  # type: ignore
+                    elif type(first_val) == AmiNode:
+                        subdicts = list(map(lambda nd: get_numeric_values(pname_hier, nd), vals))  # type: ignore
+                        rslt = {}
+                        for subdict in subdicts:
+                            rslt.update(subdict)
+                        return rslt
+                    else:
+                        return {}
+
+                for nd in rx_getwave_params[0][1]:
+                    param_vals.update(get_numeric_values(AmiName(""), nd))
                 for rslt in rx_getwave_params[1:]:
-                    for (pname, vals) in rslt[1]:
-                        param_vals[pname].extend(list(map(float, vals)))
-                tap_weights = []
-                dfe_tap_keys = list(filter(lambda s: s.startswith("dfe_tap"), param_vals.keys()))
+                    for nd in rslt[1]:
+                        vals_dict = get_numeric_values(AmiName(""), nd)
+                        for pname in vals_dict:
+                            param_vals[pname].extend(vals_dict[pname])
+
+                _tap_weights = []
+                dfe_tap_keys: list[AmiName] = list(filter(lambda s: s.tolower().contains("tap"), param_vals.keys()))  # type: ignore
                 dfe_tap_keys.sort()
                 for dfe_tap_key in dfe_tap_keys:
-                    tap_weights.append(param_vals[dfe_tap_key])
-                tap_weights = array(tap_weights).transpose()
+                    _tap_weights.append(param_vals[dfe_tap_key])
+                tap_weights = array(_tap_weights).transpose()
                 if "cdr_locked" in param_vals:
-                    lockeds = array(param_vals["cdr_locked"])
+                    lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
                     lockeds = lockeds.repeat(len(t) // len(lockeds))
                     lockeds.resize(len(t))
                 else:
                     lockeds = zeros(len(t))
                 if "cdr_ui" in param_vals:
-                    ui_ests = array(param_vals["cdr_ui"])
+                    ui_ests: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_ui")])
                     ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
                     ui_ests.resize(len(t))
                 else:
@@ -522,7 +562,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     len_x_m1 = len(x) - 1
     xing_min_t = (nui - eye_uis) * ui
 
-    def eye_xings(xings, ofst=0) -> NDArray[float]:
+    def eye_xings(xings, ofst=0) -> NDArray[float64]:
         """
         Return crossings from that portion of the signal used to generate the eye.
 
@@ -931,8 +971,9 @@ def update_results(self):
     xs = linspace(-ui * 1.0e12, ui * 1.0e12, width)
     height = 1000
     tiny_noise = normal(scale=1e-3, size=len(chnl_out[ignore_samps:]))  # to make channel eye easier to view.
-    y_max = 1.1 * max(abs(array(self.chnl_out[ignore_samps:])))
-    eye_chnl = calc_eye(ui, samps_per_ui, height, self.chnl_out[ignore_samps:] + tiny_noise, y_max)
+    chnl_out_noisy = self.chnl_out[ignore_samps:] + tiny_noise
+    y_max = 1.1 * max(abs(array(chnl_out_noisy)))
+    eye_chnl = calc_eye(ui, samps_per_ui, height, chnl_out_noisy, y_max)
     y_max = 1.1 * max(abs(array(self.rx_in[ignore_samps:])))
     eye_tx = calc_eye(ui, samps_per_ui, height, self.rx_in[ignore_samps:], y_max)
     y_max = 1.1 * max(abs(array(self.ctle_out[ignore_samps:])))
