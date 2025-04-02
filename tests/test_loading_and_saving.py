@@ -60,7 +60,7 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
     with open(save_file, "r", encoding="UTF-8") as saved_config_file:
         user_config = yaml.load(saved_config_file, Loader=yaml.Loader)
         # Change a lot of settings throughout the different tabs of the application.
-        user_config.nbits = 1234  # Normally 8000
+        user_config.eye_bits = 1234  # Normally 8000
         user_config.bit_rate = 20  # Normally 10
         user_config.mod_type = [1]  # Normally [0]
         user_config.pattern = "PRBS-23"  # Normally PRBS-7

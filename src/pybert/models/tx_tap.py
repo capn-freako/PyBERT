@@ -16,7 +16,7 @@ class TxTapTuner(HasTraits):
     value = Float(0.0)
     steps = Int(0)  # Non-zero means we want to sweep it.
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(self, name="(noname)", pos=0, enabled=False, min_val=-0.1, max_val=0.1, step=0.01, value=0.0, steps=0):
         """Allows user to define properties, at instantiation."""
 

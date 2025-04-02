@@ -320,7 +320,7 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
     return (w, H)
 
 
-# pylint: disable=too-many-arguments,too-many-locals
+# pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
 def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: float,
              clock_times: Optional[Rvec] = None) -> NDArray:
     """

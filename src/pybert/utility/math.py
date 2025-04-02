@@ -60,7 +60,7 @@ def safe_log10(x):
     return log10(x)
 
 
-# pylint: disable=too-many-locals,too-many-arguments
+# pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
 def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
                  rj: float = 0, mu_r: float = 0, mu_l: float = 0,
                  extrap: bool = False) -> tuple[Rvec, tuple[int, int]]:

@@ -1080,7 +1080,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.check_eye_bits()
         self.check_pat_len()
 
-
     def _f_max_changed(self, new_value):
         fmax = 0.5e-9 / self.t[1]  # Nyquist frequency, given our sampling rate (GHz).
         if new_value > fmax:

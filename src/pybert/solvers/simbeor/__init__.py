@@ -37,7 +37,7 @@ __path__ = [osp.join(sdkdir, "python")]
 class Solver(slvr.Solver):  # pylint: disable=too-few-public-methods
     """Simbeor-specific override of `pybert.solver.Solver` class."""
 
-    # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements,unused-argument
+    # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements,unused-argument,too-many-positional-arguments
     def solve(
         self,
         ch_type: slvr.ChType = "microstrip_se",  #: Channel cross-sectional configuration.

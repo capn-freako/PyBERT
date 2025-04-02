@@ -17,7 +17,7 @@ from pyibisami.ami.parser import AMIParamConfigurator
 from ..common import Rvec
 
 
-# pylint: disable=too-many-arguments,too-many-locals
+# pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
 def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
                   ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0  # noqa: F405
                   ) -> tuple[Rvec, Rvec, Rvec, Rvec, str, list[str]]:  # noqa: F405

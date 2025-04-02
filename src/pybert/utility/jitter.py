@@ -29,7 +29,7 @@ from .sigproc import moving_average
 debug          = False
 
 
-def find_crossing_times(  # pylint: disable=too-many-arguments
+def find_crossing_times(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     t: Rvec,
     x: Rvec,
     min_delay: float = 0.0,
@@ -119,7 +119,7 @@ def find_crossing_times(  # pylint: disable=too-many-arguments
     return array(xings[i:])
 
 
-def find_crossings(  # pylint: disable=too-many-arguments
+def find_crossings(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     t: Rvec,
     x: Rvec,
     amplitude: float = 1.0,
@@ -206,7 +206,7 @@ def find_crossings(  # pylint: disable=too-many-arguments
     return sort(concatenate(xings))
 
 
-def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
+def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements,too-many-positional-arguments
     ui: float, nui: int, pattern_len: int, ideal_xings: Rvec, actual_xings: Rvec,
     rel_thresh: float = 3.0, num_bins: int = 101,
     zero_mean: bool = True, dbg_obj: Optional[object] = None, smooth_width: int = 5

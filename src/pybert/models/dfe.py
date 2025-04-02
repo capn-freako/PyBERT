@@ -65,7 +65,7 @@ class LfilterSS:  # pylint: disable=too-few-public-methods
 class DFE:  # pylint: disable=too-many-instance-attributes
     """Behavioral model of a decision feedback equalizer (DFE)."""
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-locals
+    def __init__(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
         self,
         n_taps,
         gain,
