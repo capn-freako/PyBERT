@@ -102,8 +102,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     pattern = Map(
         {
             "PRBS-7": [7, 6],
+            "PRBS-9": [9, 5],
+            "PRBS-11": [11, 9],
+            "PRBS-13": [13, 12, 2, 1],
             "PRBS-15": [15, 14],
+            "PRBS-20": [20, 3],
             "PRBS-23": [23, 18],
+            "PRBS-31": [31, 28],
         },
         default_value="PRBS-7",
     )
@@ -285,9 +290,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     console_log = String("PyBERT Console Log\n\n")
 
     # Dependent variables
-    # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables, which don't freeze the GUI noticeably.)
+    # - Handled by the Traits/UI machinery. (Should only contain "low overhead" variables,
+    #   which don't freeze the GUI noticeably.)
     #
-    # - Note: Don't make properties, which have a high calculation overhead, dependencies of other properties!
+    # - Note: Don't make properties, which have a high calculation overhead,
+    #         dependencies of other properties!
     #         This will slow the GUI down noticeably.
     jitter_info = Property(String, depends_on=["jitter_perf"])
     status_str = Property(String, depends_on=["status"])
@@ -318,8 +325,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # Logger & Pop-up
     def log(self, msg, alert=False, exception=None):
-        """Log a message to the console and, optionally, to terminal and/or
-        pop-up dialog."""
+        """Log a message to the console and, optionally, to terminal and/or pop-up dialog."""
         _msg = msg.strip()
         txt = f"[{datetime.now()}]: PyBERT: {_msg}"
         if self.debug:
@@ -329,7 +335,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if exception:
             raise exception
         if alert and self.GUI:
-            message(_msg, "PyBERT Alert")
+            message(_msg, title="PyBERT Alert")
 
     # User "yes"/"no" alert box.
     def alert(self, msg):
@@ -1050,19 +1056,36 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def check_pat_len(self):
         "Validate chosen pattern length against number of bits being run."
         taps = self.pattern_
-        pat_len = 2 * pow(2, max(taps))
-        if pat_len > 5 * self.nbits:
-            self.log(
-                "Accurate jitter decomposition may not be possible with the current configuration!\n \
-Try to keep Nbits & EyeBits > 10 * 2^n, where `n` comes from `PRBS-n`.",
+        pat_len = 2 * pow(2, max(taps))  # "2 *", to accommodate PAM-4.
+        if self.eye_bits < 5 * pat_len:
+            self.log("\n".join([
+                "Accurate jitter decomposition may not be possible with the current configuration!",
+                "Try to keep `EyeBits` > 10 * 2^n, where `n` comes from `PRBS-n`.",]),
                 alert=True,
             )
+
+    def check_eye_bits(self):
+        "Validate user selected number of eye bits."
+        if self.eye_bits > self.nbits:
+            self.eye_bits = self.nbits
+            self.log("`EyeBits` has been held at `Nbits`.", alert=True)
 
     def _pattern_changed(self):
         self.check_pat_len()
 
     def _nbits_changed(self):
+        self.check_eye_bits()
+
+    def _eye_bits_changed(self):
+        self.check_eye_bits()
         self.check_pat_len()
+
+
+    def _f_max_changed(self, new_value):
+        fmax = 0.5e-9 / self.t[1]  # Nyquist frequency, given our sampling rate (GHz).
+        if new_value > fmax:
+            self.f_max = fmax
+            self.log("`fMax` has been held at the Nyquist frequency.", alert=True)
 
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and

@@ -38,8 +38,6 @@ from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
 from pyibisami.ami.parser import AmiAtom, AmiExpr, AmiName, AmiNode, AmiNodeParser, ParamName, ParamValue, ami_parse
-# from pyibisami.ami.parser import ParamName, ParamValue, ami_defs
-
 from pybert.models.dfe import DFE
 from pybert.utility import (
     calc_eye,
@@ -494,7 +492,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         bits_tst = bits_tst[: len(bits_ref)]
     bit_errs = where(bits_tst ^ bits_ref)[0]
     n_errs = len(bit_errs)
-    if n_errs:
+    if n_errs and False:
         self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
     self.bit_errs = n_errs
 
@@ -758,9 +756,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.total_perf = nbits * nspb / (clock() - start_time)
         split_time = clock()
         self.status = "Updating plots..."
-    except Exception:
+    except ValueError as err:
+        self.log(f"The jitter calculation could not be completed, due to the following error:\n{err}",
+                 alert=False)
         self.status = "Exception: jitter"
-        raise
+        # raise
 
     _check_sim_status()
     # Update plots.
@@ -772,9 +772,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
         self.plotting_perf = nbits * nspb / (clock() - split_time)
         self.status = "Ready."
-    except Exception:
+    except Exception as err:
+        self.log(f"The following error occured, while trying to update the plots:\n{err}")
         self.status = "Exception: plotting"
-        raise
+        # raise
 
 
 # Plot updating

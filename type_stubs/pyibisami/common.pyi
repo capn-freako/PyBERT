@@ -1,10 +1,9 @@
 from typing import Any, TypeAlias, TypeVar
-import numpy.typing as npt
 
 Real = TypeVar('Real', float, float)
 Comp = TypeVar('Comp', complex, complex)
-Rvec: TypeAlias = npt.NDArray[Real]
-Cvec: TypeAlias = npt.NDArray[Comp]
+Rvec: TypeAlias
+Cvec: TypeAlias
 PI: float
 TWOPI: float
 TestConfig = tuple[str, tuple[dict[str, Any], dict[str, Any]]]

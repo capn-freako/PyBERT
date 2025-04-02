@@ -258,7 +258,6 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     Raises:
         ValueError: If input checking fails, or curve fitting goes awry.
-        AssertionError: If less than one full pattern given as input, or an odd number of crossings per pattern was detected.
 
     Notes:
         1. The actual crossings should arrive pre-aligned to the ideal crossings.
@@ -271,12 +270,16 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         raise ValueError("calc_jitter(): zero length actual crossings vector received!")
 
     num_patterns = nui // pattern_len
-    assert num_patterns, f"Need at least one full pattern repetition! (pattern_len: {pattern_len}; nui: {nui})"
+    if num_patterns == 0:
+        raise ValueError("\n".join([
+            "Need at least one full pattern repetition!",
+            f"(pattern_len: {pattern_len}; nui: {nui})",]))
     xings_per_pattern = where(ideal_xings > (pattern_len * ui))[0][0]
     if xings_per_pattern % 2 or not xings_per_pattern:
-        print("xings_per_pattern:", xings_per_pattern)
-        print("min(ideal_xings):", min(ideal_xings))
-        raise AssertionError("pybert_util.calc_jitter(): Odd number of (or, no) crossings per pattern detected!")
+        raise ValueError("\n".join([
+            "pybert.utility.calc_jitter(): Odd number of (or, no) crossings per pattern detected!",
+            f"xings_per_pattern: {xings_per_pattern}",
+            f"min(ideal_xings): {min(ideal_xings)}",]))
 
     # Assemble the TIE track.
     i = 0
