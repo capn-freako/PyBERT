@@ -19,7 +19,7 @@ class CDR:  # pylint: disable=too-many-instance-attributes
     """A class providing behavioral modeling of a 'bang- bang' clock data
     recovery (CDR) unit."""
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         delta_t: float,
         alpha: float,

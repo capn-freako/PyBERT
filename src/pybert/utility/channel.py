@@ -14,7 +14,7 @@ from numpy import array, pi, power, sqrt  # type: ignore
 from ..common import Rvec, Cvec
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,too-many-positional-arguments
 def calc_gamma(R0: float, w0: float, Rdc: float, Z0: float,
                v0: float, Theta0: float, ws: Rvec) -> tuple[Cvec, Cvec]:  # pylint: disable=too-many-arguments
     """
@@ -85,7 +85,7 @@ def calc_gamma_RLGC(R: float, L: float, G: float, C: float, ws: Rvec) -> tuple[C
     return (gamma, Zc)
 
 
-def calc_G(H: Cvec, Rs: float, Cs: float, Zc: Cvec, RL: float, Cp: float, ws: Rvec) -> Cvec:  # pylint: disable=too-many-arguments
+def calc_G(H: Cvec, Rs: float, Cs: float, Zc: Cvec, RL: float, Cp: float, ws: Rvec) -> Cvec:  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """
     Calculates fully loaded transfer function of complete channel.
 

@@ -13,9 +13,8 @@ import os.path
 import re
 
 from cmath import phase, rect
-from numpy import array, diff, identity, ones, pi, where, zeros  # type: ignore
+from numpy import array, diff, ones, pi, where, zeros  # type: ignore
 from numpy.fft import fft  # type: ignore
-from scipy.linalg import inv
 from skrf import Network
 from skrf.network import one_port_2_two_port
 

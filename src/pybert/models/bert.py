@@ -10,7 +10,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from time import perf_counter
-from typing import Callable, NewType, Optional, TypeAlias
+from typing import Callable, Optional, TypeAlias
 
 import numpy        as np
 import numpy.typing as npt
@@ -37,9 +37,7 @@ from numpy.typing import NDArray  # type: ignore
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
-from pyibisami.ami.parser import AmiAtom, AmiExpr, AmiName, AmiNode, AmiNodeParser, ParamName, ParamValue, ami_parse
-# from pyibisami.ami.parser import ParamName, ParamValue, ami_defs
-
+from pyibisami.ami.parser import AmiName, AmiNode, ami_parse
 from pybert.models.dfe import DFE
 from pybert.utility import (
     calc_eye,
@@ -308,9 +306,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
                 def isnumeric(x):
                     try:
-                        y = float(x)
+                        _ = float(x)
                         return True
-                    except:
+                    except:  # noqa: E722, pylint: disable=bare-except
                         return False
 
                 def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[np.float64]]:
@@ -321,22 +319,21 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     first_val = vals[0]
                     if isnumeric(first_val):
                         return {pname_hier: list(map(float, vals))}  # type: ignore
-                    elif type(first_val) == AmiNode:
+                    if type(first_val) == AmiNode:  # noqa: E721, pylint: disable=unidiomatic-typecheck
                         subdicts = list(map(lambda nd: get_numeric_values(pname_hier, nd), vals))  # type: ignore
                         rslt = {}
                         for subdict in subdicts:
                             rslt.update(subdict)
                         return rslt
-                    else:
-                        return {}
+                    return {}
 
                 for nd in rx_getwave_params[0][1]:
                     param_vals.update(get_numeric_values(AmiName(""), nd))
                 for rslt in rx_getwave_params[1:]:
                     for nd in rslt[1]:
                         vals_dict = get_numeric_values(AmiName(""), nd)
-                        for pname in vals_dict:
-                            param_vals[pname].extend(vals_dict[pname])
+                        for pname, pvals in vals_dict.items():
+                            param_vals[pname].extend(pvals)
 
                 _tap_weights = []
                 dfe_tap_keys: list[AmiName] = list(filter(lambda s: s.tolower().contains("tap"), param_vals.keys()))  # type: ignore
@@ -494,7 +491,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         bits_tst = bits_tst[: len(bits_ref)]
     bit_errs = where(bits_tst ^ bits_ref)[0]
     n_errs = len(bit_errs)
-    if n_errs:
+    if n_errs and False:  # pylint: disable=condition-evals-to-constant
         self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
     self.bit_errs = n_errs
 
@@ -758,9 +755,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.total_perf = nbits * nspb / (clock() - start_time)
         split_time = clock()
         self.status = "Updating plots..."
-    except Exception:
+    except ValueError as err:
+        self.log(f"The jitter calculation could not be completed, due to the following error:\n{err}",
+                 alert=False)
         self.status = "Exception: jitter"
-        raise
+        # raise
 
     _check_sim_status()
     # Update plots.
@@ -772,9 +771,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
         self.plotting_perf = nbits * nspb / (clock() - split_time)
         self.status = "Ready."
-    except Exception:
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        self.log(f"The following error occured, while trying to update the plots:\n{err}")
         self.status = "Exception: plotting"
-        raise
+        # raise
 
 
 # Plot updating
