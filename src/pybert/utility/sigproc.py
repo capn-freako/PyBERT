@@ -175,15 +175,15 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,  # noqa: F405
             (It is *not* assumed to begin at zero.)
     """
     ddt = diff(diff(t))
-    assert not any(ddt > eps), ValueError(
-        f"`t` must be uniformly spaced! (Largest spacing difference: {max(ddt)})")
-    assert len(t) >= len(h), ValueError(
-        f"Length of `t` ({len(t)}) must be at least length of `h` ({len(h)})!")
+    if any(ddt > eps):
+        raise ValueError(f"`t` must be uniformly spaced! (Largest spacing difference: {max(ddt)})")
+    if len(t) < len(h):
+        raise ValueError(f"Length of `t` ({len(t)}) must be at least length of `h` ({len(h)})!")
     ddf = diff(diff(f))
-    assert not any(ddf > eps), ValueError(
-        f"`f` must be uniformly spaced! (Largest spacing difference: {max(ddf)})")
-    assert f[0] == 0, ValueError(
-        f"`f` must begin at zero! (f[0] = {f[0]})")
+    if any(ddf > eps):
+        raise ValueError(f"`f` must be uniformly spaced! (Largest spacing difference: {max(ddf)})")
+    if f[0] != 0:
+        raise ValueError(f"`f` must begin at zero! (f[0] = {f[0]})")
 
     s = h.cumsum()
     ts = t[1] - t[0]

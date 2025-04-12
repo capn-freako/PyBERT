@@ -15,7 +15,8 @@ class CSDF:  # pylint: disable=too-few-public-methods
     """Common Simulation Data Format (CSDF)"""
 
     def __init__(self, hdr, nms, wvs):
-        assert len(nms) == int(hdr["NODES"])
+        if len(nms) != int(hdr["NODES"]):
+            raise ValueError(f"Length of `nms` ({len(nms)}) must equal `hdr['NODES']` ({int(hdr['NODES'])})")
         self.header = {}
         self.header.update(hdr)
         self.names = nms

@@ -53,11 +53,13 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
 
     # Validate the model against the requested use mode.
     if use_getwave:
-        assert param_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]), RuntimeError(
-            "You've requested to use the `AMI_GetWave()` function of an IBIS-AMI model, which doesn't provide one!")
+        if not param_cfg.fetch_param_val(["Reserved_Parameters", "GetWave_Exists"]):
+            raise RuntimeError(
+                "You've requested to use the `AMI_GetWave()` function of an IBIS-AMI model, which doesn't provide one!")
     else:
-        assert param_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]), RuntimeError(
-            "You've requested to use the `AMI_Init()` function of an IBIS-AMI model, which doesn't return an impulse response!")
+        if not param_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]):
+            raise RuntimeError(
+                "You've requested to use the `AMI_Init()` function of an IBIS-AMI model, which doesn't return an impulse response!")
 
     # Load and initialize the model.
     model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)

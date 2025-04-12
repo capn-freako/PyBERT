@@ -79,7 +79,8 @@ def find_crossing_times(  # pylint: disable=too-many-arguments,too-many-position
     i = 0
     while abs(x[i]) < min_mag_x:
         i += 1
-        assert i < len(x), "Input signal minimum deviation not detected!"
+        if i >= len(x):
+            raise RuntimeError("Input signal minimum deviation not detected!")
     x = x[i:] - thresh
     t = t[i:]
 
@@ -94,7 +95,8 @@ def find_crossing_times(  # pylint: disable=too-many-arguments,too-many-position
 
     i = 0
     if min_delay:
-        assert min_delay < xings[-1], f"min_delay ({min_delay}) must be less than last crossing time ({xings[-1]})."
+        if min_delay >= xings[-1]:
+            raise RuntimeError(f"min_delay ({min_delay}) must be less than last crossing time ({xings[-1]}).")
         while xings[i] < min_delay:
             i += 1
 
@@ -160,8 +162,8 @@ def find_crossings(  # pylint: disable=too-many-arguments,too-many-positional-ar
         xing_times: The signal threshold crossing times.
     """
 
-    # assert mod_type >= 0 and mod_type <= 2, f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}"
-    assert 0 <= mod_type <= 2, f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}"
+    if mod_type not in [0, 1, 2]:
+        raise ValueError(f"ERROR: pybert_util.find_crossings(): Unknown modulation type: {mod_type}")
 
     xings = []
     if mod_type == 0:  # NRZ
@@ -316,7 +318,6 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     jitter = array(jitterL)
 
     # ToDo: Report this in the status bar.
-    # assert len(jitter) > 0 and len(t_jitter) > 0, "No crossings found!"
     if len(jitter) == 0 or len(t_jitter) == 0:
         print("No crossings found!", flush=True)
 
