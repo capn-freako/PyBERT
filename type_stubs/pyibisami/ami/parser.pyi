@@ -5,18 +5,18 @@ from .reserved_parameter_names  import AmiReservedParameterName, RESERVED_PARAM_
 from _typeshed import Incomplete
 from numpy.typing import NDArray
 from traits.api import HasTraits
-from typing import Any, Callable, NewType, TypeAlias
+from typing         import Any, Callable, NewType, Optional, TypeAlias
 
 __all__ = ['ParamName', 'ParamValue', 'Parameters', 'ParamValues', 'AmiName', 'AmiAtom', 'AmiExpr', 'AmiNode', 'AmiNodeParser', 'AmiParser', 'ami_parse', 'AMIParamConfigurator']
 
 ParamName  = NewType("ParamName", str)
 ParamValue:  TypeAlias = int | float | str | list["ParamValue"]
-Parameters:  TypeAlias = dict[ParamName, "AMIParameter | 'Parameters'"]
-ParamValues: TypeAlias = dict[ParamName, "ParamValue   | 'ParamValues'"]
+Parameters:  TypeAlias = dict[ParamName, "'AMIParameter' | 'Parameters'"]
+ParamValues: TypeAlias = dict[ParamName, "'ParamValue'   | 'ParamValues'"]
 
 AmiName = NewType("AmiName", str)
 AmiAtom: TypeAlias = bool | int | float | str
-AmiExpr: TypeAlias = "AmiAtom | 'AmiNode'"
+AmiExpr: TypeAlias = "'AmiAtom' | 'AmiNode'"
 AmiNode: TypeAlias = tuple[AmiName, list[AmiExpr]]
 AmiNodeParser: TypeAlias = Callable[[str], AmiNode]
 AmiParser:     TypeAlias = Callable[[str], tuple[AmiName, list[AmiNode]]]  # Atoms may not exist at the root level.
@@ -24,7 +24,7 @@ AmiParser:     TypeAlias = Callable[[str], tuple[AmiName, list[AmiNode]]]  # Ato
 ParseErrMsg = NewType("ParseErrMsg", str)
 AmiRootName = NewType("AmiRootName", str)
 ReservedParamDict: TypeAlias = dict[AmiReservedParameterName, AMIParameter]
-ModelSpecificDict: TypeAlias = dict[ParamName, "AMIParameter | 'ModelSpecificDict'"]
+ModelSpecificDict: TypeAlias = dict[ParamName, "'AMIParameter' | 'ModelSpecificDict'"]
 
 class AMIParamConfigurator(HasTraits):
     def __init__(self, ami_file_contents_str: str) -> None: ...
