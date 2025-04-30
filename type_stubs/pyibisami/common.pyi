@@ -1,5 +1,5 @@
 from typing import Any, TypeAlias, TypeVar
-import numpy.typing as npt
+import numpy.typing as npt  # type: ignore
 
 Real = TypeVar('Real', float, float)
 Comp = TypeVar('Comp', complex, complex)
