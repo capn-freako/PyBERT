@@ -143,3 +143,6 @@ pybert.log
 *.gcbench
 misc/*
 *_cfg.yaml
+
+# Metal (Apple GPU)
+metal.gputrace/
