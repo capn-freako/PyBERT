@@ -62,6 +62,10 @@ ${TYPE_STUB_INFO}: ${TYPE_STUB_SRCS}
 docs: ${VER_FILE}
 	. ./$< && ${TOX_EXEC} run -e docs
 
+build: ${VER_FILE}
+	${TOX_EXEC} run -e build
+	${PYTHON_EXEC} -m pip freeze >requirements.txt
+
 upload: ${VER_FILE}
 	. ./$< && ${TOX_EXEC} run -e upload
 
