@@ -373,6 +373,16 @@ traits_view = View(
                             Item(label="uF"),
                             spring,
                         ),
+                        HGroup(
+                            Item(
+                                name="rx_use_viterbi", label="Use Viterbi",
+                                tooltip="Apply MLSD to recovered symbols, using Viterbi algorithm.",
+                                ),
+                            Item(
+                                name="rx_viterbi_symbols", label="# Symbols",
+                                tooltip="Number of symbols to include in MLSD trellis.",
+                                ),
+                        ),
                         label="Native",
                         show_border=True,
                         enabled_when="rx_use_ibis == False",
