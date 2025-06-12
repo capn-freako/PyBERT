@@ -485,7 +485,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         Calculate the time vector appropriate for indexing `irfft()` output.
         """
         f = self.f
-        tmax = 1 / f[1]
+        try:
+            tmax = 1 / f[1]
+        except:
+            self.log(f"f_max: {self.f_max}, f_step: {self.f_step}")
+            raise
         tstep = 0.5 / f[-1]
         return arange(0, tmax, tstep)
 

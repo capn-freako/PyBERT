@@ -104,6 +104,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Local files
+local/
+
 # Temporary files
 .*
 !.*.yaml
@@ -143,3 +146,6 @@ pybert.log
 *.gcbench
 misc/*
 *_cfg.yaml
+
+# Metal (Apple GPU)
+metal.gputrace/

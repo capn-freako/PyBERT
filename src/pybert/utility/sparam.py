@@ -100,8 +100,10 @@ def se2mm(ntwk: Network, scale: float = 0.5, renumber: bool = False) -> Network:
     """
     # Confirm correct network dimmensions.
     (_, rs, cs) = ntwk.s.shape
-    assert rs == cs, "Non-square Touchstone file S-matrix!"
-    assert rs == 4, "Touchstone file must have 4 ports!"
+    if rs != cs:
+        raise ValueError("Non-square Touchstone file S-matrix!")
+    if rs != 4:
+        raise ValueError("Touchstone file must have 4 ports!")
 
     # Detect/correct "1 => 3" port numbering.
     if renumber:
@@ -155,11 +157,14 @@ def interp_s2p(ntwk: Network, f: Rvec) -> Network:
         ValueError: If `ntwk` is _not_ a 2-port network.
     """
     (_, rs, cs) = ntwk.s.shape
-    assert rs == cs, "Non-square Touchstone file S-matrix!"
-    assert rs == 2, "Touchstone file must have 2 ports!"
+    if rs != cs:
+        raise ValueError("Non-square Touchstone file S-matrix!")
+    if rs != 2:
+        raise ValueError("Touchstone file must have 2 ports!")
 
     extrap = ntwk.interpolate(f, fill_value="extrapolate", coords="polar", assume_sorted=True)
-    assert extrap.f[-1] < 1e12, f"Maximum frequency > 1 THz!\n\tf: {f}\n\textrap: {extrap}"
+    if extrap.f[-1] > 1e12:
+        raise ValueError(f"Maximum frequency > 1 THz!\n\tf: {f}\n\textrap: {extrap}")
     s11 = cap_mag(extrap.s[:, 0, 0])
     s22 = cap_mag(extrap.s[:, 1, 1])
     s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
@@ -228,8 +233,10 @@ def import_freq(filename: str, renumber: bool = False) -> Network:
     # Import and sanity check the Touchstone file.
     ntwk = Network(filename, f_unit="Hz")
     (_, rs, cs) = ntwk.s.shape
-    assert rs == cs, "Non-square Touchstone file S-matrix!"
-    assert rs in (1, 2, 4), f"Touchstone file must have 1, 2, or 4 ports!\n{ntwk}"
+    if rs != cs:
+        raise ValueError("Non-square Touchstone file S-matrix!")
+    if rs not in (1, 2, 4):
+        raise ValueError(f"Touchstone file must have 1, 2, or 4 ports!\n{ntwk}")
 
     # Convert to a 2-port network.
     if rs == 4:  # 4-port Touchstone files are assumed single-ended!

@@ -473,8 +473,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 clocks[t_ix] = 1
                 sample_times.append(t[t_ix])
     bits_out = array(bits_out)
-    start_ix = len(bits_out) - eye_bits
-    assert start_ix >= 0, "`start_ix` is negative!"
+    start_ix = max(0, len(bits_out) - eye_bits)
     end_ix = len(bits_out)
     auto_corr = (
         1.0 * correlate(bits_out[start_ix: end_ix], bits[start_ix: end_ix], mode="same") /  # noqa: W504
