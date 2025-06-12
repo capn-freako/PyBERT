@@ -16,8 +16,8 @@ Real = TypeVar('Real', float, float)
 Comp = TypeVar('Comp', complex, complex)
 Rvec = npt.NDArray[Real]
 Cvec = npt.NDArray[Comp]
+Rmat = npt.NDArray[Rvec]
+Cmat = npt.NDArray[Cvec]
 
 PI    = np.pi
 TWOPI = 2 * PI
-# PI: float = 3.14159265359
-# TWOPI: float = 2. * PI

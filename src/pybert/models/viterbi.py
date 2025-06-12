@@ -7,35 +7,85 @@ Original date: June 12, 2025
 Copyright (c) 2025 David Banas; all rights reserved World wide.
 """
 
+import numpy as np
+
+from ..common       import Rvec
+from ..utility.math import all_combs
+
 class ViterbiDecoder():
     """
     Python class modeling a Viterbi decoder.
     """
     
-function Viterbi(states, init, trans, emit, obs) is
-    input states: S hidden states
-    input init: initial probabilities of each state
-    input trans: S × S transition matrix
-    input emit: S × O emission matrix
-    input obs: sequence of T observations
+    def __init__(self, L: int, N: int, sigma: float, pulse_resp_samps: Rvec):
+        """
+        Args:
+            L: Number of symbol voltage levels.
+            N: Number of symbols to track in state matrix.
+            sigma: Standard deviation of Gaussian voltage noise.
+            pulse_resp_samps: Upstream channel pulse response samples, one per UI.
 
-    prob ← T × S matrix of zeroes
-    prev ← empty T × S matrix
-    for each state s in states do
-        prob[0][s] = init[s] * emit[s][obs[0]]
+        Notes:
+            1. The symbol voltages are assumed uniformly distributed in: [-V, +V].
+        """
 
-    for t = 1 to T - 1 inclusive do // t = 0 has been dealt with already
-        for each state s in states do
-            for each state r in states do
-                new_prob ← prob[t - 1][r] * trans[r][s] * emit[s][obs[t]]
-                if new_prob > prob[t][s] then
-                    prob[t][s] ← new_prob
-                    prev[t][s] ← r
+        # Validate input.
+        if len(pulse_resp_samps) < N:
+            raise ValueError(f"Length of `pulse_resp_samps` ({len(pulse_resp_samps)}) must be at least `N` ({N})")
 
-    path ← empty array of length T
-    path[T - 1] ← the state s with maximum prob[T - 1][s]
-    for t = T - 2 to 0 inclusive do
-        path[t] ← prev[t + 1][path[t + 1]]
+        # Build normalized (to `pulse_resp_samps[0]`) symbol level voltages.
+        symbol_level_values = [-1 + l * 2 / (L - 1) for l in range(L)]
 
-    return path
-end
+        # Build state vectors, including their expected voltage observations.
+        _states = all_combs([range(L)] * N)
+        states = []
+        for state in _states:
+            expected_voltage = 0
+            for n in range(N):
+                expected_voltage += pulse_resp_samps[n] * symbol_level_values[state[-(n + 1)]]
+            states.append((state, expected_voltage))
+        self._states = states
+
+        # Build state transition probability matrix.
+        num_states = len(states)
+        trans = []
+        for state in states:
+            row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0 for m in range(num_states)])
+            trans.append(row_vec / row_vec.sum())  # Enforce PMF.
+        self._trans = np.array(trans)
+        
+    @property
+    def states(self):
+        return self._states
+
+    @property
+    def trans(self):
+        return self._trans
+
+    def decode(self, samps: Rvec) -> list[int]:
+        """
+        Decode a sequence of observed voltages.
+
+        Args:
+            samps: Voltage samples from slicer, one per UI.
+        """
+
+        probs = [[v_prob(samp[0] - expected_voltage) for (_, expected_voltage) in states]]
+        prevs = [[]]
+        for samp in samps[1:]:
+            _prob = np.zeros(num_states)
+            _prev = np.zeros(num_states)
+            for n in range(num_states):
+                new_probs = np.array([
+                    probs[-1][n] * self.trans[n][m] * v_prob(samp - expected_voltage)
+                    for m, (_, expected_voltage) in enumerate(states)])
+                _prev = np.where(new_probs > _prob, [n] * num_states, _prev)
+                _prob = np.maximum(new_probs, _prob)
+            probs.append(_prob)
+            prevs.append(_prev)
+        path = [argmax(probs[-1])]
+        prevs.reverse()
+        for prev in prevs[: -1]:
+            path.append(prev[path[-1]])
+        path.reverse()
+        return list(map(lambda n: states[n][-1], path))
