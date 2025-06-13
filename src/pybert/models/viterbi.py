@@ -9,7 +9,7 @@ Copyright (c) 2025 David Banas; all rights reserved World wide.
 
 import numpy as np
 
-from ..common       import Rvec
+from ..common       import TWOPI, Rvec
 from ..utility.math import all_combs
 
 class ViterbiDecoder():
@@ -44,16 +44,20 @@ class ViterbiDecoder():
             for n in range(N):
                 expected_voltage += pulse_resp_samps[n] * symbol_level_values[state[-(n + 1)]]
             states.append((state, expected_voltage))
-        self._states = states
 
         # Build state transition probability matrix.
         num_states = len(states)
         trans = []
         for state in states:
-            row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0 for m in range(num_states)])
+            row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0
+                                    for m in range(num_states)])
             trans.append(row_vec / row_vec.sum())  # Enforce PMF.
-        self._trans = np.array(trans)
-        
+
+        # Initialize private variables.
+        self._states = states
+        self._trans  = np.array(trans)
+        self._sigma  = sigma
+
     @property
     def states(self):
         return self._states
@@ -61,6 +65,14 @@ class ViterbiDecoder():
     @property
     def trans(self):
         return self._trans
+
+    @property
+    def sigma(self):
+        return self._sigma
+
+    def v_prob(self, x: float) -> float:
+        sigma = self.sigma
+        return np.exp(-(x**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2)
 
     def decode(self, samps: Rvec) -> list[int]:
         """
@@ -70,20 +82,22 @@ class ViterbiDecoder():
             samps: Voltage samples from slicer, one per UI.
         """
 
-        probs = [[v_prob(samp[0] - expected_voltage) for (_, expected_voltage) in states]]
+        states = self.states
+        num_states = len(states)
+        probs = [[self.v_prob(samps[0] - expected_voltage) for (_, expected_voltage) in states]]
         prevs = [[]]
         for samp in samps[1:]:
             _prob = np.zeros(num_states)
-            _prev = np.zeros(num_states)
+            _prev = np.zeros(num_states, dtype=int)
             for n in range(num_states):
                 new_probs = np.array([
-                    probs[-1][n] * self.trans[n][m] * v_prob(samp - expected_voltage)
+                    probs[-1][n] * self.trans[n][m] * self.v_prob(samp - expected_voltage)
                     for m, (_, expected_voltage) in enumerate(states)])
                 _prev = np.where(new_probs > _prob, [n] * num_states, _prev)
                 _prob = np.maximum(new_probs, _prob)
             probs.append(_prob)
             prevs.append(_prev)
-        path = [argmax(probs[-1])]
+        path = [np.argmax(probs[-1])]
         prevs.reverse()
         for prev in prevs[: -1]:
             path.append(prev[path[-1]])
