@@ -18,6 +18,7 @@ import scipy.signal as sig
 from numpy import (  # type: ignore
     argmax,
     array,
+    concatenate,
     convolve,
     correlate,
     diff,
@@ -51,6 +52,7 @@ from pybert.utility import (
     safe_log10,
     trim_impulse,
 )
+from pybert.models.viterbi import ViterbiDecoder
 
 clock = perf_counter
 
@@ -437,7 +439,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
     if not (self.rx_use_ami and self.rx_use_getwave):  # Use PyBERT native DFE/CDR.
-        (dfe_out, tap_weights, ui_ests, clocks, lockeds, sample_times, bits_out) = dfe.run(t, ctle_out)
+        (dfe_out,
+         tap_weights,
+         ui_ests,
+         clocks,
+         lockeds,
+         sample_times,
+         bits_out) = dfe.run(t, ctle_out)
     else:                                              # Process Rx IBIS-AMI GetWave() output.
         # Process any valid clock times returned by Rx IBIS-AMI model's GetWave() function if apropos.
         dfe_out = array(ctle_out)  # In this case, `ctle_out` includes the effects of IBIS-AMI DFE.
@@ -482,8 +490,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     auto_corr = auto_corr[len(auto_corr) // 2:]
     self.auto_corr = auto_corr
     bit_dly = where(auto_corr == max(auto_corr))[0][0]
-    bits_ref = bits[(nbits - eye_bits):]
-    bits_tst = bits_out[(nbits + bit_dly - eye_bits):]
+    first_ref_bit = nbits - eye_bits
+    bits_ref = bits[first_ref_bit:]
+    first_tst_bit = first_ref_bit + bit_dly
+    bits_tst = bits_out[first_tst_bit:]
     if len(bits_ref) > len(bits_tst):
         bits_ref = bits_ref[: len(bits_tst)]
     elif len(bits_tst) > len(bits_ref):
@@ -507,6 +517,49 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
     dfe_out_s, dfe_out_p, dfe_out_H = calc_resps(t, dfe_out_h, ui, f)
 
+    self.dfe_perf = nbits * nspb / (clock() - split_time)
+    split_time = clock()
+
+    _check_sim_status()
+
+    # Apply Viterbi decoder if apropos.
+    self.bit_errs_viterbi = -1
+    self.viterbi_perf = 0
+    if self.rx_use_viterbi:
+        self.status = "Running Viterbi..."
+        match mod_type:
+            case 0:
+                L = 2
+            case 1:
+                L = 3
+            case 2:
+                L = 4
+            case _:
+                raise ValueError(f"Unrecognized modulation type: {mod_type}!")
+        N = self.rx_viterbi_symbols
+        sigma = 100e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
+        dfe_out_p_curs_ix = np.argmax(dfe_out_p)
+        dfe_out_p_samps = [dfe_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)]
+        decoder = ViterbiDecoder(L, N, sigma, dfe_out_p_samps)
+        dfe_out_samps = []
+        for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
+            ix = np.where(t >= sample_time)[0][0]
+            dfe_out_samps.append(dfe_out[ix])
+        bits_out_viterbi = concatenate(list(map(
+            lambda x: dfe.decide(x)[1],
+            decoder.decode(dfe_out_samps))))
+        bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
+        if len(bits_ref) > len(bits_tst_viterbi):
+            bits_ref = bits_ref[: len(bits_tst_viterbi)]
+        elif len(bits_tst_viterbi) > len(bits_ref):
+            bits_tst_viterbi = bits_tst_viterbi[: len(bits_ref)]
+        num_viterbi_bits = len(bits_tst_viterbi)
+        bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
+        n_errs_viterbi = len(bit_errs_viterbi)
+        self.bit_errs_viterbi = n_errs_viterbi
+        self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)
+        split_time = clock()
+
     self.dfe_h = dfe_h
     self.dfe_s = dfe_s
     self.dfe_p = dfe_p
@@ -518,8 +571,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.dfe_out = dfe_out
     self.lockeds = lockeds
 
-    self.dfe_perf = nbits * nspb / (clock() - split_time)
-    split_time = clock()
     self.status = "Analyzing jitter..."
 
     _check_sim_status()

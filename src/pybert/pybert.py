@@ -280,6 +280,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
     bit_errs = Int(0)  #: # of bit errors observed in last run.
+    bit_errs_viterbi = Int(0)  #: # of bit errors observed in last run.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
@@ -861,6 +862,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         info_str += f'      <TD align="center">DFE</TD><TD>{self.dfe_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
+        info_str += f'      <TD align="center">Viterbi</TD><TD>{self.viterbi_perf * 6e-05:6.3f}</TD>\n'
+        info_str += "    </TR>\n"
+        info_str += '    <TR align="right">\n'
         info_str += f'      <TD align="center">Jitter Analysis</TD><TD>{self.jitter_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
@@ -896,7 +900,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_status_str(self):
         status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
-        err_str = f"    | BitErrs: {int(self.bit_errs)}"
+        if self.bit_errs_viterbi >= 0:
+            err_str = f"    | BitErrs: {int(self.bit_errs)} ({int(self.bit_errs_viterbi)})"
+        else:
+            err_str = f"    | BitErrs: {int(self.bit_errs)}"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
         jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (

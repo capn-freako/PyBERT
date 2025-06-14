@@ -7,6 +7,8 @@ Original date: June 12, 2025
 Copyright (c) 2025 David Banas; all rights reserved World wide.
 """
 
+from typing import Any, Optional
+
 import numpy as np
 
 from ..common       import TWOPI, Rvec
@@ -71,21 +73,27 @@ class ViterbiDecoder():
         return self._sigma
 
     def v_prob(self, x: float) -> float:
+        # return 1 / x**2
         sigma = self.sigma
         return np.exp(-(x**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2)
 
-    def decode(self, samps: Rvec) -> list[int]:
+    def decode(self, samps: Rvec, dbg_dict: Optional[dict[str, Any]] = None) -> list[int]:
         """
         Decode a sequence of observed voltages.
 
         Args:
             samps: Voltage samples from slicer, one per UI.
+
+        Keyword Args:
+            dbg_dict: Debugging dictionary.
+                Default: None
         """
 
         states = self.states
         num_states = len(states)
-        probs = [[self.v_prob(samps[0] - expected_voltage) for (_, expected_voltage) in states]]
-        prevs = [[]]
+        first_prob = np.array([self.v_prob(samps[0] - expected_voltage) for (_, expected_voltage) in states])
+        probs = [first_prob / first_prob.sum()]
+        prevs = [np.array([-1] * num_states)]
         for samp in samps[1:]:
             _prob = np.zeros(num_states)
             _prev = np.zeros(num_states, dtype=int)
@@ -95,11 +103,16 @@ class ViterbiDecoder():
                     for m, (_, expected_voltage) in enumerate(states)])
                 _prev = np.where(new_probs > _prob, [n] * num_states, _prev)
                 _prob = np.maximum(new_probs, _prob)
-            probs.append(_prob)
+            probs.append(_prob / _prob.sum())
             prevs.append(_prev)
+        if dbg_dict is not None:
+            dbg_dict["probs"] = probs
+            dbg_dict["prevs"] = prevs.copy()
         path = [np.argmax(probs[-1])]
         prevs.reverse()
         for prev in prevs[: -1]:
             path.append(prev[path[-1]])
         path.reverse()
-        return list(map(lambda n: states[n][-1], path))
+        if dbg_dict is not None:
+            dbg_dict["path"] = path
+        return list(map(lambda n: states[n][0][-1], path))
