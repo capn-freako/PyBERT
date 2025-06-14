@@ -28,7 +28,10 @@ class ViterbiDecoder():
             pulse_resp_samps: Upstream channel pulse response samples, one per UI.
 
         Notes:
-            1. The symbol voltages are assumed uniformly distributed in: [-V, +V].
+            1. The symbol voltages are assumed uniformly distributed.
+            2. The absolute magnitude of `pulse_resp_samps` is immaterial.
+            It will be normalized to the actual signal amplitude during decoding.
+            ==> Do this, in general, in `bert.py`? <==
         """
 
         # Validate input.
@@ -82,11 +85,23 @@ class ViterbiDecoder():
         Decode a sequence of observed voltages.
 
         Args:
-            samps: Voltage samples from slicer, one per UI.
+            samps: Voltage samples from slicer input, one per UI.
 
         Keyword Args:
             dbg_dict: Debugging dictionary.
                 Default: None
+
+        Notes:
+            1. Only those samples intended for eye diagram construction and BER prediction
+            (i.e. - typically, post-DFE adaptation) should be sent as input in `samps`.
+            This is for two reasons:
+
+                - The Viterbi decoder is usually the worst performing block in a channel simulation.
+                So, minimizing the length of its input is critical to overall performance.
+
+                - The Viterbi decoder forms its voltage PDFs from its input.
+                And if things are still adapting while those PDFs are being formed then
+                they will not be accurate.
         """
 
         states = self.states
