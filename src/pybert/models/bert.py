@@ -439,13 +439,16 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
     if not (self.rx_use_ami and self.rx_use_getwave):  # Use PyBERT native DFE/CDR.
+        dbg_dict = {}
         (dfe_out,
          tap_weights,
          ui_ests,
          clocks,
          lockeds,
          sample_times,
-         bits_out) = dfe.run(t, ctle_out)
+         bits_out) = dfe.run(t, ctle_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
+        self.decision_scaler = dfe.decision_scaler
+        self.dfe_scalar_values = dbg_dict["scalar_values"]
     else:                                              # Process Rx IBIS-AMI GetWave() output.
         # Process any valid clock times returned by Rx IBIS-AMI model's GetWave() function if apropos.
         dfe_out = array(ctle_out)  # In this case, `ctle_out` includes the effects of IBIS-AMI DFE.
@@ -539,15 +542,22 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         N = self.rx_viterbi_symbols
         sigma = 100e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
         dfe_out_p_curs_ix = np.argmax(dfe_out_p)
-        dfe_out_p_samps = [dfe_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)]
+        dfe_out_p_samps = np.array([dfe_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)])
+        # decoder = ViterbiDecoder(L, N, sigma, self.decision_scaler * dfe_out_p_samps)
         decoder = ViterbiDecoder(L, N, sigma, dfe_out_p_samps)
         dfe_out_samps = []
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
             ix = np.where(t >= sample_time)[0][0]
             dfe_out_samps.append(dfe_out[ix])
-        bits_out_viterbi = concatenate(list(map(
-            lambda x: dfe.decide(x)[1],
-            decoder.decode(dfe_out_samps))))
+        if self.debug:
+            self.dfe_out_samps = dfe_out_samps
+            self.dbg_dict_viterbi = {}
+            symbols_viterbi = decoder.decode(dfe_out_samps, dbg_dict=self.dbg_dict_viterbi)
+            self.symbols_viterbi = symbols_viterbi
+            self.dbg_dict_viterbi["states"] = decoder.states
+        else:
+            symbols_viterbi = decoder.decode(dfe_out_samps)
+        bits_out_viterbi = concatenate(list(map(lambda x: dfe.decide(x)[1], symbols_viterbi)))
         bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):
             bits_ref = bits_ref[: len(bits_tst_viterbi)]
@@ -557,6 +567,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
         n_errs_viterbi = len(bit_errs_viterbi)
         self.bit_errs_viterbi = n_errs_viterbi
+        self.viterbi_errs_ixs = bit_errs_viterbi
         self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)
         split_time = clock()
 
@@ -625,6 +636,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         _xings = array(xings) - ofst
         return _xings[where(_xings > xing_min_t)] - xing_min_t
 
+    jit_chnl_done: bool = False
+    jit_tx_done: bool = False
+    jit_ctle_done: bool = False
+    jit_dfe_done: bool = False
     try:
         # - ideal
         ideal_xings = find_crossings(t, ideal_signal, decision_scaler, mod_type=mod_type)
@@ -674,6 +689,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.ofst_chnl = ofst
         self.tie_chnl = tie
         self.tie_ind_chnl = tie_ind
+        jit_chnl_done: bool = True
 
         # - Tx output
         ofst = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
@@ -717,6 +733,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.t_jitter_tx = t_jitter
         self.tie_tx = tie
         self.tie_ind_tx = tie_ind
+        jit_tx_done: bool = True
 
         # - CTLE output
         ofst = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
@@ -757,6 +774,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
         self.tie_ctle = tie
         self.tie_ind_ctle = tie_ind
+        jit_ctle_done: bool = True
 
         # - DFE output
         ofst = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
@@ -800,6 +818,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.f_MHz_dfe = array(spectrum_freqs) * 1.0e-6
         dfe_spec = self.jitter_spectrum_dfe
         self.jitter_rejection_ratio = zeros(len(dfe_spec))
+        jit_dfe_done: bool = True
 
         self.jitter_perf = nbits * nspb / (clock() - split_time)
         self.total_perf = nbits * nspb / (clock() - start_time)
@@ -808,8 +827,20 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     except ValueError as err:
         self.log(f"The jitter calculation could not be completed, due to the following error:\n{err}",
                  alert=False)
-        self.status = "Exception: jitter"
-        # raise
+        if jit_chnl_done:
+            if jit_tx_done:
+                if jit_ctle_done:
+                    if jit_dfe_done:
+                        self.status = "Exception: But, all finished!"
+                    else:
+                        self.status = "Exception: DFE jitter"
+                else:
+                    self.status = "Exception: CTLE jitter"
+            else:
+                self.status = "Exception: Tx jitter"
+        else:
+            self.status = "Exception: channel jitter"
+        raise
 
     _check_sim_status()
     # Update plots.
@@ -1029,6 +1060,7 @@ def update_results(self):
     y_max = 1.1 * max(abs(array(self.ctle_out[ignore_samps:])))
     eye_ctle = calc_eye(ui, samps_per_ui, height, self.ctle_out[ignore_samps:], y_max)
     y_max = 1.1 * max(abs(array(self.dfe_out[ignore_samps:])))
+    self.dfe_eye_ymax = y_max
     i = 0
     len_clock_times = len(clock_times)
     while i < len_clock_times and clock_times[i] < ignore_until:

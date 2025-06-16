@@ -593,8 +593,10 @@ traits_view = View(
                                 Item(name="gain", label="Gain", tooltip="error feedback gain"),
                                 Item(name="n_ave", label="Nave.", tooltip="# of CDR adaptations per DFE adaptation"),
                                 HGroup(
-                                    Item(name="decision_scaler", label="Level", tooltip="target output magnitude"),
+                                    Item(name="decision_scaler", label="Level", format_str="%0.3f",
+                                         tooltip="target output magnitude"),
                                     Item(label="V"),
+                                    Item(name="use_agc", label="Use AGC", tooltip="Continuously adjust `Level` automatically."),
                                 ),
                                 HGroup(
                                     Item(

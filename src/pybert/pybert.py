@@ -248,6 +248,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     gain = Float(0.2)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
+    use_agc = Bool(True)  #: Continuously adjust `decision_scalar` when True.
 
     # - CDR
     delta_t = Float(0.1)  #: CDR proportional branch magnitude (ps).

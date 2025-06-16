@@ -10,9 +10,13 @@ Copyright (c) 2025 David Banas; all rights reserved World wide.
 from typing import Any, Optional
 
 import numpy as np
+from scipy.special import erf
 
 from ..common       import TWOPI, Rvec
 from ..utility.math import all_combs
+
+SQRT2: float = np.sqrt(2.0)
+
 
 class ViterbiDecoder():
     """
@@ -75,10 +79,18 @@ class ViterbiDecoder():
     def sigma(self):
         return self._sigma
 
-    def v_prob(self, x: float) -> float:
+    def v_prob(self, x: float, v: float) -> float:
+        """
+        Calculate the probability of `x` given expectation `v`.
+        """
         # return 1 / x**2
         sigma = self.sigma
-        return np.exp(-(x**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2)
+        if v >= 0:
+            y = x - v
+        else:
+            y = v - x
+        # return np.exp(-(x**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2)
+        return 0.5 * (1 + erf(y / (sigma * SQRT2)))
 
     def decode(self, samps: Rvec, dbg_dict: Optional[dict[str, Any]] = None) -> list[int]:
         """
@@ -90,6 +102,9 @@ class ViterbiDecoder():
         Keyword Args:
             dbg_dict: Debugging dictionary.
                 Default: None
+
+        Returns:
+            List of symbol ordinates detected.
 
         Notes:
             1. Only those samples intended for eye diagram construction and BER prediction
@@ -106,15 +121,17 @@ class ViterbiDecoder():
 
         states = self.states
         num_states = len(states)
-        first_prob = np.array([self.v_prob(samps[0] - expected_voltage) for (_, expected_voltage) in states])
+        first_prob = np.array([self.v_prob(samps[0], expected_voltage)
+                                   for (_, expected_voltage) in states])
         probs = [first_prob / first_prob.sum()]
-        prevs = [np.array([-1] * num_states)]
+        # prevs = [np.array([0] * num_states)]
+        prevs = [np.arange(num_states)]
         for samp in samps[1:]:
             _prob = np.zeros(num_states)
             _prev = np.zeros(num_states, dtype=int)
             for n in range(num_states):
                 new_probs = np.array([
-                    probs[-1][n] * self.trans[n][m] * self.v_prob(samp - expected_voltage)
+                    probs[-1][n] * self.trans[n][m] * self.v_prob(samp, expected_voltage)
                     for m, (_, expected_voltage) in enumerate(states)])
                 _prev = np.where(new_probs > _prob, [n] * num_states, _prev)
                 _prob = np.maximum(new_probs, _prob)
