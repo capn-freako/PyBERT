@@ -16,6 +16,7 @@ import numpy        as np
 import numpy.typing as npt
 import scipy.signal as sig
 from numpy import (  # type: ignore
+    arange,
     argmax,
     array,
     concatenate,
@@ -540,11 +541,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             case _:
                 raise ValueError(f"Unrecognized modulation type: {mod_type}!")
         N = self.rx_viterbi_symbols
-        sigma = 100e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
+        M = self.rx_viterbi_precursor
+        sigma = 50e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
         dfe_out_p_curs_ix = np.argmax(dfe_out_p)
-        dfe_out_p_samps = np.array([dfe_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)])
-        # decoder = ViterbiDecoder(L, N, sigma, self.decision_scaler * dfe_out_p_samps)
-        decoder = ViterbiDecoder(L, N, sigma, dfe_out_p_samps)
+        dfe_out_p_samps = np.array([dfe_out_p[dfe_out_p_curs_ix + n * nspui] for n in arange(N) - M])
+        decoder = ViterbiDecoder(L, N, M, sigma, dfe_out_p_samps)
         dfe_out_samps = []
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
             ix = np.where(t >= sample_time)[0][0]
@@ -557,7 +558,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.dbg_dict_viterbi["states"] = decoder.states
         else:
             symbols_viterbi = decoder.decode(dfe_out_samps)
-        bits_out_viterbi = concatenate(list(map(lambda x: dfe.decide(x)[1], symbols_viterbi)))
+        bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss[0])[1], symbols_viterbi)))
         bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):
             bits_ref = bits_ref[: len(bits_tst_viterbi)]

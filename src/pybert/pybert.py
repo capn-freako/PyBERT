@@ -183,9 +183,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     vod = Float(1.0)  #: Tx differential output voltage (V)
     rs = Float(100)  #: Tx source impedance (Ohms)
     cout = Range(low=0.001, high=1000, value=0.5)  #: Tx parasitic output capacitance (pF)
-    pn_mag = Float(0.1)  #: Periodic noise magnitude (V).
+    pn_mag = Float(0.01)  #: Periodic noise magnitude (V).
     pn_freq = Float(11)  #: Periodic noise frequency (MHz).
-    rn = Float(0.1)  #: Standard deviation of Gaussian random noise (V).
+    rn = Float(0.01)  #: Standard deviation of Gaussian random noise (V).
     tx_taps = List(
         [
             TxTapTuner(name="Pre-tap3",  pos=-3, enabled=True, min_val=-0.05, max_val=0.05),
@@ -240,7 +240,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_ibis_valid = Bool(False)  #: (Bool)
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
-    rx_viterbi_symbols = Int(3)  #: Number of symbols to track in Viterbi decoder.
+    rx_viterbi_symbols = Int(7)  #: Number of symbols to track in Viterbi decoder.
+    rx_viterbi_precursor = Int(1)  #: Number of pre-cursor symbols.
 
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
