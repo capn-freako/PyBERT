@@ -65,5 +65,5 @@ traits==7.0.2
 traitsui==8.0.0
 typing_extensions==4.12.2
 tzdata==2025.2
-urllib3==2.3.0
+urllib3==2.5.0
 virtualenv==20.29.3
