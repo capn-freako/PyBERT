@@ -542,7 +542,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 raise ValueError(f"Unrecognized modulation type: {mod_type}!")
         N = self.rx_viterbi_symbols
         M = self.rx_viterbi_precursor
-        sigma = 50e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
+        sigma = 10e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
         dfe_out_p_curs_ix = np.argmax(dfe_out_p)
         dfe_out_p_samps = np.array([dfe_out_p[dfe_out_p_curs_ix + n * nspui] for n in arange(N) - M])
         decoder = ViterbiDecoder(L, N, M, sigma, dfe_out_p_samps)

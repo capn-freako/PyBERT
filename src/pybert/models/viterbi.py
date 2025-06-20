@@ -62,16 +62,22 @@ class ViterbiDecoder():
         num_states = len(states)
         trans = []
         for state in states:
-            # row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0
-            row_vec = np.array([1 if state[0][1: -M] == states[m][0][0: -(1 + M)] else 0
-                                    for m in range(num_states)])
+            if M != 0:
+                row_vec = np.array([1 if state[0][1: -M] == states[m][0][0: -(1 + M)] else 0
+                                        for m in range(num_states)])
+            else:
+                row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0
+                                        for m in range(num_states)])
             trans.append(row_vec / row_vec.sum())  # Enforce PMF.
             # print(f"{len(list(filter(lambda x: x != 0, row_vec)))}")
 
         # Build noise voltage interpolator.
         vs = np.linspace(-2, 2, 4_000)  # 1 mV precision
-        v_prob = sp.interpolate.interp1d(
-            vs, [np.exp(-(v**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2) for v in vs])
+        # v_prob = sp.interpolate.interp1d(
+        #     vs, [1e-3 * np.exp(-(v**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2) for v in vs])
+        probs = np.array([1 / v**2 for v in vs])
+        probs /= probs.sum()
+        v_prob = sp.interpolate.interp1d(vs, probs)
 
         # Initialize private variables.
         self._states = states
@@ -123,6 +129,7 @@ class ViterbiDecoder():
         """
 
         states = self.states
+        trans  = self.trans
         state_curs_ix = self.state_curs_ix
         num_states = len(states)
         first_prob = np.array([self.v_prob(samps[0] - expected_voltage)
@@ -134,13 +141,15 @@ class ViterbiDecoder():
         for n, samp in enumerate(samps[1:]):
             if not (n + 1) % samps_per_star:
                 print("*", end="")
+            s_probs = [self.v_prob(samp - expected_voltage)
+                           for _, expected_voltage in states]
             _prob = np.zeros(num_states)
             _prev = np.zeros(num_states, dtype=int)
             for r in range(num_states):
                 new_probs = np.array(
-                    [0 if self.trans[r][s] == 0
-                       else probs[-1][r] * self.trans[r][s] * self.v_prob(samp - expected_voltage)
-                         for s, (_, expected_voltage) in enumerate(states)])
+                    [0 if trans[r][s] == 0
+                       else probs[-1][r] * trans[r][s] * s_prob
+                         for s, s_prob in enumerate(s_probs)])
                 _prev = np.where(new_probs > _prob, [r] * num_states, _prev)
                 _prob = np.maximum(new_probs, _prob)
             probs.append(_prob / _prob.sum())
