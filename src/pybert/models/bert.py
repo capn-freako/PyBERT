@@ -10,7 +10,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from time import perf_counter
-from typing import Callable, Optional, TypeAlias
+from typing import Any, Callable, Optional, TypeAlias
 
 import numpy        as np
 import numpy.typing as npt
@@ -53,7 +53,7 @@ from pybert.utility import (
     safe_log10,
     trim_impulse,
 )
-from pybert.models.viterbi import ViterbiDecoder
+from pybert.models.viterbi import ViterbiDecoder_ISI
 
 clock = perf_counter
 
@@ -343,13 +343,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 dfe_tap_keys.sort()
                 for dfe_tap_key in dfe_tap_keys:
                     _tap_weights.append(param_vals[dfe_tap_key])
-                tap_weights = array(_tap_weights).transpose()
+                tap_weights: list[list[float]] = list(array(_tap_weights).transpose())
                 if "cdr_locked" in param_vals:
-                    lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
-                    lockeds = lockeds.repeat(len(t) // len(lockeds))
-                    lockeds.resize(len(t))
+                    _lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
+                    _lockeds = _lockeds.repeat(len(t) // len(_lockeds))
+                    _lockeds.resize(len(t))
                 else:
-                    lockeds = zeros(len(t))
+                    _lockeds = zeros(len(t))
+                lockeds: list[bool] = list(map(bool, _lockeds))
                 if "cdr_ui" in param_vals:
                     ui_ests: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_ui")])
                     ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
@@ -440,7 +441,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
     if not (self.rx_use_ami and self.rx_use_getwave):  # Use PyBERT native DFE/CDR.
-        dbg_dict = {}
+        dbg_dict: dict[str, Any] = {}
         (dfe_out,
          tap_weights,
          ui_ests,
@@ -455,7 +456,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         dfe_out = array(ctle_out)  # In this case, `ctle_out` includes the effects of IBIS-AMI DFE.
         dfe_out.resize(len(t))
         t_ix = 0
-        bits_out = []
+        _bits_out = []
         clocks = zeros(len(t))
         sample_times = []
         if self.rx_use_clocks and clock_times is not None:
@@ -469,7 +470,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     self.log("Went beyond system time vector end searching for next clock time!")
                     break
                 _, _bits = dfe.decide(ctle_out[t_ix])
-                bits_out.extend(_bits)
+                _bits_out.extend(_bits)
                 clocks[t_ix] = 1
                 sample_times.append(sample_time)
         # Process any remaining output, using inferred sampling instants.
@@ -481,10 +482,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                                                          for k in range(nspui)])
             for t_ix in range(next_sample_ix, len(t), nspui):
                 _, _bits = dfe.decide(ctle_out[t_ix])
-                bits_out.extend(_bits)
+                _bits_out.extend(_bits)
                 clocks[t_ix] = 1
                 sample_times.append(t[t_ix])
-    bits_out = array(bits_out)
+        bits_out = array(_bits_out)
     start_ix = max(0, len(bits_out) - eye_bits)
     end_ix = len(bits_out)
     auto_corr = (
@@ -541,11 +542,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             case _:
                 raise ValueError(f"Unrecognized modulation type: {mod_type}!")
         N = self.rx_viterbi_symbols
-        M = self.rx_viterbi_precursor
         sigma = 10e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
         dfe_out_p_curs_ix = np.argmax(ctle_out_p)
-        dfe_out_p_samps = np.array([ctle_out_p[dfe_out_p_curs_ix + n * nspui] for n in arange(N) - M])
-        decoder = ViterbiDecoder(L, N, M, sigma, dfe_out_p_samps)
+        dfe_out_p_samps = np.array([ctle_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)])
+        decoder = ViterbiDecoder_ISI(L, N, sigma, dfe_out_p_samps)
         dfe_out_samps = []
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
             ix = np.where(t >= sample_time)[0][0]
@@ -553,12 +553,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         if self.debug:
             self.dfe_out_samps = dfe_out_samps
             self.dbg_dict_viterbi = {}
-            symbols_viterbi = decoder.decode(dfe_out_samps, dbg_dict=self.dbg_dict_viterbi)
+            path = decoder.decode(dfe_out_samps, dbg_dict=self.dbg_dict_viterbi)
+            symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
             self.symbols_viterbi = symbols_viterbi
             self.dbg_dict_viterbi["states"] = decoder.states
+            self.dbg_dict_viterbi["path"] = path
         else:
             symbols_viterbi = decoder.decode(dfe_out_samps)
-        bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss[0])[1], symbols_viterbi)))
+        bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
         bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):
             bits_ref = bits_ref[: len(bits_tst_viterbi)]
@@ -591,7 +593,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.adaptation = tap_weights
     self.ui_ests = array(ui_ests) * 1.0e12  # (ps)
     self.clocks = clocks
-    self.lockeds = lockeds
     self.clock_times = sample_times
 
     # Analyze the jitter.
@@ -690,7 +691,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.ofst_chnl = ofst
         self.tie_chnl = tie
         self.tie_ind_chnl = tie_ind
-        jit_chnl_done: bool = True
+        jit_chnl_done = True
 
         # - Tx output
         ofst = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
@@ -734,7 +735,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.t_jitter_tx = t_jitter
         self.tie_tx = tie
         self.tie_ind_tx = tie_ind
-        jit_tx_done: bool = True
+        jit_tx_done = True
 
         # - CTLE output
         ofst = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
@@ -775,7 +776,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
         self.tie_ctle = tie
         self.tie_ind_ctle = tie_ind
-        jit_ctle_done: bool = True
+        jit_ctle_done = True
 
         # - DFE output
         ofst = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
@@ -819,7 +820,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.f_MHz_dfe = array(spectrum_freqs) * 1.0e-6
         dfe_spec = self.jitter_spectrum_dfe
         self.jitter_rejection_ratio = zeros(len(dfe_spec))
-        jit_dfe_done: bool = True
+        jit_dfe_done = True
 
         self.jitter_perf = nbits * nspb / (clock() - split_time)
         self.total_perf = nbits * nspb / (clock() - start_time)

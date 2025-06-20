@@ -1,4 +1,5 @@
-"""Behavioral model of a decision feedback equalizer (DFE).
+"""
+Behavioral model of a decision feedback equalizer (DFE).
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -10,6 +11,10 @@ into the larger *PyBERT* framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
+
+import numpy        as np
+import numpy.typing as npt
+
 from numpy import array, diff, histogram, mean, sign, where, zeros  # type: ignore
 from scipy.signal import iirfilter
 from typing import Any, Optional
@@ -208,26 +213,25 @@ class DFE:  # pylint: disable=too-many-instance-attributes
 
         return filter_out
 
-    def decide(self, x):
+    def decide(self, x: float) -> tuple[float, list[int]]:
         """Make the bit decisions, according to modulation type.
 
         Args:
-            x(float): The signal value, at the decision time.
+            x: The signal value, at the decision time.
 
         Returns:
-            tuple(float, [int]): The members of the returned tuple are:
+            A pair containing
 
-                decision:
-                    One of:
+                - One of:
 
-                        - {-1, 1}              (NRZ)
-                        - {-1, 0, +1}          (Duo-binary)
-                        - {-1, -1/3, +1/3, +1} (PAM-4)
+                    - {-1, 1}              (NRZ)
+                    - {-1, 0, +1}          (Duo-binary)
+                    - {-1, -1/3, +1/3, +1} (PAM-4)
 
-                        according to what the ideal signal level should have been.
-                        ('decision_scaler' normalized)
+                    according to what the ideal signal level should have been.
+                    ('decision_scaler' normalized)
 
-                bits: The list of bits recovered.
+                - The list of bits recovered.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -273,8 +277,18 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         signal: Rvec,
         use_agc: bool = False,
         dbg_dict: Optional[dict[str, Any]] = None
-    ) -> tuple[list[float], list[list[float]], list[float], list[int], list[bool], list[float], list[int]]:
-        """Run the DFE on the input signal.
+    ) -> tuple[
+        npt.NDArray[np.float64],
+        list[list[float]],
+        npt.NDArray[np.float64],
+        npt.NDArray[np.float64],
+        list[bool],
+        list[float],
+        npt.NDArray[np.integer[Any]]
+    ]:
+
+        """
+        Run the DFE on the input signal.
 
         Args:
             sample_times: Vector of signal sampling times.
@@ -330,10 +344,10 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         next_clock_time = ui / 2.0
         locked = False
 
-        res = []
-        tap_weights = [self.tap_weights]
-        ui_ests = []
-        lockeds = []
+        res: list[float] = []
+        tap_weights: list[list[float]] = [self.tap_weights]
+        ui_ests: list[float] = []
+        lockeds: list[bool] = []
         clocks = zeros(len(sample_times))
         clock_times = [next_clock_time]
         bits = []
@@ -354,16 +368,14 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 clk_cntr += 1
                 clocks[smpl_cntr] = 1
                 current_clock_sample = sum_out
-                samples = [last_clock_sample, boundary_sample, current_clock_sample]
+                samples = array([last_clock_sample, boundary_sample, current_clock_sample])
                 if mod_type == 0:  # NRZ
                     pass
                 elif mod_type == 1:  # Duo-binary
-                    samples = array(samples)
                     if samples.mean() < 0.0:
                         samples -= thresholds[0]
                     else:
                         samples -= thresholds[1]
-                    samples = list(samples)
                 elif mod_type == 2:  # PAM-4
                     pass
                 else:
@@ -412,6 +424,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
 
         self.ui = ui
         self.decision_scaler = decision_scaler
-        dbg_dict["scalar_values"] = scalar_values
+        if dbg_dict is not None:
+            dbg_dict["scalar_values"] = scalar_values
 
-        return (res, tap_weights, ui_ests, clocks, lockeds, clock_times, bits)
+        return (array(res), tap_weights, array(ui_ests), clocks, lockeds, clock_times, array(bits))

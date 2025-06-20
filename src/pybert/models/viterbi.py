@@ -7,39 +7,203 @@ Original date: June 12, 2025
 Copyright (c) 2025 David Banas; all rights reserved World wide.
 """
 
-from typing import Any, Optional
+from abc import ABC, abstractmethod
+from typing import Any, Generic, Optional, TypeAlias, TypeVar
 
 import numpy as np
 import scipy as sp
 from scipy.special import erf
 
-from ..common       import TWOPI, Rvec
+from ..common       import TWOPI, Rvec, Rmat
 from ..utility.math import all_combs
 
+S = TypeVar('S')                # generic state type
+O = TypeVar('O')                # generic observation type
 SQRT2: float = np.sqrt(2.0)
 
 
-class ViterbiDecoder():
+class ViterbiDecoder(ABC, Generic[S, O]):
     """
-    Python class modeling a Viterbi decoder.
+    Abstract definition of a Viterbi decoder.
+    """
+
+    @property
+    @abstractmethod
+    def states(self) -> list[S]:
+        """
+        List of all possible states.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def trans(self) -> Rmat:
+        """
+        State transition probability matrix.
+
+        Notes:
+            1. Row/column ordinates match those of `states`.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def trellis(self) -> list[list[tuple[float, int]]]:
+        """
+        Current trellis matrix.
+
+        Notes:
+            1. Length of returned list gives trellis depth.
+            2. Length of all inner lists should equal `len(states)`.
+            3. Each location in the trellis matrix contains the
+                probability and previous state index for the corresponding state.
+        """
+        pass
+
+    @abstractmethod
+    def prob(self, s: int, x: O) -> float:
+        """
+        Probability of state at index `s` given observation `x`.
+        """
+        pass
+
+    @property
+    def path(self) -> list[int]:
+        """
+        Maximum likelihood forward path through the trellis.
+
+        Notes:
+            1. First element in returned list corresponds to the time
+            just before the first trellis column.
+            2. The decided state of the final trellis column is *not* included.
+        """
+
+        trellis = self.trellis
+        trellis_depth = len(trellis)
+        num_states = len(trellis[-1])
+
+        # Starting with highest probability final state, backtrack through trellis.
+        prevs = [trellis[-1][np.argmax(list(map(lambda pr: pr[0], trellis[-1])))][1]]
+        for ix in range(2, trellis_depth + 1):
+            try:
+                prevs.append(trellis[-ix][prevs[-1]][1])
+            except:
+                print(f"ix: {ix}")
+                print(f"len(trellis): {len(trellis)}")
+                raise
+        prevs.reverse()
+        return prevs
+
+    def step_trellis(self, x: O, priming: bool = False) -> int:
+        """
+        Shift the trellis one column left, using the given observation sample.
+
+        Args:
+            x: The new observation sample.
+
+        Keyword Args:
+            priming: Don't perform backtrace when True.
+                Default: False
+
+        Returns:
+            The decided state index of the exiting (i.e. - leftmost) column.
+        """
+
+        trellis = self.trellis
+        num_states = len(trellis[-1])
+
+        # Shift trellis contents one column left.
+        for col in range(len(trellis) - 1):
+            trellis[col] = trellis[col + 1]
+
+        # Calculate maximum state probabilities, along w/ previous state, for new rightmost column.
+        probs = np.zeros(num_states)
+        # prevs = np.array(num_states, dtype=S)
+        prevs = np.array(num_states)
+        for r in range(num_states):
+            new_probs = np.array(
+                [0 if self.trans[r][s] == 0
+                   else trellis[-1][r][0] * self.trans[r][s] * self.prob(s, x)
+                     for s in range(num_states)])
+            prevs = np.where(new_probs > probs, [r] * num_states, prevs)
+            probs = np.maximum(new_probs, probs)
+        trellis[-1] = list(zip(probs / probs.sum(), prevs))
+
+        prev = 0
+        if not priming:
+            prev = self.path[0]
+
+        return prev
+
+    def decode(self, samps: list[O], dbg_dict: Optional[dict[str, Any]] = None) -> list[int]:
+        """
+        Use trellis to decode a list of observations.
+
+        Args:
+            samps: List of observations.
+
+        Keyword Args:
+            dbg_dict: Dictionary for stashing debugging info.
+                Default: None
+
+        Returns:
+            Maximum likelihood sequence estimation (MLSE) of state indices.
+        """
+
+        trellis = self.trellis
+        num_states = len(trellis[-1])
+
+        # Prime the trellis.
+        first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
+        first_col /= first_col.sum()
+        trellis[-1] = list(zip(first_col, [0] * num_states))
+        for x in samps[1: num_states]:
+            self.step_trellis(x, priming=True)
+
+        # Run the remaining samples.
+        states = []
+        probs_prevs: list[list[tuple[float, int]]] = []
+        for x in samps[num_states:]:
+            if dbg_dict is not None:
+                probs_prevs.append(self.trellis[0])
+            states.append(self.step_trellis(x))
+
+        # Purge the trellis.
+        states.extend(self.path[1:])
+        states.append(int(np.argmax(list(map(lambda pr: pr[0], trellis[-1])))))
+        if dbg_dict is not None:
+            probs_prevs.extend(self.trellis[1:])
+
+        # Fill in debugging dictionary if appropriate.
+        if dbg_dict is not None:
+            probs: list[list[float]] = []
+            prevs: list[list[int]]   = []
+            (probs, prevs) = zip(*list(map(lambda x: zip(*x), probs_prevs)))
+            dbg_dict["probs"] = probs
+            dbg_dict["prevs"] = prevs
+
+        return states
+
+
+State_ISI: TypeAlias = tuple[list[int], float]
+
+
+class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
+    """
+    Viterbi decoder using ISI to define observation probabilities.
     """
     
-    def __init__(self, L: int, N: int, M: int, sigma: float, pulse_resp_samps: Rvec):
+    def __init__(self, L: int, N: int, sigma: float, pulse_resp_samps: Rvec):
         """
         Args:
             L: Number of symbol voltage levels.
-            N: Number of symbols to track in state matrix.
-            M: Number of pre-cursor symbols.
-            sigma: Standard deviation of Gaussian voltage noise.
-            pulse_resp_samps: Upstream channel pulse response samples, one per UI.
-                Must agree with `N`/`M`!
+            N: Number of symbols per state.
+            sigma: Standard deviation of Gaussian voltage noise (V).
+            pulse_resp_samps: Upstream channel pulse response samples, one per UI (V).
+                (Must have length `N`!)
 
         Notes:
             1. The symbol voltages are assumed uniformly distributed.
-            2. The pulse response sample vector given must contain both:
-
-                - the correct number of total samples, and
-                - the correct number of pre-cursor samples.
         """
 
         # Validate input.
@@ -50,41 +214,39 @@ class ViterbiDecoder():
         symbol_level_values = [-1 + l * 2 / (L - 1) for l in range(L)]
 
         # Build state vectors, including their expected voltage observations.
-        _states = all_combs([range(L)] * N)
+        _states = all_combs([list(range(L))] * N)
         states = []
-        for state in _states:
+        for s in _states:
             expected_voltage = 0
             for n in range(N):
-                expected_voltage += pulse_resp_samps[n] * symbol_level_values[state[-(n + 1)]]
-            states.append((state, expected_voltage))
+                expected_voltage += pulse_resp_samps[n] * symbol_level_values[s[-(n + 1)]]
+            states.append((s, expected_voltage))
 
         # Build state transition probability matrix.
         num_states = len(states)
         trans = []
         for state in states:
-            if M != 0:
-                row_vec = np.array([1 if state[0][1: -M] == states[m][0][0: -(1 + M)] else 0
-                                        for m in range(num_states)])
-            else:
-                row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0
-                                        for m in range(num_states)])
+            row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0
+                                    for m in range(num_states)])
             trans.append(row_vec / row_vec.sum())  # Enforce PMF.
-            # print(f"{len(list(filter(lambda x: x != 0, row_vec)))}")
 
         # Build noise voltage interpolator.
         vs = np.linspace(-2, 2, 4_000)  # 1 mV precision
-        # v_prob = sp.interpolate.interp1d(
-        #     vs, [1e-3 * np.exp(-(v**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2) for v in vs])
-        probs = np.array([1 / v**2 for v in vs])
-        probs /= probs.sum()
-        v_prob = sp.interpolate.interp1d(vs, probs)
+        v_prob = sp.interpolate.interp1d(
+            vs, [1e-3 * np.exp(-(v**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2) for v in vs])
+        # probs = np.array([1 / v**2 for v in vs])
+        # probs /= probs.sum()
+        # v_prob = sp.interpolate.interp1d(vs, probs)
+
+        # Build initial trellis.
+        trellis = [[(1 / num_states, 0)] * num_states] * N
 
         # Initialize private variables.
         self._states = states
         self._trans  = np.array(trans)
         self._sigma  = sigma
-        self._state_curs_ix = -(1 + M)
         self._v_prob = v_prob
+        self._trellis = trellis
 
     @property
     def states(self):
@@ -95,73 +257,19 @@ class ViterbiDecoder():
         return self._trans
 
     @property
-    def sigma(self):
-        return self._sigma
+    def trellis(self):
+        return self._trellis
 
     @property
-    def state_curs_ix(self):
-        return self._state_curs_ix
+    def sigma(self):
+        return self._sigma
 
     @property
     def v_prob(self):
         return self._v_prob
 
-    def decode(self, samps: Rvec, dbg_dict: Optional[dict[str, Any]] = None) -> list[int]:
+    def prob(self, s: int, x: float) -> float:
         """
-        Decode a sequence of observed voltages.
-
-        Args:
-            samps: Voltage samples from slicer input, one per UI.
-
-        Keyword Args:
-            dbg_dict: Debugging dictionary.
-                Default: None
-
-        Returns:
-            List of symbol ordinates detected.
-
-        Notes:
-            1. Only those samples intended for eye diagram construction and BER prediction
-            (i.e. - typically, post-DFE adaptation) should be sent as input in `samps`.
-            This is because the Viterbi decoder is usually the worst performing block in a
-            channel simulation.
-            So, minimizing the length of its input is critical to overall performance.
+        Probability of state at index `s` given observation `x`.
         """
-
-        states = self.states
-        trans  = self.trans
-        state_curs_ix = self.state_curs_ix
-        num_states = len(states)
-        first_prob = np.array([self.v_prob(samps[0] - expected_voltage)
-                                   for (_, expected_voltage) in states])
-        probs = [first_prob / first_prob.sum()]
-        prevs = [np.arange(num_states)]
-        print("Samples processed: ", end="")
-        samps_per_star = len(samps) // 20
-        for n, samp in enumerate(samps[1:]):
-            if not (n + 1) % samps_per_star:
-                print("*", end="")
-            s_probs = [self.v_prob(samp - expected_voltage)
-                           for _, expected_voltage in states]
-            _prob = np.zeros(num_states)
-            _prev = np.zeros(num_states, dtype=int)
-            for r in range(num_states):
-                new_probs = np.array(
-                    [0 if trans[r][s] == 0
-                       else probs[-1][r] * trans[r][s] * s_prob
-                         for s, s_prob in enumerate(s_probs)])
-                _prev = np.where(new_probs > _prob, [r] * num_states, _prev)
-                _prob = np.maximum(new_probs, _prob)
-            probs.append(_prob / _prob.sum())
-            prevs.append(_prev)
-        if dbg_dict is not None:
-            dbg_dict["probs"] = probs
-            dbg_dict["prevs"] = prevs.copy()
-        path = [np.argmax(probs[-1])]
-        prevs.reverse()
-        for prev in prevs[: -1]:
-            path.append(prev[path[-1]])
-        path.reverse()
-        if dbg_dict is not None:
-            dbg_dict["path"] = path
-        return list(map(lambda n: states[n][0][state_curs_ix:], path))
+        return self.v_prob(x - self.states[s][1])
