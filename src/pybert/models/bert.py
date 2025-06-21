@@ -546,20 +546,23 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         dfe_out_p_curs_ix = np.argmax(ctle_out_p)
         dfe_out_p_samps = np.array([ctle_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)])
         decoder = ViterbiDecoder_ISI(L, N, sigma, dfe_out_p_samps)
-        dfe_out_samps = []
+        pulse_resp_samps = []
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
             ix = np.where(t >= sample_time)[0][0]
-            dfe_out_samps.append(dfe_out[ix])
+            pulse_resp_samps.append(dfe_out[ix])
         if self.debug:
-            self.dfe_out_samps = dfe_out_samps
             self.dbg_dict_viterbi = {}
-            path = decoder.decode(dfe_out_samps, dbg_dict=self.dbg_dict_viterbi)
-            symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
+            path = decoder.decode(pulse_resp_samps, dbg_dict=self.dbg_dict_viterbi)
+        else:
+            path = decoder.decode(pulse_resp_samps)
+        symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
+        if self.debug:
+            self.pulse_resp_samps = pulse_resp_samps
             self.symbols_viterbi = symbols_viterbi
-            self.dbg_dict_viterbi["states"] = decoder.states
+            self.dbg_dict_viterbi["decoder"] = decoder
             self.dbg_dict_viterbi["path"] = path
         else:
-            symbols_viterbi = decoder.decode(dfe_out_samps)
+            symbols_viterbi = decoder.decode(pulse_resp_samps)
         bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
         bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):

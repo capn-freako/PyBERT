@@ -64,6 +64,9 @@ class ViterbiDecoder(ABC, Generic[S, O]):
     def prob(self, s: int, x: O) -> float:
         """
         Probability of state at index `s` given observation `x`.
+
+        Notes:
+            1. This is sometimes referred to as the "emission probability" in the literature.
         """
         pass
 
@@ -151,19 +154,31 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         """
 
         trellis = self.trellis
+        trellis_depth = len(trellis)
         num_states = len(trellis[-1])
 
         # Prime the trellis.
         first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
         first_col /= first_col.sum()
+        # print(f"{samps[0]:+0.3f}", end="")
+        # for p in first_col:
+        #     print(f"  {p:.3f}", end="")
+        # print("")
         trellis[-1] = list(zip(first_col, [0] * num_states))
-        for x in samps[1: num_states]:
+        # print("            1        2        3        4        5        6        7        8        9       10       11       12       13       14       15       16")
+        for n, x in enumerate(samps[1: trellis_depth]):
             self.step_trellis(x, priming=True)
+            # print(f"\n{samps[n + 1]:+0.3f}", end="")
+            # for ix in range(n + 2):
+            #     print("\t", end="")
+            #     for p, r in trellis[-(1 + ix)]:
+            #         print(f"{p:.2f}[{r + 1 : >2d}] ", end="")
+            #     print("")
 
         # Run the remaining samples.
         states = []
         probs_prevs: list[list[tuple[float, int]]] = []
-        for x in samps[num_states:]:
+        for x in samps[trellis_depth:]:
             if dbg_dict is not None:
                 probs_prevs.append(self.trellis[0])
             states.append(self.step_trellis(x))
