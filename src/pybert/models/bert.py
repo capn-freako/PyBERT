@@ -561,8 +561,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.symbols_viterbi = symbols_viterbi
             self.dbg_dict_viterbi["decoder"] = decoder
             self.dbg_dict_viterbi["path"] = path
-        else:
-            symbols_viterbi = decoder.decode(pulse_resp_samps)
         bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
         bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):

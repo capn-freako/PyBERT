@@ -1,0 +1,225 @@
+!!python/object:pybert.configuration.PyBertCfg
+date_created: Sat Jun 21 14:15:20 2025
+version: 7.2.1
+bit_rate: 10.0
+nbits: 20000
+pattern: PRBS-7
+seed: 1
+nspui: 32
+eye_bits: 10000
+mod_type:
+- 0
+debug: false
+f_max: 40.0
+f_step: 10.0
+use_ch_file: false
+ch_file: ''
+impulse_length: 0.0
+Rdc: 0.1876
+w0: 10000000.0
+R0: 1.452
+Theta0: 0.02
+Z0: 100.0
+v0: 0.67
+l_ch: 2.0
+renumber: false
+use_window: false
+vod: 1.0
+rs: 100.0
+cout: 0.5
+pn_mag: 0.0
+pn_freq: 11.0
+rn: 0.01
+tx_taps:
+- !!python/tuple
+    - true
+    - -0.025
+    - -0.05
+    - 0.05
+- !!python/tuple
+    - true
+    - 0.05000000000000002
+    - -0.1
+    - 0.1
+- !!python/tuple
+    - true
+    - -0.2
+    - -0.2
+    - 0.2
+- !!python/tuple
+    - false
+    - 0.0
+    - -0.2
+    - 0.2
+- !!python/tuple
+    - false
+    - 0.0
+    - -0.1
+    - 0.1
+- !!python/tuple
+    - false
+    - 0.0
+    - -0.05
+    - 0.05
+tx_tap_tuners:
+- !!python/tuple
+    - true
+    - -3
+    - -0.05
+    - 0.05
+    - 0.025
+- !!python/tuple
+    - true
+    - -2
+    - -0.1
+    - 0.1
+    - 0.05
+- !!python/tuple
+    - true
+    - -1
+    - -0.2
+    - 0.2
+    - 0.1
+- !!python/tuple
+    - false
+    - 1
+    - -0.2
+    - 0.2
+    - 0.1
+- !!python/tuple
+    - false
+    - 2
+    - -0.1
+    - 0.1
+    - 0.05
+- !!python/tuple
+    - false
+    - 3
+    - -0.05
+    - 0.05
+    - 0.025
+tx_use_ami: false
+tx_use_ts4: false
+tx_use_getwave: false
+tx_ami_file: ''
+tx_dll_file: ''
+tx_ibis_file: ''
+tx_use_ibis: false
+rin: 100.0
+cin: 0.5
+cac: 1.0
+use_ctle_file: false
+ctle_file: ''
+rx_bw: 12.0
+peak_freq: 5.0
+peak_mag: 12.0
+ctle_enable: true
+rx_use_ami: false
+rx_use_ts4: false
+rx_use_getwave: false
+rx_ami_file: ''
+rx_dll_file: ''
+rx_ibis_file: ''
+rx_use_ibis: false
+rx_use_viterbi: false
+rx_viterbi_symbols: 7
+sum_ideal: true
+decision_scaler: 0.015
+gain: 200.0
+n_ave: 100.0
+sum_bw: 12.0
+use_agc: false
+delta_t: 0.1
+alpha: 0.01
+n_lock_ave: 500
+rel_lock_tol: 0.1
+lock_sustain: 500
+thresh: 3.0
+rx_bw_tune: 12.0
+peak_freq_tune: 5.0
+peak_mag_tune: 12.0
+min_mag_tune: 0.0
+max_mag_tune: 12.0
+step_mag_tune: 1.0
+ctle_enable_tune: true
+dfe_tap_tuners:
+- !!python/tuple
+    - true
+    - 0.0
+    - 0.4
+- !!python/tuple
+    - true
+    - -0.15
+    - 0.15
+- !!python/tuple
+    - true
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - true
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
+- !!python/tuple
+    - false
+    - -0.05
+    - 0.1
