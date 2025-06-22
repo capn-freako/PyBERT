@@ -125,6 +125,8 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_dll_file = the_PyBERT.rx_dll_file
         self.rx_ibis_file = the_PyBERT.rx_ibis_file
         self.rx_use_ibis = the_PyBERT.rx_use_ibis
+        self.rx_use_viterbi = the_PyBERT.rx_use_viterbi
+        self.rx_viterbi_symbols = the_PyBERT.rx_viterbi_symbols
 
         # DFE
         self.sum_ideal = the_PyBERT.sum_ideal
@@ -132,6 +134,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.gain = the_PyBERT.gain
         self.n_ave = the_PyBERT.n_ave
         self.sum_bw = the_PyBERT.sum_bw
+        self.use_agc = the_PyBERT.use_agc
 
         # CDR
         self.delta_t = the_PyBERT.delta_t

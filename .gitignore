@@ -145,7 +145,6 @@ pybert.log
 *.png
 *.sublime-workspace
 *.gcbench
-misc/*
 *_cfg.yaml
 
 # Metal (Apple GPU)

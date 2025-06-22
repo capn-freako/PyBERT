@@ -183,9 +183,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     vod = Float(1.0)  #: Tx differential output voltage (V)
     rs = Float(100)  #: Tx source impedance (Ohms)
     cout = Range(low=0.001, high=1000, value=0.5)  #: Tx parasitic output capacitance (pF)
-    pn_mag = Float(0.1)  #: Periodic noise magnitude (V).
+    pn_mag = Float(0.01)  #: Periodic noise magnitude (V).
     pn_freq = Float(11)  #: Periodic noise frequency (MHz).
-    rn = Float(0.1)  #: Standard deviation of Gaussian random noise (V).
+    rn = Float(0.01)  #: Standard deviation of Gaussian random noise (V).
     tx_taps = List(
         [
             TxTapTuner(name="Pre-tap3",  pos=-3, enabled=True, min_val=-0.05, max_val=0.05),
@@ -239,6 +239,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_ibis_file = File("", entries=5, filter=["*.ibs"])  #: (File)
     rx_ibis_valid = Bool(False)  #: (Bool)
     rx_use_ibis = Bool(False)  #: (Bool)
+    rx_use_viterbi = Bool(False)  #: (Bool)
+    rx_viterbi_symbols = Int(7)  #: Number of symbols to track in Viterbi decoder.
 
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
@@ -246,6 +248,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     gain = Float(0.2)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
+    use_agc = Bool(True)  #: Continuously adjust `decision_scalar` when True.
 
     # - CDR
     delta_t = Float(0.1)  #: CDR proportional branch magnitude (ps).
@@ -278,6 +281,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
     bit_errs = Int(0)  #: # of bit errors observed in last run.
+    bit_errs_viterbi = Int(0)  #: # of bit errors observed in last run.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
@@ -859,6 +863,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         info_str += f'      <TD align="center">DFE</TD><TD>{self.dfe_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
+        info_str += f'      <TD align="center">Viterbi</TD><TD>{self.viterbi_perf * 6e-05:6.3f}</TD>\n'
+        info_str += "    </TR>\n"
+        info_str += '    <TR align="right">\n'
         info_str += f'      <TD align="center">Jitter Analysis</TD><TD>{self.jitter_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
@@ -894,7 +901,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_status_str(self):
         status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
-        err_str = f"    | BitErrs: {int(self.bit_errs)}"
+        if self.bit_errs_viterbi >= 0:
+            err_str = f"    | BitErrs: {int(self.bit_errs)} ({int(self.bit_errs_viterbi)})"
+        else:
+            err_str = f"    | BitErrs: {int(self.bit_errs)}"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
         jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (

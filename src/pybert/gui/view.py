@@ -373,6 +373,16 @@ traits_view = View(
                             Item(label="uF"),
                             spring,
                         ),
+                        HGroup(
+                            Item(
+                                name="rx_use_viterbi", label="Use Viterbi",
+                                tooltip="Apply MLSD to recovered symbols, using Viterbi algorithm.",
+                                ),
+                            Item(
+                                name="rx_viterbi_symbols", label="# Symbols",
+                                tooltip="Number of symbols to include in MLSD trellis.",
+                                ),
+                        ),
                         label="Native",
                         show_border=True,
                         enabled_when="rx_use_ibis == False",
@@ -583,8 +593,10 @@ traits_view = View(
                                 Item(name="gain", label="Gain", tooltip="error feedback gain"),
                                 Item(name="n_ave", label="Nave.", tooltip="# of CDR adaptations per DFE adaptation"),
                                 HGroup(
-                                    Item(name="decision_scaler", label="Level", tooltip="target output magnitude"),
+                                    Item(name="decision_scaler", label="Level", format_str="%0.3f",
+                                         tooltip="target output magnitude"),
                                     Item(label="V"),
+                                    Item(name="use_agc", label="Use AGC", tooltip="Continuously adjust `Level` automatically."),
                                 ),
                                 HGroup(
                                     Item(

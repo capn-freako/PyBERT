@@ -10,7 +10,7 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
 from functools import reduce
-from typing import Iterator
+from typing import Any, Iterator, TypeVar
 
 from numpy import (  # type: ignore
     append, array, cumsum, exp, log10,
@@ -21,6 +21,8 @@ from numpy.fft import fftshift  # type: ignore
 from pybert.utility.sigproc import moving_average
 
 from ..common import Rvec
+
+T = TypeVar('T', Any, Any)
 
 
 def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:
@@ -117,3 +119,20 @@ def gaus_pdf(x: Rvec, mu: float, sigma: float) -> Rvec:
     "Gaussian probability density function."
     sqrt_2pi = sqrt(2 * pi)
     return exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * sqrt_2pi)
+
+
+def all_combs(xss: list[list[T]]) -> list[list[T]]:
+    """
+    Generate all combinations of input.
+
+    Args:
+        xss: The lists of candidates for each position in the final output.
+
+    Returns:
+        All possible combinations of inputs.
+    """
+    if not xss:
+        return [[]]
+    head, *tail = xss
+    yss = all_combs(tail)
+    return [[x, *ys] for x in head for ys in yss]  # type: ignore

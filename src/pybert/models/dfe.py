@@ -1,4 +1,5 @@
-"""Behavioral model of a decision feedback equalizer (DFE).
+"""
+Behavioral model of a decision feedback equalizer (DFE).
 
 Original Author: David Banas <capn.freako@gmail.com>
 
@@ -10,9 +11,15 @@ into the larger *PyBERT* framework.
 
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
-from numpy import array, sign, zeros  # type: ignore
-from scipy.signal import iirfilter
 
+import numpy        as np
+import numpy.typing as npt
+
+from numpy import array, diff, histogram, mean, sign, where, zeros  # type: ignore
+from scipy.signal import iirfilter
+from typing import Any, Optional
+
+from pybert.common     import Rvec
 from pybert.models.cdr import CDR
 
 gNch_taps = 3  # Number of taps used in summing node filter.
@@ -206,26 +213,25 @@ class DFE:  # pylint: disable=too-many-instance-attributes
 
         return filter_out
 
-    def decide(self, x):
+    def decide(self, x: float) -> tuple[float, list[int]]:
         """Make the bit decisions, according to modulation type.
 
         Args:
-            x(float): The signal value, at the decision time.
+            x: The signal value, at the decision time.
 
         Returns:
-            tuple(float, [int]): The members of the returned tuple are:
+            A pair containing
 
-                decision:
-                    One of:
+                - One of:
 
-                        - {-1, 1}              (NRZ)
-                        - {-1, 0, +1}          (Duo-binary)
-                        - {-1, -1/3, +1/3, +1} (PAM-4)
+                    - {-1, 1}              (NRZ)
+                    - {-1, 0, +1}          (Duo-binary)
+                    - {-1, -1/3, +1/3, +1} (PAM-4)
 
-                        according to what the ideal signal level should have been.
-                        ('decision_scaler' normalized)
+                    according to what the ideal signal level should have been.
+                    ('decision_scaler' normalized)
 
-                bits: The list of bits recovered.
+                - The list of bits recovered.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -265,37 +271,57 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         return decision, bits
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    def run(self, sample_times, signal):
-        """Run the DFE on the input signal.
+    def run(
+        self,
+        sample_times: Rvec,
+        signal: Rvec,
+        use_agc: bool = False,
+        dbg_dict: Optional[dict[str, Any]] = None
+    ) -> tuple[
+        npt.NDArray[np.float64],
+        list[list[float]],
+        npt.NDArray[np.float64],
+        npt.NDArray[np.float64],
+        list[bool],
+        list[float],
+        npt.NDArray[np.integer[Any]]
+    ]:
+
+        """
+        Run the DFE on the input signal.
 
         Args:
-            sample_times([float]): Vector of time values at wich
-                corresponding signal values were sampled.
-            signal([float]): Vector of sampled signal values.
+            sample_times: Vector of signal sampling times.
+            signal: Vector of sampled signal values.
+
+        Keyword Args:
+            use_agc: Perform continuous adjustment of `decision_scaler` when True.
+                Default: False
 
         Returns:
-            tuple(([float], [[float]], [float], [int], [bool], [float], [int])):
-                The members of the returned tuple, in order, are:
+            A tuple containing
 
-                    res([float]):
-                        Samples of the summing node output, taken at the
-                        times given in *sample_times*.
-                    tap_weights([[float]]):
-                        List of list of tap weights showing how the DFE
-                        adapted over time.
-                    ui_ests([float]):
-                        List of unit interval estimates, showing how the
-                        CDR adapted.
-                    clocks([int]):
-                        List of mostly zeros with ones at the recovered
-                        clocking instants. Useful for overlaying the
-                        clock times on signal waveforms, in plots.
-                    lockeds([bool]):
-                        List of Booleans indicating state of CDR lock.
-                    clock_times([float]):
-                        List of clocking instants, as recovered by the CDR.
-                    bits([int]):
-                        List of recovered bits.
+                res
+                :    Samples of the summing node output, taken at the times given in *sample_times*.
+
+                tap_weights
+                :    List of list of tap weights showing how the DFE adapted over time.
+
+                ui_ests
+                :    List of unit interval estimates, showing how the CDR adapted.
+
+                clocks
+                :    List of mostly zeros with ones at the recovered clocking instants.
+                Useful for overlaying the clock times on signal waveforms, in plots.
+
+                lockeds
+                :    List of Booleans indicating state of CDR lock.
+
+                clock_times
+                :    List of clocking instants, as recovered by the CDR.
+
+                bits
+                :    List of recovered bits.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -318,14 +344,16 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         next_clock_time = ui / 2.0
         locked = False
 
-        res = []
-        tap_weights = [self.tap_weights]
-        ui_ests = []
-        lockeds = []
+        res: list[float] = []
+        tap_weights: list[list[float]] = [self.tap_weights]
+        ui_ests: list[float] = []
+        lockeds: list[bool] = []
         clocks = zeros(len(sample_times))
         clock_times = [next_clock_time]
         bits = []
         boundary_sample = 0
+        pos_slicer_samps = []  # Positive-valued summer output values sampled by slicer.
+        scalar_values = [decision_scaler]
         for t, x in zip(sample_times, signal):
             if not ideal:
                 sum_out = summing_filter.step(x - filter_out)
@@ -340,16 +368,14 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 clk_cntr += 1
                 clocks[smpl_cntr] = 1
                 current_clock_sample = sum_out
-                samples = [last_clock_sample, boundary_sample, current_clock_sample]
+                samples = array([last_clock_sample, boundary_sample, current_clock_sample])
                 if mod_type == 0:  # NRZ
                     pass
                 elif mod_type == 1:  # Duo-binary
-                    samples = array(samples)
                     if samples.mean() < 0.0:
                         samples -= thresholds[0]
                     else:
                         samples -= thresholds[1]
-                    samples = list(samples)
                 elif mod_type == 2:  # PAM-4
                     pass
                 else:
@@ -369,10 +395,36 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 next_boundary_time = next_clock_time + ui / 2.0
                 next_clock_time += ui
                 clock_times.append(next_clock_time)
+                if use_agc and sum_out > 0:
+                    pos_slicer_samps.append(sum_out)
+                    if len(pos_slicer_samps) > 1000:
+                        hist, bin_edges = histogram(pos_slicer_samps, bins=100)
+                        bin_centers = (bin_edges[: -1] + bin_edges[1:]) / 2
+                        hist_1st_deriv = diff(hist)
+                        hist_2nd_deriv = diff(hist_1st_deriv)
+                        hist_2nd_deriv_min = min(hist_2nd_deriv)
+                        hist_2nd_deriv_thresh = 0.8 * hist_2nd_deriv_min
+                        hist_2nd_deriv_peaks = where(hist_2nd_deriv < hist_2nd_deriv_thresh, hist_2nd_deriv, 0)
+                        if not any(hist_2nd_deriv_peaks):
+                            break
+                        ix = -1
+                        while hist_2nd_deriv_peaks[ix] == 0:
+                            ix -= 1
+                        ix_upper = ix
+                        while hist_2nd_deriv_peaks[ix] != 0:
+                            ix -= 1
+                        ix_lower = ix
+                        ix_center = (ix_lower + ix_upper) // 2
+                        decision_scaler = bin_centers[ix_center]
+                        scalar_values.append(decision_scaler)
+
             ui_ests.append(ui)
             lockeds.append(locked)
             smpl_cntr += 1
 
         self.ui = ui
+        self.decision_scaler = decision_scaler
+        if dbg_dict is not None:
+            dbg_dict["scalar_values"] = scalar_values
 
-        return (res, tap_weights, ui_ests, clocks, lockeds, clock_times, bits)
+        return (array(res), tap_weights, array(ui_ests), clocks, lockeds, clock_times, array(bits))

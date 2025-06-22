@@ -10,14 +10,16 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from time import perf_counter
-from typing import Callable, Optional, TypeAlias
+from typing import Any, Callable, Optional, TypeAlias
 
 import numpy        as np
 import numpy.typing as npt
 import scipy.signal as sig
 from numpy import (  # type: ignore
+    arange,
     argmax,
     array,
+    concatenate,
     convolve,
     correlate,
     diff,
@@ -51,6 +53,7 @@ from pybert.utility import (
     safe_log10,
     trim_impulse,
 )
+from pybert.models.viterbi import ViterbiDecoder_ISI
 
 clock = perf_counter
 
@@ -340,13 +343,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 dfe_tap_keys.sort()
                 for dfe_tap_key in dfe_tap_keys:
                     _tap_weights.append(param_vals[dfe_tap_key])
-                tap_weights = array(_tap_weights).transpose()
+                tap_weights: list[list[float]] = list(array(_tap_weights).transpose())
                 if "cdr_locked" in param_vals:
-                    lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
-                    lockeds = lockeds.repeat(len(t) // len(lockeds))
-                    lockeds.resize(len(t))
+                    _lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
+                    _lockeds = _lockeds.repeat(len(t) // len(_lockeds))
+                    _lockeds.resize(len(t))
                 else:
-                    lockeds = zeros(len(t))
+                    _lockeds = zeros(len(t))
+                lockeds: list[bool] = list(map(bool, _lockeds))
                 if "cdr_ui" in param_vals:
                     ui_ests: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_ui")])
                     ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
@@ -437,13 +441,22 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
     if not (self.rx_use_ami and self.rx_use_getwave):  # Use PyBERT native DFE/CDR.
-        (dfe_out, tap_weights, ui_ests, clocks, lockeds, sample_times, bits_out) = dfe.run(t, ctle_out)
+        dbg_dict: dict[str, Any] = {}
+        (dfe_out,
+         tap_weights,
+         ui_ests,
+         clocks,
+         lockeds,
+         sample_times,
+         bits_out) = dfe.run(t, ctle_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
+        self.decision_scaler = dfe.decision_scaler
+        self.dfe_scalar_values = dbg_dict["scalar_values"]
     else:                                              # Process Rx IBIS-AMI GetWave() output.
         # Process any valid clock times returned by Rx IBIS-AMI model's GetWave() function if apropos.
         dfe_out = array(ctle_out)  # In this case, `ctle_out` includes the effects of IBIS-AMI DFE.
         dfe_out.resize(len(t))
         t_ix = 0
-        bits_out = []
+        _bits_out = []
         clocks = zeros(len(t))
         sample_times = []
         if self.rx_use_clocks and clock_times is not None:
@@ -457,7 +470,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     self.log("Went beyond system time vector end searching for next clock time!")
                     break
                 _, _bits = dfe.decide(ctle_out[t_ix])
-                bits_out.extend(_bits)
+                _bits_out.extend(_bits)
                 clocks[t_ix] = 1
                 sample_times.append(sample_time)
         # Process any remaining output, using inferred sampling instants.
@@ -469,10 +482,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                                                          for k in range(nspui)])
             for t_ix in range(next_sample_ix, len(t), nspui):
                 _, _bits = dfe.decide(ctle_out[t_ix])
-                bits_out.extend(_bits)
+                _bits_out.extend(_bits)
                 clocks[t_ix] = 1
                 sample_times.append(t[t_ix])
-    bits_out = array(bits_out)
+        bits_out = array(_bits_out)
     start_ix = max(0, len(bits_out) - eye_bits)
     end_ix = len(bits_out)
     auto_corr = (
@@ -482,8 +495,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     auto_corr = auto_corr[len(auto_corr) // 2:]
     self.auto_corr = auto_corr
     bit_dly = where(auto_corr == max(auto_corr))[0][0]
-    bits_ref = bits[(nbits - eye_bits):]
-    bits_tst = bits_out[(nbits + bit_dly - eye_bits):]
+    first_ref_bit = nbits - eye_bits
+    bits_ref = bits[first_ref_bit:]
+    first_tst_bit = first_ref_bit + bit_dly
+    bits_tst = bits_out[first_tst_bit:]
     if len(bits_ref) > len(bits_tst):
         bits_ref = bits_ref[: len(bits_tst)]
     elif len(bits_tst) > len(bits_ref):
@@ -507,6 +522,59 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
     dfe_out_s, dfe_out_p, dfe_out_H = calc_resps(t, dfe_out_h, ui, f)
 
+    self.dfe_perf = nbits * nspb / (clock() - split_time)
+    split_time = clock()
+
+    _check_sim_status()
+
+    # Apply Viterbi decoder if apropos.
+    self.bit_errs_viterbi = -1
+    self.viterbi_perf = 0
+    if self.rx_use_viterbi:
+        self.status = "Running Viterbi..."
+        match mod_type:
+            case 0:
+                L = 2
+            case 1:
+                L = 3
+            case 2:
+                L = 4
+            case _:
+                raise ValueError(f"Unrecognized modulation type: {mod_type}!")
+        N = self.rx_viterbi_symbols
+        sigma = 10e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
+        dfe_out_p_curs_ix = np.argmax(ctle_out_p)
+        dfe_out_p_samps = np.array([ctle_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)])
+        decoder = ViterbiDecoder_ISI(L, N, sigma, dfe_out_p_samps)
+        pulse_resp_samps = []
+        for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
+            ix = np.where(t >= sample_time)[0][0]
+            pulse_resp_samps.append(dfe_out[ix])
+        if self.debug:
+            self.dbg_dict_viterbi = {}
+            path = decoder.decode(pulse_resp_samps, dbg_dict=self.dbg_dict_viterbi)
+        else:
+            path = decoder.decode(pulse_resp_samps)
+        symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
+        if self.debug:
+            self.pulse_resp_samps = pulse_resp_samps
+            self.symbols_viterbi = symbols_viterbi
+            self.dbg_dict_viterbi["decoder"] = decoder
+            self.dbg_dict_viterbi["path"] = path
+        bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
+        bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
+        if len(bits_ref) > len(bits_tst_viterbi):
+            bits_ref = bits_ref[: len(bits_tst_viterbi)]
+        elif len(bits_tst_viterbi) > len(bits_ref):
+            bits_tst_viterbi = bits_tst_viterbi[: len(bits_ref)]
+        num_viterbi_bits = len(bits_tst_viterbi)
+        bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
+        n_errs_viterbi = len(bit_errs_viterbi)
+        self.bit_errs_viterbi = n_errs_viterbi
+        self.viterbi_errs_ixs = bit_errs_viterbi
+        self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)
+        split_time = clock()
+
     self.dfe_h = dfe_h
     self.dfe_s = dfe_s
     self.dfe_p = dfe_p
@@ -518,8 +586,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.dfe_out = dfe_out
     self.lockeds = lockeds
 
-    self.dfe_perf = nbits * nspb / (clock() - split_time)
-    split_time = clock()
     self.status = "Analyzing jitter..."
 
     _check_sim_status()
@@ -528,7 +594,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.adaptation = tap_weights
     self.ui_ests = array(ui_ests) * 1.0e12  # (ps)
     self.clocks = clocks
-    self.lockeds = lockeds
     self.clock_times = sample_times
 
     # Analyze the jitter.
@@ -574,6 +639,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         _xings = array(xings) - ofst
         return _xings[where(_xings > xing_min_t)] - xing_min_t
 
+    jit_chnl_done: bool = False
+    jit_tx_done: bool = False
+    jit_ctle_done: bool = False
+    jit_dfe_done: bool = False
     try:
         # - ideal
         ideal_xings = find_crossings(t, ideal_signal, decision_scaler, mod_type=mod_type)
@@ -623,6 +692,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.ofst_chnl = ofst
         self.tie_chnl = tie
         self.tie_ind_chnl = tie_ind
+        jit_chnl_done = True
 
         # - Tx output
         ofst = (argmax(sig.correlate(rx_in, x)) - len_x_m1) * Ts
@@ -666,6 +736,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.t_jitter_tx = t_jitter
         self.tie_tx = tie
         self.tie_ind_tx = tie_ind
+        jit_tx_done = True
 
         # - CTLE output
         ofst = (argmax(sig.correlate(ctle_out, x)) - len_x_m1) * Ts
@@ -706,6 +777,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.jitter_ind_spectrum_ctle = jitter_ind_spectrum
         self.tie_ctle = tie
         self.tie_ind_ctle = tie_ind
+        jit_ctle_done = True
 
         # - DFE output
         ofst = (argmax(sig.correlate(dfe_out, x)) - len_x_m1) * Ts
@@ -749,6 +821,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.f_MHz_dfe = array(spectrum_freqs) * 1.0e-6
         dfe_spec = self.jitter_spectrum_dfe
         self.jitter_rejection_ratio = zeros(len(dfe_spec))
+        jit_dfe_done = True
 
         self.jitter_perf = nbits * nspb / (clock() - split_time)
         self.total_perf = nbits * nspb / (clock() - start_time)
@@ -757,8 +830,20 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     except ValueError as err:
         self.log(f"The jitter calculation could not be completed, due to the following error:\n{err}",
                  alert=False)
-        self.status = "Exception: jitter"
-        # raise
+        if jit_chnl_done:
+            if jit_tx_done:
+                if jit_ctle_done:
+                    if jit_dfe_done:
+                        self.status = "Exception: But, all finished!"
+                    else:
+                        self.status = "Exception: DFE jitter"
+                else:
+                    self.status = "Exception: CTLE jitter"
+            else:
+                self.status = "Exception: Tx jitter"
+        else:
+            self.status = "Exception: channel jitter"
+        raise
 
     _check_sim_status()
     # Update plots.
@@ -978,6 +1063,7 @@ def update_results(self):
     y_max = 1.1 * max(abs(array(self.ctle_out[ignore_samps:])))
     eye_ctle = calc_eye(ui, samps_per_ui, height, self.ctle_out[ignore_samps:], y_max)
     y_max = 1.1 * max(abs(array(self.dfe_out[ignore_samps:])))
+    self.dfe_eye_ymax = y_max
     i = 0
     len_clock_times = len(clock_times)
     while i < len_clock_times and clock_times[i] < ignore_until:
