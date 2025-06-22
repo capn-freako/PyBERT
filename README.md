@@ -16,7 +16,7 @@ User Installation
 Developer Installation
 ----------------------
 
-- <https://github.com/capn-freako/PyBERT/wiki/dev_install>
+- <https://github.com/capn-freako/PyBERT/wiki/Developer_Instructions>
 
 Wiki
 ----
