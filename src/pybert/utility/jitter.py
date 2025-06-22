@@ -61,7 +61,7 @@ def find_crossing_times(  # pylint: disable=too-many-arguments,too-many-position
         thresh: Vertical crossing threshold.
 
     Returns:
-        xing_times: Array of signal threshold crossing times.
+        Array of signal threshold crossing times.
     """
 
     if len(t) != len(x):
@@ -159,7 +159,7 @@ def find_crossings(  # pylint: disable=too-many-arguments,too-many-positional-ar
             Default: 0
 
     Returns:
-        xing_times: The signal threshold crossing times.
+        The signal threshold crossing times.
     """
 
     if mod_type not in [0, 1, 2]:
@@ -238,25 +238,26 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             Default: 5
 
     Returns:
-        ( Jtot: The total jitter.
-        , times: The times (taken from 'ideal_xings') corresponding to the returned jitter values.
-        , jISI: The peak to peak jitter due to intersymbol interference (ISI).
-        , jDCD: The peak to peak jitter due to duty cycle distortion (DCD).
-        , jPj: The peak to peak jitter due to uncorrelated periodic sources (Pj).
-        , jRj: The standard deviation of the jitter due to uncorrelated unbounded random sources (Rj).
-        , jPjDD: Dual-Dirac peak to peak jitter.
-        , jRjDD: Dual-Dirac random jitter.
-        , Jind: The data independent jitter.
-        , thresh: Threshold for determining periodic components.
-        , Stot: The spectral magnitude of the total jitter.
-        , Sind: The spectral magnitude of the data independent jitter.
-        , freqs: The frequencies corresponding to the spectrum components.
-        , histTOT: The smoothed histogram of the total jitter.
-        , histIND: The smoothed histogram of the data-independent jitter.
-        , centers: The bin center values for both histograms.
-        , mu_pos: The mean of the Gaussian distribution best fitted to the right tail.
-        , mu_neg: The mean of the Gaussian distribution best fitted to the left tail.
-        )
+        A tuple containing
+
+            - The total jitter.
+            - The times (taken from 'ideal_xings') corresponding to the returned jitter values.
+            - The peak to peak jitter due to intersymbol interference (ISI).
+            - The peak to peak jitter due to duty cycle distortion (DCD).
+            - The peak to peak jitter due to uncorrelated periodic sources (Pj).
+            - The standard deviation of the jitter due to uncorrelated unbounded random sources (Rj).
+            - Dual-Dirac peak to peak jitter.
+            - Dual-Dirac random jitter.
+            - The data independent jitter.
+            - Threshold for determining periodic components.
+            - The spectral magnitude of the total jitter.
+            - The spectral magnitude of the data independent jitter.
+            - The frequencies corresponding to the spectrum components.
+            - The smoothed histogram of the total jitter.
+            - The smoothed histogram of the data-independent jitter.
+            - The bin center values for both histograms.
+            - The mean of the Gaussian distribution best fitted to the right tail.
+            - The mean of the Gaussian distribution best fitted to the left tail.
 
     Raises:
         ValueError: If input checking fails, or curve fitting goes awry.

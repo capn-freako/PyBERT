@@ -1,4 +1,7 @@
-"""All pybert threads that support stop or abort derive from this class."""
+"""
+All pybert threads that support stop or abort derive from this class.
+"""
+
 from threading import Event, Thread
 
 
@@ -11,6 +14,7 @@ class StoppableThread(Thread):
     """
 
     def __init__(self):
+        """"""
         super().__init__()
         self._stop_event = Event()
 

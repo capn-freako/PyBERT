@@ -40,11 +40,12 @@ extensions = [
     "m2r2",
 ]
 autodoc_default_options = {
-    "undoc-members": True,
-    "inherited-members": False,
-    "show-inheritance": True,
-    "members": True,
     "exclude-members": "default_traits_view",
+    "inherited-members": False,
+    "members": True,
+    "member-order": "groupwise",
+    "show-inheritance": True,
+    "undoc-members": False,
 }
 autodoc_mock_imports = [
     "chaco",

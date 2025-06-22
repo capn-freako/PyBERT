@@ -72,14 +72,14 @@ def sdd_21(ntwk: Network, renumber: bool = False) -> Network:
             Default: False
 
     Returns:
-        Sdd: 2-port differential network.
+        2-port differential network.
     """
     mm = se2mm(ntwk, renumber=renumber)
     return Network(frequency=ntwk.f, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
 
 
 def se2mm(ntwk: Network, scale: float = 0.5, renumber: bool = False) -> Network:
-    """
+    r"""
     Given a 4-port single-ended network, return its mixed mode equivalent.
 
     Args:
@@ -92,12 +92,18 @@ def se2mm(ntwk: Network, scale: float = 0.5, renumber: bool = False) -> Network:
             Default: False
 
     Returns:
-        Smm: Mixed mode equivalent network, in the following format:
-            Sdd11  Sdd12  Sdc11  Sdc12
-            Sdd21  Sdd22  Sdc21  Sdc22
-            Scd11  Scd12  Scc11  Scc12
-            Scd21  Scd22  Scc21  Scc22
+        Mixed mode equivalent network, in the following format
+
+            .. math::
+
+                \begin{matrix}
+                Sdd11 & Sdd12 & Sdc11 & Sdc12\\
+                Sdd21 & Sdd22 & Sdc21 & Sdc22\\
+                Scd11 & Scd12 & Scc11 & Scc12\\
+                Scd21 & Scd22 & Scc21 & Scc22
+                \end{matrix}
     """
+
     # Confirm correct network dimmensions.
     (_, rs, cs) = ntwk.s.shape
     if rs != cs:
@@ -151,10 +157,10 @@ def interp_s2p(ntwk: Network, f: Rvec) -> Network:
         f: The list of new frequency sampling points (Hz).
 
     Returns:
-        Sint: The interpolated/extrapolated 2-port network.
+        The interpolated/extrapolated 2-port network.
 
     Raises:
-        ValueError: If `ntwk` is _not_ a 2-port network.
+        ValueError: If ``ntwk`` is _not_ a 2-port network.
     """
     (_, rs, cs) = ntwk.s.shape
     if rs != cs:
@@ -182,15 +188,16 @@ def H_2_s2p(H: Cvec, Zc: Cvec, fs: Rvec, Zref: float = 50) -> Network:
     Args:
         H: Transfer function of medium alone.
         Zc: Complex impedance of medium.
-        fs: Frequencies at which `H` and `Zc` were sampled (Hz).
+        fs: Frequencies at which ``H`` and ``Zc`` were sampled (Hz).
 
     Keyword Args:
         Zref: Reference (i.e. - port) impedance to be used in constructing the network (Ohms).
             Default: 50
 
     Returns:
-        s2p: 2-port network representing the channel to which `H` and `Zc` pertain.
+        2-port network representing the channel to which ``H`` and ``Zc`` pertain.
     """
+
     # ToDo: Fix this code.  # pylint: disable=fixme
     ws = 2 * pi * fs
     G = calc_G(H, Zref, 0, Zc, Zref, 0, ws)  # See `calc_G()` docstring.
@@ -221,7 +228,7 @@ def import_freq(filename: str, renumber: bool = False) -> Network:
             Default = False
 
     Returns:
-        s2p_DD: 2-port network.
+        2-port differential network.
 
     Raises:
         ValueError: If Touchstone file is not 1, 2, or 4-port.
@@ -263,7 +270,7 @@ def import_channel(filename: str, sample_per: float, fs: Rvec,
             Default: False
 
     Returns:
-        s2p: 2-port network description of channel.
+        2-port network description of channel.
 
     Notes:
         1. When a time domain (i.e. - impulse or step response) file is being imported,

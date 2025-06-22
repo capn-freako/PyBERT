@@ -86,7 +86,8 @@ gNtaps       =     5
 
 
 class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
-    """A serial communication link bit error rate tester (BERT) simulator with
+    """
+    A serial communication link bit error rate tester (BERT) simulator with
     a GUI interface.
 
     Useful for exploring the concepts of serial communication link
@@ -1268,8 +1269,17 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         return chnl_h
 
-    def simulate(self, initial_run=False, update_plots=True):
-        """Run all queued simulations."""
+    def simulate(self, initial_run: bool = False, update_plots: bool = True) -> None:
+        """
+        Run all queued simulations.
+
+        Keyword Args:
+            initial_run: Set to ``True`` only for the first run.
+                Default: ``False``
+            update_plots: Set to ``False`` for notebook operation.
+                Default: ``True``
+        """
+
         # Running the simulation will fill in the required data structure.
         my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
         # Once the required data structure is filled in, we can create the plots.

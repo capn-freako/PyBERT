@@ -1,27 +1,13 @@
-====================
-*PyBERT* Main Module
-====================
+======================================
+`pybert.pybert` - *PyBERT* Main Module
+======================================
+
+.. automodule:: pybert.pybert
+   :no-index:
+   :exclude-members: PyBERT
 
 Main Class
 **********
 
 .. autoclass:: pybert.pybert.PyBERT
-   :members: __init__
-
-Custom Threads
-**************
-
-A separate thread is used for optimization, in order to preserve GUI responsiveness to user input while optimizing.
-And all custom threads used in PyBERT are derived from `StoppableThread`, so that any optimization may be aborted by the user.
-
-.. autoclass:: pybert.threads.stoppable.StoppableThread
-   :members:
-
-.. autoclass:: pybert.threads.optimization.OptThread
-   :members:
-
-Tx FIR Tap Tuner
-****************
-
-.. autoclass:: pybert.pybert.TxTapTuner
-   :members:
+   :exclude-members: dcd_chnl,dcd_ctle,dcd_dfe,dcd_tx,dfe_tap_tuners,instructions,isi_chnl,isi_ctle,isi_dfe,isi_tx,jitter_perf,pjDD_chnl,pjDD_ctle,pjDD_dfe,pjDD_tx,pj_chnl,pj_ctle,pj_dfe,pj_tx,rjDD_chnl,rjDD_ctle,rjDD_dfe,rjDD_tx,rj_chnl,rj_ctle,rj_dfe,rj_tx,run_count,seed

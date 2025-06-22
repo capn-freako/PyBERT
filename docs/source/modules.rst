@@ -1,38 +1,21 @@
-=================
-Top Level Modules
-=================
+===========================
+Modules in *PyBERT* Package
+===========================
+
+Top Level Modules (`pybert`)
+****************************
 
 .. toctree::
    :maxdepth: 1
 
    pybert
 
-Models (`pybert.models`)
-************************
+pybert.common - Common miscellaneous definitions and aliases.
+-------------------------------------------------------------
 
-.. automodule:: pybert.models
-
-.. toctree::
-   :maxdepth: 1
-
-   bert
-   dfe
-   cdr
-
-GUI Elements (`pybert.gui`)
-***************************
-
-.. automodule:: pybert.gui
-
-.. toctree::
-   :maxdepth: 1
-
-   view
-   plot
-   help
-
-Miscellaneous
-*************
+.. automodule:: pybert.common
+   :members: Real,Comp,Rvec,Cvec,Rmat,Cmat
+   :member-order: bysource
 
 pybert.configuration - Data structure for saving *PyBERT* configuration.
 ------------------------------------------------------------------------
@@ -46,8 +29,68 @@ pybert.results - Data structure for saving *PyBERT* results.
 .. automodule:: pybert.results
    :members:
 
-pybert.utility - Various utilities used by other modules.
----------------------------------------------------------
+pybert.cli - Command line interface.
+------------------------------------------------------------
+
+.. automodule:: pybert.cli
+   :members:
+   
+Models (`pybert.models`)
+************************
+
+.. automodule:: pybert.models
+
+.. toctree::
+   :maxdepth: 1
+
+   bert
+   tx_tap
+   dfe
+   cdr
+   viterbi
+
+GUI Elements (`pybert.gui`)
+***************************
+
+.. automodule:: pybert.gui
+
+.. toctree::
+   :maxdepth: 1
+
+   view
+   plot
+   handler
+   help
+
+Parsers (`pybert.parsers`)
+**************************
+
+.. automodule:: pybert.parsers
+
+Threads (`pybert.threads`)
+**************************
+
+.. automodule:: pybert.threads
+
+.. toctree::
+   :maxdepth: 1
+
+   stoppable
+   sim
+   optimization
+
+Utility (`pybert.utility`)
+**************************
 
 .. automodule:: pybert.utility
-   :members:
+
+.. toctree::
+   :maxdepth: 1
+
+   channel
+   ibisami
+   jitter
+   math
+   python
+   sigproc
+   sparam

@@ -52,7 +52,7 @@ PyBERT documentation exists in 2 separate forms:
 - For developers:
 
   - pybert/doc/build/html/index.html  (See testing on how to build the documentation)
-  - https://github.com/capn-freako/PyBERT/wiki/dev_install
+  - https://github.com/capn-freako/PyBERT/wiki/Developer_Instructions
 
 - For users:
 

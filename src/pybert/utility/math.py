@@ -35,8 +35,7 @@ def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:
         seed: The initial value of the shift register.
 
     Returns:
-        generator: A PRBS generator object with a next() method, for retrieving
-            the next bit in the sequence.
+        A PRBS generator object with a next() method, for retrieving the next bit in the sequence.
     """
     val = int(seed)
     num_taps = max(taps)
@@ -87,7 +86,7 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
             Default: False
 
     Returns:
-        bathtub: the vector of probabilities forming the bathtub curve
+        The vector of probabilities forming the bathtub curve.
     """
 
     half_len  = len(jit_pdf) // 2
