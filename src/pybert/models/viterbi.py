@@ -5,6 +5,14 @@ Original author: David Banas <capn.freako@gmail.com>
 Original date: June 12, 2025
 
 Copyright (c) 2025 David Banas; all rights reserved World wide.
+
+To use this module to construct your own Viterbi decoder, import the ``ViterbiDecoder`` class as follows:
+
+.. code-block:: python
+
+    from pybert.models.viterbi import ViterbiDecoder
+
+and follow the example given by the ``ViterbiDecoder_ISI`` class definition, below.
 """
 
 from abc import ABC, abstractmethod
@@ -88,12 +96,7 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         # Starting with highest probability final state, backtrack through trellis.
         prevs = [trellis[-1][np.argmax(list(map(lambda pr: pr[0], trellis[-1])))][1]]
         for ix in range(2, trellis_depth + 1):
-            try:
-                prevs.append(trellis[-ix][prevs[-1]][1])
-            except:
-                print(f"ix: {ix}")
-                print(f"len(trellis): {len(trellis)}")
-                raise
+            prevs.append(trellis[-ix][prevs[-1]][1])
         prevs.reverse()
         return prevs
 
@@ -121,7 +124,6 @@ class ViterbiDecoder(ABC, Generic[S, O]):
 
         # Calculate maximum state probabilities, along w/ previous state, for new rightmost column.
         probs = np.zeros(num_states)
-        # prevs = np.array(num_states, dtype=S)
         prevs = np.array(num_states)
         for r in range(num_states):
             new_probs = np.array(
@@ -160,20 +162,9 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         # Prime the trellis.
         first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
         first_col /= first_col.sum()
-        # print(f"{samps[0]:+0.3f}", end="")
-        # for p in first_col:
-        #     print(f"  {p:.3f}", end="")
-        # print("")
         trellis[-1] = list(zip(first_col, [0] * num_states))
-        # print("            1        2        3        4        5        6        7        8        9       10       11       12       13       14       15       16")
         for n, x in enumerate(samps[1: trellis_depth]):
             self.step_trellis(x, priming=True)
-            # print(f"\n{samps[n + 1]:+0.3f}", end="")
-            # for ix in range(n + 2):
-            #     print("\t", end="")
-            #     for p, r in trellis[-(1 + ix)]:
-            #         print(f"{p:.2f}[{r + 1 : >2d}] ", end="")
-            #     print("")
 
         # Run the remaining samples.
         states = []
@@ -200,7 +191,8 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         return states
 
 
-State_ISI: TypeAlias = tuple[list[int], float]
+# Following is an example of creating a concrete Viterbi decoder, using the abstract model above.
+State_ISI: TypeAlias = tuple[list[int], float]  # list of symbol values, expected voltage
 
 
 class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
@@ -214,11 +206,13 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
             L: Number of symbol voltage levels.
             N: Number of symbols per state.
             sigma: Standard deviation of Gaussian voltage noise (V).
-            pulse_resp_samps: Upstream channel pulse response samples, one per UI (V).
-                (Must have length `N`!)
+            pulse_resp_samps: Upstream channel pulse response samples,
+                one per UI, beginning with cursor (V).
+                (Must have length >= `N`!)
 
         Notes:
             1. The symbol voltages are assumed uniformly distributed.
+            (This will require modification for photonics!)
         """
 
         # Validate input.
@@ -249,9 +243,6 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         vs = np.linspace(-2, 2, 4_000)  # 1 mV precision
         v_prob = sp.interpolate.interp1d(
             vs, [1e-3 * np.exp(-(v**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2) for v in vs])
-        # probs = np.array([1 / v**2 for v in vs])
-        # probs /= probs.sum()
-        # v_prob = sp.interpolate.interp1d(vs, probs)
 
         # Build initial trellis.
         trellis = [[(1 / num_states, 0)] * num_states] * N
