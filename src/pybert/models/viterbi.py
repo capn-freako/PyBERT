@@ -20,17 +20,16 @@ from typing import Any, Generic, Optional, TypeAlias, TypeVar
 
 import numpy as np
 import scipy as sp
-from scipy.special import erf
 
 from ..common       import TWOPI, Rvec, Rmat
 from ..utility.math import all_combs
 
 S = TypeVar('S')                # generic state type
-O = TypeVar('O')                # generic observation type
+X = TypeVar('X')                # generic observation type
 SQRT2: float = np.sqrt(2.0)
 
 
-class ViterbiDecoder(ABC, Generic[S, O]):
+class ViterbiDecoder(ABC, Generic[S, X]):
     """
     Abstract definition of a Viterbi decoder.
     """
@@ -41,7 +40,6 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         """
         List of all possible states.
         """
-        pass
 
     @property
     @abstractmethod
@@ -52,7 +50,6 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         Notes:
             1. Row/column ordinates match those of `states`.
         """
-        pass
 
     @property
     @abstractmethod
@@ -66,17 +63,15 @@ class ViterbiDecoder(ABC, Generic[S, O]):
             3. Each location in the trellis matrix contains the
                 probability and previous state index for the corresponding state.
         """
-        pass
 
     @abstractmethod
-    def prob(self, s: int, x: O) -> float:
+    def prob(self, s: int, x: X) -> float:
         """
         Probability of state at index `s` given observation `x`.
 
         Notes:
             1. This is sometimes referred to as the "emission probability" in the literature.
         """
-        pass
 
     @property
     def path(self) -> list[int]:
@@ -91,7 +86,6 @@ class ViterbiDecoder(ABC, Generic[S, O]):
 
         trellis = self.trellis
         trellis_depth = len(trellis)
-        num_states = len(trellis[-1])
 
         # Starting with highest probability final state, backtrack through trellis.
         prevs = [trellis[-1][np.argmax(list(map(lambda pr: pr[0], trellis[-1])))][1]]
@@ -100,7 +94,7 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         prevs.reverse()
         return prevs
 
-    def step_trellis(self, x: O, priming: bool = False) -> int:
+    def step_trellis(self, x: X, priming: bool = False) -> int:
         """
         Shift the trellis one column left, using the given observation sample.
 
@@ -128,8 +122,8 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         for r in range(num_states):
             new_probs = np.array(
                 [0 if self.trans[r][s] == 0
-                   else trellis[-1][r][0] * self.trans[r][s] * self.prob(s, x)
-                     for s in range(num_states)])
+                 else trellis[-1][r][0] * self.trans[r][s] * self.prob(s, x)
+                 for s in range(num_states)])
             prevs = np.where(new_probs > probs, [r] * num_states, prevs)
             probs = np.maximum(new_probs, probs)
         trellis[-1] = list(zip(probs / probs.sum(), prevs))
@@ -140,7 +134,7 @@ class ViterbiDecoder(ABC, Generic[S, O]):
 
         return prev
 
-    def decode(self, samps: list[O], dbg_dict: Optional[dict[str, Any]] = None) -> list[int]:
+    def decode(self, samps: list[X], dbg_dict: Optional[dict[str, Any]] = None) -> list[int]:
         """
         Use trellis to decode a list of observations.
 
@@ -163,7 +157,7 @@ class ViterbiDecoder(ABC, Generic[S, O]):
         first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
         first_col /= first_col.sum()
         trellis[-1] = list(zip(first_col, [0] * num_states))
-        for n, x in enumerate(samps[1: trellis_depth]):
+        for x in samps[1: trellis_depth]:
             self.step_trellis(x, priming=True)
 
         # Run the remaining samples.
@@ -199,7 +193,8 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
     """
     Viterbi decoder using ISI to define observation probabilities.
     """
-    
+
+    # pylint: disable=too-many-locals
     def __init__(self, L: int, N: int, sigma: float, pulse_resp_samps: Rvec):
         """
         Args:
@@ -220,7 +215,7 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
             raise ValueError(f"Length of `pulse_resp_samps` ({len(pulse_resp_samps)}) must be at least `N` ({N})")
 
         # Build normalized (to `pulse_resp_samps[0]`) symbol level voltages.
-        symbol_level_values = [-1 + l * 2 / (L - 1) for l in range(L)]
+        symbol_level_values = [-1 + v * 2 / (L - 1) for v in range(L)]
 
         # Build state vectors, including their expected voltage observations.
         _states = all_combs([list(range(L))] * N)
@@ -236,7 +231,7 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         trans = []
         for state in states:
             row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0
-                                    for m in range(num_states)])
+                                for m in range(num_states)])
             trans.append(row_vec / row_vec.sum())  # Enforce PMF.
 
         # Build noise voltage interpolator.
@@ -267,11 +262,11 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         return self._trellis
 
     @property
-    def sigma(self):
+    def sigma(self):  # pylint: disable=missing-function-docstring
         return self._sigma
 
     @property
-    def v_prob(self):
+    def v_prob(self):  # pylint: disable=missing-function-docstring
         return self._v_prob
 
     def prob(self, s: int, x: float) -> float:

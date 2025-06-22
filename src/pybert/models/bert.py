@@ -16,7 +16,6 @@ import numpy        as np
 import numpy.typing as npt
 import scipy.signal as sig
 from numpy import (  # type: ignore
-    arange,
     argmax,
     array,
     concatenate,

@@ -12,12 +12,13 @@ into the larger *PyBERT* framework.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
+from typing import Any, Optional
+
 import numpy        as np
 import numpy.typing as npt
 
-from numpy import array, diff, histogram, mean, sign, where, zeros  # type: ignore
+from numpy        import array, diff, histogram, sign, where, zeros  # type: ignore
 from scipy.signal import iirfilter
-from typing import Any, Optional
 
 from pybert.common     import Rvec
 from pybert.models.cdr import CDR

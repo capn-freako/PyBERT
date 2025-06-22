@@ -248,7 +248,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     gain = Float(0.2)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
-    use_agc = Bool(True)  #: Continuously adjust `decision_scalar` when True.
+    use_agc = Bool(False)  #: Continuously adjust `decision_scalar` when True.
 
     # - CDR
     delta_t = Float(0.1)  #: CDR proportional branch magnitude (ps).
@@ -489,11 +489,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         Calculate the time vector appropriate for indexing `irfft()` output.
         """
         f = self.f
-        try:
-            tmax = 1 / f[1]
-        except:
-            self.log(f"f_max: {self.f_max}, f_step: {self.f_step}")
-            raise
+        tmax = 1 / f[1]
         tstep = 0.5 / f[-1]
         return arange(0, tmax, tstep)
 
