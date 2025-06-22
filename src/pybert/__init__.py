@@ -26,7 +26,7 @@ try:
 except Exception:  # pylint: disable=broad-exception-caught
     __version__ = "(dev)"
 
-__date__ = "June 24, 2024"
+__date__ = "June 22, 2025"
 __authors__ = "David Banas & David Patterson"
 __copy__ = "Copyright (c) 2014 David Banas, 2019 David Patterson"
 
