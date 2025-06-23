@@ -1,7 +1,7 @@
 """
 Python model of a Viterbi decoder.
 
-Original author: David Banas <capn.freako@gmail.com>
+Original author: David Banas <capn.freako@gmail.com>  
 Original date: June 12, 2025
 
 Copyright (c) 2025 David Banas; all rights reserved World wide.
@@ -48,7 +48,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         State transition probability matrix.
 
         Notes:
-            1. Row/column ordinates match those of `states`.
+            1. Row/column ordinates match those of ``states``.
         """
 
     @property
@@ -59,15 +59,15 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
         Notes:
             1. Length of returned list gives trellis depth.
-            2. Length of all inner lists should equal `len(states)`.
+            2. Length of all inner lists should equal ``len(states)``.
             3. Each location in the trellis matrix contains the
-                probability and previous state index for the corresponding state.
+            probability and previous state index for the corresponding state.
         """
 
     @abstractmethod
     def prob(self, s: int, x: X) -> float:
         """
-        Probability of state at index `s` given observation `x`.
+        Probability of state at index ``s`` given observation ``x``.
 
         Notes:
             1. This is sometimes referred to as the "emission probability" in the literature.
@@ -271,6 +271,6 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
 
     def prob(self, s: int, x: float) -> float:
         """
-        Probability of state at index `s` given observation `x`.
+        Probability of state at index ``s`` given observation ``x``.
         """
         return self.v_prob(x - self.states[s][1])

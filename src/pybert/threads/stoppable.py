@@ -6,9 +6,9 @@ from threading import Event, Thread
 
 
 class StoppableThread(Thread):
-    """Thread class with a stop() method.
+    """Thread class with a ``stop()`` method.
 
-    The thread itself has to check regularly for the stopped() condition.
+    The thread itself has to check regularly for the ``stopped()`` condition.
 
     All PyBERT thread classes are subclasses of this class.
     """
@@ -25,6 +25,6 @@ class StoppableThread(Thread):
 
     def stopped(self):
         """Should be called by thread (i.e. - subclass) periodically and, if this function
-        returns True, thread should clean itself up and quit ASAP.
+        returns *True*, thread should clean itself up and quit ASAP.
         """
         return self._stop_event.is_set()
