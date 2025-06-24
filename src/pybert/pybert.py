@@ -241,7 +241,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_ibis_valid = Bool(False)  #: (Bool)
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
-    rx_viterbi_symbols = Int(7)  #: Number of symbols to track in Viterbi decoder.
+    rx_viterbi_symbols = Int(4)  #: Number of symbols to track in Viterbi decoder.
 
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).

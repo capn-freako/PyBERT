@@ -557,22 +557,24 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
         if self.debug:
             self.pulse_resp_samps = pulse_resp_samps
-            self.symbols_viterbi = symbols_viterbi
+            self.ctle_out_samps   = ctle_out_samps
+            self.symbols_viterbi  = symbols_viterbi
             self.dbg_dict_viterbi["decoder"] = decoder
             self.dbg_dict_viterbi["path"] = path
-        bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
-        bits_tst_viterbi = bits_out_viterbi[first_tst_bit:]
+        # bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
+        bits_tst_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
+        # bits_tst_viterbi = bits_out_viterbi[first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):
             bits_ref = bits_ref[: len(bits_tst_viterbi)]
         elif len(bits_tst_viterbi) > len(bits_ref):
             bits_tst_viterbi = bits_tst_viterbi[: len(bits_ref)]
         num_viterbi_bits = len(bits_tst_viterbi)
         bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
-        n_errs_viterbi = len(bit_errs_viterbi)
-        if n_errs_viterbi:
-            print(f"Bits sent:        {bits_ref[first_tst_bit: first_tst_bit + 20]}")
-            print(f"Viterbi detected: {bits_tst_viterbi[first_tst_bit + 1: first_tst_bit + 21]}")
-        self.bit_errs_viterbi = n_errs_viterbi
+        # n_errs_viterbi = len(bit_errs_viterbi)
+        # if n_errs_viterbi:
+        #     print(f"Bits sent:        {bits_ref[first_tst_bit: first_tst_bit + 20]}")
+        #     print(f"Viterbi detected: {bits_tst_viterbi[first_tst_bit + 1: first_tst_bit + 21]}")
+        self.bit_errs_viterbi = len(bit_errs_viterbi)
         self.viterbi_errs_ixs = bit_errs_viterbi
         self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)
         split_time = clock()
