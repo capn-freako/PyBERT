@@ -542,18 +542,18 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 raise ValueError(f"Unrecognized modulation type: {mod_type}!")
         N = self.rx_viterbi_symbols
         sigma = 10e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
-        dfe_out_p_curs_ix = np.argmax(ctle_out_p)
-        dfe_out_p_samps = np.array([ctle_out_p[dfe_out_p_curs_ix + n * nspui] for n in range(N)])
-        decoder = ViterbiDecoder_ISI(L, N, sigma, dfe_out_p_samps)
-        pulse_resp_samps = []
+        pulse_resp_curs_ix = np.argmax(ctle_out_p)
+        pulse_resp_samps = np.array([ctle_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
+        decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
+        ctle_out_samps = []
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
             ix = np.where(t >= sample_time)[0][0]
-            pulse_resp_samps.append(dfe_out[ix])
+            ctle_out_samps.append(ctle_out[ix])
         if self.debug:
             self.dbg_dict_viterbi = {}
-            path = decoder.decode(pulse_resp_samps, dbg_dict=self.dbg_dict_viterbi)
+            path = decoder.decode(ctle_out_samps, dbg_dict=self.dbg_dict_viterbi)
         else:
-            path = decoder.decode(pulse_resp_samps)
+            path = decoder.decode(ctle_out_samps)
         symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
         if self.debug:
             self.pulse_resp_samps = pulse_resp_samps
@@ -561,7 +561,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.dbg_dict_viterbi["decoder"] = decoder
             self.dbg_dict_viterbi["path"] = path
         bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
-        bits_tst_viterbi = bits_out_viterbi  # [first_tst_bit:]
+        bits_tst_viterbi = bits_out_viterbi[first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):
             bits_ref = bits_ref[: len(bits_tst_viterbi)]
         elif len(bits_tst_viterbi) > len(bits_ref):
@@ -569,6 +569,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         num_viterbi_bits = len(bits_tst_viterbi)
         bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
         n_errs_viterbi = len(bit_errs_viterbi)
+        if n_errs_viterbi:
+            print(f"Bits sent:        {bits_ref[first_tst_bit: first_tst_bit + 20]}")
+            print(f"Viterbi detected: {bits_tst_viterbi[first_tst_bit + 1: first_tst_bit + 21]}")
         self.bit_errs_viterbi = n_errs_viterbi
         self.viterbi_errs_ixs = bit_errs_viterbi
         self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)

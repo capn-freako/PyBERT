@@ -21,8 +21,9 @@ from typing import Any, Generic, Optional, TypeAlias, TypeVar
 import numpy as np
 import scipy as sp
 
-from ..common       import TWOPI, Rvec, Rmat
-from ..utility.math import all_combs
+from ..common               import TWOPI, Rvec, Rmat
+from ..utility.math         import all_combs
+from ..utility.functional   import fst
 
 S = TypeVar('S')                # generic state type
 X = TypeVar('X')                # generic observation type
@@ -107,6 +108,9 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
         Returns:
             The decided state index of the exiting (i.e. - leftmost) column.
+
+        Raises:
+            ValueError: If trellis cannot be stepped.
         """
 
         trellis = self.trellis
@@ -126,7 +130,11 @@ class ViterbiDecoder(ABC, Generic[S, X]):
                  for s in range(num_states)])
             prevs = np.where(new_probs > probs, [r] * num_states, prevs)
             probs = np.maximum(new_probs, probs)
-        trellis[-1] = list(zip(probs / probs.sum(), prevs))
+        probs_sum = probs.sum()
+        if probs_sum == 0:
+            raise ValueError("Failed to step trellis!")
+        else:
+            trellis[-1] = list(zip(probs / probs_sum, prevs))
 
         prev = 0
         if not priming:
@@ -156,9 +164,14 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         # Prime the trellis.
         first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
         first_col /= first_col.sum()
-        trellis[-1] = list(zip(first_col, [0] * num_states))
+        trellis[-1] = list(zip(first_col, range(num_states)))
         for x in samps[1: trellis_depth]:
-            self.step_trellis(x, priming=True)
+            try:
+                self.step_trellis(x, priming=True)
+            except ValueError as err:
+                prev_trel_col_maxes = np.array(sorted(trellis[-2], key=fst, reverse=True)[:5])
+                raise RuntimeError(
+                    f"Trellis got stuck at:\n\n{prev_trel_col_maxes}\n\ntrying to process observation: {x}!")
 
         # Run the remaining samples.
         states = []
@@ -170,7 +183,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
         # Purge the trellis.
         states.extend(self.path[1:])
-        states.append(int(np.argmax(list(map(lambda pr: pr[0], trellis[-1])))))
+        states.append(int(np.argmax(list(map(fst, trellis[-1])))))
         if dbg_dict is not None:
             probs_prevs.extend(self.trellis[1:])
 
