@@ -56,12 +56,13 @@ def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int
 
     Args:
         weightss: The current list of tap weight combinations.
-        enumerated_tuners: List of pairs, each containing:
+        enumerated_tuners: List of pairs, each containing
+
             - the index of this tap in the list, and
             - this tap tuner.
 
     Return:
-        tap_weights: List of all possible tap weight combinations.
+        List of all possible tap weight combinations.
     """
     if not enumerated_tuners:
         return weightss
@@ -86,7 +87,12 @@ def coopt(pybert) -> tuple[list[float], float, float, bool]:  # pylint: disable=
         pybert(PyBERT): The PyBERT instance on which to perform co-optimization.
 
     Returns:
-        (tx_weights, ctle_peaking, FOM, success): The ideal Tx FFE / Rx CTLE settings & figure of merit.
+        A tuple containing
+
+            - the optimum Tx FFE tap weights,
+            - the optimum Rx CTLE peaking,
+            - the figure of merit for the returned settings, and
+            - the status of the optimization attempt (`True` = success).
 
     Raises:
         RuntimeError: If user opts to abort.

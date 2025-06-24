@@ -89,8 +89,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     Notes:
         1. When using IBIS-AMI models, we often need to scale the impulse response
-            by the sample interval, or its inverse, because while IBIS-AMI models
-            take the impulse response to have units: (V/s), PyBERT uses: (V/sample).
+        by the sample interval, or its inverse, because while IBIS-AMI models
+        take the impulse response to have units: (V/s), PyBERT uses: (V/sample).
     """
 
     def _check_sim_status():

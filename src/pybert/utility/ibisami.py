@@ -1,7 +1,8 @@
 """
 General IBIS-AMI utilities for PyBERT.
 
-Original author: David Banas <capn.freako@gmail.com>  
+Original author: David Banas <capn.freako@gmail.com>
+
 Original date:   June 16, 2024
 
 Copyright (c) 2024 David Banas; all rights reserved World wide.
@@ -38,13 +39,14 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
             Default: 0 (Means "Use existing value.")
 
     Returns:
-        y, clks, h, out_h, msg, params_out: A tuple consisting of:
-            - the model output convolved w/ any channel impulse response given in `chnl_h`,
+        A tuple consisting of
+
+            - the model output convolved w/ any channel impulse response given in ``chnl_h``,
             - the model determined sampling instants (a.k.a. - "clock times"), if appropriate,
             - the model's impulse response (V/sample),
             - the impulse response of the model concatenated w/ the given channel (V/sample),
-            - input parameters, and any message returned by the model's AMI_Init() function, and
-            - any output parameters from GetWave() if apropos.
+            - input parameters, and any message returned by the model's ``AMI_Init()`` function, and
+            - any output parameters from ``GetWave()`` if apropos.
 
     Raises:
         IOError: if the given file name cannot be found/opened.

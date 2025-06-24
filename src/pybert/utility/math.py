@@ -1,7 +1,8 @@
 """
 Channel math utilities for PyBERT.
 
-Original author: David Banas <capn.freako@gmail.com>  
+Original author: David Banas <capn.freako@gmail.com>
+
 Original date:   June 16, 2024
 
 Copyright (c) 2024 David Banas; all rights reserved World wide.
@@ -35,7 +36,7 @@ def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:
         seed: The initial value of the shift register.
 
     Returns:
-        A PRBS generator object with a next() method, for retrieving the next bit in the sequence.
+        A PRBS generator object with a ``next()`` method for retrieving the next bit in the sequence.
     """
     val = int(seed)
     num_taps = max(taps)

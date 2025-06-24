@@ -14,11 +14,31 @@ class TxTapTuner(HasTraits):
     max_val = Float(0.1)
     step = Float(0.01)
     value = Float(0.0)
-    steps = Int(0)  # Non-zero means we want to sweep it.
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def __init__(self, name="(noname)", pos=0, enabled=False, min_val=-0.1, max_val=0.1, step=0.01, value=0.0, steps=0):
-        """Allows user to define properties, at instantiation."""
+    def __init__(
+        self, name: str = "(noname)", pos: int = 0, enabled: bool = False,
+        min_val: float = -0.1, max_val: float = 0.1, step: float = 0.01, value: float = 0.0
+    ):
+        """
+        Allows user to define properties, at instantiation.
+
+        Keyword Args:
+            name: Tap name/label.
+                Default: "(noname)"
+            pos: Tap position (0 = cursor).
+                Default: 0
+            enabled: Will participate in EQ optimization when *True*.
+                Default: *False*
+            min_val: Minimum allowed value during optimization.
+                Default: -0.1
+            max_val: Maximum allowed value during optimization.
+                Default: 0.1
+            step: Increment used during optimization.
+                Default: 0.01
+            value: Current value.
+                Default: 0.0
+        """
 
         # Super-class initialization is ABSOLUTELY NECESSARY, in order
         # to get all the Traits/UI machinery setup correctly.
@@ -31,4 +51,3 @@ class TxTapTuner(HasTraits):
         self.max_val = max_val
         self.step = step
         self.value = value
-        self.steps = steps

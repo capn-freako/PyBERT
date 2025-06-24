@@ -33,9 +33,10 @@ def calc_gamma(R0: float, w0: float, Rdc: float, Z0: float,
         ws: frequency sample points vector (rads./s)
 
     Returns:
-        (gamma, Zc): A pair consisting of frequency dependent:
+        A pair consisting of frequency dependent
+
             - propagation constant, and
-            - characteristic impedance
+            - characteristic impedance.
     """
 
     w = array(ws).copy()
@@ -68,9 +69,10 @@ def calc_gamma_RLGC(R: float, L: float, G: float, C: float, ws: Rvec) -> tuple[C
         ws: frequency sample points vector (rads./s)
 
     Returns:
-        (gamma, Zc): A pair consisting of frequency dependent:
+        A pair consisting of frequency dependent
+
             - propagation constant, and
-            - characteristic impedance
+            - characteristic impedance.
     """
 
     w = array(ws).copy()
@@ -99,7 +101,7 @@ def calc_G(H: Cvec, Rs: float, Cs: float, Zc: Cvec, RL: float, Cp: float, ws: Rv
         ws: frequency sample points vector (rads./s)
 
     Returns:
-        G: transfer function of fully loaded channel
+        Transfer function of fully loaded channel
     """
 
     w = array(ws).copy()

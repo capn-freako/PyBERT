@@ -45,7 +45,7 @@ class MyHandler(Handler):
     def do_save_cfg(self, info):
         """Save the configuration.
 
-        If no config file is set, use the `self.do_save_cfg_as()` method to prompt the user.
+        If no config file is set, use the ``self.do_save_cfg_as()`` method to prompt the user.
 
         Args:
             info: When an action is clicked, it passes the whole trait instance to this function.
