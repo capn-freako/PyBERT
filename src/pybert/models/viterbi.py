@@ -1,7 +1,8 @@
 """
 Python model of a Viterbi decoder.
 
-Original author: David Banas <capn.freako@gmail.com>  
+Original author: David Banas <capn.freako@gmail.com>
+
 Original date: June 12, 2025
 
 Copyright (c) 2025 David Banas; all rights reserved World wide.
@@ -62,7 +63,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             1. Length of returned list gives trellis depth.
             2. Length of all inner lists should equal ``len(states)``.
             3. Each location in the trellis matrix contains the
-            probability and previous state index for the corresponding state.
+               probability and previous state index for the corresponding state.
         """
 
     @abstractmethod
@@ -216,7 +217,7 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
             sigma: Standard deviation of Gaussian voltage noise (V).
             pulse_resp_samps: Upstream channel pulse response samples,
                 one per UI, beginning with cursor (V).
-                (Must have length >= `N`!)
+                (Must have length >= ``N``!)
 
         Notes:
             1. The symbol voltages are assumed uniformly distributed.

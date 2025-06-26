@@ -12,7 +12,7 @@ into the larger *PyBERT* framework.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 import numpy        as np
 import numpy.typing as npt
@@ -27,13 +27,14 @@ gNch_taps = 3  # Number of taps used in summing node filter.
 
 
 class LfilterSS:  # pylint: disable=too-few-public-methods
-    """A single steppable version of scipy.signal.lfilter()."""
+    """A single steppable version of ``scipy.signal.lfilter()``."""
 
-    def __init__(self, b, a):
+    # def __init__(self, b: list[float], a: list[float]):
+    def __init__(self, b: npt.NDArray[np.float64], a: npt.NDArray[np.float64]):
         """
         Args:
-            b([float]): Coefficients of the numerator of the rational transfer function.
-            a([float]): Coefficients of the denominator of the rational transfer function.
+            b: Coefficients of the numerator of the rational transfer function.
+            a: Coefficients of the denominator of the rational transfer function.
         """
 
         if a[0] != 1.0:
@@ -75,64 +76,48 @@ class DFE:  # pylint: disable=too-many-instance-attributes
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
         self,
-        n_taps,
-        gain,
-        delta_t,
-        alpha,
-        ui,
-        n_spb,
-        decision_scaler,
-        mod_type=0,
-        bandwidth=100.0e9,
-        n_ave=10,
-        n_lock_ave=500,
-        rel_lock_tol=0.01,
-        lock_sustain=500,
-        ideal=True,
-        limits=None,
+        n_taps: int,
+        gain: float,
+        delta_t: float,
+        alpha: float,
+        ui: float,
+        n_spb: int,
+        decision_scaler: float,
+        mod_type: int = 0,
+        bandwidth: float = 100.0e9,
+        n_ave: int = 10,
+        n_lock_ave: int = 500,
+        rel_lock_tol: float = 0.01,
+        lock_sustain: int = 500,
+        ideal: bool = True,
+        limits: Optional[list[tuple[float, float]]] = None,
     ):
         """
-        Inputs:
+        Args:
+            - n_taps: # of taps in adaptive filter
+            - gain: adaptive filter tap weight correction gain
+            - delta_t: CDR proportional branch constant (ps)
+            - alpha: CDR integral branch constant (normalized to delta_t)
+            - ui: nominal unit interval (ps)
+            - n_spb: # of samples per unit interval
+            - decision_scaler: multiplicative constant applied to the result of
+            the sign function, when making a "1 vs. 0" decision.
+            Sets the target magnitude for the DFE.
 
-          Required:
+        Keyword Args:
+            - mod_type: The modulation type
 
-          - n_taps           # of taps in adaptive filter
-
-          - gain             adaptive filter tap weight correction gain
-
-          - delta_t          CDR proportional branch constant (ps)
-
-          - alpha            CDR integral branch constant (normalized to delta_t)
-
-          - ui               nominal unit interval (ps)
-
-          - n_spb            # of samples per unit interval
-
-          - decision_scaler  multiplicative constant applied to the result of
-                             the sign function, when making a "1 vs. 0" decision.
-                             Sets the target magnitude for the DFE.
-
-          Optional:
-
-          - mod_type         The modulation type:
-                             - 0: NRZ
-                             - 1: Duo-binary
-                             - 2: PAM-4
-
-          - bandwidth        The bandwidth, at the summing node (Hz).
-
-          - n_ave            The number of averages to take, before adapting.
-                             (Also, the number of CDR adjustments per DFE adaptation.)
-
-          - n_lock_ave       The number of unit interval estimates to
-                             consider, when determining locked status.
-
-          - rel_lock_tol     The relative tolerance for determining lock.
-
-          - lock_sustain     Length of the histerysis vector used for
-                             lock flagging.
-
-          - ideal            Boolean flag. When true, use an ideal summing node.
+                - 0: NRZ
+                - 1: Duo-binary
+                - 2: PAM-4
+            - bandwidth: The bandwidth, at the summing node (Hz).
+            - n_ave: The number of averages to take, before adapting.
+                (Also, the number of CDR adjustments per DFE adaptation.)
+            - n_lock_ave: The number of unit interval estimates to consider, when determining locked status.
+            - rel_lock_tol: The relative tolerance for determining lock.
+            - lock_sustain: Length of the histerysis vector used for lock flagging.
+            - ideal: Boolean flag. When true, use an ideal summing node.
+            - limits: List of pairs containing min/max values per tap.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -170,16 +155,17 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             raise RuntimeError("ERROR: DFE.__init__(): Unrecognized modulation type requested!")
         self.thresholds = thresholds
 
-    def step(self, decision, error, update):
-        """Step the DFE, according to the new decision and error inputs.
+    def step(self, decision: float, error: float, update: bool):
+        """
+        Step the DFE, according to the new decision and error inputs.
 
         Args:
-            decision(float): Current slicer output.
-            error(float): Difference between summing node and slicer outputs.
-            update(bool): If true, update tap weights.
+            decision: Current slicer output.
+            error: Difference between summing node and slicer outputs.
+            update: If true, update tap weights.
 
         Returns:
-            res(float): New backward filter output value.
+            res: New backward filter output value.
         """
 
         # Copy class object variables into local function namespace, for efficiency.
@@ -189,7 +175,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         n_ave = self.n_ave
 
         # Calculate this step's corrections and add to running total.
-        corrections = [old + new for (old, new) in zip(self.corrections, [val * error * gain for val in tap_values])]
+        corrections = array([old + new for (old, new) in zip(self.corrections, [val * error * gain for val in tap_values])])
 
         # Update the tap weights with the average corrections, if appropriate.
         if update:
@@ -228,9 +214,6 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                     - {-1, 1}              (NRZ)
                     - {-1, 0, +1}          (Duo-binary)
                     - {-1, -1/3, +1/3, +1} (PAM-4)
-
-                    according to what the ideal signal level should have been.
-                    ('decision_scaler' normalized)
 
                 - The list of bits recovered.
 
@@ -298,31 +281,20 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         Keyword Args:
             use_agc: Perform continuous adjustment of `decision_scaler` when True.
                 Default: False
+            dbg_dict: Optional dictionary, for stashing debugging information at runtime.
+                Default: None
 
         Returns:
             A tuple containing
 
-                res
-                :    Samples of the summing node output, taken at the times given in *sample_times*.
-
-                tap_weights
-                :    List of list of tap weights showing how the DFE adapted over time.
-
-                ui_ests
-                :    List of unit interval estimates, showing how the CDR adapted.
-
-                clocks
-                :    List of mostly zeros with ones at the recovered clocking instants.
-                Useful for overlaying the clock times on signal waveforms, in plots.
-
-                lockeds
-                :    List of Booleans indicating state of CDR lock.
-
-                clock_times
-                :    List of clocking instants, as recovered by the CDR.
-
-                bits
-                :    List of recovered bits.
+                - res: Samples of the summing node output, taken at the times given in *sample_times*.
+                - tap_weights: List of list of tap weights showing how the DFE adapted over time.
+                - ui_ests: List of unit interval estimates, showing how the CDR adapted.
+                - clocks: List of mostly zeros with ones at the recovered clocking instants.
+                    Useful for overlaying the clock times on signal waveforms, in plots.
+                - lockeds: List of Booleans indicating state of CDR lock.
+                - clock_times: List of clocking instants, as recovered by the CDR.
+                - bits: List of recovered bits.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -338,10 +310,10 @@ class DFE:  # pylint: disable=too-many-instance-attributes
 
         clk_cntr = 0
         smpl_cntr = 0
-        filter_out = 0
-        nxt_filter_out = 0
-        last_clock_sample = 0
-        next_boundary_time = 0
+        filter_out = 0.0
+        nxt_filter_out = 0.0
+        last_clock_sample = 0.0
+        next_boundary_time = 0.0
         next_clock_time = ui / 2.0
         locked = False
 

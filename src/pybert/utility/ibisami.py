@@ -89,6 +89,7 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     if use_getwave:
         y, clks, params_out = model.getWave(x, bits_per_call=bits_per_call)
         return (y, clks, h, out_h, msg, list(map(lambda p: p.decode('utf-8'), params_out)))
+        # return (y, clks, h, out_h, msg, params_out)
     try:
         y = convolve(x, out_h)[:len(x)]
     except Exception:

@@ -13,6 +13,8 @@ Copyright (c) 2019 by David Banas; All rights reserved World wide.
 from typing import List, Sequence, Tuple
 
 from numpy import array, mean, sign, where  # type: ignore
+import numpy as np
+import numpy.typing as npt
 
 
 class CDR:  # pylint: disable=too-many-instance-attributes
@@ -71,7 +73,7 @@ class CDR:  # pylint: disable=too-many-instance-attributes
 
         return self._locked
 
-    def adapt(self, samples: Sequence[float]) -> Tuple[float, bool]:  # pylint: disable=too-many-locals
+    def adapt(self, samples: npt.NDArray[np.float64]) -> tuple[float, bool]:  # pylint: disable=too-many-locals
         """Adapt period/phase, according to 3 samples.
 
         Should be called, when the clock has just struck.
@@ -101,7 +103,7 @@ class CDR:  # pylint: disable=too-many-instance-attributes
 
         integral_correction = integral_corrections[-1]
 
-        samples = list(map(sign, samples))
+        samples = array(list(map(sign, samples)))
         if samples[0] == samples[2]:  # No transition; no correction.
             proportional_correction = 0.0
         elif samples[0] == samples[1]:  # Early clock; increase period.
