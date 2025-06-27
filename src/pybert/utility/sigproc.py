@@ -221,7 +221,7 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000, front_porch:
     Args:
         g: Response to trim.
 
-    KeywordArgs:
+    Keyword Args:
         min_len: Minimum length of returned vector.
             Default: 0
         max_len: Maximum length of returned vector.
