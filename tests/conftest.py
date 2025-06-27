@@ -19,6 +19,23 @@ def dut_imp_len():
     yield dut
 
 @pytest.fixture(scope="module")
+def dut_viterbi():
+    """Return an initialized pybert object with Viterbi decoder enabled."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.rx_use_viterbi = True
+    dut.simulate(initial_run=True)
+    yield dut
+
+@pytest.fixture(scope="module")
+def dut_viterbi_stressed():
+    """Return an initialized pybert object with Viterbi decoder enabled and eye stressed."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.rx_use_viterbi = True
+    dut.l_ch = 2.0
+    dut.simulate(initial_run=True)
+    yield dut
+
+@pytest.fixture(scope="module")
 def ibisami_rx_init():
     """
     Return an initialized pybert object configured to use

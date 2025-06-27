@@ -7,18 +7,7 @@ Original date:   June 24, 2025
 Copyright (c) 2025 David Banas; all rights reserved World wide.
 """
 
-from functools import reduce
-from typing import Any, Iterator, TypeVar
-
-from numpy import (  # type: ignore
-    append, array, cumsum, exp, log10,
-    maximum, ones, pi, sqrt, where
-)
-from numpy.fft import fftshift  # type: ignore
-
-from pybert.utility.sigproc import moving_average
-
-from ..common import Rvec
+from typing import Any, TypeVar
 
 T = TypeVar('T', Any, Any)
 
@@ -35,4 +24,3 @@ def fst(xs: tuple[T, ...]) -> T:
     """
 
     return xs[0]
-

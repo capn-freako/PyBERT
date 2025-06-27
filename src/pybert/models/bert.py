@@ -527,7 +527,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     _check_sim_status()
 
     # Apply Viterbi decoder if apropos.
-    self.bit_errs_viterbi = -1
+    self.bit_errs_viterbi = -1  # `-1` flags that Viterbi was not run.
     self.viterbi_perf = 0
     if self.rx_use_viterbi:
         self.status = "Running Viterbi..."
@@ -541,7 +541,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             case _:
                 raise ValueError(f"Unrecognized modulation type: {mod_type}!")
         N = self.rx_viterbi_symbols
-        sigma = 10e-3  # ToDo: Make this an accurate assessment of the random vertical noise.
+        sigma = self.rn
         pulse_resp_curs_ix = np.argmax(ctle_out_p)
         pulse_resp_samps = np.array([ctle_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
@@ -561,19 +561,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.symbols_viterbi  = symbols_viterbi
             self.dbg_dict_viterbi["decoder"] = decoder
             self.dbg_dict_viterbi["path"] = path
-        # bits_out_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
         bits_tst_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
-        # bits_tst_viterbi = bits_out_viterbi[first_tst_bit:]
         if len(bits_ref) > len(bits_tst_viterbi):
             bits_ref = bits_ref[: len(bits_tst_viterbi)]
         elif len(bits_tst_viterbi) > len(bits_ref):
             bits_tst_viterbi = bits_tst_viterbi[: len(bits_ref)]
         num_viterbi_bits = len(bits_tst_viterbi)
         bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
-        # n_errs_viterbi = len(bit_errs_viterbi)
-        # if n_errs_viterbi:
-        #     print(f"Bits sent:        {bits_ref[first_tst_bit: first_tst_bit + 20]}")
-        #     print(f"Viterbi detected: {bits_tst_viterbi[first_tst_bit + 1: first_tst_bit + 21]}")
         self.bit_errs_viterbi = len(bit_errs_viterbi)
         self.viterbi_errs_ixs = bit_errs_viterbi
         self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)

@@ -10,7 +10,7 @@ integration into the larger *PyBERT* framework.
 
 Copyright (c) 2019 by David Banas; All rights reserved World wide.
 """
-from typing import List, Sequence, Tuple
+from typing import List
 
 from numpy import array, mean, sign, where  # type: ignore
 import numpy as np

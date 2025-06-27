@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pipbert"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "8.1.0"
+version = "8.1.1"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           ]
 readme = "README.md"

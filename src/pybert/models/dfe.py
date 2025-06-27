@@ -12,7 +12,7 @@ into the larger *PyBERT* framework.
 Copyright (c) 2014 by David Banas; All rights reserved World wide.
 """
 
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
 
 import numpy        as np
 import numpy.typing as npt

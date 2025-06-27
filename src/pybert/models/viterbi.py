@@ -134,8 +134,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         probs_sum = probs.sum()
         if probs_sum == 0:
             raise ValueError("Failed to step trellis!")
-        else:
-            trellis[-1] = list(zip(probs / probs_sum, prevs))
+        trellis[-1] = list(zip(probs / probs_sum, prevs))
 
         prev = 0
         if not priming:
@@ -172,7 +171,8 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             except ValueError as err:
                 prev_trel_col_maxes = np.array(sorted(trellis[-2], key=fst, reverse=True)[:5])
                 raise RuntimeError(
-                    f"Trellis got stuck at:\n\n{prev_trel_col_maxes}\n\ntrying to process observation: {x}!")
+                    f"Trellis got stuck at:\n\n{prev_trel_col_maxes}\n\ntrying to process observation: {x}!"
+                ) from err
 
         # Run the remaining samples.
         states = []
