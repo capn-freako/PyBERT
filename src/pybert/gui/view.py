@@ -725,7 +725,7 @@ traits_view = View(
                     label="Rx CTLE",
                     show_border=True,
                 ),
-                VGroup(  # FFE
+                VGroup(  # Rx FFE
                     HGroup(
                         Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
                         Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
@@ -738,6 +738,7 @@ traits_view = View(
                                 ObjectColumn(name="enabled"),
                                 ObjectColumn(name="min_val"),
                                 ObjectColumn(name="max_val"),
+                                ObjectColumn(name="step"),
                                 ObjectColumn(name="value", format="%+05.3f", style="readonly"),
                             ],
                             configurable=False,

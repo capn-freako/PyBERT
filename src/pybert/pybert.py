@@ -950,6 +950,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         info_str += f'      <TD align="center">CTLE</TD><TD>{self.ctle_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
+        info_str += f'      <TD align="center">FFE</TD><TD>{self.ffe_perf * 6e-05:6.3f}</TD>\n'
+        info_str += "    </TR>\n"
+        info_str += '    <TR align="right">\n'
         info_str += f'      <TD align="center">DFE</TD><TD>{self.dfe_perf * 6e-05:6.3f}</TD>\n'
         info_str += "    </TR>\n"
         info_str += '    <TR align="right">\n'
