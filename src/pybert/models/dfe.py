@@ -94,30 +94,30 @@ class DFE:  # pylint: disable=too-many-instance-attributes
     ):
         """
         Args:
-            - n_taps: # of taps in adaptive filter
-            - gain: adaptive filter tap weight correction gain
-            - delta_t: CDR proportional branch constant (ps)
-            - alpha: CDR integral branch constant (normalized to delta_t)
-            - ui: nominal unit interval (ps)
-            - n_spb: # of samples per unit interval
-            - decision_scaler: multiplicative constant applied to the result of
-            the sign function, when making a "1 vs. 0" decision.
-            Sets the target magnitude for the DFE.
+            n_taps: # of taps in adaptive filter
+            gain: adaptive filter tap weight correction gain
+            delta_t: CDR proportional branch constant (ps)
+            alpha: CDR integral branch constant (normalized to delta_t)
+            ui: nominal unit interval (ps)
+            n_spb: # of samples per unit interval
+            decision_scaler: multiplicative constant applied to the result of the sign function, when making a "1 vs. 0" decision.
+                Sets the target magnitude for the DFE.
 
         Keyword Args:
-            - mod_type: The modulation type
+            mod_type: The modulation type
 
                 - 0: NRZ
                 - 1: Duo-binary
                 - 2: PAM-4
-            - bandwidth: The bandwidth, at the summing node (Hz).
-            - n_ave: The number of averages to take, before adapting.
+
+            bandwidth: The bandwidth, at the summing node (Hz).
+            n_ave: The number of averages to take, before adapting.
                 (Also, the number of CDR adjustments per DFE adaptation.)
-            - n_lock_ave: The number of unit interval estimates to consider, when determining locked status.
-            - rel_lock_tol: The relative tolerance for determining lock.
-            - lock_sustain: Length of the histerysis vector used for lock flagging.
-            - ideal: Boolean flag. When true, use an ideal summing node.
-            - limits: List of pairs containing min/max values per tap.
+            n_lock_ave: The number of unit interval estimates to consider, when determining locked status.
+            rel_lock_tol: The relative tolerance for determining lock.
+            lock_sustain: Length of the histerysis vector used for lock flagging.
+            ideal: Boolean flag. When true, use an ideal summing node.
+            limits: List of pairs containing min/max values per tap.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.

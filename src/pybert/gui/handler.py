@@ -1,4 +1,5 @@
-"""Action Handler for the traitsui view of the PyBERT class.
+"""
+Action Handler for the traitsui view of the PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -6,6 +7,7 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
+
 import sys
 import webbrowser
 from pathlib import Path
@@ -188,9 +190,10 @@ class MyHandler(Handler):
             for tuner in pybert.tx_tap_tuners:
                 if tuner.enabled:
                     n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
-            for tuner in pybert.ffe_tap_tuners:
-                if tuner.enabled:
-                    n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+            if not pybert.use_mmse:
+                for tuner in pybert.ffe_tap_tuners:
+                    if tuner.enabled:
+                        n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
             if n_trials > 1_000_000:
                 usr_resp = pybert.alert(f"You've opted to run over {n_trials // 1_000_000} million trials!\nAre you sure?")
                 if not usr_resp:

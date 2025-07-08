@@ -1,4 +1,5 @@
-"""Default controller definition for PyBERT class.
+"""
+Default controller definition for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -366,7 +367,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     if ctle_enable:
                         ctle_h = get_ctle_h()
                         ctle_out_h = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
-                        # ctle_out = convolve(x + noise, ctle_out_h)[:len(x)]
                         ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
                     else:
                         ctle_h = array([1.] + [0.] * (min_len - 1))
@@ -429,8 +429,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         ffe_out_h = convolve(ffe_h, ctle_out_h)[: len(chnl_h)]
         ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
         # Calculate the remaining responses from the impulse responses.
-        ffe_s, ffe_p, ffe_H = calc_resps(t, ffe_h, ui, f)
-        ffe_out_s, ffe_out_p, ffe_out_H = calc_resps(t, ffe_out_h, ui, f)
+        ffe_s, ffe_p, ffe_H = calc_resps(t, ffe_h, ui, f)                   # pylint: disable=unused-variable
+        ffe_out_s, ffe_out_p, ffe_out_H = calc_resps(t, ffe_out_h, ui, f)   # pylint: disable=unused-variable
 
     self.ffe_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
@@ -533,7 +533,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         dfe_h.resize(len(ctle_out_h), refcheck=False)
     else:
         dfe_h = array([1.0] + list(zeros(nspui - 1)))
-    dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
+    dfe_out_h = convolve(ffe_out_h, dfe_h)[: len(ffe_out_h)]
 
     # Calculate the remaining responses from the impulse responses.
     dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)

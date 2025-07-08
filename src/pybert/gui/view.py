@@ -1,4 +1,5 @@
-"""Default view definition for PyBERT class.
+"""
+Default view definition for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -62,6 +63,12 @@ traits_view = View(
                                 label="Modulation",
                                 tooltip="line signalling/modulation scheme",
                                 editor=CheckListEditor(values=[(0, "NRZ"), (1, "Duo-binary"), (2, "PAM-4")]),
+                            ),
+                            Item(
+                                name="rlm",
+                                label="RLM",
+                                tooltip="relative level mismatch",
+                                enabled_when="mod_type[0] == 2"
                             ),
                             label="Rate && Modulation",
                             show_border=True,
@@ -729,17 +736,18 @@ traits_view = View(
                     HGroup(
                         Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
                         Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
+                        Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
                     ),
                     Item(
                         name="ffe_tap_tuners",
                         editor=TableEditor(
                             columns=[
                                 ObjectColumn(name="name", editable=False),
-                                ObjectColumn(name="enabled"),
+                                ObjectColumn(name="enabled", editable=False),
                                 ObjectColumn(name="min_val"),
                                 ObjectColumn(name="max_val"),
                                 ObjectColumn(name="step"),
-                                ObjectColumn(name="value", format="%+05.3f", style="readonly"),
+                                ObjectColumn(name="value", format="%+05.3f", editable=False),
                             ],
                             configurable=False,
                             reorderable=False,

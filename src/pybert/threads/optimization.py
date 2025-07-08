@@ -12,13 +12,16 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 
 import time
 
-from numpy import arange, argmax, array, convolve, log10, ones, pi, prod, where, zeros  # type: ignore
+from numpy import arange, array, convolve, log10, ones, pi, prod, where, zeros  # type: ignore
 from numpy.fft import irfft  # type: ignore
 from scipy.interpolate import interp1d
 
+from pychopmarg.optimize import mmse
+from pychopmarg.noise import NoiseCalc
+
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
-from pybert.utility import make_ctle, calc_resps
+from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights
 
 gDebugOptimize = False
 
@@ -124,18 +127,30 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     peak_freq = pybert.peak_freq_tune * 1e9
     dfe_taps  = pybert.dfe_tap_tuners
     tx_taps   = pybert.tx_tap_tuners
-    rx_taps   = pybert.rx_taps
+    rx_taps   = pybert.ffe_tap_tuners
+    rx_n_taps = pybert.rx_n_taps
+    rx_n_pre  = pybert.rx_n_pre
     max_len   = 100 * pybert.nspui
+    num_levels = pybert.mod_type[0] + 2
+
+    # Find number of enabled DFE taps. (No support for floating taps, yet.)
+    n_dfe_taps = 0
+    for tap in dfe_taps:
+        if not tap.enabled:
+            break
+        n_dfe_taps += 1
 
     # Calculate time/frequency vectors for CTLE.
     ctle_fmax = 100 * rx_bw  # Should give -40dB at truncation, assuming 20 dB/dec. roll-off.
     f_ctle = arange(0, ctle_fmax + 10e6, 10e6)  # 10 MHz freq. step & includes `ctle_fmax` (i.e. - fNyquist)
     w_ctle = 2 * pi * f_ctle
-    t_ctle = [n * 1.0 / (2 * ctle_fmax) for n in range(2 * (len(f_ctle) - 1))]
+    ts_ctle = 0.5 / ctle_fmax
+    t_ctle = [n * ts_ctle for n in range(2 * (len(f_ctle) - 1))]  # Presumes use of `rfft()`/`irfft()`.
 
     # Calculate unequalized channel pulse response.
     h_chnl = pybert.calc_chnl_h()
     t = pybert.t
+    t_irfft = pybert.t_irfft
     ui = pybert.ui
     nspui = pybert.nspui
     f = pybert.f
@@ -154,7 +169,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 f"{err}",
                 "Sorry, that's more Tx tap weight combinations than I can handle.",
                 "I had to abort the EQ optimization in your stead.",
-                ])) from err
+            ])) from err
 
     for tx_weights in tx_weightss:
         tx_weights.insert(tx_curs_pos, 1 - sum(abs(array(tx_weights))))
@@ -166,21 +181,28 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         peak_mags = array([0])
 
     # Calculate Rx FFE tap weight candidates.
-    rx_tuners = pybert.ffe_tap_tuners
-    n_rx_weights = len(rx_tuners)
-    n_enabled_rx_weights = len(list(filter(lambda t: t.enabled, rx_tuners)))
-    try:
-        rx_weightss = mk_tx_weights([[0] * n_rx_weights,], list(enumerate(rx_tuners)))
-    except ValueError as err:
-        raise RuntimeError(
-            "\n".join([
-                f"{err}",
-                "Sorry, that's more Rx FFE tap weight combinations than I can handle.",
-                "I had to abort the EQ optimization in your stead.",
+    n_rx_weights = len(rx_taps)
+    n_enabled_rx_weights = len(list(filter(lambda t: t.enabled, rx_taps)))
+    if pybert.use_mmse:
+        rx_weightss = [[0.0] * n_rx_weights,]
+    else:
+        try:
+            rx_weightss = mk_tx_weights([[0.0] * n_rx_weights,], list(enumerate(rx_taps)))
+        except ValueError as err:
+            raise RuntimeError(
+                "\n".join([
+                    f"{err}",
+                    "Sorry, that's more Rx FFE tap weight combinations than I can handle.",
+                    "I had to abort the EQ optimization in your stead.",
                 ])) from err
 
     # Calculate and report the total number of trials, as well as some other misc. info.
-    n_trials = len(peak_mags) * len(tx_weightss) * len(rx_weightss)
+    if pybert.use_mmse:
+        n_trials = len(peak_mags) * len(tx_weightss)
+    else:
+        n_trials = len(peak_mags) * len(tx_weightss) * len(rx_weightss)
+    trials_run_inc = n_trials // 100
+
     pybert.log("\n".join([
         "Optimizing linear EQ...",
         f"\tTime step: {t[1] * 1e12:5.1f} ps",
@@ -197,7 +219,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     peak_mag_best = 0.
     trials_run = 0
     dfe_weights = zeros(len(dfe_taps))
-    for peak_mag in peak_mags:
+    for peak_mag in peak_mags:  # pylint: disable=too-many-nested-blocks
         _, H_ctle = make_ctle(rx_bw, peak_freq, peak_mag, w_ctle)
         _h_ctle = irfft(H_ctle)
         krnl = interp1d(t_ctle, _h_ctle, bounds_error=False, fill_value=0)
@@ -207,50 +229,81 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         for tx_weights in tx_weightss:
             # sum = concatenate
             h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
-            p_tx = convolve(p_ctle_out, h_tx)[:len(p_ctle_out)]
-            for rx_weights in rx_weightss:
-                h_rx = array(sum([[rx_weight] + [0] * (nspui - 1) for rx_weight in rx_weights], []))
-                p_tot = convolve(p_tx, h_rx)[:len(p_tx)]
-                curs_ix = where(p_tot == max(p_tot))[0][0]
-                # Test for obvious "to ignore" cases.
-                if p_tot[argmax(abs(p_tot))] < 0:  # Main peak is negative.
-                    continue
-                if curs_ix > len(p_tot) // 2:      # Main peak occurs in right half of waveform.
-                    continue
-                curs_amp = p_tot[curs_ix]
-                for k, tap in filter(lambda k_tap: k_tap[1].enabled, enumerate(dfe_taps)):
-                    isi = p_tot[curs_ix + (k + 1) * nspui]
-                    ideal_tap_weight = isi / curs_amp
-                    actual_tap_weight = max(tap.min_val, min(tap.max_val, ideal_tap_weight))
-                    dfe_weights[k] = actual_tap_weight
-                    p_tot[curs_ix + (k + 1) * nspui - nspui // 2:] -= actual_tap_weight * curs_amp
+            p_tx = convolve(p_ctle_out, h_tx)[:len(p_ctle_out)].copy()
+            if pybert.use_mmse:
+                _krnl = interp1d(t[:len(p_tx)], p_tx, bounds_error=False, fill_value=0)
+                p_tx_interp = _krnl(t_irfft)
+                curs_ix = where(p_tx_interp == max(p_tx_interp))[0][0]
+                curs_amp = p_tx_interp[curs_ix]
                 n_pre_isi = curs_ix // nspui
-                isi_sum = sum(abs(p_tot[curs_ix - n_pre_isi * nspui::nspui])) - abs(curs_amp)
-                fom = curs_amp / isi_sum
-                if fom > fom_max:
-                    dfe_weights_best = dfe_weights.copy()
-                    tx_weights_best = tx_weights.copy()
-                    del tx_weights_best[tx_curs_pos]
-                    peak_mag_best = peak_mag
-                    rx_weights_best = rx_weights.copy()
-                    clocks = 1.1 * curs_amp * ones(len(p_tot))
-                    for ix in range(curs_ix - n_pre_isi * nspui, len(clocks), nspui):
-                        clocks[ix] = 0
-                    pybert.plotdata.set_data("clocks_tune", clocks)
-                    pybert.plotdata.set_data("ctle_out_h_tune", p_tot)
-                    pybert.plotdata.set_data("t_ns_opt", pybert.t_ns[:len(p_tot)])
-                    pybert.plotdata.set_data("curs_amp", [0, curs_amp])
-                    curs_time = pybert.t_ns[curs_ix]
-                    pybert.plotdata.set_data("curs_ix", [curs_time, curs_time])
-                    fom_max = fom
-                    time.sleep(0.001)
+                noise_calc = NoiseCalc(
+                    num_levels, ui, curs_ix, t_irfft, p_tx_interp, [], f,
+                    pybert.tx_H, pybert.chnl_H, ones(len(f)), pybert.ctle_H,
+                    0.0, 0.5, 25, 0.0, 0.0
+                )
+                mmse_rslts = mmse(
+                    noise_calc, pybert.rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type[0] + 2,
+                    array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
+                    array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
+                rx_weights_better = mmse_rslts["rx_taps"]
+                dfe_weights_better = mmse_rslts["dfe_tap_weights"]
+                fom = mmse_rslts["fom"]
+                _krnl = interp1d(t_irfft, mmse_rslts["vic_pulse_resp"], bounds_error=False, fill_value=0)
+                _p_tx = _krnl(t[:len(p_tx)])
+                try:
+                    p_tot = add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, _p_tx)
+                except ValueError:
+                    fom = -1000  # Flag as obviously non-optimum.
+                fom_better = fom
                 trials_run += 1
-                if not trials_run % 100:
+                if not trials_run % trials_run_inc:
                     pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
                     time.sleep(0.001)
                     if pybert.opt_thread.stopped():
                         pybert.status = "Optimization aborted by user."
                         raise RuntimeError("Optimization aborted by user.")
+            else:  # exhaustive sweep of Rx FFE tap weight combinations
+                fom_better = fom_max
+                for rx_weights in rx_weightss:
+                    try:  # FixMe: The line below is broken.
+                        p_tot = add_ffe_dfe(rx_weights, get_dfe_weights(dfe_taps, p_tx, nspui), nspui, p_tx)
+                        curs_ix = where(p_tot == max(p_tot))[0][0]
+                        curs_amp = p_tot[curs_ix]
+                    except ValueError:
+                        continue
+                    n_pre_isi = curs_ix // nspui
+                    isi_sum = sum(abs(p_tot[curs_ix - n_pre_isi * nspui::nspui])) - abs(curs_amp)
+                    fom = curs_amp / isi_sum
+                    if fom > fom_better:
+                        rx_weights_better = rx_weights
+                        dfe_weights_better = dfe_weights
+                        fom_better = fom
+                    trials_run += 1
+                    if not trials_run % trials_run_inc:
+                        pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
+                        time.sleep(0.001)
+                        if pybert.opt_thread.stopped():
+                            pybert.status = "Optimization aborted by user."
+                            raise RuntimeError("Optimization aborted by user.")
+            if fom_better > fom_max:
+                rx_weights_best = rx_weights_better.copy()
+                dfe_weights_best = dfe_weights_better.copy()
+                tx_weights_best = tx_weights.copy()
+                del tx_weights_best[tx_curs_pos]
+                peak_mag_best = peak_mag
+                curs_ix = where(p_tot == max(p_tot))[0][0]
+                curs_amp = p_tot[curs_ix]
+                n_pre_isi = curs_ix // nspui
+                clocks = 1.1 * curs_amp * ones(len(p_tot))
+                clocks[curs_ix - n_pre_isi * nspui::nspui] = 0
+                pybert.plotdata.set_data("clocks_tune", clocks)
+                pybert.plotdata.set_data("ctle_out_h_tune", p_tot)
+                pybert.plotdata.set_data("t_ns_opt", pybert.t_ns[:len(p_tot)])
+                pybert.plotdata.set_data("curs_amp", [0, curs_amp])
+                curs_time = pybert.t_ns[curs_ix]
+                pybert.plotdata.set_data("curs_ix", [curs_time, curs_time])
+                fom_max = fom_better
+                time.sleep(0.001)
 
     for k, dfe_weight in enumerate(dfe_weights_best):  # pylint: disable=possibly-used-before-assignment
         dfe_taps[k].value = dfe_weight
