@@ -157,7 +157,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     step_mag_tune = Float(1)  #: EQ optimizer CTLE peaking mag. step (dB).
     ctle_enable_tune = Bool(True)  #: EQ optimizer CTLE enable
     dfe_tap_tuners = List(
-        [TxTapTuner(name="Tap1",  enabled=True,  min_val=0.1,   max_val=0.4,  value=0.1),
+        [TxTapTuner(name="Tap1",  enabled=True,  min_val=-0.2,   max_val=0.4,  value=0.0),
          TxTapTuner(name="Tap2",  enabled=True,  min_val=-0.15, max_val=0.15, value=0.0),
          TxTapTuner(name="Tap3",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
          TxTapTuner(name="Tap4",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
