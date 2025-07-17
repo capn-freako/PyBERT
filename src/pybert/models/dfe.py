@@ -17,7 +17,7 @@ from typing import Any, Optional
 import numpy        as np
 import numpy.typing as npt
 
-from numpy        import array, diff, histogram, sign, where, zeros  # type: ignore
+from numpy        import array, diff, histogram, mean, sign, sqrt, where, zeros  # type: ignore
 from scipy.signal import iirfilter
 
 from pybert.common     import Rvec
@@ -91,6 +91,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         lock_sustain: int = 500,
         ideal: bool = True,
         limits: Optional[list[tuple[float, float]]] = None,
+        agc_n_ave: int = 100,
     ):
         """
         Args:
@@ -118,6 +119,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             lock_sustain: Length of the histerysis vector used for lock flagging.
             ideal: Boolean flag. When true, use an ideal summing node.
             limits: List of pairs containing min/max values per tap.
+            agc_n_ave: Number of previous slicer sample to keep, for AGC operation.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -140,19 +142,23 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         self.corrections = zeros(n_taps)
         self.ideal = ideal
         self.limits = limits
+        self.agc_n_ave = agc_n_ave
 
-        thresholds = []
-        if mod_type == 0:  # NRZ
-            pass
-        elif mod_type == 1:  # Duo-binary
-            thresholds.append(-decision_scaler / 2.0)
-            thresholds.append(decision_scaler / 2.0)
-        elif mod_type == 2:  # PAM-4
-            thresholds.append(-decision_scaler * 2.0 / 3.0)
-            thresholds.append(0.0)
-            thresholds.append(decision_scaler * 2.0 / 3.0)
-        else:
-            raise RuntimeError("ERROR: DFE.__init__(): Unrecognized modulation type requested!")
+        # Misc. finalization
+        self.update_thresholds()
+
+    def update_thresholds(self):
+        """Update decision thresholds."""
+        decision_scaler = self.decision_scaler
+        match self.mod_type:
+            case 0:
+                thresholds = [0.0]
+            case 1:
+                thresholds = [-decision_scaler / 2.0, decision_scaler / 2.0]
+            case 2:
+                thresholds = [-decision_scaler * 2.0 / 3.0, 0.0, decision_scaler * 2.0 / 3.0]
+            case _:
+                raise RuntimeError("Unrecognized modulation type!")
         self.thresholds = thresholds
 
     def step(self, decision: float, error: float, update: bool):
@@ -307,6 +313,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         ideal = self.ideal
         mod_type = self.mod_type
         thresholds = self.thresholds
+        agc_n_ave = self.agc_n_ave
 
         clk_cntr = 0
         smpl_cntr = 0
@@ -316,6 +323,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         next_boundary_time = 0.0
         next_clock_time = ui / 2.0
         locked = False
+        n_slicer_samps = 0
+        n_ave_samps = 0
 
         res: list[float] = []
         tap_weights: list[list[float]] = [self.tap_weights]
@@ -325,7 +334,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         clock_times = [next_clock_time]
         bits = []
         boundary_sample = 0
-        pos_slicer_samps = []  # Positive-valued summer output values sampled by slicer.
+        slicer_samps = zeros(agc_n_ave)
+        ave_samps = zeros(agc_n_ave)
         scalar_values = [decision_scaler]
         for t, x in zip(sample_times, signal):
             if not ideal:
@@ -368,35 +378,36 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 next_boundary_time = next_clock_time + ui / 2.0
                 next_clock_time += ui
                 clock_times.append(next_clock_time)
-                if use_agc and sum_out > 0:
-                    pos_slicer_samps.append(sum_out)
-                    if len(pos_slicer_samps) > 1000:
-                        hist, bin_edges = histogram(pos_slicer_samps, bins=100)
-                        bin_centers = (bin_edges[: -1] + bin_edges[1:]) / 2
-                        hist_1st_deriv = diff(hist)
-                        hist_2nd_deriv = diff(hist_1st_deriv)
-                        hist_2nd_deriv_min = min(hist_2nd_deriv)
-                        hist_2nd_deriv_thresh = 0.8 * hist_2nd_deriv_min
-                        hist_2nd_deriv_peaks = where(hist_2nd_deriv < hist_2nd_deriv_thresh, hist_2nd_deriv, 0)
-                        if not any(hist_2nd_deriv_peaks):
-                            break
-                        ix = -1
-                        while hist_2nd_deriv_peaks[ix] == 0:
-                            ix -= 1
-                        ix_upper = ix
-                        while hist_2nd_deriv_peaks[ix] != 0:
-                            ix -= 1
-                        ix_lower = ix
-                        ix_center = (ix_lower + ix_upper) // 2
-                        decision_scaler = bin_centers[ix_center]
-                        scalar_values.append(decision_scaler)
-
+                if use_agc:
+                    # Shift in new sample.
+                    slicer_samps[:-1] = slicer_samps[1:]
+                    slicer_samps[-1] = sum_out
+                    n_slicer_samps += 1
+                    if n_slicer_samps >= agc_n_ave:
+                        ave_slicer_samps = mean(abs(slicer_samps))
+                        # Shift in new average.
+                        ave_samps[:-1] = ave_samps[1:]
+                        ave_samps[-1] = ave_slicer_samps
+                        n_ave_samps += 1
+                        if n_ave_samps >= agc_n_ave:
+                            ave_ave_samps = mean(ave_samps)
+                            match self.mod_type:
+                                case 0:
+                                    decision_scaler = ave_ave_samps
+                                case 1:
+                                    decision_scaler = 1.5 * ave_ave_samps
+                                case 2:
+                                    decision_scaler = 1.5 * ave_ave_samps
+                                case _:
+                                    raise RuntimeError("Unrecognized modulation type!")
+                            scalar_values.append(decision_scaler)
+                            self.decision_scaler = decision_scaler
+                            self.update_thresholds()
             ui_ests.append(ui)
             lockeds.append(locked)
             smpl_cntr += 1
 
         self.ui = ui
-        self.decision_scaler = decision_scaler
         if dbg_dict is not None:
             dbg_dict["scalar_values"] = scalar_values
 
