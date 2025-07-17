@@ -12,8 +12,8 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 
 import time
 
-from numpy import arange, array, convolve, log10, ones, pi, prod, where, zeros  # type: ignore
-from numpy.fft import irfft  # type: ignore
+from numpy import arange, array, convolve, log10, ones, pi, prod, resize, where, zeros  # type: ignore
+from numpy.fft import irfft, rfft  # type: ignore
 from scipy.interpolate import interp1d
 
 from pychopmarg.optimize import mmse
@@ -21,7 +21,7 @@ from pychopmarg.noise import NoiseCalc
 
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
-from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights
+from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights, raised_cosine
 
 gDebugOptimize = False
 
@@ -150,7 +150,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     # Calculate unequalized channel pulse response.
     h_chnl = pybert.calc_chnl_h()
     t = pybert.t
-    t_irfft = pybert.t_irfft
+    # t_irfft = pybert.t_irfft
     ui = pybert.ui
     nspui = pybert.nspui
     f = pybert.f
@@ -214,6 +214,15 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         f"\tRunning {n_trials} trials.",
         ""]))
 
+    # Calculate `f_t` and interpolated channel frequency response.
+    dt = t[1] - t[0]            # `t` assumed uniformly sampled throughout.
+    fN = 0.5 / dt               # Nyquist frequency
+    f0 = 100e6                  # fundamental frequency
+    f_t = arange(0, fN + f0 / 2, f0)  # "+ f0 / 2", to ensure `fN` gets included.
+    _t = array([n * dt for n in range((len(f_t) - 1) * 2)])
+    krnl = interp1d(f, pybert.chnl_H, bounds_error=False, fill_value=0)
+    chnl_H = krnl(f_t)
+
     # Run the optimization loop.
     fom_max = -1000.
     peak_mag_best = 0.
@@ -230,19 +239,20 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         h_ctle = krnl(t[:max_len])
         h_ctle *= sum(_h_ctle) / sum(h_ctle)
         p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
+        ctle_H = rfft(resize(h_ctle, len(_t)))
         for tx_weights in tx_weightss:
             # sum = concatenate
             h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
-            p_tx = convolve(p_ctle_out, h_tx)[:len(p_ctle_out)].copy()
+            p_tx = convolve(p_ctle_out, h_tx)
+            p_tx.resize(len(_t))
             if pybert.use_mmse:
-                _krnl = interp1d(t[:len(p_tx)], p_tx, bounds_error=False, fill_value=0)
-                p_tx_interp = _krnl(t_irfft)
-                curs_ix = where(p_tx_interp == max(p_tx_interp))[0][0]
-                curs_amp = p_tx_interp[curs_ix]
+                curs_ix = where(p_tx == max(p_tx))[0][0]
+                curs_amp = p_tx[curs_ix]
                 n_pre_isi = curs_ix // nspui
+                tx_H = rfft(resize(h_tx, len(_t)))
                 noise_calc = NoiseCalc(
-                    num_levels, ui, curs_ix, t_irfft, p_tx_interp, [], f,
-                    pybert.tx_H, pybert.chnl_H, ones(len(f)), pybert.ctle_H,
+                    num_levels, ui, curs_ix, _t, p_tx, [], f_t,
+                    tx_H, chnl_H, ones(len(f_t)), ctle_H,
                     0.0, 0.5, 25, 0.0, 0.0
                 )
                 mmse_rslts = mmse(
@@ -252,12 +262,8 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 rx_weights_better = mmse_rslts["rx_taps"]
                 dfe_weights_better = mmse_rslts["dfe_tap_weights"]
                 fom = mmse_rslts["fom"]
-                _krnl = interp1d(t_irfft, mmse_rslts["vic_pulse_resp"], bounds_error=False, fill_value=0)
-                _p_tx = _krnl(t[:len(p_tx)])
-                try:
-                    p_tot = add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, _p_tx)
-                except ValueError:
-                    fom = -1000  # Flag as obviously non-optimum.
+                p_tot = resize(add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
+                               nspui * (n_rx_weights + 5))
                 fom_better = fom
                 trials_run += 1
                 if not trials_run % trials_run_inc:
