@@ -219,6 +219,10 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     peak_mag_best = 0.
     trials_run = 0
     dfe_weights = zeros(len(dfe_taps))
+    rx_weights_best = zeros(rx_n_taps)
+    dfe_weights_best = zeros(len(dfe_taps))
+    tx_weights_best = [0.0] * len(tx_taps)
+    del tx_weights_best[tx_curs_pos]
     for peak_mag in peak_mags:  # pylint: disable=too-many-nested-blocks
         _, H_ctle = make_ctle(rx_bw, peak_freq, peak_mag, w_ctle)
         _h_ctle = irfft(H_ctle)
@@ -242,7 +246,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                     0.0, 0.5, 25, 0.0, 0.0
                 )
                 mmse_rslts = mmse(
-                    noise_calc, pybert.rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type[0] + 2,
+                    noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type[0] + 2,
                     array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
                     array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
                 rx_weights_better = mmse_rslts["rx_taps"]
