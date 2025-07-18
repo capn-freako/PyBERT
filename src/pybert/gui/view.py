@@ -234,6 +234,7 @@ traits_view = View(
                                 Item(
                                     name="use_ch_file",
                                     label="Use file",
+                                    enabled_when="ch_file",
                                 ),
                                 Item(
                                     name="renumber",
@@ -523,7 +524,6 @@ traits_view = View(
                                 Item(
                                     name="ctle_file",
                                     label="Filename",
-                                    enabled_when="use_ctle_file == True",
                                     editor=FileEditor(dialog_style="open"),
                                 ),
                                 label="File",
