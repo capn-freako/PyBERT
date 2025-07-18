@@ -127,6 +127,8 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_use_ibis = the_PyBERT.rx_use_ibis
         self.rx_use_viterbi = the_PyBERT.rx_use_viterbi
         self.rx_viterbi_symbols = the_PyBERT.rx_viterbi_symbols
+        self.rx_n_taps = the_PyBERT.rx_n_taps
+        self.rx_n_pre = the_PyBERT.rx_n_pre
 
         # DFE
         self.sum_ideal = the_PyBERT.sum_ideal
@@ -154,6 +156,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.max_mag_tune = the_PyBERT.max_mag_tune
         self.step_mag_tune = the_PyBERT.step_mag_tune
         self.ctle_enable_tune = the_PyBERT.ctle_enable_tune
+        self.use_mmse = the_PyBERT.use_mmse
         self.dfe_tap_tuners = []
         for tap in the_PyBERT.dfe_tap_tuners:
             self.dfe_tap_tuners.append((tap.enabled, tap.min_val, tap.max_val))

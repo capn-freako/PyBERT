@@ -1,4 +1,5 @@
-"""Default view definition for PyBERT class.
+"""
+Default view definition for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -62,6 +63,12 @@ traits_view = View(
                                 label="Modulation",
                                 tooltip="line signalling/modulation scheme",
                                 editor=CheckListEditor(values=[(0, "NRZ"), (1, "Duo-binary"), (2, "PAM-4")]),
+                            ),
+                            Item(
+                                name="rlm",
+                                label="RLM",
+                                tooltip="relative level mismatch",
+                                enabled_when="mod_type[0] == 2"
                             ),
                             label="Rate && Modulation",
                             show_border=True,
@@ -227,6 +234,7 @@ traits_view = View(
                                 Item(
                                     name="use_ch_file",
                                     label="Use file",
+                                    enabled_when="ch_file",
                                 ),
                                 Item(
                                     name="renumber",
@@ -398,7 +406,7 @@ traits_view = View(
         ),
         # "Equalization" tab.
         HGroup(  # Channel Parameters
-            VGroup(
+            VGroup(  # Tx EQ
                 VGroup(
                     HGroup(
                         VGroup(
@@ -459,7 +467,7 @@ traits_view = View(
                 label="Tx Equalization",
                 show_border=True,
             ),
-            VGroup(
+            VGroup(  # Rx EQ
                 VGroup(
                     HGroup(
                         VGroup(
@@ -503,63 +511,62 @@ traits_view = View(
                     show_border=True,
                 ),
                 VGroup(
-                    VGroup(  # CTLE
-                        Item(name="ctle_enable", label="Enable", tooltip="CTLE enable",),
-                        HGroup(  # File
-                            Item(
-                                name="use_ctle_file",
-                                label="Use",
-                                tooltip="Select CTLE impulse/step response from file.",
-                                enabled_when="ctle_file",
-                            ),
-                            Item(
-                                name="ctle_file",
-                                label="Filename",
-                                enabled_when="use_ctle_file == True",
-                                editor=FileEditor(dialog_style="open"),
-                            ),
-                            label="File",
-                            show_border=True,
-                        ),
-                        VGroup(  # Model
-                            HGroup(
-                                Item(
-                                    name="peak_freq",
-                                    label="CTLE fp",
-                                    tooltip="CTLE peaking frequency (GHz)",
-                                    enabled_when="use_ctle_file == False",
-                                ),
-                                Item(label="GHz"),
-                                spring,
-                                Item(
-                                    name="rx_bw",
-                                    label="Bandwidth",
-                                    tooltip="unequalized signal path bandwidth (GHz).",
-                                    enabled_when="use_ctle_file == False",
-                                ),
-                                Item(label="GHz"),
-                            ),
-                            HGroup(
-                                Item(
-                                    name="peak_mag",
-                                    label="CTLE boost",
-                                    tooltip="CTLE peaking magnitude (dB)",
-                                    format_str="%4.1f",
-                                    enabled_when="use_ctle_file == False",
-                                ),
-                                Item(label="dB"),
-                                spring,
-                            ),
-                            label="Model",
-                            show_border=True,
-                            enabled_when="use_ctle_file == False",
-                        ),
-                        label="CTLE",
-                        show_border=True,
-                        enabled_when="rx_use_ami == False",
-                    ),
                     HGroup(
-                        VGroup(
+                        VGroup(  # CTLE
+                            Item(name="ctle_enable", label="Enable", tooltip="CTLE enable",),
+                            HGroup(  # File
+                                Item(
+                                    name="use_ctle_file",
+                                    label="Use",
+                                    tooltip="Select CTLE impulse/step response from file.",
+                                    enabled_when="ctle_file",
+                                ),
+                                Item(
+                                    name="ctle_file",
+                                    label="Filename",
+                                    editor=FileEditor(dialog_style="open"),
+                                ),
+                                label="File",
+                                show_border=True,
+                            ),
+                            VGroup(  # Model
+                                HGroup(
+                                    Item(
+                                        name="peak_freq",
+                                        label="CTLE fp",
+                                        tooltip="CTLE peaking frequency (GHz)",
+                                        enabled_when="use_ctle_file == False",
+                                    ),
+                                    Item(label="GHz"),
+                                    spring,
+                                    Item(
+                                        name="rx_bw",
+                                        label="Bandwidth",
+                                        tooltip="unequalized signal path bandwidth (GHz).",
+                                        enabled_when="use_ctle_file == False",
+                                    ),
+                                    Item(label="GHz"),
+                                ),
+                                HGroup(
+                                    Item(
+                                        name="peak_mag",
+                                        label="CTLE boost",
+                                        tooltip="CTLE peaking magnitude (dB)",
+                                        format_str="%4.1f",
+                                        enabled_when="use_ctle_file == False",
+                                    ),
+                                    Item(label="dB"),
+                                    spring,
+                                ),
+                                label="Model",
+                                show_border=True,
+                                enabled_when="use_ctle_file == False",
+                            ),
+                            label="CTLE",
+                            show_border=True,
+                            enabled_when="rx_use_ami == False",
+                        ),
+                        VGroup(  # CDR
                             HGroup(
                                 Item(
                                     name="delta_t",
@@ -587,8 +594,34 @@ traits_view = View(
                             label="CDR",
                             show_border=True,
                         ),
-                        VGroup(
-                            Item(label="Use Optimizer tab to configure."),
+                    ),
+                    HGroup(
+                        VGroup(  # FFE
+                            HGroup(
+                                Item(name="rx_n_taps", label="Ntaps", tooltip="total number of taps"),
+                                Item(name="rx_n_pre", label="Npre", tooltip="number of pre-cursor taps"),
+                            ),
+                            Item(
+                                name="rx_taps",
+                                editor=TableEditor(
+                                    columns=[
+                                        ObjectColumn(name="name", editable=False),
+                                        ObjectColumn(name="enabled", style="simple"),
+                                        ObjectColumn(name="value", format="%+05.3f", horizontal_alignment="center"),
+                                    ],
+                                    configurable=False,
+                                    reorderable=False,
+                                    sortable=False,
+                                    selection_mode="cell",
+                                    rows=4,
+                                ),
+                                show_label=False,
+                            ),
+                            label="FFE",
+                            show_border=True,
+                        ),
+                        VGroup(  # DFE
+                            Item(label="Use Optimizer tab to further configure."),
                             VGroup(
                                 Item(name="gain", label="Gain", tooltip="error feedback gain"),
                                 Item(name="n_ave", label="Nave.", tooltip="# of CDR adaptations per DFE adaptation"),
@@ -699,7 +732,38 @@ traits_view = View(
                     label="Rx CTLE",
                     show_border=True,
                 ),
-                VGroup(
+                VGroup(  # Rx FFE
+                    HGroup(
+                        Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
+                        Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
+                        Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
+                    ),
+                    Item(
+                        name="ffe_tap_tuners",
+                        editor=TableEditor(
+                            columns=[
+                                ObjectColumn(name="name", editable=False),
+                                ObjectColumn(name="enabled", editable=False),
+                                ObjectColumn(name="min_val"),
+                                ObjectColumn(name="max_val"),
+                                ObjectColumn(name="step"),
+                                ObjectColumn(name="value", format="%+05.3f", editable=False),
+                            ],
+                            configurable=False,
+                            reorderable=False,
+                            sortable=False,
+                            selection_mode="cell",
+                            auto_size=True,
+                            rows=6,
+                            orientation="horizontal",
+                            is_grid_cell=True,
+                        ),
+                        show_label=False,
+                    ),
+                    label="Rx FFE",
+                    show_border=True,
+                ),
+                VGroup(  # DFE
                     HGroup(
                         Item(name="btn_disable", show_label=False, tooltip="Disable all DFE taps."),
                         Item(name="btn_enable",  show_label=False, tooltip="Enable all DFE taps."),

@@ -1,4 +1,5 @@
-"""Default controller definition for PyBERT class.
+"""
+Default controller definition for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -366,7 +367,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     if ctle_enable:
                         ctle_h = get_ctle_h()
                         ctle_out_h = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
-                        ctle_out = convolve(x + noise, ctle_out_h)[:len(x)]
+                        ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
                     else:
                         ctle_h = array([1.] + [0.] * (min_len - 1))
                         ctle_out_h = tx_out_h
@@ -416,6 +417,23 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     self.ctle_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
+    self.status = "Running FFE..."
+
+    _check_sim_status()
+
+    # FFE output and incremental/cumulative responses.
+    if any(tap.enabled for tap in self.rx_taps):
+        # Using `sum` to concatenate:
+        ffe_h = array(sum([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps], []))
+        ffe_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
+        ffe_out_h = convolve(ffe_h, ctle_out_h)[: len(chnl_h)]
+        ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
+        # Calculate the remaining responses from the impulse responses.
+        ffe_s, ffe_p, ffe_H = calc_resps(t, ffe_h, ui, f)                   # pylint: disable=unused-variable
+        ffe_out_s, ffe_out_p, ffe_out_H = calc_resps(t, ffe_out_h, ui, f)   # pylint: disable=unused-variable
+
+    self.ffe_perf = nbits * nspb / (clock() - split_time)
+    split_time = clock()
     self.status = "Running DFE/CDR..."
 
     _check_sim_status()
@@ -447,12 +465,12 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
          clocks,
          lockeds,
          sample_times,
-         bits_out) = dfe.run(t, ctle_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
+         bits_out) = dfe.run(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
     else:                                              # Process Rx IBIS-AMI GetWave() output.
         # Process any valid clock times returned by Rx IBIS-AMI model's GetWave() function if apropos.
-        dfe_out = array(ctle_out)  # In this case, `ctle_out` includes the effects of IBIS-AMI DFE.
+        dfe_out = array(ffe_out)  # In this case, `ffe_out` includes the effects of IBIS-AMI DFE.
         dfe_out.resize(len(t))
         t_ix = 0
         _bits_out = []
@@ -468,7 +486,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 if t_ix >= len(t):
                     self.log("Went beyond system time vector end searching for next clock time!")
                     break
-                _, _bits = dfe.decide(ctle_out[t_ix])
+                _, _bits = dfe.decide(ffe_out[t_ix])
                 _bits_out.extend(_bits)
                 clocks[t_ix] = 1
                 sample_times.append(sample_time)
@@ -477,10 +495,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             # Starting at `nspui/4` handles either case:
             #   - starting at UI boundary, or
             #   - starting at last sampling instant.
-            next_sample_ix = t_ix + nspui // 4 + argmax([sum(abs(ctle_out[t_ix + nspui // 4 + k::nspui]))
+            next_sample_ix = t_ix + nspui // 4 + argmax([sum(abs(ffe_out[t_ix + nspui // 4 + k::nspui]))
                                                          for k in range(nspui)])
             for t_ix in range(next_sample_ix, len(t), nspui):
-                _, _bits = dfe.decide(ctle_out[t_ix])
+                _, _bits = dfe.decide(ffe_out[t_ix])
                 _bits_out.extend(_bits)
                 clocks[t_ix] = 1
                 sample_times.append(t[t_ix])
@@ -515,7 +533,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         dfe_h.resize(len(ctle_out_h), refcheck=False)
     else:
         dfe_h = array([1.0] + list(zeros(nspui - 1)))
-    dfe_out_h = convolve(ctle_out_h, dfe_h)[: len(ctle_out_h)]
+    dfe_out_h = convolve(ffe_out_h, dfe_h)[: len(ffe_out_h)]
 
     # Calculate the remaining responses from the impulse responses.
     dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
@@ -545,19 +563,19 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         pulse_resp_curs_ix = np.argmax(ctle_out_p)
         pulse_resp_samps = np.array([ctle_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
-        ctle_out_samps = []
+        sig_samps = []
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
             ix = np.where(t >= sample_time)[0][0]
-            ctle_out_samps.append(ctle_out[ix])
+            sig_samps.append(ffe_out[ix])
         if self.debug:
             self.dbg_dict_viterbi = {}
-            path = decoder.decode(ctle_out_samps, dbg_dict=self.dbg_dict_viterbi)
+            path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
         else:
-            path = decoder.decode(ctle_out_samps)
+            path = decoder.decode(sig_samps)
         symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
         if self.debug:
             self.pulse_resp_samps = pulse_resp_samps
-            self.ctle_out_samps   = ctle_out_samps
+            self.sig_samps   = sig_samps
             self.symbols_viterbi  = symbols_viterbi
             self.dbg_dict_viterbi["decoder"] = decoder
             self.dbg_dict_viterbi["path"] = path
