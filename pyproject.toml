@@ -13,7 +13,7 @@ requires-python = ">=3.10,<3.13"
 dependencies = [
     "enable>=6.1.0",
     "kiwisolver",
-    "pychopmarg>=3.1",
+    "pychopmarg>=3.1.1",
     "pyibis-ami>=7.2.3",
     "pyside6<6.7",
     "pyyaml>=6",

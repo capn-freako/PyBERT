@@ -27,4 +27,4 @@ class TestOptimizer(object):
             assert (time() - start_time) < WATCHDOG_TIMEOUT, "Watchdog timed out!"
 
         # Confirm optimizer success.
-        assert dut.status.beginswith("Success"), "Optimization failed!"
+        assert dut.status.startswith("Finished"), f"Optimization failed: {dut.status}."
