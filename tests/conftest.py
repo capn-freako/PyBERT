@@ -3,7 +3,32 @@
 import pytest
 
 from pybert.pybert import PyBERT
+from pybert.gui.handler import MyHandler
 
+
+class DummyInfo():
+    """Dummy ``Info`` object, for making use of convenience functions in ``pybert.gui.handler.MyHandler``."""
+    object: PyBERT = None
+
+    def __init__(self, thePyBERT: PyBERT):
+        self.object = thePyBERT
+
+
+@pytest.fixture(scope="module")
+def optimization_triplet():
+    """
+    Return a triplet for testing the optimizer, containing
+
+    - an initialized PyBERT object that has NOT run the initial simulation,
+    - an instance of ``pybert.gui.handler.MyHandler``, and
+    - a dummy ``Info`` object pre-initialized with a pointer to the returned PyBERT object.
+    """
+
+    thePyBERT = PyBERT(run_simulation=False, gui=False)
+    theHandler = MyHandler()
+    theInfo = DummyInfo(thePyBERT)
+
+    yield (thePyBERT, theHandler, theInfo)
 
 @pytest.fixture(scope="module")
 def dut():

@@ -1,4 +1,5 @@
-"""Action Handler for the traitsui view of the PyBERT class.
+"""
+Action Handler for the traitsui view of the PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -6,6 +7,7 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
+
 import sys
 import webbrowser
 from pathlib import Path
@@ -160,6 +162,9 @@ class MyHandler(Handler):
         pybert.peak_mag_tune = pybert.peak_mag
         pybert.rx_bw_tune = pybert.rx_bw
         pybert.ctle_enable_tune = pybert.ctle_enable
+        for i, tap in enumerate(pybert.rx_taps):
+            pybert.ffe_tap_tuners[i].value   = tap.value
+            pybert.ffe_tap_tuners[i].enabled = tap.enabled
 
     def do_use_eq(self, info):
         """Save the equalization."""
@@ -171,6 +176,9 @@ class MyHandler(Handler):
         pybert.peak_mag = pybert.peak_mag_tune
         pybert.rx_bw = pybert.rx_bw_tune
         pybert.ctle_enable = pybert.ctle_enable_tune
+        for i, tap in enumerate(pybert.ffe_tap_tuners):
+            pybert.rx_taps[i].value   = tap.value
+            pybert.rx_taps[i].enabled = tap.enabled
 
     def do_tune_eq(self, info):
         "Optimize the linear equalization."
@@ -178,9 +186,14 @@ class MyHandler(Handler):
         if pybert.opt_thread and pybert.opt_thread.is_alive():
             pass
         else:
-            n_trials = int((pybert.max_mag_tune - pybert.min_mag_tune) / pybert.step_mag_tune)
+            n_trials = int((pybert.max_mag_tune - pybert.min_mag_tune) / pybert.step_mag_tune + 1)
             for tuner in pybert.tx_tap_tuners:
-                n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step)
+                if tuner.enabled:
+                    n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+            if not pybert.use_mmse:
+                for tuner in pybert.ffe_tap_tuners:
+                    if tuner.enabled:
+                        n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
             if n_trials > 1_000_000:
                 usr_resp = pybert.alert(f"You've opted to run over {n_trials // 1_000_000} million trials!\nAre you sure?")
                 if not usr_resp:

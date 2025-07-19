@@ -12,11 +12,11 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 import re
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from numpy import (  # type: ignore
-    arange, argmax, array, convolve, cos, cumsum, diff,
-    mean, ones, pad, pi, roll, sign, where, zeros
+    arange, argmax, array, convolve, cos, cumsum, diff, maximum,
+    mean, minimum, ones, pad, pi, roll, sign, where, zeros
 )
 from numpy.fft import rfft  # type: ignore
 from numpy.typing import NDArray  # type: ignore
@@ -24,6 +24,7 @@ from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
 
 from ..common import Rvec, Cvec
+from ..models.tx_tap import TxTapTuner
 
 
 def moving_average(a: Rvec, n: int = 3) -> Rvec:
@@ -425,3 +426,67 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
         _jitter = _jitter[:nbits]
 
     return array(_jitter), valid_ix
+
+
+def add_ffe_dfe(
+    # ffe_weights: list[float], dfe_weights: list[float], nspui: int, pr_ctle_out: Rvec
+    ffe_weights: Sequence[float], dfe_weights: Sequence[float], nspui: int, pr_ctle_out: Rvec
+) -> Rvec:
+    """
+    Add the effects of the FFE and DFE to the cumulative system pulse response at the CTLE output.
+
+    Args:
+        ffe_weights: List of FFE tap weights.
+        dfe_weights: List of DFE tap weights.
+        nspui: Number of vector samples per unit interval.
+        pr_ctle_out: Cumulative system pulse response at CTLE output.
+
+    Returns:
+        Complete system pulse response, including the effects of the Rx FFE and DFE.
+
+    Raises:
+        ValueError: If given post-CTLE pulse response is clearly non-optimum.
+            (Used to improve overall performance of exhaustive optimization.)
+    """
+
+    # Add the effect of FFE. (`sum()` is used to concatenate.)
+    h_ffe = array(sum([[ffe_weight] + [0] * (nspui - 1) for ffe_weight in ffe_weights], []))
+    p_tot = convolve(pr_ctle_out, h_ffe)[:len(pr_ctle_out)]
+    curs_ix = where(p_tot == max(p_tot))[0][0]
+
+    # Test for obvious "to ignore" cases.
+    if p_tot[argmax(abs(p_tot))] < 0:
+        raise ValueError("Main peak is negative!")
+    if curs_ix > len(p_tot) // 2:
+        raise ValueError("Main peak occurs in right half of waveform!")
+
+    # Add the effect of DFE.
+    h_dfe = array(sum([[-dfe_weight] + [0] * (nspui - 1) for dfe_weight in ([-1.0] + list(dfe_weights))], []))
+    p_tot = convolve(p_tot, h_dfe)[:len(p_tot)]
+
+    return p_tot
+
+
+def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int) -> list[float]:
+    """
+    Get the ideal DFE tap weights, given the tap tuners and pulse response, using PRZF.
+
+    Args:
+        dfe_taps: List of ``TxTapTuners`` governing DFE tap weight ranges.
+        pr: Pulse response to be equalized.
+        nspui: Number of vector samples per unit interval.
+
+    Returns:
+        List of ideal DFE tap weights.
+    """
+
+    n_taps = len(dfe_taps)
+    min_weights = array(list(map(lambda t: t.min_val, dfe_taps)))
+    max_weights = array(list(map(lambda t: t.max_val, dfe_taps)))
+
+    curs_ix = where(pr == max(pr))[0][0]
+    curs_amp = pr[curs_ix]
+    ideal_weights = pr[curs_ix + nspui: curs_ix + n_taps * nspui + 1: nspui] / curs_amp  # "+ 1" to ensure last one gets included.
+    actual_weights = minimum(max_weights, maximum(min_weights, ideal_weights))
+
+    return actual_weights

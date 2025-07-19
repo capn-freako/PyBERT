@@ -21,6 +21,7 @@ TYPE_STUB_INFO := type_stubs.info
 TYPE_STUB_SRC_DIRS := PyAMI/src
 TYPE_STUB_SRCS := $(shell for DIR in ${TYPE_STUB_SRC_DIRS}; do find $${DIR} -name '*.py' 2>/dev/null; done)
 TYPE_STUB_DIR := type_stubs
+# ARGS = $(wordlist 2, $(words $(MAKECMDGOALS)), $(MAKECMDGOALS))
 
 # Put it first so that "make" without arguments is like "make help".
 dflt: help
