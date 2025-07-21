@@ -3,6 +3,7 @@
 # Developer tooling
 autoflake
 black
+build
 isort
 pytest
 pytest-cov

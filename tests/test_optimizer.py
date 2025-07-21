@@ -47,3 +47,30 @@ class TestOptimizer(object):
 
         # Confirm optimizer success.
         assert dut.status.startswith("Finished"), f"Optimization failed: {dut.status}."
+
+    def test_viterbi(self, optimization_triplet):
+        """Test Viterbi decoder, post-optimization."""
+        
+        # Launch optimization.
+        dut, handler, info = optimization_triplet
+        handler.do_tune_eq(info)
+
+        # Confirm successful optimization launch.
+        assert dut.opt_thread and dut.opt_thread.is_alive(), "Optimizer failed to launch!"
+
+        # Wait for optimizer to finish, or watchdog timer to expire.
+        start_time = time()
+        while dut.opt_thread.is_alive():
+            sleep(1.0)
+            assert (time() - start_time) < WATCHDOG_TIMEOUT, "Watchdog timed out!"
+
+        # Confirm optimizer success.
+        assert dut.status.startswith("Finished"), f"Optimization failed: {dut.status}."
+
+        # Run optimized simulation w/ Viterbi decoder enabled.
+        handler.do_use_eq(info)
+        thePyBERT = info.object
+        thePyBERT.rx_viterbi_symbols = 2  # Solely to speed up testing.
+        thePyBERT.rx_use_viterbi = True
+        thePyBERT.simulate(initial_run=True)
+        assert thePyBERT.status == "Ready.", "Status not 'Ready.'!"

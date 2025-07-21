@@ -36,6 +36,11 @@ class ViterbiDecoder(ABC, Generic[S, X]):
     Abstract definition of a Viterbi decoder.
     """
 
+    log_msg: str = ""
+
+    def log(self, msg: str):
+        self.log_msg += msg
+
     @property
     @abstractmethod
     def states(self) -> list[S]:
@@ -75,6 +80,12 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             1. This is sometimes referred to as the "emission probability" in the literature.
         """
 
+    @abstractmethod
+    def expectation(self, s: int) -> Any:
+        """
+        Expected observation for state at index ``s``.
+        """
+
     @property
     def path(self) -> list[int]:
         """
@@ -92,7 +103,11 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         # Starting with highest probability final state, backtrack through trellis.
         prevs = [trellis[-1][np.argmax(list(map(lambda pr: pr[0], trellis[-1])))][1]]
         for ix in range(2, trellis_depth + 1):
-            prevs.append(trellis[-ix][prevs[-1]][1])
+            try:
+                prevs.append(trellis[-ix][prevs[-1]][1])
+            except IndexError as err:
+                print(f"len(trellis[-ix]): {len(trellis[-ix])}, prevs[-1]: {prevs[-1]}, trellis[-1]: {trellis[-1]}")
+                raise
         prevs.reverse()
         return prevs
 
@@ -109,9 +124,6 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
         Returns:
             The decided state index of the exiting (i.e. - leftmost) column.
-
-        Raises:
-            ValueError: If trellis cannot be stepped.
         """
 
         trellis = self.trellis
@@ -123,7 +135,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
         # Calculate maximum state probabilities, along w/ previous state, for new rightmost column.
         probs = np.zeros(num_states)
-        prevs = np.array(num_states)
+        prevs = np.arange(num_states)
         for r in range(num_states):
             new_probs = np.array(
                 [0 if self.trans[r][s] == 0
@@ -132,9 +144,14 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             prevs = np.where(new_probs > probs, [r] * num_states, prevs)
             probs = np.maximum(new_probs, probs)
         probs_sum = probs.sum()
-        if probs_sum == 0:
-            raise ValueError("Failed to step trellis!")
-        trellis[-1] = list(zip(probs / probs_sum, prevs))
+        # ToDo: Need to eliminate this possibility.
+        if not probs_sum:  # Trap all zeros.
+            self.log("WARNING: All probabilities zero while stepping trellis, using observation: {x}, and expected value: {s.expectation}!")
+            probs = np.array(
+                [0.0 if self.trans[r][s] == 0 else 1.0
+                 for s in range(num_states)])
+        probs /= probs_sum
+        trellis[-1] = list(zip(probs, prevs))
 
         prev = 0
         if not priming:
@@ -163,16 +180,14 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
         # Prime the trellis.
         first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
-        first_col /= first_col.sum()
+        if not first_col.sum():  # Trap all zeros and log the event.
+            self.log("WARNING: All probabilities zero while priming first column, using observation: {samps[0]}!")
+            first_col = (1.0 / num_states) * np.ones(num_states)
+        sum_tot = first_col.sum()
+        first_col /= sum_tot
         trellis[-1] = list(zip(first_col, range(num_states)))
         for x in samps[1: trellis_depth]:
-            try:
-                self.step_trellis(x, priming=True)
-            except ValueError as err:
-                prev_trel_col_maxes = np.array(sorted(trellis[-2], key=fst, reverse=True)[:5])
-                raise RuntimeError(
-                    f"Trellis got stuck at:\n\n{prev_trel_col_maxes}\n\ntrying to process observation: {x}!"
-                ) from err
+            self.step_trellis(x, priming=True)
 
         # Run the remaining samples.
         states = []
@@ -251,7 +266,8 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         # Build noise voltage interpolator.
         vs = np.linspace(-2, 2, 4_000)  # 1 mV precision
         v_prob = sp.interpolate.interp1d(
-            vs, [1e-3 * np.exp(-(v**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2) for v in vs])
+            vs, [1e-3 * np.exp(-(v**2) / (2 * sigma**2)) / np.sqrt(TWOPI * sigma**2) for v in vs],
+            bounds_error=False, fill_value=0)
 
         # Build initial trellis.
         trellis = [[(1 / num_states, 0)] * num_states] * N
@@ -287,4 +303,13 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         """
         Probability of state at index ``s`` given observation ``x``.
         """
-        return self.v_prob(x - self.states[s][1])
+        # return self.v_prob(x - self.states[s][1])
+        rslt = self.v_prob(x - self.states[s][1])
+        assert not np.isnan(rslt)
+        return rslt
+
+    def expectation(self, s: int) -> float:
+        """
+        Expected observation in state ``s``.
+        """
+        return self.states[s][1]

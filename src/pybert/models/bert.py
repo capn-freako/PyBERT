@@ -425,12 +425,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     if any(tap.enabled for tap in self.rx_taps):
         # Using `sum` to concatenate:
         ffe_h = array(sum([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps], []))
-        ffe_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
-        ffe_out_h = convolve(ffe_h, ctle_out_h)[: len(chnl_h)]
-        ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
-        # Calculate the remaining responses from the impulse responses.
-        ffe_s, ffe_p, ffe_H = calc_resps(t, ffe_h, ui, f)                   # pylint: disable=unused-variable
-        ffe_out_s, ffe_out_p, ffe_out_H = calc_resps(t, ffe_out_h, ui, f)   # pylint: disable=unused-variable
+    else:
+        ffe_h = array([1] + [0] * (nspui - 1))
+    ffe_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
+    ffe_out_h = convolve(ffe_h, ctle_out_h)[: len(chnl_h)]
+    ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
+    # Calculate the remaining responses from the impulse responses.
+    ffe_s, ffe_p, ffe_H = calc_resps(t, ffe_h, ui, f)                   # pylint: disable=unused-variable
+    ffe_out_s, ffe_out_p, ffe_out_H = calc_resps(t, ffe_out_h, ui, f)   # pylint: disable=unused-variable
 
     self.ffe_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
