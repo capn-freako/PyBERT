@@ -21,7 +21,7 @@ from pychopmarg.noise import NoiseCalc
 
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
-from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights, raised_cosine
+from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights
 
 gDebugOptimize = False
 
@@ -244,7 +244,8 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
             # sum = concatenate
             h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
             p_tx = convolve(p_ctle_out, h_tx)
-            p_tx.resize(len(_t))
+            # p_tx.resize(len(_t))
+            p_tx = resize(p_tx, len(_t))
             if pybert.use_mmse:
                 curs_ix = where(p_tx == max(p_tx))[0][0]
                 curs_amp = p_tx[curs_ix]
@@ -318,4 +319,4 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     for k, dfe_weight in enumerate(dfe_weights_best):  # pylint: disable=possibly-used-before-assignment
         dfe_taps[k].value = dfe_weight
 
-    return (tx_weights_best, peak_mag_best, rx_weights_best, fom_max, True)  # pylint: disable=possibly-used-before-assignment
+    return (tx_weights_best, peak_mag_best, list(rx_weights_best), fom_max, True)  # pylint: disable=possibly-used-before-assignment

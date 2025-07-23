@@ -562,8 +562,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 raise ValueError(f"Unrecognized modulation type: {mod_type}!")
         N = self.rx_viterbi_symbols
         sigma = self.rn
-        pulse_resp_curs_ix = np.argmax(ctle_out_p)
-        pulse_resp_samps = np.array([ctle_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
+        pulse_resp_curs_ix = np.argmax(ffe_out_p)
+        pulse_resp_samps = np.array([ffe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
         sig_samps = []
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):

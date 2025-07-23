@@ -17,7 +17,7 @@ from typing import Any, Optional
 import numpy        as np
 import numpy.typing as npt
 
-from numpy        import array, diff, histogram, mean, sign, sqrt, where, zeros  # type: ignore
+from numpy        import array, mean, sign, zeros
 from scipy.signal import iirfilter
 
 from pybert.common     import Rvec
@@ -393,11 +393,11 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                             ave_ave_samps = mean(ave_samps)
                             match self.mod_type:
                                 case 0:
-                                    decision_scaler = ave_ave_samps
+                                    decision_scaler = ave_ave_samps         # type: ignore
                                 case 1:
-                                    decision_scaler = 1.5 * ave_ave_samps
+                                    decision_scaler = 1.5 * ave_ave_samps   # type: ignore
                                 case 2:
-                                    decision_scaler = 1.5 * ave_ave_samps
+                                    decision_scaler = 1.5 * ave_ave_samps   # type: ignore
                                 case _:
                                     raise RuntimeError("Unrecognized modulation type!")
                             scalar_values.append(decision_scaler)

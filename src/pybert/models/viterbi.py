@@ -39,6 +39,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
     log_msg: str = ""
 
     def log(self, msg: str):
+        """Debugging logger."""
         self.log_msg += msg
 
     @property
@@ -103,11 +104,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         # Starting with highest probability final state, backtrack through trellis.
         prevs = [trellis[-1][np.argmax(list(map(lambda pr: pr[0], trellis[-1])))][1]]
         for ix in range(2, trellis_depth + 1):
-            try:
-                prevs.append(trellis[-ix][prevs[-1]][1])
-            except IndexError as err:
-                print(f"len(trellis[-ix]): {len(trellis[-ix])}, prevs[-1]: {prevs[-1]}, trellis[-1]: {trellis[-1]}")
-                raise
+            prevs.append(trellis[-ix][prevs[-1]][1])
         prevs.reverse()
         return prevs
 
@@ -143,14 +140,13 @@ class ViterbiDecoder(ABC, Generic[S, X]):
                  for s in range(num_states)])
             prevs = np.where(new_probs > probs, [r] * num_states, prevs)
             probs = np.maximum(new_probs, probs)
-        probs_sum = probs.sum()
         # ToDo: Need to eliminate this possibility.
-        if not probs_sum:  # Trap all zeros.
+        if not probs.sum():  # Trap all zeros.
             self.log("WARNING: All probabilities zero while stepping trellis, using observation: {x}, and expected value: {s.expectation}!")
             probs = np.array(
                 [0.0 if self.trans[r][s] == 0 else 1.0
                  for s in range(num_states)])
-        probs /= probs_sum
+        probs /= probs.sum()
         trellis[-1] = list(zip(probs, prevs))
 
         prev = 0
@@ -210,6 +206,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             (probs, prevs) = zip(*list(map(lambda x: zip(*x), probs_prevs)))
             dbg_dict["probs"] = probs
             dbg_dict["prevs"] = prevs
+            dbg_dict["log"] = self.log_msg
 
         return states
 
