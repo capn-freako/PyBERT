@@ -150,7 +150,6 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     # Calculate unequalized channel pulse response.
     h_chnl = pybert.calc_chnl_h()
     t = pybert.t
-    # t_irfft = pybert.t_irfft
     ui = pybert.ui
     nspui = pybert.nspui
     f = pybert.f
@@ -244,8 +243,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
             # sum = concatenate
             h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
             p_tx = convolve(p_ctle_out, h_tx)
-            # p_tx.resize(len(_t))
-            p_tx = resize(p_tx, len(_t))
+            p_tx.resize(len(_t), refcheck=False)  # `p_tx = numpy.resize(p_tx, ...)` does NOT work!
             if pybert.use_mmse:
                 curs_ix = where(p_tx == max(p_tx))[0][0]
                 curs_amp = p_tx[curs_ix]

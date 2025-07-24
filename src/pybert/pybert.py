@@ -55,6 +55,8 @@ from traits.etsconfig.api import ETSConfig
 from traitsui.message import message, error
 from scipy.interpolate import interp1d
 
+from pychopmarg import __version__ as PyChOpMarg_VERSION  # type: ignore
+
 from pyibisami import __version__ as PyAMI_VERSION  # type: ignore
 from pyibisami.ami.model import AMIModel
 from pyibisami.ami.parser import AMIParamConfigurator
@@ -1512,6 +1514,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.log(f"Python Version: {platform.python_version()}")
         self.log(f"PyBERT Version: {VERSION}")
         self.log(f"PyAMI Version: {PyAMI_VERSION}")
+        self.log(f"PyChOpMarg Version: {PyChOpMarg_VERSION}")
         self.log(f"GUI Toolkit: {ETSConfig.toolkit}")
         self.log(f"Kiva Backend: {ETSConfig.kiva_backend}")
 
