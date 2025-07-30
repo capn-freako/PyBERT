@@ -82,6 +82,8 @@ master_doc = "index"
 project = "PyBERT"
 copyright = "2014 David Banas, 2019 David Patterson"
 author = "David Banas & David Patterson"
+version = "v9.1"
+release = "v9.1.3"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
