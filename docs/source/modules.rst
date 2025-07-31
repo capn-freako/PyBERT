@@ -46,6 +46,11 @@ Parsers (``pybert.parsers``)
 
 .. automodule:: pybert.parsers
 
+.. toctree::
+   :maxdepth: 1
+
+   hspice
+
 Threads (``pybert.threads``)
 ****************************
 
