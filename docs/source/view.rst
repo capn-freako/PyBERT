@@ -1,6 +1,6 @@
-==========================
-GUI - Main View Definition
-==========================
+======================================
+``.view`` - GUI - Main View Definition
+======================================
 
 .. automodule:: pybert.gui.view
    :members:

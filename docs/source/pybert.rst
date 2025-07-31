@@ -1,9 +1,10 @@
-======================================
-`pybert.pybert` - *PyBERT* Main Module
-======================================
+==================================
+``.pybert`` - *PyBERT* Main Module
+==================================
 
 .. automodule:: pybert.pybert
-   :no-index:
+   :members:
+   :member-order: bysource
    :exclude-members: PyBERT
 
 Main Class

@@ -1,6 +1,6 @@
-=====================
-S-parameter Utilities
-=====================
+===================================
+``.sparam`` - S-parameter Utilities
+===================================
 
 .. automodule:: pybert.utility.sparam
    :members:

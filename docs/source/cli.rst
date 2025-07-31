@@ -1,6 +1,6 @@
 ==================================
-``.math`` - General Math Utilities
+``.cli`` - Command line interface.
 ==================================
 
-.. automodule:: pybert.utility.math
+.. automodule:: pybert.cli
    :members:

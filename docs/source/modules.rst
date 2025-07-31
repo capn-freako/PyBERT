@@ -2,41 +2,20 @@
 Modules in *PyBERT* Package
 ===========================
 
-Top Level Modules (`pybert`)
-****************************
+Top Level Modules (``pybert``)
+******************************
 
 .. toctree::
    :maxdepth: 1
 
    pybert
+   common
+   configuration
+   results
+   cli
 
-pybert.common - Common miscellaneous definitions and aliases.
--------------------------------------------------------------
-
-.. automodule:: pybert.common
-   :members: Real,Comp,Rvec,Cvec,Rmat,Cmat
-   :member-order: bysource
-
-pybert.configuration - Data structure for saving *PyBERT* configuration.
-------------------------------------------------------------------------
-
-.. automodule:: pybert.configuration
-   :members:
-
-pybert.results - Data structure for saving *PyBERT* results.
-------------------------------------------------------------
-
-.. automodule:: pybert.results
-   :members:
-
-pybert.cli - Command line interface.
-------------------------------------------------------------
-
-.. automodule:: pybert.cli
-   :members:
-   
-Models (`pybert.models`)
-************************
+Models (``pybert.models``)
+**************************
 
 .. automodule:: pybert.models
 
@@ -49,8 +28,8 @@ Models (`pybert.models`)
    cdr
    viterbi
 
-GUI Elements (`pybert.gui`)
-***************************
+GUI Elements (``pybert.gui``)
+*****************************
 
 .. automodule:: pybert.gui
 
@@ -62,13 +41,13 @@ GUI Elements (`pybert.gui`)
    handler
    help
 
-Parsers (`pybert.parsers`)
-**************************
+Parsers (``pybert.parsers``)
+****************************
 
 .. automodule:: pybert.parsers
 
-Threads (`pybert.threads`)
-**************************
+Threads (``pybert.threads``)
+****************************
 
 .. automodule:: pybert.threads
 
@@ -79,8 +58,8 @@ Threads (`pybert.threads`)
    sim
    optimization
 
-Utility (`pybert.utility`)
-**************************
+Utility (``pybert.utility``)
+****************************
 
 .. automodule:: pybert.utility
 

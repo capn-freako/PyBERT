@@ -1,6 +1,6 @@
-=====================
-Viterbi Decoder Model
-=====================
+====================================
+``.viterbi`` - Viterbi Decoder Model
+====================================
 
 .. automodule:: pybert.models.viterbi
    :exclude-members: ViterbiDecoder_ISI
