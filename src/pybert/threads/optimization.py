@@ -200,7 +200,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         n_trials = len(peak_mags) * len(tx_weightss)
     else:
         n_trials = len(peak_mags) * len(tx_weightss) * len(rx_weightss)
-    trials_run_inc = n_trials // 100
+    trials_run_inc = n_trials // 100 or 1
 
     pybert.log("\n".join([
         "Optimizing linear EQ...",
