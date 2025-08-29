@@ -1429,7 +1429,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         # Running the simulation will fill in the required data structure.
         my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
         # Once the required data structure is filled in, we can create the plots.
-        make_plots(self, n_dfe_taps=len(self.dfe_tap_tuners))
+        if update_plots:
+            make_plots(self, n_dfe_taps=len(self.dfe_tap_tuners))
 
     def load_configuration(self, filepath: Path):
         """Load in a configuration into pybert.
