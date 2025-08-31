@@ -61,6 +61,12 @@ def mon_mag(zs: Cvec) -> Cvec:
 
 
 # ToDo: Are there SciKit-RF alternatives to these next two functions?  # pylint: disable=fixme
+# Yes:
+# ntwk_mm = ntwk.copy()
+# ntwk_mm.renumber([0, 1, 2, 3], [0, 2, 1, 3])
+# ntwk_mm.se2gmm(p=2)
+# ntwk_dd = ntwk_mm.subnetwork([0, 1])
+
 def sdd_21(ntwk: Network, renumber: bool = False) -> Network:
     """
     Given a 4-port single-ended network, return its differential 2-port network.
