@@ -2,6 +2,8 @@
 
 import pytest
 
+from pathlib import Path
+
 from pybert.pybert import PyBERT
 from pybert.gui.handler import MyHandler
 
@@ -57,6 +59,16 @@ def dut_viterbi_stressed():
     dut = PyBERT(run_simulation=False, gui=False)
     dut.rx_use_viterbi = True
     dut.l_ch = 2.0
+    dut.simulate(initial_run=True)
+    yield dut
+
+@pytest.fixture(scope="module")
+def dut_viterbi_1p5mChannel():
+    """Return a pybert object initialized using ``chnl_1p5.yaml``."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.load_configuration(Path("misc", "ViterbiTesting", "chnl_1p5.yaml"))
+    assert dut.status == "Loaded configuration.", RuntimeError(
+        "Configuration load failed!")
     dut.simulate(initial_run=True)
     yield dut
 

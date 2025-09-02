@@ -26,3 +26,14 @@ class TestViterbiStressed(object):
         n_errs = dut.bit_errs
         n_errs_viterbi = dut.bit_errs_viterbi
         assert n_errs_viterbi < n_errs, f"No improvement from Viterbi decoder ({n_errs_viterbi} errors), relative to DFE ({n_errs} errors)!"
+
+
+@pytest.mark.usefixtures("dut_viterbi_1p5mChannel")
+class TestViterbi1p5mChannel(object):
+    """Test Viterbi decoder on ``chnl_1p5.yaml`` configuration."""
+
+    def test_perf(self, dut):
+        """Test relative Viterbi decoder performance."""
+        n_errs = dut.bit_errs
+        n_errs_viterbi = dut.bit_errs_viterbi
+        assert n_errs_viterbi < n_errs, f"No improvement from Viterbi decoder ({n_errs_viterbi} errors), relative to DFE ({n_errs} errors)!"
