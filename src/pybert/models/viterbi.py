@@ -17,7 +17,7 @@ and follow the example given by the ``ViterbiDecoder_ISI`` class definition, bel
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Optional, TypeAlias, TypeVar
+from typing import Any, Generic, Optional, Sequence, TypeAlias, TypeVar
 
 import numpy as np
 import scipy as sp
@@ -36,6 +36,20 @@ class ViterbiDecoder(ABC, Generic[S, X]):
     Abstract definition of a Viterbi decoder.
     """
 
+    @abstractmethod
+    def prob(self, s: int, x: X) -> float:
+        """
+        Probability of state at index ``s`` given observation ``x``.
+
+        Notes:
+            1. This is sometimes referred to as the "emission probability" in the literature.
+        """
+
+    _states: list[S] = []
+    _expecteds: Sequence[X] = []
+    _trans: Rmat = np.array([np.array([]),])
+    _trellis: list[list[tuple[float, int]]]
+
     log_msg: str = ""
 
     def log(self, msg: str):
@@ -43,14 +57,11 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         self.log_msg += msg
 
     @property
-    @abstractmethod
     def states(self) -> list[S]:
-        """
-        List of all possible states.
-        """
+        """List of all possible states."""
+        return self._states
 
     @property
-    @abstractmethod
     def trans(self) -> Rmat:
         """
         State transition probability matrix.
@@ -58,9 +69,9 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         Notes:
             1. Row/column ordinates match those of ``states``.
         """
+        return self._trans
 
     @property
-    @abstractmethod
     def trellis(self) -> list[list[tuple[float, int]]]:
         """
         Current trellis matrix.
@@ -71,21 +82,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             3. Each location in the trellis matrix contains the
                probability and previous state index for the corresponding state.
         """
-
-    @abstractmethod
-    def prob(self, s: int, x: X) -> float:
-        """
-        Probability of state at index ``s`` given observation ``x``.
-
-        Notes:
-            1. This is sometimes referred to as the "emission probability" in the literature.
-        """
-
-    @abstractmethod
-    def expectation(self, s: int) -> Any:
-        """
-        Expected observation for state at index ``s``.
-        """
+        return self._trellis
 
     @property
     def path(self) -> list[int]:
@@ -107,6 +104,10 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             prevs.append(trellis[-ix][prevs[-1]][1])
         prevs.reverse()
         return prevs
+
+    def expectation(self, s: int) -> X:
+        """Expected observation for state at index ``s``."""
+        return self._expecteds[s]
 
     def step_trellis(self, x: X, priming: bool = False) -> int:
         """
@@ -212,7 +213,8 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
 
 # Following is an example of creating a concrete Viterbi decoder, using the abstract model above.
-State_ISI: TypeAlias = tuple[list[int], float]  # list of symbol values, expected voltage
+# State_ISI: TypeAlias = tuple[list[int], float]  # list of symbol values, expected voltage
+State_ISI: TypeAlias = list[int]  # list of symbol values, expected voltage
 
 
 class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
@@ -244,19 +246,19 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         symbol_level_values = [-1 + v * 2 / (L - 1) for v in range(L)]
 
         # Build state vectors, including their expected voltage observations.
-        _states = all_combs([list(range(L))] * N)
-        states = []
-        for s in _states:
-            expected_voltage = 0
+        states = all_combs([list(range(L))] * N)
+        expecteds = []
+        for s in states:
+            expected_voltage = 0.0
             for n in range(N):
                 expected_voltage += pulse_resp_samps[n] * symbol_level_values[s[-(n + 1)]]
-            states.append((s, expected_voltage))
+            expecteds.append(expected_voltage)
 
         # Build state transition probability matrix.
         num_states = len(states)
         trans = []
         for state in states:
-            row_vec = np.array([1 if state[0][1:] == states[m][0][0: -1] else 0
+            row_vec = np.array([1 if state[1:] == states[m][0: -1] else 0
                                 for m in range(num_states)])
             trans.append(row_vec / row_vec.sum())  # Enforce PMF.
 
@@ -271,22 +273,11 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
 
         # Initialize private variables.
         self._states = states
+        self._expecteds = expecteds
         self._trans  = np.array(trans)
         self._sigma  = sigma
         self._v_prob = v_prob
         self._trellis = trellis
-
-    @property
-    def states(self):
-        return self._states
-
-    @property
-    def trans(self):
-        return self._trans
-
-    @property
-    def trellis(self):
-        return self._trellis
 
     @property
     def sigma(self):  # pylint: disable=missing-function-docstring
@@ -300,13 +291,4 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         """
         Probability of state at index ``s`` given observation ``x``.
         """
-        # return self.v_prob(x - self.states[s][1])
-        rslt = self.v_prob(x - self.states[s][1])
-        assert not np.isnan(rslt)
-        return rslt
-
-    def expectation(self, s: int) -> float:
-        """
-        Expected observation in state ``s``.
-        """
-        return self.states[s][1]
+        return self.v_prob(x - self.expectation(s))

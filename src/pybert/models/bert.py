@@ -574,7 +574,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
         else:
             path = decoder.decode(sig_samps)
-        symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
+        symbols_viterbi = list(map(lambda ix: decoder.states[ix][-1], path))
         if self.debug:
             self.pulse_resp_samps = pulse_resp_samps
             self.sig_samps   = sig_samps
