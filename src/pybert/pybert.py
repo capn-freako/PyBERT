@@ -38,6 +38,7 @@ from traits.api import (
     Array,
     Bool,
     Button,
+    Enum,
     File,
     Float,
     HasTraits,
@@ -48,6 +49,7 @@ from traits.api import (
     Property,
     Range,
     String,
+    Trait,
     cached_property,
     observe,
 )
@@ -119,7 +121,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     )
     seed = Int(1)  # LFSR seed. 0 means regenerate bits, using a new random seed, each run.
     nspui = Range(low=2, high=256, value=32)  #: Signal vector samples per unit interval.
-    mod_type   = List([0])                   #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    mod_type   = Trait("NRZ", {"NRZ": 0, "Duo-binary": 1, "PAM-4": 2})
     do_sweep   = Bool(False)  #: Run sweeps? (Default = False)
     debug      = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
     thresh     = Float(3.0)   #: Spectral threshold for identifying periodic components (sigma). (Default = 3.0)
@@ -272,6 +274,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
     rx_viterbi_symbols = Int(4)  #: Number of symbols to track in Viterbi decoder.
+    rx_viterbi_fec = Bool(False)  #: Use FEC, as opposed to ISI, for Viterbi decoding when True.
 
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
@@ -362,7 +365,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     jitter_info = Property(String, depends_on=["jitter_perf"])
     status_str = Property(String, depends_on=["status"])
     sweep_info = Property(String, depends_on=["sweep_results"])
-    t = Property(Array, depends_on=["ui", "nspui", "nbits"])
+    t = Property(Array, depends_on=["ui", "nspui", "nui"])
     t_ns = Property(Array, depends_on=["t"])
     f = Property(Array, depends_on=["f_step", "f_max"])
     w = Property(Array, depends_on=["f"])
@@ -571,7 +574,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     @cached_property
     def _get_bits(self):
-        "Generate the bit stream."
+        """Generate the bit stream."""
+
         pattern = self.pattern_
         seed = self.seed
         nbits = self.nbits
@@ -580,21 +584,18 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             seed = randint(128)
             while not seed:  # We don't want to seed our LFSR with zero.
                 seed = randint(128)
+
         bit_gen = lfsr_bits(pattern, seed)
         bits = [next(bit_gen) for _ in range(nbits)]
+
         return array(bits)
 
     @cached_property
     def _get_ui(self):
-        """
-        Returns the "unit interval" (i.e. - the nominal time span of each symbol moving through the channel).
-        """
+        """Returns the "unit interval" (i.e. - the nominal time span of each symbol moving through the channel)."""
 
-        mod_type = self.mod_type[0]
-        bit_rate = self.bit_rate * 1.0e9
-
-        ui = 1.0 / bit_rate
-        if mod_type == 2:  # PAM-4
+        ui = 1.0 / (self.bit_rate * 1.0e9)
+        if not self.rx_viterbi_fec and self.mod_type_ == 2:  # PAM-4, but not because we're using FEC
             ui *= 2.0
 
         return ui
@@ -603,11 +604,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_nui(self):
         """Returns the number of unit intervals in the test vectors."""
 
-        mod_type = self.mod_type[0]
+        mod_type = self.mod_type_
         nbits = self.nbits
 
         nui = nbits
-        if mod_type == 2:  # PAM-4
+        if not self.rx_viterbi_fec and mod_type == 2:  # PAM-4, but not because we're using FEC
             nui //= 2
 
         return nui
@@ -616,49 +617,20 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_eye_uis(self):
         """Returns the number of unit intervals to use for eye construction."""
 
-        mod_type = self.mod_type[0]
+        mod_type = self.mod_type_
         eye_bits = self.eye_bits
 
         eye_uis = eye_bits
-        if mod_type == 2:  # PAM-4
+        if not self.rx_viterbi_fec and mod_type == 2:  # PAM-4, but not because we're using FEC
             eye_uis //= 2
 
         return eye_uis
 
     @cached_property
-    def _get_ideal_h(self):
-        """Returns the ideal link impulse response."""
-
-        ui = self.ui.value
-        nspui = self.nspui
-        t = self.t
-        mod_type = self.mod_type[0]
-        ideal_type = self.ideal_type[0]
-
-        t = array(t) - t[-1] / 2.0
-
-        if ideal_type == 0:  # delta
-            ideal_h = zeros(len(t))
-            ideal_h[len(t) / 2] = 1.0
-        elif ideal_type == 1:  # sinc
-            ideal_h = sinc(t / (ui / 2.0))
-        elif ideal_type == 2:  # raised cosine
-            ideal_h = (cos(pi * t / (ui / 2.0)) + 1.0) / 2.0
-            ideal_h = where(t < -ui / 2.0, zeros(len(t)), ideal_h)
-            ideal_h = where(t >  ui / 2.0, zeros(len(t)), ideal_h)
-        else:
-            raise ValueError("PyBERT._get_ideal_h(): ERROR: Unrecognized ideal impulse response type.")
-
-        if mod_type == 1:  # Duo-binary relies upon the total link impulse response to perform the required addition.
-            ideal_h = 0.5 * (ideal_h + pad(ideal_h[:-1 * nspui], (nspui, 0), "constant", constant_values=(0, 0)))
-
-        return ideal_h
-
-    @cached_property
     def _get_symbols(self):
         """Generate the symbol stream."""
 
-        mod_type = self.mod_type[0]
+        mod_type = self.mod_type_
         vod = self.vod
         bits = self.bits
 
@@ -671,17 +643,20 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             symbols = 2 * array(symbols) - 1
         elif mod_type == 2:  # PAM-4
             symbols = []
+            if self.rx_viterbi_fec:
+                encoder = FEC_Encoder()
+                bits = encoder.encode(bits)
             for bits in zip(bits[0::2], bits[1::2]):
                 if bits == (0, 0):
                     symbols.append(-1.0)
                 elif bits == (0, 1):
                     symbols.append(-1.0 / 3.0)
-                elif bits == (1, 0):
+                elif bits == (1, 1):  # Gray coding required for correct FEC Viterbi decoding.
                     symbols.append(1.0 / 3.0)
                 else:
                     symbols.append(1.0)
         else:
-            raise ValueError("ERROR: _get_symbols(): Unknown modulation type requested!")
+            raise ValueError(f"ERROR: _get_symbols(): Unknown modulation type: {mod_type}, requested!")
 
         return array(symbols) * vod
 
@@ -1247,6 +1222,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.f_max = fmax
             self.log("`fMax` has been held at the Nyquist frequency.", alert=True)
 
+    def _rx_viterbi_fec_changed(self, new_value):
+        if new_value:
+            self.mod_type = "PAM-4"
+
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
@@ -1444,9 +1423,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.status = "Loaded configuration."
         except InvalidFileType:
             self.log("This filetype is not currently supported.")
+            raise
         except Exception as err:  # pylint: disable=broad-exception-caught
             self.log("Failed to load configuration. See the console for more detail.")
             self.log(str(err))
+            raise
 
     def save_configuration(self, filepath: Path):
         """Save out a configuration from pybert.

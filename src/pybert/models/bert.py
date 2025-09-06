@@ -27,6 +27,7 @@ from numpy import (  # type: ignore
     histogram,
     linspace,
     mean,
+    pad,
     repeat,
     resize,
     transpose,
@@ -40,8 +41,7 @@ from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
 from pyibisami.ami.parser import AmiName, AmiNode, ami_parse
-from pybert.models.dfe import DFE
-from pybert.utility import (
+from ..utility import (
     calc_eye,
     calc_jitter,
     calc_resps,
@@ -53,7 +53,9 @@ from pybert.utility import (
     safe_log10,
     trim_impulse,
 )
-from pybert.models.viterbi import ViterbiDecoder_ISI
+from .dfe     import DFE
+from .fec     import FEC_Encoder, FEC_Decoder
+from .viterbi import ViterbiDecoder_ISI
 
 clock = perf_counter
 
@@ -140,7 +142,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     lock_sustain = self.lock_sustain
     bandwidth = self.sum_bw * 1.0e9
     rel_thresh = self.thresh
-    mod_type = self.mod_type[0]
+    mod_type = self.mod_type_
     impulse_length = self.impulse_length
 
     # Calculate misc. values.
@@ -151,10 +153,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     max_len = 100 * nspui
     if impulse_length:
         min_len = max_len = round(impulse_length / ts)
-    if mod_type == 2:  # PAM-4
+    nspb = nspui
+    if not self.rx_viterbi_fec and mod_type == 2:  # PAM-4, but not because we're using FEC
         nspb = nspui // 2
-    else:
-        nspb = nspui
 
     # Generate the ideal over-sampled signal.
     #
@@ -384,7 +385,12 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, f)
 
     # Calculate convolutional delay.
-    ctle_out.resize(len(t), refcheck=False)
+    len_t = len(t)
+    len_ctle_out = len(ctle_out)
+    if len_ctle_out < len_t:
+        ctle_out = pad(ctle_out, (0, len_t - len_ctle_out))
+    else:
+        ctle_out = ctle_out[:len_t]
     ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
     if ctle_out_h_main_lobe.size:
         conv_dly_ix = ctle_out_h_main_lobe[0]

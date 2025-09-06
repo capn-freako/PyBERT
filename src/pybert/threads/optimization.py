@@ -131,7 +131,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     rx_n_taps = pybert.rx_n_taps
     rx_n_pre  = pybert.rx_n_pre
     max_len   = 100 * pybert.nspui
-    num_levels = pybert.mod_type[0] + 2
+    num_levels = pybert.mod_type_ + 2
 
     # Find number of enabled DFE taps. (No support for floating taps, yet.)
     n_dfe_taps = 0
@@ -255,7 +255,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                     0.0, 0.5, 25, 0.0, 0.0
                 )
                 mmse_rslts = mmse(
-                    noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type[0] + 2,
+                    noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
                     array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
                     array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
                 rx_weights_better = mmse_rslts["rx_taps"]

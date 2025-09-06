@@ -150,7 +150,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
     def update_thresholds(self):
         """Update decision thresholds."""
         decision_scaler = self.decision_scaler
-        match self.mod_type:
+        mod_type = self.mod_type
+        match mod_type:
             case 0:
                 thresholds = [0.0]
             case 1:
@@ -158,7 +159,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             case 2:
                 thresholds = [-decision_scaler * 2.0 / 3.0, 0.0, decision_scaler * 2.0 / 3.0]
             case _:
-                raise RuntimeError("Unrecognized modulation type!")
+                raise RuntimeError(f"Unrecognized modulation type: {mod_type}!")
         self.thresholds = thresholds
 
     def step(self, decision: float, error: float, update: bool):
@@ -245,10 +246,10 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         elif mod_type == 2:  # PAM-4
             if x > self.thresholds[2]:
                 decision = 1
-                bits = [1, 1]
+                bits = [1, 0]  # Gray coding
             elif x > self.thresholds[1]:
                 decision = 1.0 / 3.0
-                bits = [1, 0]
+                bits = [1, 1]  # Gray coding
             elif x > self.thresholds[0]:
                 decision = -1.0 / 3.0
                 bits = [0, 1]
