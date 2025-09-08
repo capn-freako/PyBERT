@@ -70,6 +70,7 @@ from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
+from pybert.models.fec import FEC_Encoder, FEC_Decoder
 from pybert.results import PyBertData
 from pybert.threads.optimization import OptThread
 from pybert.utility import (

@@ -55,16 +55,31 @@ class FEC_Encoder():
         self._state = (x, state[0], state[1])
         return rslt
 
+    def encode(self, bits: list[int]) -> list[int]:
+        """
+        Encode a list of bits.
+
+        Args:
+            bits: List of bits to encode.
+
+        Returns:
+            List of encoded bits (twice as many as were input).
+        """
+
+        gbits: list[int] = []
+        for bit in bits:
+            gbits.extend(self.step(bit))
+
+        return gbits
+
     @property
     def state(self):
         return self._state
     
 
 # Note: `int` is used for simplicity, but is expected to be bound to: [0,1], in all cases.
-# Delay3Tap: TypeAlias = tuple[int, int, int, int]  # current input, previous input, etc.
 Delay3Tap: TypeAlias = list[int]  # current input, previous input, etc.
 BitPair:   TypeAlias = tuple[int, int]            # lsb, msb
-# State_FEC: TypeAlias = tuple[Delay3Tap, BitPair]  # state, expected observation
 
 
 class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
@@ -85,7 +100,7 @@ class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
         # Build state vectors, along with their expected observations.
         states = all_combs([[0, 1],] * 4)
         expecteds = list(map(lambda s: ((s[0] + s[1] + s[2] + s[3]) % 2,
-                                        (s[0]        + s[2] + s[3]) % 2), self._states))
+                                        (s[0]        + s[2] + s[3]) % 2), states))
 
         # Build state transition probability matrix.
         num_states = len(states)
@@ -99,18 +114,13 @@ class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
         trellis = [[(1 / num_states, 0)] * num_states] * L
 
         # Calculate "emission" probabilities.
-        # probs: tuple[tuple[Rvec, Rvec], tuple[Rvec, Rvec]] = (
-        #     (np.zeros(num_states), np.zeros(num_states)),
-        #     (np.zeros(num_states), np.zeros(num_states)))
         probs: list[list[Rvec]] = [
             [np.zeros(num_states), np.zeros(num_states)],
             [np.zeros(num_states), np.zeros(num_states)]]
         for g1 in range(2):
-            # rslt: tuple[Rvec, Rvec] = (np.zeros(num_states), np.zeros(num_states))
             for g0 in range(2):
-                pvec = np.array(map(lambda gs: 2 - (abs(g0 - gs[0]) + abs(g1 - gs[1])), expecteds))
+                pvec = np.array(list(map(lambda gs: float(2 - (abs(g0 - gs[0]) + abs(g1 - gs[1]))), expecteds)))
                 pvec /= pvec.sum()  # Enforce PMF.
-                # rslt[g0] = pvec.copy()
                 probs[g1][g0] = pvec.copy()
 
         # Initialize private variables.
@@ -128,5 +138,5 @@ class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
             1. This is sometimes referred to as the "emission probability" in the literature.
         """
 
-        g0, g1 = x
+        g1, g0 = x
         return self._probs[g1][g0][s]

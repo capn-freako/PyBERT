@@ -490,3 +490,29 @@ def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int) -> list[fl
     actual_weights = minimum(max_weights, maximum(min_weights, ideal_weights))
 
     return actual_weights
+
+
+def resize_zero_pad(x: Rvec, new_length: int) -> Rvec:
+    """
+    Resize an array, zero padding if necessary.
+
+    Args:
+        x: Array to resize.
+        new_length: Desired new length of array.
+
+    Returns:
+        Resized array, zero padded if longer than original.
+
+    Notes:
+        1. This function is necessary to cover a funny corner case w/ NumPy.
+        The ``numpy.resize()`` function repeats the input array when asked to
+        extend its length, which is not what we want in PyBERT.
+        And the ``numpy.ndarray.resize()`` function, which zero pads instead,
+        is fragile, due to data ownership.
+    """
+
+    len_x = len(x)
+    if new_length <= len_x:
+        return x[:new_length]
+    else:
+        return pad(x, (0, new_length - len_x))
