@@ -210,7 +210,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     pn[pn_samps // 2:] = pn_mag
     self.pn_period = pn_period
     self.pn_samps = pn_samps
-    pn = resize(pn, len(x))
+    pn = resize(pn, len(x))  # Here, we want the repetition that `numpy.resize()` gives.
     # High pass filter it. (Simulating capacitive coupling.)
     (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
     pn = lfilter(b, a, pn)[: len(pn)]
@@ -529,7 +529,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     split_time = clock()
     _check_sim_status()
 
-    self.bit_errs_viterbi = -1  # `-1` flags that Viterbi was not run.
     self.viterbi_perf = 0
     if self.rx_use_viterbi:
         dbg_dict_viterbi: Optional[dict[str, Any]] = None
@@ -539,9 +538,17 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
             fec_decoder = FEC_Decoder(N)
+            # print(f"len(bits_out): {len(bits_out)}")
+            # print(f"len(ffe_out): {len(ffe_out)}")
+            # print(f"len(t): {len(t)}")
+            # print(f"dt: {t[1] - t[0]}")
+            # print(f"dfe.mod_type: {dfe.mod_type}")
+            # print(f"dfe.dbg_dict: {dbg_dict}")
             path = fec_decoder.decode(list(zip(bits_out[:-1:2], bits_out[1::2])), dbg_dict=dbg_dict_viterbi)
+            # print(f"len(path): {len(path)}")
             _states = fec_decoder.states
             bits_out = list(map(lambda ix: _states[ix][0], path))
+            # print(f"len(bits_out): {len(bits_out)}")
         else:
             self.status = "Running Viterbi..."
             match mod_type:
@@ -594,7 +601,16 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         bits_ref = bits_ref[: len(bits_tst)]
     elif len(bits_tst) > len(bits_ref):
         bits_tst = bits_tst[: len(bits_ref)]
-    bit_errs = where(bits_tst ^ bits_ref)[0]
+    try:
+        bit_errs = where(bits_tst ^ bits_ref)[0]
+    except:
+        print(f"bits_tst: {bits_tst}")
+        print(f"bits_ref: {bits_ref}")
+        print(f"first_ref_bit: {first_ref_bit}")
+        print(f"len(bits): {len(bits)}")
+        print(f"first_tst_bit: {first_tst_bit}")
+        print(f"len(bits_out): {len(bits_out)}")
+        raise
     n_errs = len(bit_errs)
     if n_errs and False:  # pylint: disable=condition-evals-to-constant
         self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")

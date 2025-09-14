@@ -59,7 +59,11 @@ def safe_log10(x):
         if x == 0:
             x = 1.0e-20
 
-    return log10(x)
+    try:
+        return log10(x)
+    except:
+        print(f"x: {x}")
+        raise
 
 
 # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments

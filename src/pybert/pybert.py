@@ -344,7 +344,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
     bit_errs = Int(0)  #: # of bit errors observed in last run.
-    bit_errs_viterbi = Int(0)  #: # of bit errors observed in last run.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
@@ -644,7 +643,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             symbols = 2 * array(symbols) - 1
         elif mod_type == 2:  # PAM-4
             symbols = []
-            if self.rx_viterbi_fec:
+            if self.rx_use_viterbi and self.rx_viterbi_fec:
                 encoder = FEC_Encoder()
                 bits = encoder.encode(bits)
             for bits in zip(bits[0::2], bits[1::2]):
@@ -969,10 +968,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_status_str(self):
         status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
-        if self.bit_errs_viterbi >= 0:
-            err_str = f"    | BitErrs: {int(self.bit_errs)} ({int(self.bit_errs_viterbi)})"
-        else:
-            err_str = f"    | BitErrs: {int(self.bit_errs)}"
+        err_str = f"    | BitErrs: {int(self.bit_errs)}"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
         jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (
@@ -1007,6 +1003,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.dfe.limits = limits
 
     def _rx_n_taps_changed(self, new_value):
+        if new_value < 0:
+            # self._rx_n_taps_changed(0)
+            self.rx_n_taps = 0
+            return
         for n, tuner in enumerate(self.ffe_tap_tuners):
             if n >= new_value:
                 tuner.enabled = False
@@ -1017,6 +1017,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 tap.enabled = False
             else:
                 tap.enabled = True
+        if self.rx_n_pre >= new_value:
+            self.rx_n_pre = max(0, new_value - 1)
 
     @observe("rx_n_pre")
     def rx_n_pre_changed(self, event):
