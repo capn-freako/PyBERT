@@ -197,8 +197,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 "I had to abort the EQ optimization in your stead.",
             ])) from err
 
-    for tx_weights in tx_weightss:
-        insert(tx_weights, tx_curs_pos, 1 - sum(abs(array(tx_weights))))
+    tx_weightss = list(map(lambda ws: insert(ws, tx_curs_pos, 1 - sum(abs(ws))), tx_weightss))
 
     # Calculate CTLE gain candidates.
     if pybert.ctle_enable_tune:
@@ -283,15 +282,25 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                     tx_H, chnl_H, ones(len(f_t)), ctle_H,
                     0.0, 0.5, 25, 0.0, 0.0
                 )
-                mmse_rslts = mmse(
-                    noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
-                    array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
-                    array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
+                try:
+                    mmse_rslts = mmse(
+                        noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
+                        array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
+                        array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
+                except:
+                    print(f"curs_ix: {curs_ix}")
+                    print(f"curs_amp: {curs_amp}")
+                    print(f"h_tx: {h_tx}")
+                    print(f"tx_weights: {tx_weights}")
+                    raise
                 rx_weights_better = mmse_rslts["rx_taps"]
                 dfe_weights_better = mmse_rslts["dfe_tap_weights"]
                 fom = mmse_rslts["fom"]
-                p_tot = resize_zero_pad(add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
-                               nspui * (n_rx_weights + 5))
+                try:
+                    p_tot = resize_zero_pad(add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
+                                   nspui * (n_rx_weights + 5))
+                except ValueError:  # Flags obviously non-optimum case.
+                    continue
                 fom_better = fom
                 trials_run += 1
                 if not trials_run % trials_run_inc:

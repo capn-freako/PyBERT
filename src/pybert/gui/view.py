@@ -740,8 +740,8 @@ traits_view = View(
                 ),
                 VGroup(  # Rx FFE
                     HGroup(
-                        Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
-                        Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
+                        # Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
+                        # Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
                         Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
                     ),
                     Item(

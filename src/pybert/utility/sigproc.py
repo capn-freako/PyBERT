@@ -455,7 +455,8 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
 
 
 def add_ffe_dfe(
-    ffe_weights: Sequence[float], dfe_weights: Sequence[float], nspui: int, pr_ctle_out: Rvec
+    # ffe_weights: Sequence[float], dfe_weights: Sequence[float], nspui: int, pr_ctle_out: Rvec
+    ffe_weights: Rvec, dfe_weights: Rvec, nspui: int, pr_ctle_out: Rvec
 ) -> Rvec:
     """
     Add the effects of the FFE and DFE to the cumulative system pulse response at the CTLE output.
@@ -475,7 +476,7 @@ def add_ffe_dfe(
     """
 
     # Add the effect of FFE. (`sum()` is used to concatenate.)
-    if ffe_weights:
+    if len(ffe_weights) and ffe_weights.any():
         h_ffe = array(sum([[ffe_weight] + [0] * (nspui - 1) for ffe_weight in ffe_weights], []))
         p_tot = convolve(pr_ctle_out, h_ffe)[:len(pr_ctle_out)]
     else:
