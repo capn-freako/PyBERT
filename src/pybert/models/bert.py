@@ -441,6 +441,16 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ffe_s, ffe_p, ffe_H = calc_resps(t, ffe_h, ui, f)                   # pylint: disable=unused-variable
     ffe_out_s, ffe_out_p, ffe_out_H = calc_resps(t, ffe_out_h, ui, f)   # pylint: disable=unused-variable
 
+    self.ffe_h = ffe_h
+    self.ffe_s = ffe_s
+    self.ffe_p = ffe_p
+    self.ffe_H = ffe_H
+    self.ffe_out_h = ffe_out_h
+    self.ffe_out_s = ffe_out_s
+    self.ffe_out_p = ffe_out_p
+    self.ffe_out_H = ffe_out_H
+    self.ffe_out = ffe_out
+
     self.ffe_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
     _check_sim_status()
@@ -538,17 +548,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
             fec_decoder = FEC_Decoder(N)
-            # print(f"len(bits_out): {len(bits_out)}")
-            # print(f"len(ffe_out): {len(ffe_out)}")
-            # print(f"len(t): {len(t)}")
-            # print(f"dt: {t[1] - t[0]}")
-            # print(f"dfe.mod_type: {dfe.mod_type}")
-            # print(f"dfe.dbg_dict: {dbg_dict}")
             path = fec_decoder.decode(list(zip(bits_out[:-1:2], bits_out[1::2])), dbg_dict=dbg_dict_viterbi)
-            # print(f"len(path): {len(path)}")
             _states = fec_decoder.states
             bits_out = list(map(lambda ix: _states[ix][0], path))
-            # print(f"len(bits_out): {len(bits_out)}")
         else:
             self.status = "Running Viterbi..."
             match mod_type:
@@ -571,8 +573,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 self.pulse_resp_samps = pulse_resp_samps
                 self.sig_samps = sig_samps
                 self.symbols_viterbi = symbols_viterbi
-                self.dbg_dict_viterbi["decoder"] = viterbi_decoder
-                self.dbg_dict_viterbi["path"] = path
+                self.symbols_dfe = dfe_rslts["decisions"]
+                self.dbg_dict_viterbi = {
+                    "decoder": viterbi_decoder,
+                    "path": path,
+                    }
             bits_out = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
         self.viterbi_perf = nbits * nspb / (clock() - split_time)
 

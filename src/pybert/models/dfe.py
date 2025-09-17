@@ -295,6 +295,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 - "clock_times": List of clocking instants, as recovered by the CDR.
                 - "bits": List of recovered bits.
                 - "sig_samps": Samples of the summing node output, taken at the clocking instants.
+                - "decisions": Symbol decisions made based on voltages sampled at clocking instants.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -328,6 +329,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         clock_times = [next_clock_time]
         bits = []
         sig_samps = []
+        decisions = []
         boundary_sample = 0
         slicer_samps = zeros(agc_n_ave)
         ave_samps = zeros(agc_n_ave)
@@ -362,6 +364,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 decision, new_bits = self.decide(sum_out)
                 bits.extend(new_bits)
                 sig_samps.append(sum_out)
+                decisions.append(decision)
                 slicer_output = decision * decision_scaler
                 error = sum_out - slicer_output
                 update = locked and (clk_cntr % n_ave) == 0
@@ -416,7 +419,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             "lockeds": lockeds,
             "clock_times": clock_times,
             "bits": array(bits),
-            "sig_samps": array(sig_samps)
+            "sig_samps": array(sig_samps),
+            "decisions": array(decisions),
         })
 
         return rslt

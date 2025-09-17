@@ -245,14 +245,16 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         # Build normalized (to `pulse_resp_samps[0]`) symbol level voltages.
         symbol_level_values = [-1 + v * 2 / (L - 1) for v in range(L)]
 
-        # Build state vectors, including their expected voltage observations.
-        states = all_combs([list(range(L))] * N)
-        expecteds = []
-        for s in states:
-            expected_voltage = 0.0
-            for n in range(N):
-                expected_voltage += pulse_resp_samps[n] * symbol_level_values[s[-(n + 1)]]
-            expecteds.append(expected_voltage)
+        # Build state vectors and their expected voltage observations.
+        # states = all_combs([list(range(L))] * N)
+        states = all_combs([symbol_level_values] * N)
+        # expecteds = []
+        # for s in states:
+        #     expected_voltage = 0.0
+        #     for n in range(N):
+        #         expected_voltage += pulse_resp_samps[n] * symbol_level_values[s[-(n + 1)]]
+        #     expecteds.append(expected_voltage)
+        expecteds = [sum([pulse_resp_samps[n] * s[-(n + 1)] for n in range(N)]) for s in states]
 
         # Build state transition probability matrix.
         num_states = len(states)
