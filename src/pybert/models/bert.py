@@ -11,7 +11,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from time import perf_counter
-from typing import Any, Callable, Optional, TypeAlias
+from typing import Any, Callable, Optional, TypeAlias, Union
 
 import numpy        as np
 import numpy.typing as npt
@@ -27,6 +27,7 @@ from numpy import (  # type: ignore
     histogram,
     linspace,
     mean,
+    ones,
     pad,
     repeat,
     resize,
@@ -545,12 +546,32 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         if self.debug:
             dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
+        pulse_resp_curs_ix = np.argmax(ffe_out_p)
+        pulse_resp_samps = np.array([ffe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
-            fec_decoder = FEC_Decoder(N)
-            path = fec_decoder.decode(list(zip(bits_out[:-1:2], bits_out[1::2])), dbg_dict=dbg_dict_viterbi)
-            _states = fec_decoder.states
+            decoder: Union[FEC_Decoder, ViterbiDecoder_ISI] = FEC_Decoder(N)
+            path = decoder.decode(list(zip(bits_out[0::2], bits_out[1::2])), dbg_dict=dbg_dict_viterbi)
+            # path = decoder.decode(list(zip(bits_out[1::2], bits_out[0::2])), dbg_dict=dbg_dict_viterbi)  # worse
+            _states = decoder.states
             bits_out = list(map(lambda ix: _states[ix][0], path))
+            if self.debug:  # Regenerate the observed symbols.
+                init_state = _states[path[0]][1:]
+                encoder = FEC_Encoder()  #init_state=init_state)
+                gbitss = encoder.encode(bits_out)
+                symbols_viterbi: list[float] = []
+                for gbits in gbitss:
+                    match gbits:
+                        case (0, 0):
+                            symbols_viterbi.append(-1.0)
+                        case (0, 1):
+                            symbols_viterbi.append(-1.0 / 3.0)
+                        case (1, 1):
+                            symbols_viterbi.append(1.0 / 3.0)
+                        case (1, 0):
+                            symbols_viterbi.append(1.0)
+                        case _:
+                            raise ValueError(f"Invalid bit pair: {gbits}!")
         else:
             self.status = "Running Viterbi..."
             match mod_type:
@@ -563,23 +584,26 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 case _:
                     raise ValueError(f"Unrecognized modulation type: {mod_type}!")
             sigma = self.rn
-            pulse_resp_curs_ix = np.argmax(ffe_out_p)
-            pulse_resp_samps = np.array([ffe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
-            viterbi_decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
-            path = viterbi_decoder.decode(sig_samps, dbg_dict=dbg_dict_viterbi)
-            _states = viterbi_decoder.states
-            symbols_viterbi: list[float] = list(map(lambda ix: _states[ix][-1], path))
-            if self.debug:
-                self.pulse_resp_samps = pulse_resp_samps
-                self.sig_samps = sig_samps
-                self.symbols_viterbi = symbols_viterbi
-                self.symbols_dfe = dfe_rslts["decisions"]
-                self.dbg_dict_viterbi = {
-                    "decoder": viterbi_decoder,
-                    "path": path,
-                    }
+            decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
+            path = decoder.decode(sig_samps, dbg_dict=dbg_dict_viterbi)
+            _states = decoder.states
+            symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
             bits_out = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
         self.viterbi_perf = nbits * nspb / (clock() - split_time)
+        if self.debug:
+            # self.pulse_resp_samps = pulse_resp_samps
+            # self.sig_samps = sig_samps
+            # self.symbols_viterbi = symbols_viterbi
+            # self.symbols_dfe = dfe_rslts["decisions"]
+            dbg_dict_viterbi.update({
+                "decoder": decoder,
+                "path": path,
+                "pulse_resp_samps": pulse_resp_samps,
+                "sig_samps": sig_samps,
+                "symbols_viterbi": symbols_viterbi,
+                "symbols_dfe": dfe_rslts["decisions"],
+                })
+            self.dbg_dict_viterbi = dbg_dict_viterbi
 
     split_time = clock()
     _check_sim_status()
@@ -608,6 +632,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         bits_tst = bits_tst[: len(bits_ref)]
     try:
         bit_errs = where(bits_tst ^ bits_ref)[0]
+        bit_errs = where(bits_tst ^ bits_ref, ones(len(bits_tst)), zeros(len(bits_tst)))
     except:
         print(f"bits_tst: {bits_tst}")
         print(f"bits_ref: {bits_ref}")
@@ -616,10 +641,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         print(f"first_tst_bit: {first_tst_bit}")
         print(f"len(bits_out): {len(bits_out)}")
         raise
-    n_errs = len(bit_errs)
+    n_errs = len(where(bit_errs == 1.0)[0])
     if n_errs and False:  # pylint: disable=condition-evals-to-constant
         self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
-    self.bit_errs = n_errs
+    self.bit_errs = bit_errs
+    self.n_errs = n_errs
 
     self.dfe_h = dfe_h
     self.dfe_s = dfe_s

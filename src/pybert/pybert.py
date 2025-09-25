@@ -343,7 +343,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     sweep_results = List([])
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
-    bit_errs = Int(0)  #: # of bit errors observed in last run.
+    n_errs = Int(0)  #: # of bit errors observed in last run.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
@@ -370,13 +370,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     f = Property(Array, depends_on=["f_step", "f_max"])
     w = Property(Array, depends_on=["f"])
     t_irfft = Property(Array, depends_on=["f"])
-    bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count"])
-    symbols = Property(Array, depends_on=["bits", "mod_type", "vod"])
+    bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count", "rx_use_viterbi", "rx_viterbi_fec"])
+    symbols = Property(Array, depends_on=["bits", "vod"])
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
     rx_ffe = Property(Array, depends_on=["rx_taps.value", "rx_taps.enabled"])
-    ui = Property(Float, depends_on=["bit_rate", "mod_type"])
-    nui = Property(Int, depends_on=["nbits", "mod_type"])
-    eye_uis = Property(Int, depends_on=["eye_bits", "mod_type"])
+    ui = Property(Float, depends_on=["bit_rate", "mod_type", "rx_use_viterbi", "rx_viterbi_fec"])
+    nui = Property(Int, depends_on=["nbits", "mod_type", "rx_use_viterbi", "rx_viterbi_fec"])
+    eye_uis = Property(Int, depends_on=["eye_bits", "mod_type", "rx_use_viterbi", "rx_viterbi_fec"])
     dfe_out_p = Array()
 
     # Custom buttons, which we'll use in particular tabs.
@@ -595,7 +595,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         """Returns the "unit interval" (i.e. - the nominal time span of each symbol moving through the channel)."""
 
         ui = 1.0 / (self.bit_rate * 1.0e9)
-        if not self.rx_viterbi_fec and self.mod_type_ == 2:  # PAM-4, but not because we're using FEC
+        if self.mod_type == "PAM-4" and not (self.rx_use_viterbi and self.rx_viterbi_fec):
             ui *= 2.0
 
         return ui
@@ -604,11 +604,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_nui(self):
         """Returns the number of unit intervals in the test vectors."""
 
-        mod_type = self.mod_type_
-        nbits = self.nbits
-
-        nui = nbits
-        if not self.rx_viterbi_fec and mod_type == 2:  # PAM-4, but not because we're using FEC
+        nui = self.nbits
+        if self.mod_type == "PAM-4" and not (self.rx_use_viterbi and self.rx_viterbi_fec):
             nui //= 2
 
         return nui
@@ -617,11 +614,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_eye_uis(self):
         """Returns the number of unit intervals to use for eye construction."""
 
-        mod_type = self.mod_type_
-        eye_bits = self.eye_bits
-
-        eye_uis = eye_bits
-        if not self.rx_viterbi_fec and mod_type == 2:  # PAM-4, but not because we're using FEC
+        eye_uis = self.eye_bits
+        if self.mod_type == "PAM-4" and not (self.rx_use_viterbi and self.rx_viterbi_fec):
             eye_uis //= 2
 
         return eye_uis
@@ -645,16 +639,21 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             symbols = []
             if self.rx_use_viterbi and self.rx_viterbi_fec:
                 encoder = FEC_Encoder()
-                bits = encoder.encode(bits)
-            for bits in zip(bits[0::2], bits[1::2]):
-                if bits == (0, 0):
-                    symbols.append(-1.0)
-                elif bits == (0, 1):
-                    symbols.append(-1.0 / 3.0)
-                elif bits == (1, 1):  # Gray coding required for correct FEC Viterbi decoding.
-                    symbols.append(1.0 / 3.0)
-                else:
-                    symbols.append(1.0)
+                gbitss = encoder.encode(bits)
+            else:
+                gbitss = zip(bits[0::2], bits[1::2])
+            for gbits in gbitss:
+                match gbits:
+                    case (0, 0):
+                        symbols.append(-1.0)
+                    case (0, 1):
+                        symbols.append(-1.0 / 3.0)
+                    case (1, 1):  # Gray coding required for correct FEC Viterbi decoding.
+                        symbols.append(1.0 / 3.0)
+                    case (1, 0):
+                        symbols.append(1.0)
+                    case _:
+                        raise ValueError(f"Invalid bit pair: {gbits}!")
         else:
             raise ValueError(f"ERROR: _get_symbols(): Unknown modulation type: {mod_type}, requested!")
 
@@ -968,7 +967,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_status_str(self):
         status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
-        err_str = f"    | BitErrs: {int(self.bit_errs)}"
+        err_str = f"    | BitErrs: {int(self.n_errs)}"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
         jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (
