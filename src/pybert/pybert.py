@@ -369,6 +369,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     t_irfft = Property(Array, depends_on=["f"])
     bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count"])
     symbols = Property(Array, depends_on=["bits", "mod_type", "vod"])
+    L = Property(Int, depends_on=["mod_type"])
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
     rx_ffe = Property(Array, depends_on=["rx_taps.value", "rx_taps.enabled"])
     ui = Property(Float, depends_on=["bit_rate", "mod_type"])
@@ -653,6 +654,20 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             ideal_h = 0.5 * (ideal_h + pad(ideal_h[:-1 * nspui], (nspui, 0), "constant", constant_values=(0, 0)))
 
         return ideal_h
+
+    @cached_property
+    def _get_L(self):
+        """Number of symbols in alphabet."""
+
+        match(self.mod_type[0]):
+            case 0:  # NRZ
+                return 2
+            case 1:  # Duobinary
+                return 3
+            case 2:  # PAM-4
+                return 4
+            case _:  # Unrecognized!
+                raise ValueError("Unknown modulation type found!")
 
     @cached_property
     def _get_symbols(self):

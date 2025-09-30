@@ -872,7 +872,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     except Exception as err:  # pylint: disable=broad-exception-caught
         self.log(f"The following error occured, while trying to update the plots:\n{err}")
         self.status = "Exception: plotting"
-        # raise
+        raise
 
 
 # Plot updating
@@ -1096,29 +1096,59 @@ def update_results(self):
     self.plotdata.set_data("eye_dfe", eye_dfe)
 
     # Viterbi trellis
-    trellis_state_bubble_xs = []
-    trellis_state_bubble_ys = []
-    trellis_path_xs = []
-    trellis_path_ys = []
+    N_PATHS = 3
+    trellis_path_xs:     list[int]       = []
+    trellis_path_ys:     list[list[int]] = [[], [], []]
+    trellis_state_ys:    list[list[int]] = [[], [], []]
+    trellis_state_probs: list[list[int]] = [[], [], []]
     if self.rx_use_viterbi:
-        path = self.dbg_dict_viterbi["path"]
-        trellis_path_xs = range(len(path))
-        trellis_path_ys = path
+        trellis_path_ys     = []
+        trellis_state_ys    = []
+        trellis_state_probs = []
 
-        # trellis = [[]]
-        # nx = len(path)
-        # for n, (probs, prevs) in enumerate(zip(self.dbg_dict_viterbi["probs"],
-        #                                        self.dbg_dict_viterbi["prevs"])):
-        #     probs_prevs_filt: list[tuple[int, tuple[float, int]]] = [m, (prob, prev)
-        #         for m, (prob, prev) in enumerate(zip(probs, prev))
-        #         if prob >= MIN_VITERBI_PROB]
-        #     if n:  # 2nd, 3rd, etc. column
-        #     else:  # 1st column
-        #         for m, (prob, _) in probs_prevs_filt:
-                    
+        # Assemble pairs of lists of probabilities and previous states, by trellis column.
+        probss_prevss = list(zip(self.dbg_dict_viterbi["probs"],
+                                 self.dbg_dict_viterbi["prevs"]))
+        probss_prevss.reverse()  # We trace backwards through the trellis.
+        trellis_path_xs = range(len(probss_prevss))
+
+        # Start with the most probable final states.
+        prob_prev_pairs = list(enumerate(zip(*(probss_prevss[0]))))  # `enumerate()` provides correct y-index.
+        prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)   # Sort on state probability.
+        most_probable_pairs = [x[0] for x in prob_prev_pairs[:N_PATHS]]
+        trellis_path_ys.append(most_probable_pairs)
+
+        # Then, taking the remaining trellis columns one at a time...
+        for probs, prevs in probss_prevss:
+            trellis_path_ys.append([prevs[y] for y in trellis_path_ys[-1]])
+            state_probs: list[tuple[int, float]] = list(enumerate(probs))
+            state_probs.sort(key=lambda x: x[1], reverse=True)   # Sort on state probability.
+            trellis_state_ys.append([x[0] for x in state_probs[:N_PATHS]])
+            trellis_state_probs.append([x[1] for x in state_probs[:N_PATHS]])
+        trellis_path_ys = trellis_path_ys[:-1]  # Trim the extra element.
+
+        # Restore forward order of lists.
+        trellis_path_ys.reverse()
+        trellis_state_ys.reverse()
+        trellis_state_probs.reverse()
+
+        # Transpose the lists, to attain the proper data layout for plotting.
+        trellis_path_ys = list(zip(*trellis_path_ys))
+        trellis_state_ys = list(zip(*trellis_state_ys))
+        trellis_state_probs = list(zip(*trellis_state_probs))
+
     self.plotdata.set_data("trellis_path_xs", trellis_path_xs)
-    self.plotdata.set_data("trellis_path_ys", trellis_path_ys)
-
+    self.plotdata.set_data("trellis_path1_ys", trellis_path_ys[0])
+    self.plotdata.set_data("trellis_path2_ys", trellis_path_ys[1])
+    self.plotdata.set_data("trellis_path3_ys", trellis_path_ys[2])
+    self.plotdata.set_data("trellis_state1_ys", trellis_state_ys[0])
+    self.plotdata.set_data("trellis_state2_ys", trellis_state_ys[1])
+    self.plotdata.set_data("trellis_state3_ys", trellis_state_ys[2])
+    self.plotdata.set_data("trellis_state1_probs", trellis_state_probs[0])
+    self.plotdata.set_data("trellis_state2_probs", trellis_state_probs[1])
+    self.plotdata.set_data("trellis_state3_probs", trellis_state_probs[2])
+    if hasattr(self, "plot_viterbi"):
+        self.plot_viterbi.components[0].value_range.high_setting = self.L ** self.rx_viterbi_symbols - 0.5
 
 def update_eyes(self):
     """Update the heat plots representing the eye diagrams.
