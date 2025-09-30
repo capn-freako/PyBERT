@@ -62,7 +62,7 @@ AmiFloats: TypeAlias = tuple[AmiName, list["float | 'AmiFloats'"]]
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.0e-12
 gFc             = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
-
+MIN_VITERBI_PROB = 0.01  # Minimum state probability required, to be included in trellis graph.
 
 # pylint: disable=too-many-locals,protected-access,too-many-branches,too-many-statements
 def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True,
@@ -569,18 +569,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
             ix = np.where(t >= sample_time)[0][0]
             sig_samps.append(ffe_out[ix])
-        if self.debug:
-            self.dbg_dict_viterbi = {}
-            path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
-        else:
-            path = decoder.decode(sig_samps)
+        self.dbg_dict_viterbi = {}
+        path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
         symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
-        if self.debug:
-            self.pulse_resp_samps = pulse_resp_samps
-            self.sig_samps   = sig_samps
-            self.symbols_viterbi  = symbols_viterbi
-            self.dbg_dict_viterbi["decoder"] = decoder
-            self.dbg_dict_viterbi["path"] = path
+        self.pulse_resp_samps = pulse_resp_samps
+        self.sig_samps   = sig_samps
+        self.symbols_viterbi  = symbols_viterbi
+        self.dbg_dict_viterbi["decoder"] = decoder
+        self.dbg_dict_viterbi["path"] = path
         bits_tst_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
         if len(bits_ref) > len(bits_tst_viterbi):
             bits_ref = bits_ref[: len(bits_tst_viterbi)]
@@ -641,18 +637,18 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     len_x_m1 = len(x) - 1
     xing_min_t = (nui - eye_uis) * ui
 
-    def eye_xings(xings, ofst=0) -> NDArray[float64]:
+    def eye_xings(xings: list[float], ofst: float = 0) -> NDArray[float64]:
         """
         Return crossings from that portion of the signal used to generate the eye.
 
         Args:
-            xings([float]): List of crossings.
+            xings: List of crossings.
 
         Keyword Args:
-            ofst(float): Time offset to be subtracted from all crossings.
+            ofst: Time offset to be subtracted from all crossings.
 
         Returns:
-            [float]: Selected crossings, offset and eye-start corrected.
+            Selected crossings, offset and eye-start corrected.
         """
         _xings = array(xings) - ofst
         return _xings[where(_xings > xing_min_t)] - xing_min_t
@@ -881,11 +877,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
 # Plot updating
 # pylint: disable=too-many-locals,protected-access,too-many-statements
+# def update_results(self: PyBERT):
 def update_results(self):
-    """Updates all plot data used by GUI.
+    """
+    Updates all plot data used by GUI.
 
     Args:
-        self(PyBERT): Reference to an instance of the *PyBERT* class.
+        self: Reference to an instance of the *PyBERT* class.
     """
 
     # Copy globals into local namespace.
@@ -1096,6 +1094,30 @@ def update_results(self):
     self.plotdata.set_data("eye_tx", eye_tx)
     self.plotdata.set_data("eye_ctle", eye_ctle)
     self.plotdata.set_data("eye_dfe", eye_dfe)
+
+    # Viterbi trellis
+    trellis_state_bubble_xs = []
+    trellis_state_bubble_ys = []
+    trellis_path_xs = []
+    trellis_path_ys = []
+    if self.rx_use_viterbi:
+        path = self.dbg_dict_viterbi["path"]
+        trellis_path_xs = range(len(path))
+        trellis_path_ys = path
+
+        # trellis = [[]]
+        # nx = len(path)
+        # for n, (probs, prevs) in enumerate(zip(self.dbg_dict_viterbi["probs"],
+        #                                        self.dbg_dict_viterbi["prevs"])):
+        #     probs_prevs_filt: list[tuple[int, tuple[float, int]]] = [m, (prob, prev)
+        #         for m, (prob, prev) in enumerate(zip(probs, prev))
+        #         if prob >= MIN_VITERBI_PROB]
+        #     if n:  # 2nd, 3rd, etc. column
+        #     else:  # 1st column
+        #         for m, (prob, _) in probs_prevs_filt:
+                    
+    self.plotdata.set_data("trellis_path_xs", trellis_path_xs)
+    self.plotdata.set_data("trellis_path_ys", trellis_path_ys)
 
 
 def update_eyes(self):

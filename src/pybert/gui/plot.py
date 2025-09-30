@@ -106,6 +106,27 @@ def make_plots(self, n_dfe_taps):
     container_tune.add(plot_h_tune)
     self.plot_h_tune = container_tune
 
+    # - Viterbi trellis
+    plot_viterbi = Plot(plotdata)
+    plot_viterbi.plot(("trellis_path_xs", "trellis_path_ys"),
+        type="scatter", outline_color="blue", marker="circle", color="white")
+    plot_viterbi.plot(("trellis_path_xs", "trellis_path_ys"), type="line", color="blue")
+    plot_viterbi.index_range.low_setting  =  0
+    plot_viterbi.index_range.high_setting = 10
+    plot_viterbi.index_axis.tick_interval =  1
+    plot_viterbi.value_axis.tick_interval =  1
+    plot_viterbi.title = "Viterbi Decoder Trellis"
+    plot_viterbi.index_axis.title = "Symbol Index"
+    plot_viterbi.value_axis.title = "State Index"
+
+    plot_viterbi.tools.append(PanTool(plot_viterbi,
+        constrain=True, constrain_key=None, constrain_direction="x",
+        pan_keys_step=100.0, restrict_to_data=True))
+
+    container_viterbi = GridPlotContainer(shape=(1, 1))
+    container_viterbi.add(plot_viterbi)
+    self.plot_viterbi = container_viterbi
+
     # - Impulse Responses tab
     plot_h_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
     plot_h_chnl.plot(("t_ns_chnl", "chnl_h"), type="line", color="blue", name="Incremental")

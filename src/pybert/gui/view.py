@@ -846,6 +846,11 @@ traits_view = View(
                 label="Bathtubs",
                 id="plots_bathtub",
             ),
+            VGroup(
+                Item("plot_viterbi", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
+                label="Viterbi",
+                id="plots_viterbi",
+            ),
             layout="tabbed",
             label="Results",
             id="results",
