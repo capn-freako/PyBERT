@@ -2,6 +2,8 @@
 
 import pytest
 
+from pathlib import Path
+
 from pybert.pybert import PyBERT
 from pybert.gui.handler import MyHandler
 
@@ -31,6 +33,18 @@ def optimization_triplet():
     yield (thePyBERT, theHandler, theInfo)
 
 @pytest.fixture(scope="module")
+def pdut(request):
+    """Return a parameterized PyBERT object that has already run the initial simulation."""
+    cfg = request.param
+    assert isinstance(cfg, dict), "Fixture parameter must be a dictionary of PyBERT attributes!"
+    dut = PyBERT(run_simulation=False, gui=False)
+    for k, v in cfg.items():
+        assert hasattr(dut, k), f"Unrecognized PyBERT attribute: {k}!"
+        setattr(dut, k, v)
+    dut.simulate(initial_run=True)
+    yield dut
+
+@pytest.fixture(scope="module")
 def dut():
     """Return an initialized pybert object that has already run the initial simulation."""
     yield PyBERT(gui=False)
@@ -57,6 +71,16 @@ def dut_viterbi_stressed():
     dut = PyBERT(run_simulation=False, gui=False)
     dut.rx_use_viterbi = True
     dut.l_ch = 2.0
+    dut.simulate(initial_run=True)
+    yield dut
+
+@pytest.fixture(scope="module")
+def dut_viterbi_1p5mChannel():
+    """Return a pybert object initialized using ``chnl_1p5.yaml``."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.load_configuration(Path("misc", "ViterbiTesting", "chnl_1p5.yaml"))
+    assert dut.status == "Loaded configuration.", RuntimeError(
+        "Configuration load failed!")
     dut.simulate(initial_run=True)
     yield dut
 

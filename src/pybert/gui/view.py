@@ -13,6 +13,7 @@ from pyface.image_resource import ImageResource
 from traitsui.api import (  # CloseAction,
     Action,
     CheckListEditor,
+    EnumEditor,
     FileEditor,
     Group,
     HGroup,
@@ -62,13 +63,12 @@ traits_view = View(
                                 name="mod_type",
                                 label="Modulation",
                                 tooltip="line signalling/modulation scheme",
-                                editor=CheckListEditor(values=[(0, "NRZ"), (1, "Duo-binary"), (2, "PAM-4")]),
                             ),
                             Item(
                                 name="rlm",
                                 label="RLM",
                                 tooltip="relative level mismatch",
-                                enabled_when="mod_type[0] == 2"
+                                enabled_when="mod_type_ == 2"
                             ),
                             label="Rate && Modulation",
                             show_border=True,
@@ -387,8 +387,14 @@ traits_view = View(
                                 tooltip="Apply MLSD to recovered symbols, using Viterbi algorithm.",
                             ),
                             Item(
-                                name="rx_viterbi_symbols", label="# Symbols",
+                                name="rx_viterbi_symbols", label="Trellis Depth",
+                                enabled_when="rx_use_viterbi",
                                 tooltip="Number of symbols to include in MLSD trellis.",
+                            ),
+                            Item(
+                                name="rx_viterbi_fec", label="Use FEC",
+                                enabled_when="rx_use_viterbi",
+                                tooltip="Use FEC, as opposed to ISI, for Viterbi decoding.",
                             ),
                         ),
                         label="Native",
@@ -734,8 +740,8 @@ traits_view = View(
                 ),
                 VGroup(  # Rx FFE
                     HGroup(
-                        Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
-                        Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
+                        # Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
+                        # Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
                         Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
                     ),
                     Item(
@@ -818,7 +824,7 @@ traits_view = View(
             ),
             Group(
                 Item("plots_H", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
-                label="Freq. Resp.",
+                label="Frequency",
                 id="plots_H",
             ),
             layout="tabbed",
