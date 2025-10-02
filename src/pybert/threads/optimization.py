@@ -11,20 +11,24 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 """
 
 import time
+import warnings
 
-from numpy import arange, array, convolve, log10, ones, pi, prod, resize, where, zeros  # type: ignore
+from numpy import arange, array, convolve, delete, insert, log10, ones, pi, prod, where, zeros  # type: ignore
 from numpy.fft import irfft, rfft  # type: ignore
 from scipy.interpolate import interp1d
 
 from pychopmarg.optimize import mmse
 from pychopmarg.noise import NoiseCalc
 
+from pybert.common import Rvec
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
-from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights
+from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights, resize_zero_pad, safe_log10
 
 gDebugOptimize = False
 
+# Temporary, for debugging:
+warnings.filterwarnings("error", category=RuntimeWarning)
 
 # pylint: disable=no-member
 class OptThread(StoppableThread):
@@ -53,12 +57,44 @@ class OptThread(StoppableThread):
         pybert.peak_mag_tune = rx_peaking
         for k, rx_weight in enumerate(rx_weights):
             pybert.ffe_tap_tuners[k].value = rx_weight
-        pybert.status = f"Finished. (SNR: {20 * log10(fom):5.1f} dB)"
+        pybert.status = f"Finished. (SNR: {20 * safe_log10(fom):5.1f} dB)"
 
 
-def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int, TxTapTuner]]) -> list[list[float]]:
+def mk_tap_weight_combs(tap_tuners: list[TxTapTuner]) -> list[Rvec]:
     """
-    Make all tap weight combinations possible from a list of Tx tap tuners.
+    Make all tap weight combinations possible from a list of tap tuners.
+
+    Args:
+        tap_tuners: List of tap tuner control objects.
+
+    Return:
+        List of all possible tap weight combinations.
+
+    Raises:
+        ValueError: If empty list given as input.
+        ValueError: If total number of combinations is too large.
+    """
+
+    if not tap_tuners:
+        raise ValueError("Input list may not be empty!")
+
+    # Check total number of combinations.
+    n_combs = prod([int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+                      if tuner.enabled else 1
+                      for tuner in tap_tuners])
+    if n_combs > 1_000_000:
+        raise ValueError(
+            f"Total number of combinations ({int(n_combs // 1e6)} M) is too great!")
+
+    # Prime recursive helper, then trim priming from results.
+    rslts = _mk_tap_weight_combs([zeros(len(tap_tuners))], enumerate(tap_tuners))
+    rslts = list(filter(lambda xs: any(xs != 0.0), rslts))
+    return rslts
+
+
+def _mk_tap_weight_combs(weightss: list[Rvec], enumerated_tuners: list[tuple[int, TxTapTuner]]) -> list[Rvec]:
+    """
+    Recursive helper function.
 
     Args:
         weightss: The current list of tap weight combinations. (Supports recursion.)
@@ -69,34 +105,26 @@ def mk_tx_weights(weightss: list[list[float]], enumerated_tuners: list[tuple[int
 
     Return:
         List of all possible tap weight combinations.
-
-    Raises:
-        ValueError: If total number of combinations is too large.
     """
-
-    # Check total number of combinations.
-    n_combs = prod([int((tuner.max_val - tuner.min_val) / tuner.step + 1)
-                    if tuner.enabled else 1 for _, tuner in enumerated_tuners])
-    if n_combs > 1_000_000:
-        raise ValueError(
-            f"Total number of combinations ({int(n_combs // 1e6)} M) is too great!")
 
     # Check for end of recursion.
     if not enumerated_tuners:
         return weightss
 
     # Perform normal (i.e. - recursive) calculation.
-    head, *tail = enumerated_tuners
+    head, *tail = enumerated_tuners  # Pythonic list expansion to: first element, all the rest
     n, tuner = head
     if not tuner.enabled:
-        return mk_tx_weights(weightss, tail)
+        return _mk_tap_weight_combs(weightss, tail)  # Skip this tap if its associated tuner is disabled.
+    # Expand the current list by replicating each existing item several times,
+    # according to a sweep of the current tap being considered.
     weight_vals = arange(tuner.min_val, tuner.max_val + tuner.step, tuner.step)
     new_weightss = []
     for weights in weightss:
         for val in weight_vals:
             weights[n] = val
             new_weightss.append(weights.copy())
-    return mk_tx_weights(new_weightss, tail)
+    return _mk_tap_weight_combs(new_weightss, tail)
 
 
 def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
@@ -131,7 +159,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     rx_n_taps = pybert.rx_n_taps
     rx_n_pre  = pybert.rx_n_pre
     max_len   = 100 * pybert.nspui
-    num_levels = pybert.mod_type[0] + 2
+    num_levels = pybert.mod_type_ + 2
 
     # Find number of enabled DFE taps. (No support for floating taps, yet.)
     n_dfe_taps = 0
@@ -157,11 +185,10 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     pybert.plotdata.set_data("p_chnl", p_chnl)
 
     # Calculate Tx tap weight candidates.
-    n_weights = len(tx_taps)
     n_enabled_weights = len(list(filter(lambda t: t.enabled, tx_taps)))
     tx_curs_pos = max(0, -tx_taps[0].pos)  # list position at which to insert main tap
     try:
-        tx_weightss = mk_tx_weights([[0] * n_weights,], list(enumerate(pybert.tx_tap_tuners)))
+        tx_weightss = mk_tap_weight_combs(pybert.tx_tap_tuners)
     except ValueError as err:
         raise RuntimeError(
             "\n".join([
@@ -170,8 +197,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 "I had to abort the EQ optimization in your stead.",
             ])) from err
 
-    for tx_weights in tx_weightss:
-        tx_weights.insert(tx_curs_pos, 1 - sum(abs(array(tx_weights))))
+    tx_weightss = list(map(lambda ws: insert(ws, tx_curs_pos, 1 - sum(abs(ws))), tx_weightss))
 
     # Calculate CTLE gain candidates.
     if pybert.ctle_enable_tune:
@@ -183,10 +209,12 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     n_rx_weights = len(rx_taps)
     n_enabled_rx_weights = len(list(filter(lambda t: t.enabled, rx_taps)))
     if pybert.use_mmse:
-        rx_weightss = [[0.0] * n_rx_weights,]
+        rx_weightss = [zeros(n_rx_weights)]  # For `n_trials` calculation only.
     else:
         try:
-            rx_weightss = mk_tx_weights([[0.0] * n_rx_weights,], list(enumerate(rx_taps)))
+            rx_weightss = mk_tap_weight_combs(rx_taps)
+            if not rx_weightss:  # Trap the "null FFE" case.
+                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]
         except ValueError as err:
             raise RuntimeError(
                 "\n".join([
@@ -238,31 +266,41 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         h_ctle = krnl(t[:max_len])
         h_ctle *= sum(_h_ctle) / sum(h_ctle)
         p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
-        ctle_H = rfft(resize(h_ctle, len(_t)))
+        ctle_H = rfft(resize_zero_pad(h_ctle, len(_t)))
         for tx_weights in tx_weightss:
             # sum = concatenate
             h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
             p_tx = convolve(p_ctle_out, h_tx)
-            p_tx.resize(len(_t), refcheck=False)  # `p_tx = numpy.resize(p_tx, ...)` does NOT work!
+            p_tx = resize_zero_pad(p_tx, len(_t))
             if pybert.use_mmse:
                 curs_ix = where(p_tx == max(p_tx))[0][0]
                 curs_amp = p_tx[curs_ix]
                 n_pre_isi = curs_ix // nspui
-                tx_H = rfft(resize(h_tx, len(_t)))
+                tx_H = rfft(resize_zero_pad(h_tx, len(_t)))
                 noise_calc = NoiseCalc(
                     num_levels, ui, curs_ix, _t, p_tx, [], f_t,
                     tx_H, chnl_H, ones(len(f_t)), ctle_H,
                     0.0, 0.5, 25, 0.0, 0.0
                 )
-                mmse_rslts = mmse(
-                    noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type[0] + 2,
-                    array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
-                    array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
+                try:
+                    mmse_rslts = mmse(
+                        noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
+                        array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
+                        array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
+                except:
+                    print(f"curs_ix: {curs_ix}")
+                    print(f"curs_amp: {curs_amp}")
+                    print(f"h_tx: {h_tx}")
+                    print(f"tx_weights: {tx_weights}")
+                    raise
                 rx_weights_better = mmse_rslts["rx_taps"]
                 dfe_weights_better = mmse_rslts["dfe_tap_weights"]
                 fom = mmse_rslts["fom"]
-                p_tot = resize(add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
-                               nspui * (n_rx_weights + 5))
+                try:
+                    p_tot = resize_zero_pad(add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
+                                   nspui * (n_rx_weights + 5))
+                except ValueError:  # Flags obviously non-optimum case.
+                    continue
                 fom_better = fom
                 trials_run += 1
                 if not trials_run % trials_run_inc:
@@ -275,14 +313,25 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 fom_better = fom_max
                 for rx_weights in rx_weightss:
                     try:  # FixMe: The line below is broken.
-                        p_tot = add_ffe_dfe(rx_weights, get_dfe_weights(dfe_taps, p_tx, nspui), nspui, p_tx)
+                        try:
+                            p_tot = add_ffe_dfe(rx_weights, get_dfe_weights(dfe_taps, p_tx, nspui), nspui, p_tx)
+                        except ValueError:  # Flags obviously non-optimum case.
+                            continue
                         curs_ix = where(p_tot == max(p_tot))[0][0]
                         curs_amp = p_tot[curs_ix]
                     except ValueError:
-                        continue
+                        # continue
+                        raise
                     n_pre_isi = curs_ix // nspui
                     isi_sum = sum(abs(p_tot[curs_ix - n_pre_isi * nspui::nspui])) - abs(curs_amp)
-                    fom = curs_amp / isi_sum
+                    try:
+                        fom = curs_amp / isi_sum
+                    except RuntimeWarning:
+                        print(f"curs_amp: {curs_amp}")
+                        print(f"isi_sum: {isi_sum}")
+                        print(f"p_tot: {p_tot}")
+                        print(f"rx_weightss: {rx_weightss}")
+                        raise
                     if fom > fom_better:
                         rx_weights_better = rx_weights
                         dfe_weights_better = dfe_weights
@@ -297,8 +346,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
             if fom_better > fom_max:
                 rx_weights_best = rx_weights_better.copy()
                 dfe_weights_best = dfe_weights_better.copy()
-                tx_weights_best = tx_weights.copy()
-                del tx_weights_best[tx_curs_pos]
+                tx_weights_best = delete(tx_weights, tx_curs_pos)
                 peak_mag_best = peak_mag
                 curs_ix = where(p_tot == max(p_tot))[0][0]
                 curs_amp = p_tot[curs_ix]

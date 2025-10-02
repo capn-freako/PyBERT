@@ -91,7 +91,7 @@ def make_plots(self, n_dfe_taps):
     plot_h_tune.plot(("t_ns_opt", "ctle_out_h_tune"), name="Equalized Pulse Response", type="line", color="blue")
     plot_h_tune.plot(("t_ns_opt", "p_chnl"), name="Channel Pulse Response", type="line", color="magenta")
     plot_h_tune.plot(("curs_ix", "curs_amp"), name="Main Cursor", type="segment", color="red")
-    plot_h_tune.title = "Channel + Tx Preemphasis + CTLE (+ AMI DFE) + FFE + Ideal DFE"
+    plot_h_tune.title = "Pulse Response at Slicer Input, Assuming Bounded Ideal DFE"
     plot_h_tune.legend.labels = ["Channel Pulse Response",
                                  "Equalized Pulse Response",
                                  "Clocks",

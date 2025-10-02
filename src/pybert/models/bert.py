@@ -11,7 +11,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from time import perf_counter
-from typing import Any, Callable, Optional, TypeAlias
+from typing import Any, Callable, Optional, TypeAlias, Union
 
 import numpy        as np
 import numpy.typing as npt
@@ -27,6 +27,8 @@ from numpy import (  # type: ignore
     histogram,
     linspace,
     mean,
+    ones,
+    pad,
     repeat,
     resize,
     transpose,
@@ -40,8 +42,9 @@ from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
 from pyibisami.ami.parser import AmiName, AmiNode, ami_parse
-from pybert.models.dfe import DFE
-from pybert.utility import (
+from .dfe     import DFE
+from .fec     import FEC_Encoder, FEC_Decoder
+from ..utility import (
     calc_eye,
     calc_jitter,
     calc_resps,
@@ -49,11 +52,12 @@ from pybert.utility import (
     import_channel,
     make_bathtub,
     make_ctle,
+    resize_zero_pad,
     run_ami_model,
     safe_log10,
     trim_impulse,
 )
-from pybert.models.viterbi import ViterbiDecoder_ISI
+from .viterbi import ViterbiDecoder, ViterbiDecoder_ISI
 
 clock = perf_counter
 
@@ -62,7 +66,7 @@ AmiFloats: TypeAlias = tuple[AmiName, list["float | 'AmiFloats'"]]
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.0e-12
 gFc             = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
-MIN_VITERBI_PROB = 0.01  # Minimum state probability required, to be included in trellis graph.
+
 
 # pylint: disable=too-many-locals,protected-access,too-many-branches,too-many-statements
 def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True,
@@ -93,10 +97,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         by the sample interval, or its inverse, because while IBIS-AMI models
         take the impulse response to have units: (V/s), PyBERT uses: (V/sample).
     """
-
-    # TEMP DBG
-    print("bert.my_run_simulation():", flush=True)
-    # END DBG
 
     def _check_sim_status():
         """Checks the status of the simulation thread and if this simulation needs to stop."""
@@ -144,10 +144,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     lock_sustain = self.lock_sustain
     bandwidth = self.sum_bw * 1.0e9
     rel_thresh = self.thresh
-    mod_type = self.mod_type[0]
+    mod_type = self.mod_type_
     impulse_length = self.impulse_length
 
     # Calculate misc. values.
+    len_t = len(t)
     Ts = t[1]
     ts = Ts
     fs = 1 / ts
@@ -155,10 +156,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     max_len = 100 * nspui
     if impulse_length:
         min_len = max_len = round(impulse_length / ts)
-    if mod_type == 2:  # PAM-4
+    nspb = nspui
+    if not self.rx_viterbi_fec and mod_type == 2:  # PAM-4, but not because we're using FEC
         nspb = nspui // 2
-    else:
-        nspb = nspui
 
     # Generate the ideal over-sampled signal.
     #
@@ -168,19 +168,20 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ideal_signal = x
     if mod_type == 1:  # Handle duo-binary case.
         duob_h = array(([0.5] + [0.0] * (nspui - 1)) * 2)
-        ideal_signal = convolve(x, duob_h)[: len(t)]
+        ideal_signal = convolve(x, duob_h)[: len_t]
 
     # Calculate the channel response, as well as its (hypothetical)
     # solitary effect on the data, for plotting purposes only.
     try:
         split_time = clock()
         chnl_h = self.calc_chnl_h()
+        len_h = len(chnl_h)
         _calc_chnl_time = clock() - split_time
         # Note: We're not using 'self.ideal_signal', because we rely on the system response to
         #       create the duobinary waveform. We only create it explicitly, above,
         #       so that we'll have an ideal reference for comparison.
         split_time = clock()
-        chnl_out = convolve(x, chnl_h)[: len(t)]
+        chnl_out = convolve(x, chnl_h)[: len_t]
         _conv_chnl_time = clock() - split_time
         if self.debug:
             self.log(f"Channel calculation time: {_calc_chnl_time}")
@@ -210,7 +211,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     pn[pn_samps // 2:] = pn_mag
     self.pn_period = pn_period
     self.pn_samps = pn_samps
-    pn = resize(pn, len(x))
+    pn = resize(pn, len(x))  # Here, we want the repetition that `numpy.resize()` gives.
     # High pass filter it. (Simulating capacitive coupling.)
     (b, a) = iirfilter(2, gFc / (fs / 2), btype="highpass")
     pn = lfilter(b, a, pn)[: len(pn)]
@@ -234,7 +235,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 ctle_h = diff(ctle_h)  # impulse response is derivative of step response.
             else:
                 ctle_h *= ts  # Normalize to (V/sample)
-            ctle_h.resize(len(t))
+            ctle_h = resize_zero_pad(ctle_h, len_t)
             ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.
         else:
             if ctle_enable:
@@ -292,8 +293,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             else:                # Tx is PyBERT native.
                 # Using `sum` to concatenate:
                 tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
-                tx_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
-                tx_out_h = convolve(tx_h, chnl_h)[: len(chnl_h)]
+                tx_h = resize_zero_pad(tx_h, len_h)
+                tx_out_h = convolve(tx_h, chnl_h)[:len_h]
                 rx_in = convolve(x, tx_out_h)[:len(x)] + noise
             # Calculate the remaining responses from the impulse responses.
             tx_s, tx_p, tx_H = calc_resps(t, tx_h, ui, f)
@@ -350,17 +351,17 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 tap_weights: list[list[float]] = list(array(_tap_weights).transpose())
                 if "cdr_locked" in param_vals:
                     _lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
-                    _lockeds = _lockeds.repeat(len(t) // len(_lockeds))
-                    _lockeds.resize(len(t))
+                    _lockeds = _lockeds.repeat(len_t // len(_lockeds))
+                    _lockeds = resize_zero_pad(_lockeds, len_t)
                 else:
-                    _lockeds = zeros(len(t))
+                    _lockeds = zeros(len_t)
                 lockeds: list[bool] = list(map(bool, _lockeds))
                 if "cdr_ui" in param_vals:
                     ui_ests: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_ui")])
-                    ui_ests = ui_ests.repeat(len(t) // len(ui_ests))
-                    ui_ests.resize(len(t))
+                    ui_ests = ui_ests.repeat(len_t // len(ui_ests))
+                    ui_ests = resize_zero_pad(ui_ests, len_t)
                 else:
-                    ui_ests = zeros(len(t))
+                    ui_ests = zeros(len_t)
             else:  # Rx is either AMI_Init() or PyBERT native.
                 if self.rx_use_ami:  # Rx Init()
                     ctle_out, _, ctle_h, ctle_out_h, msg, _ = run_ami_model(
@@ -370,7 +371,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 else:                # PyBERT native Rx
                     if ctle_enable:
                         ctle_h = get_ctle_h()
-                        ctle_out_h = convolve(tx_out_h, ctle_h)[:len(tx_out_h)]
+                        ctle_out_h = convolve(tx_out_h, ctle_h)[:len_h]
                         ctle_out = convolve(rx_in, ctle_h)[:len(rx_in)]
                     else:
                         ctle_h = array([1.] + [0.] * (min_len - 1))
@@ -388,7 +389,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ctle_out_s, ctle_out_p, ctle_out_H = calc_resps(t, ctle_out_h, ui, f)
 
     # Calculate convolutional delay.
-    ctle_out.resize(len(t), refcheck=False)
+    len_ctle_out = len(ctle_out)
+    if len_ctle_out < len_t:
+        ctle_out = pad(ctle_out, (0, len_t - len_ctle_out))
+    else:
+        ctle_out = ctle_out[:len_t]
     ctle_out_h_main_lobe = where(ctle_out_h >= max(ctle_out_h) / 2.0)[0]
     if ctle_out_h_main_lobe.size:
         conv_dly_ix = ctle_out_h_main_lobe[0]
@@ -421,136 +426,111 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     self.ctle_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
-    self.status = "Running FFE..."
-
     _check_sim_status()
 
-    # FFE output and incremental/cumulative responses.
-    if any(tap.enabled for tap in self.rx_taps):
-        # Using `sum` to concatenate:
-        ffe_h = array(sum([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps], []))
-    else:
-        ffe_h = array([1] + [0] * (nspui - 1))
-    ffe_h.resize(len(chnl_h), refcheck=False)  # "refcheck=False", to get around Tox failure.
-    ffe_out_h = convolve(ffe_h, ctle_out_h)[: len(chnl_h)]
+    # Run the Rx FFE if appropriate.
+    self.status = "Running FFE..."
+    ffe_h = array([1] + [0] * (nspui - 1))  # i.e. - no FFE, by default
+    if not self.rx_use_ami:  # Using PyBERT native Rx model. So, check for FFE.
+        if any(tap.enabled for tap in self.rx_taps):
+            # Using `sum` to concatenate:
+            ffe_h = array(sum([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps], []))
+    ffe_h = resize_zero_pad(ffe_h, len_h)
+    ffe_out_h = convolve(ffe_h, ctle_out_h)[:len_h]
     ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
     # Calculate the remaining responses from the impulse responses.
     ffe_s, ffe_p, ffe_H = calc_resps(t, ffe_h, ui, f)                   # pylint: disable=unused-variable
     ffe_out_s, ffe_out_p, ffe_out_H = calc_resps(t, ffe_out_h, ui, f)   # pylint: disable=unused-variable
 
+    self.ffe_h = ffe_h
+    self.ffe_s = ffe_s
+    self.ffe_p = ffe_p
+    self.ffe_H = ffe_H
+    self.ffe_out_h = ffe_out_h
+    self.ffe_out_s = ffe_out_s
+    self.ffe_out_p = ffe_out_p
+    self.ffe_out_H = ffe_out_H
+    self.ffe_out = ffe_out
+
     self.ffe_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
-    self.status = "Running DFE/CDR..."
-
     _check_sim_status()
 
-    # DFE output and incremental/cumulative responses.
-    if any(tap.enabled for tap in dfe_tap_tuners):
-        _gain = gain
-        _ideal = self.sum_ideal
-        _n_taps = len(dfe_tap_tuners)
-    else:
-        _gain = 0.0
-        _ideal = True
-        _n_taps = 0
+    # Final post-processing (i.e. - DFE, Viterbi ISI, or Viterbi FEC)
+    # Note: The DFE must be run, if only as a "dummy", in all cases because:
+    #       - it provides the correct sample times from the CDR, which is encapsulated within the DFE, and
+    #       - it is used to convert signal level to bits.
+    #       There is only one exception to this: when running AMI `GetWave()` w/ `rx_use_clocks` true
+    #       and having actually received clock times back from the AMI model. In that case, we use those
+    #       clock times instead of our CDR. Note, however, that we still need the DFE to convert
+    #       signal level to bits.
+
+    # By default, make a "dummy" DFE.
+    _gain = 0.0
+    _ideal = True
+    _n_taps = 0
     limits = []
-    for tuner in self.dfe_tap_tuners:
-        if tuner.enabled:
-            limits.append((tuner.min_val, tuner.max_val))
-        else:
-            limits.append((0., 0.))
+    # Only make a "real" DFE if we're running the native PyBERT Rx model and not using Viterbi.
+    if not self.rx_use_ami and not self.rx_use_viterbi:
+        if any(tap.enabled for tap in dfe_tap_tuners):
+            _gain = gain
+            _ideal = self.sum_ideal
+            _n_taps = len(dfe_tap_tuners)
+            for tuner in dfe_tap_tuners:
+                if tuner.enabled:
+                    limits.append((tuner.min_val, tuner.max_val))
+                else:
+                    limits.append((0., 0.))
     dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
-    if not (self.rx_use_ami and self.rx_use_getwave):  # Use PyBERT native DFE/CDR.
+
+    self.status = "Running DFE/CDR..."
+
+    self.decision_scaler = 0.0
+    self.dfe_scalar_values = []
+    # Accommodate the singular special case.
+    if self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and clock_times:
+        sample_times = []
+        bits_out = []
+        sig_samps = []
+        t_ix = 0
+        clocks = zeros(len_t)
+        dfe_out = ffe_out
+        for clock_time in clock_times:
+            if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
+                break
+            sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
+            while t_ix < len_t and t[t_ix] < sample_time:
+                t_ix += 1
+            if t_ix >= len_t:
+                self.log("Went beyond system time vector end searching for next clock time!")
+                break
+            sig_samp = ffe_out[t_ix]
+            _, _bits = dfe.decide(sig_samp)
+            bits_out.extend(_bits)
+            clocks[t_ix] = 1
+            sample_times.append(sample_time)
+            sig_samps.append(sig_samp)
+    else:  # all other cases
         dbg_dict: dict[str, Any] = {}
-        (dfe_out,
-         tap_weights,
-         ui_ests,
-         clocks,
-         lockeds,
-         sample_times,
-         bits_out) = dfe.run(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
+        dfe_rslts = dfe.run(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
+        bits_out = dfe_rslts["bits"]
+        sig_samps = dfe_rslts["sig_samps"]
+        tap_weights = dfe_rslts["tap_weights"]
+        dfe_out = dfe_rslts["dfe_out"]
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
-    else:                                              # Process Rx IBIS-AMI GetWave() output.
-        # Process any valid clock times returned by Rx IBIS-AMI model's GetWave() function if apropos.
-        dfe_out = array(ffe_out)  # In this case, `ffe_out` includes the effects of IBIS-AMI DFE.
-        dfe_out.resize(len(t))
-        t_ix = 0
-        _bits_out = []
-        clocks = zeros(len(t))
-        sample_times = []
-        if self.rx_use_clocks and clock_times is not None:
-            for clock_time in clock_times:
-                if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
-                    break
-                sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
-                while t_ix < len(t) and t[t_ix] < sample_time:
-                    t_ix += 1
-                if t_ix >= len(t):
-                    self.log("Went beyond system time vector end searching for next clock time!")
-                    break
-                _, _bits = dfe.decide(ffe_out[t_ix])
-                _bits_out.extend(_bits)
-                clocks[t_ix] = 1
-                sample_times.append(sample_time)
-        # Process any remaining output, using inferred sampling instants.
-        if t_ix < (len(t) - 5 * nspui / 4):
-            # Starting at `nspui/4` handles either case:
-            #   - starting at UI boundary, or
-            #   - starting at last sampling instant.
-            next_sample_ix = t_ix + nspui // 4 + argmax([sum(abs(ffe_out[t_ix + nspui // 4 + k::nspui]))
-                                                         for k in range(nspui)])
-            for t_ix in range(next_sample_ix, len(t), nspui):
-                _, _bits = dfe.decide(ffe_out[t_ix])
-                _bits_out.extend(_bits)
-                clocks[t_ix] = 1
-                sample_times.append(t[t_ix])
-        bits_out = array(_bits_out)
-    if len(bits_out) < nbits:
-        bits_out = pad(bits_out, (nbits - len(bits_out), 0))
-    else:
-        bits_out = bits_out[-nbits:]
-    # start_ix = max(0, len(bits_out) - eye_bits)
-    # end_ix = len(bits_out)
-    # bits_tst = bits_out[start_ix: end_ix]
-    bits_tst = bits_out[-eye_bits:]
-    auto_corr = (
-        1.0 * correlate(bits_tst, bits[-eye_bits:], mode="same") /  # noqa: W504
-        sum(bits[-eye_bits:])
-    )
-    auto_corr = auto_corr[len(auto_corr) // 2:]
-    self.auto_corr = auto_corr
-    bit_dly = where(auto_corr == max(auto_corr))[0][0]
-    print(f"\t`bit_dly`: {bit_dly}", flush=True)
-    bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
-    # bits_ref = bits[-(bit_dly + eye_bits) + 1: -bit_dly + 1]
-    assert len(bits_ref) == len(bits_tst)
-    # first_ref_bit = nbits - eye_bits - bit_dly
-    # bits_ref = bits[first_ref_bit: first_ref_bit + eye_bits]
-    # first_tst_bit = first_ref_bit + bit_dly
-    # first_tst_bit = nbits - eye_bits
-    # bits_tst = bits_out[first_tst_bit:]
-    # if len(bits_ref) > len(bits_tst):
-    #     bits_ref = bits_ref[: len(bits_tst)]
-    # elif len(bits_tst) > len(bits_ref):
-    #     bits_tst = bits_tst[: len(bits_ref)]
-    bit_errs = where(bits_tst ^ bits_ref)[0]
-    n_errs = len(bit_errs)
-    if n_errs and False:  # pylint: disable=condition-evals-to-constant
-        self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
-    self.bit_errs = n_errs
 
     if len(tap_weights) > 0:
         dfe_h = array(
             [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
             sum([[-x] + list(zeros(nspui - 1)) for x in tap_weights[-1]], []))  # sum as concat
-        dfe_h.resize(len(ctle_out_h), refcheck=False)
     else:
         dfe_h = array([1.0] + list(zeros(nspui - 1)))
-    dfe_out_h = convolve(ffe_out_h, dfe_h)[: len(ffe_out_h)]
+    dfe_out_h = convolve(ffe_out_h, dfe_h)[: len_h]
+    dfe_h = resize_zero_pad(dfe_h, len(ctle_out_h))
 
     # Calculate the remaining responses from the impulse responses.
     dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
@@ -558,64 +538,114 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     self.dfe_perf = nbits * nspb / (clock() - split_time)
     split_time = clock()
-
     _check_sim_status()
 
-    # Apply Viterbi decoder if apropos.
-    self.bit_errs_viterbi = -1  # `-1` flags that Viterbi was not run.
     self.viterbi_perf = 0
     if self.rx_use_viterbi:
-        self.status = "Running Viterbi..."
-
-        # Grab the needed attributes of the PyBERT instance.
-        L = self.L
+        dbg_dict_viterbi: Optional[dict[str, Any]] = None
+        if self.debug:
+            dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
-        sigma = self.rn
-
-        # Construct the decoder.
         pulse_resp_curs_ix = np.argmax(ffe_out_p)
         pulse_resp_samps = np.array([ffe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
-        decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
+        if self.rx_viterbi_fec:
+            self.status = "Running FEC..."
+            decoder: Union[FEC_Decoder, ViterbiDecoder_ISI] = FEC_Decoder(N)
+            path = decoder.decode(list(zip(bits_out[0::2], bits_out[1::2])), dbg_dict=dbg_dict_viterbi)
+            # path = decoder.decode(list(zip(bits_out[1::2], bits_out[0::2])), dbg_dict=dbg_dict_viterbi)  # worse
+            _states = decoder.states
+            bits_out = list(map(lambda ix: _states[ix][0], path))
+            if self.debug:  # Regenerate the observed symbols.
+                init_state = _states[path[0]][1:]
+                encoder = FEC_Encoder()  #init_state=init_state)
+                gbitss = encoder.encode(bits_out)
+                symbols_viterbi: list[float] = []
+                for gbits in gbitss:
+                    match gbits:
+                        case (0, 0):
+                            symbols_viterbi.append(-1.0)
+                        case (0, 1):
+                            symbols_viterbi.append(-1.0 / 3.0)
+                        case (1, 1):
+                            symbols_viterbi.append(1.0 / 3.0)
+                        case (1, 0):
+                            symbols_viterbi.append(1.0)
+                        case _:
+                            raise ValueError(f"Invalid bit pair: {gbits}!")
+        else:
+            self.status = "Running Viterbi..."
+            match mod_type:
+                case 0:
+                    L = 2
+                case 1:
+                    L = 3
+                case 2:
+                    L = 4
+                case _:
+                    raise ValueError(f"Unrecognized modulation type: {mod_type}!")
+            sigma = self.rn
+            decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
+            path = decoder.decode(sig_samps, dbg_dict=dbg_dict_viterbi)
+            _states = decoder.states
+            symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
+            bits_out = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
+        self.viterbi_perf = nbits * nspb / (clock() - split_time)
+        if self.debug:
+            # self.pulse_resp_samps = pulse_resp_samps
+            # self.sig_samps = sig_samps
+            # self.symbols_viterbi = symbols_viterbi
+            # self.symbols_dfe = dfe_rslts["decisions"]
+            dbg_dict_viterbi.update({
+                "decoder": decoder,
+                "path": path,
+                "pulse_resp_samps": pulse_resp_samps,
+                "sig_samps": sig_samps,
+                "symbols_viterbi": symbols_viterbi,
+                "symbols_dfe": dfe_rslts["decisions"],
+                })
+            self.dbg_dict_viterbi = dbg_dict_viterbi
 
-        # Assemble the (nominally) UI-spaced samples of the Rx FFE output.
-        sig_samps = []
-        # - Avoid exception due to DFE predicting a last sample time beyond system time vector end.
-        # - ("+ 1" ensures correct number of samples in either case.)
-        _sample_times = list(filter(lambda x: x <= t[-1], sample_times[-(eye_uis + 1):]))
-        # - Trap the case of the last one just making it through filtration.
-        _sample_times = _sample_times[:eye_uis]
-        ix = 0
-        for sample_time in _sample_times:
-            while t[ix] < sample_time:
-                ix += 1
-            sig_samps.append(ffe_out[ix])
-        # TEMP DBG
-        print(f"\tNumber of signal samples: {len(sig_samps)}", flush=True)
-        # END DBG
-        self.dbg_dict_viterbi = {}
-        path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
-        print(f"\tLength of `path`: {len(path)}", flush=True)
-        symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
-        self.pulse_resp_samps = pulse_resp_samps
-        self.sig_samps   = sig_samps
-        self.symbols_viterbi  = symbols_viterbi
-        self.dbg_dict_viterbi["decoder"] = decoder
-        self.dbg_dict_viterbi["path"] = path
-        bits_tst_viterbi = concatenate(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)))
-        if len(bits_ref) > len(bits_tst_viterbi):
-            bits_ref = bits_ref[: len(bits_tst_viterbi)]
-        elif len(bits_tst_viterbi) > len(bits_ref):
-            bits_tst_viterbi = bits_tst_viterbi[: len(bits_ref)]
-        num_viterbi_bits = len(bits_tst_viterbi)
-        bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
-        # TEMP DBG
-        print(f"\tbits_tst_viterbi[-20:]: {bits_tst_viterbi[-20:]}", flush=True)
-        print(f"\tbits_ref[-20:]:         {bits_ref[-20:]}", flush=True)
-        # END DBG
-        self.bit_errs_viterbi = len(bit_errs_viterbi)
-        self.viterbi_errs_ixs = bit_errs_viterbi
-        self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)
-        split_time = clock()
+    split_time = clock()
+    _check_sim_status()
+
+    # Check the output BER.
+    start_ix = max(0, len(bits_out) - eye_bits)
+    end_ix = len(bits_out)
+    try:
+        auto_corr = (
+            1.0 * correlate(bits_out[start_ix: end_ix], bits[start_ix: end_ix], mode="same") /  # noqa: W504
+            sum(bits[start_ix: end_ix])
+        )
+    except Exception as err:
+        print(f"start_ix: {start_ix}, end_ix: {end_ix}, len(bits_out): {len(bits_out)}, len(bits): {len(bits)}")
+        raise
+    auto_corr = auto_corr[len(auto_corr) // 2:]
+    self.auto_corr = auto_corr
+    bit_dly = where(auto_corr == max(auto_corr))[0][0]
+    first_ref_bit = nbits - eye_bits
+    bits_ref = bits[first_ref_bit:]
+    first_tst_bit = first_ref_bit + bit_dly
+    bits_tst = bits_out[first_tst_bit:]
+    if len(bits_ref) > len(bits_tst):
+        bits_ref = bits_ref[: len(bits_tst)]
+    elif len(bits_tst) > len(bits_ref):
+        bits_tst = bits_tst[: len(bits_ref)]
+    try:
+        bit_errs = where(bits_tst ^ bits_ref)[0]
+        bit_errs = where(bits_tst ^ bits_ref, ones(len(bits_tst)), zeros(len(bits_tst)))
+    except:
+        print(f"bits_tst: {bits_tst}")
+        print(f"bits_ref: {bits_ref}")
+        print(f"first_ref_bit: {first_ref_bit}")
+        print(f"len(bits): {len(bits)}")
+        print(f"first_tst_bit: {first_tst_bit}")
+        print(f"len(bits_out): {len(bits_out)}")
+        raise
+    n_errs = len(where(bit_errs == 1.0)[0])
+    if n_errs and False:  # pylint: disable=condition-evals-to-constant
+        self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
+    self.bit_errs = bit_errs
+    self.n_errs = n_errs
 
     self.dfe_h = dfe_h
     self.dfe_s = dfe_s
@@ -626,7 +656,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.dfe_out_p = dfe_out_p
     self.dfe_out_H = dfe_out_H
     self.dfe_out = dfe_out
-    self.lockeds = lockeds
+    self.lockeds = dfe_rslts["lockeds"]
 
     self.status = "Analyzing jitter..."
 
@@ -634,9 +664,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Save local variables to class instance for state preservation, performing unit conversion where necessary.
     self.adaptation = tap_weights
-    self.ui_ests = array(ui_ests) * 1.0e12  # (ps)
-    self.clocks = clocks
-    self.clock_times = sample_times
+    self.ui_ests = array(dfe_rslts["ui_ests"]) * 1.0e12  # (ps)
+    self.clocks = dfe_rslts["clocks"]
+    self.clock_times = dfe_rslts["clock_times"]
 
     # Analyze the jitter.
     self.thresh_tx = array([])
@@ -665,18 +695,18 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     len_x_m1 = len(x) - 1
     xing_min_t = (nui - eye_uis) * ui
 
-    def eye_xings(xings: list[float], ofst: float = 0) -> NDArray[float64]:
+    def eye_xings(xings, ofst=0) -> NDArray[float64]:
         """
         Return crossings from that portion of the signal used to generate the eye.
 
         Args:
-            xings: List of crossings.
+            xings([float]): List of crossings.
 
         Keyword Args:
-            ofst: Time offset to be subtracted from all crossings.
+            ofst(float): Time offset to be subtracted from all crossings.
 
         Returns:
-            Selected crossings, offset and eye-start corrected.
+            [float]: Selected crossings, offset and eye-start corrected.
         """
         _xings = array(xings) - ofst
         return _xings[where(_xings > xing_min_t)] - xing_min_t
@@ -900,18 +930,16 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     except Exception as err:  # pylint: disable=broad-exception-caught
         self.log(f"The following error occured, while trying to update the plots:\n{err}")
         self.status = "Exception: plotting"
-        raise
+        # raise
 
 
 # Plot updating
 # pylint: disable=too-many-locals,protected-access,too-many-statements
-# def update_results(self: PyBERT):
 def update_results(self):
-    """
-    Updates all plot data used by GUI.
+    """Updates all plot data used by GUI.
 
     Args:
-        self: Reference to an instance of the *PyBERT* class.
+        self(PyBERT): Reference to an instance of the *PyBERT* class.
     """
 
     # Copy globals into local namespace.
@@ -957,8 +985,8 @@ def update_results(self):
     (bin_counts, bin_edges) = histogram(ui_ests, bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     clock_spec = rfft(ui_ests)
-    _f0 = 1 / (t[1] * len(t))
-    spec_freqs = [_f0 * k for k in range(len(t) // 2 + 1)]
+    _f0 = 1 / (t[1] * len_t)
+    spec_freqs = [_f0 * k for k in range(len_t // 2 + 1)]
     self.plotdata.set_data("clk_per_hist_bins", bin_centers)
     self.plotdata.set_data("clk_per_hist_vals", bin_counts)
     self.plotdata.set_data("clk_spec", safe_log10(abs(clock_spec[1:]) / abs(clock_spec[1])))  # Omit the d.c. value and normalize to fundamental magnitude.
@@ -1123,65 +1151,6 @@ def update_results(self):
     self.plotdata.set_data("eye_ctle", eye_ctle)
     self.plotdata.set_data("eye_dfe", eye_dfe)
 
-    # Viterbi trellis
-    N_PATHS = 3
-    trellis_path_xs:     list[int]       = []
-    trellis_path_ys:     list[list[int]] = [[], [], []]
-    trellis_state_ys:    list[list[int]] = [[], [], []]
-    trellis_state_probs: list[list[int]] = [[], [], []]
-    if self.rx_use_viterbi:
-        trellis_path_ys     = []
-        trellis_state_ys    = []
-        trellis_state_probs = []
-
-        # Assemble pairs of lists of probabilities and previous states, by trellis column.
-        probss_prevss = list(zip(self.dbg_dict_viterbi["probs"],
-                                 self.dbg_dict_viterbi["prevs"]))
-        probss_prevss.reverse()  # We trace backwards through the trellis.
-        trellis_path_xs = range(len(probss_prevss))
-
-        # TMP DBG
-        print(f"bert.update_results():", flush=True)
-        print(f"\tLength of `probss_prevss: {len(probss_prevss)}", flush=True)
-        # END DBG
-
-        # Start with the most probable final states.
-        prob_prev_pairs = list(enumerate(zip(*(probss_prevss[0]))))  # `enumerate()` provides correct y-index.
-        prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)    # Sort on state probability.
-        most_probable_pairs = [x[0] for x in prob_prev_pairs[:N_PATHS]]
-        trellis_path_ys.append(most_probable_pairs)
-
-        # Then, taking the remaining trellis columns one at a time...
-        for probs, prevs in probss_prevss:
-            trellis_path_ys.append([prevs[y] for y in trellis_path_ys[-1]])
-            state_probs: list[tuple[int, float]] = list(enumerate(probs))
-            state_probs.sort(key=lambda x: x[1], reverse=True)   # Sort on state probability.
-            trellis_state_ys.append([x[0] for x in state_probs[:N_PATHS]])
-            trellis_state_probs.append([x[1] for x in state_probs[:N_PATHS]])
-        trellis_path_ys = trellis_path_ys[:-1]  # Trim the extra element.
-
-        # Restore forward order of lists.
-        trellis_path_ys.reverse()
-        trellis_state_ys.reverse()
-        trellis_state_probs.reverse()
-
-        # Transpose the lists, to attain the proper data layout for plotting.
-        trellis_path_ys = list(zip(*trellis_path_ys))
-        trellis_state_ys = list(zip(*trellis_state_ys))
-        trellis_state_probs = list(zip(*trellis_state_probs))
-
-    self.plotdata.set_data("trellis_path_xs", trellis_path_xs)
-    self.plotdata.set_data("trellis_path1_ys", trellis_path_ys[0])
-    self.plotdata.set_data("trellis_path2_ys", trellis_path_ys[1])
-    self.plotdata.set_data("trellis_path3_ys", trellis_path_ys[2])
-    self.plotdata.set_data("trellis_state1_ys", trellis_state_ys[0])
-    self.plotdata.set_data("trellis_state2_ys", trellis_state_ys[1])
-    self.plotdata.set_data("trellis_state3_ys", trellis_state_ys[2])
-    self.plotdata.set_data("trellis_state1_probs", trellis_state_probs[0])
-    self.plotdata.set_data("trellis_state2_probs", trellis_state_probs[1])
-    self.plotdata.set_data("trellis_state3_probs", trellis_state_probs[2])
-    if hasattr(self, "plot_viterbi"):
-        self.plot_viterbi.components[0].value_range.high_setting = self.L ** self.rx_viterbi_symbols - 0.5
 
 def update_eyes(self):
     """Update the heat plots representing the eye diagrams.
