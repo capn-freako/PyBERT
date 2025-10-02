@@ -8,7 +8,7 @@ Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
 
 from chaco.api import ColorMapper, GridPlotContainer, Plot
-from chaco.default_colormaps import viridis
+from chaco.default_colormaps import viridis, wistia
 from chaco.tools.api import PanTool, ZoomTool
 
 from pybert.models.bert import update_eyes
@@ -108,17 +108,18 @@ def make_plots(self, n_dfe_taps):
     self.plot_h_tune = container_tune
 
     # - Viterbi trellis
+    cmap = wistia
     plot_viterbi = Plot(plotdata)
     plot_viterbi.plot(("trellis_path_xs", "trellis_state1_ys", "trellis_state1_probs"),
-        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=viridis,
+        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=10)
     plot_viterbi.plot(("trellis_path_xs", "trellis_path1_ys"), type="line", color="blue")
     plot_viterbi.plot(("trellis_path_xs", "trellis_state2_ys", "trellis_state2_probs"),
-        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=viridis,
+        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=8)
     plot_viterbi.plot(("trellis_path_xs", "trellis_path2_ys"), type="line", color="green")
     plot_viterbi.plot(("trellis_path_xs", "trellis_state3_ys", "trellis_state3_probs"),
-        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=viridis,
+        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=6)
     plot_viterbi.plot(("trellis_path_xs", "trellis_path3_ys"), type="line", color="red")
     plot_viterbi.index_range.low_setting  =  0

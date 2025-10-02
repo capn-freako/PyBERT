@@ -272,6 +272,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
     rx_viterbi_symbols = Int(4)  #: Number of symbols to track in Viterbi decoder.
+    trellis_max_x = Int(10_150)
+    trellis_pan_control = Range(low=0, high='trellis_max_x', value=0)
 
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
@@ -1252,9 +1254,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _nbits_changed(self):
         self.check_eye_bits()
 
-    def _eye_bits_changed(self):
+    def _eye_bits_changed(self, new_value):
         self.check_eye_bits()
         self.check_pat_len()
+        self.trellis_max_x = new_value - 10
 
     def _f_max_changed(self, new_value):
         fmax = 0.5e-9 / self.t[1]  # Nyquist frequency, given our sampling rate (GHz).
@@ -1262,6 +1265,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.f_max = fmax
             self.log("`fMax` has been held at the Nyquist frequency.", alert=True)
 
+    def _trellis_pan_control_changed(self, new_value):
+        self.plot_viterbi.components[0].index_range.set_bounds(new_value, new_value + 10)
+    
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.

@@ -94,6 +94,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         take the impulse response to have units: (V/s), PyBERT uses: (V/sample).
     """
 
+    # TEMP DBG
+    print("bert.my_run_simulation():", flush=True)
+    # END DBG
+
     def _check_sim_status():
         """Checks the status of the simulation thread and if this simulation needs to stop."""
         if aborted_sim and aborted_sim():
@@ -505,23 +509,34 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 clocks[t_ix] = 1
                 sample_times.append(t[t_ix])
         bits_out = array(_bits_out)
-    start_ix = max(0, len(bits_out) - eye_bits)
-    end_ix = len(bits_out)
+    if len(bits_out) < nbits:
+        bits_out = pad(bits_out, (nbits - len(bits_out), 0))
+    else:
+        bits_out = bits_out[-nbits:]
+    # start_ix = max(0, len(bits_out) - eye_bits)
+    # end_ix = len(bits_out)
+    # bits_tst = bits_out[start_ix: end_ix]
+    bits_tst = bits_out[-eye_bits:]
     auto_corr = (
-        1.0 * correlate(bits_out[start_ix: end_ix], bits[start_ix: end_ix], mode="same") /  # noqa: W504
-        sum(bits[start_ix: end_ix])
+        1.0 * correlate(bits_tst, bits[-eye_bits:], mode="same") /  # noqa: W504
+        sum(bits[-eye_bits:])
     )
     auto_corr = auto_corr[len(auto_corr) // 2:]
     self.auto_corr = auto_corr
     bit_dly = where(auto_corr == max(auto_corr))[0][0]
-    first_ref_bit = nbits - eye_bits
-    bits_ref = bits[first_ref_bit:]
-    first_tst_bit = first_ref_bit + bit_dly
-    bits_tst = bits_out[first_tst_bit:]
-    if len(bits_ref) > len(bits_tst):
-        bits_ref = bits_ref[: len(bits_tst)]
-    elif len(bits_tst) > len(bits_ref):
-        bits_tst = bits_tst[: len(bits_ref)]
+    print(f"\t`bit_dly`: {bit_dly}", flush=True)
+    bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
+    # bits_ref = bits[-(bit_dly + eye_bits) + 1: -bit_dly + 1]
+    assert len(bits_ref) == len(bits_tst)
+    # first_ref_bit = nbits - eye_bits - bit_dly
+    # bits_ref = bits[first_ref_bit: first_ref_bit + eye_bits]
+    # first_tst_bit = first_ref_bit + bit_dly
+    # first_tst_bit = nbits - eye_bits
+    # bits_tst = bits_out[first_tst_bit:]
+    # if len(bits_ref) > len(bits_tst):
+    #     bits_ref = bits_ref[: len(bits_tst)]
+    # elif len(bits_tst) > len(bits_ref):
+    #     bits_tst = bits_tst[: len(bits_ref)]
     bit_errs = where(bits_tst ^ bits_ref)[0]
     n_errs = len(bit_errs)
     if n_errs and False:  # pylint: disable=condition-evals-to-constant
@@ -551,26 +566,35 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.viterbi_perf = 0
     if self.rx_use_viterbi:
         self.status = "Running Viterbi..."
-        match mod_type:
-            case 0:
-                L = 2
-            case 1:
-                L = 3
-            case 2:
-                L = 4
-            case _:
-                raise ValueError(f"Unrecognized modulation type: {mod_type}!")
+
+        # Grab the needed attributes of the PyBERT instance.
+        L = self.L
         N = self.rx_viterbi_symbols
         sigma = self.rn
+
+        # Construct the decoder.
         pulse_resp_curs_ix = np.argmax(ffe_out_p)
         pulse_resp_samps = np.array([ffe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
+
+        # Assemble the (nominally) UI-spaced samples of the Rx FFE output.
         sig_samps = []
-        for sample_time in filter(lambda x: x <= t[-1], sample_times[first_tst_bit:]):
-            ix = np.where(t >= sample_time)[0][0]
+        # - Avoid exception due to DFE predicting a last sample time beyond system time vector end.
+        # - ("+ 1" ensures correct number of samples in either case.)
+        _sample_times = list(filter(lambda x: x <= t[-1], sample_times[-(eye_uis + 1):]))
+        # - Trap the case of the last one just making it through filtration.
+        _sample_times = _sample_times[:eye_uis]
+        ix = 0
+        for sample_time in _sample_times:
+            while t[ix] < sample_time:
+                ix += 1
             sig_samps.append(ffe_out[ix])
+        # TEMP DBG
+        print(f"\tNumber of signal samples: {len(sig_samps)}", flush=True)
+        # END DBG
         self.dbg_dict_viterbi = {}
         path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
+        print(f"\tLength of `path`: {len(path)}", flush=True)
         symbols_viterbi = list(map(lambda ix: decoder.states[ix][0][-1], path))
         self.pulse_resp_samps = pulse_resp_samps
         self.sig_samps   = sig_samps
@@ -584,6 +608,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bits_tst_viterbi = bits_tst_viterbi[: len(bits_ref)]
         num_viterbi_bits = len(bits_tst_viterbi)
         bit_errs_viterbi = where(bits_tst_viterbi ^ bits_ref)[0]
+        # TEMP DBG
+        print(f"\tbits_tst_viterbi[-20:]: {bits_tst_viterbi[-20:]}", flush=True)
+        print(f"\tbits_ref[-20:]:         {bits_ref[-20:]}", flush=True)
+        # END DBG
         self.bit_errs_viterbi = len(bit_errs_viterbi)
         self.viterbi_errs_ixs = bit_errs_viterbi
         self.viterbi_perf = num_viterbi_bits * nspb / (clock() - split_time)
@@ -1112,9 +1140,14 @@ def update_results(self):
         probss_prevss.reverse()  # We trace backwards through the trellis.
         trellis_path_xs = range(len(probss_prevss))
 
+        # TMP DBG
+        print(f"bert.update_results():", flush=True)
+        print(f"\tLength of `probss_prevss: {len(probss_prevss)}", flush=True)
+        # END DBG
+
         # Start with the most probable final states.
         prob_prev_pairs = list(enumerate(zip(*(probss_prevss[0]))))  # `enumerate()` provides correct y-index.
-        prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)   # Sort on state probability.
+        prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)    # Sort on state probability.
         most_probable_pairs = [x[0] for x in prob_prev_pairs[:N_PATHS]]
         trellis_path_ys.append(most_probable_pairs)
 

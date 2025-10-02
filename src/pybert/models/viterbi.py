@@ -174,6 +174,12 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         trellis_depth = len(trellis)
         num_states = len(trellis[-1])
 
+        # TEMP DBG
+        print("ViterbiDecoder.decode():")
+        print(f"\tNumber of samples: {len(samps)}", flush=True)
+        print(f"\tTrellis depth: {trellis_depth}", flush=True)
+        # END DBG
+
         # Prime the trellis.
         first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
         if not first_col.sum():  # Trap all zeros and log the event.
@@ -197,7 +203,12 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         states.extend(self.path[1:])
         states.append(int(np.argmax(list(map(fst, trellis[-1])))))
         if dbg_dict is not None:
-            probs_prevs.extend(self.trellis[1:])
+            probs_prevs.extend(self.trellis)
+
+        # TEMP DBG
+        print(f"\tNumber of states: {len(states)}", flush=True)
+        print(f"\tLength of `probs_prevs`: {len(probs_prevs)}", flush=True)
+        # END DBG
 
         # Fill in debugging dictionary if appropriate.
         if dbg_dict is not None:
