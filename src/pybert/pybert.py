@@ -627,7 +627,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_L(self):
         """Number of symbols in alphabet."""
 
-        match(self.mod_type[0]):
+        match(self.mod_type_):
             case 0:  # NRZ
                 return 2
             case 1:  # Duobinary

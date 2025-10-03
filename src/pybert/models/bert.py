@@ -518,10 +518,27 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         dfe_rslts = dfe.run(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
         bits_out = dfe_rslts["bits"]
         sig_samps = dfe_rslts["sig_samps"]
+        sample_times = dfe_rslts["clock_times"]
         tap_weights = dfe_rslts["tap_weights"]
         dfe_out = dfe_rslts["dfe_out"]
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
+
+    if len(bits_out) < nbits:
+        bits_out = pad(bits_out, (nbits - len(bits_out), 0))
+    else:
+        bits_out = bits_out[-nbits:]
+    bits_tst = bits_out[-eye_bits:]
+    auto_corr = (
+        1.0 * correlate(bits_tst, bits[-eye_bits:], mode="same") /  # noqa: W504
+        sum(bits[-eye_bits:])
+    )
+    auto_corr = auto_corr[len(auto_corr) // 2:]
+    self.auto_corr = auto_corr
+    bit_dly = where(auto_corr == max(auto_corr))[0][0]
+    print(f"\t`bit_dly`: {bit_dly}", flush=True)
+    bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
+    assert len(bits_ref) == len(bits_tst)
 
     if len(tap_weights) > 0:
         dfe_h = array(
@@ -540,18 +557,33 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     split_time = clock()
     _check_sim_status()
 
+    # Apply Viterbi decoder if apropos.
     self.viterbi_perf = 0
     if self.rx_use_viterbi:
-        dbg_dict_viterbi: Optional[dict[str, Any]] = None
-        if self.debug:
-            dbg_dict_viterbi = {}
+        # Assemble the (nominally) UI-spaced samples of the Rx FFE output.
+        sig_samps = []
+        # - Avoid exception due to DFE predicting a last sample time beyond system time vector end.
+        # - ("+ 1" ensures correct number of samples in either case.)
+        _sample_times = list(filter(lambda x: x <= t[-1], sample_times[-(eye_uis + 1):]))
+        # - Trap the case of the last one just making it through filtration.
+        _sample_times = _sample_times[:eye_uis]
+        ix = 0
+        for sample_time in _sample_times:
+            while t[ix] < sample_time:
+                ix += 1
+            sig_samps.append(ffe_out[ix])
+        # TEMP DBG
+        print(f"\tNumber of signal samples: {len(sig_samps)}", flush=True)
+        # END DBG
+
+        self.dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
         pulse_resp_curs_ix = np.argmax(ffe_out_p)
         pulse_resp_samps = np.array([ffe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
             decoder: Union[FEC_Decoder, ViterbiDecoder_ISI] = FEC_Decoder(N)
-            path = decoder.decode(list(zip(bits_out[0::2], bits_out[1::2])), dbg_dict=dbg_dict_viterbi)
+            path = decoder.decode(list(zip(bits_out[0::2], bits_out[1::2])), dbg_dict=self.dbg_dict_viterbi)
             # path = decoder.decode(list(zip(bits_out[1::2], bits_out[0::2])), dbg_dict=dbg_dict_viterbi)  # worse
             _states = decoder.states
             bits_out = list(map(lambda ix: _states[ix][0], path))
@@ -574,18 +606,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                             raise ValueError(f"Invalid bit pair: {gbits}!")
         else:
             self.status = "Running Viterbi..."
-            match mod_type:
-                case 0:
-                    L = 2
-                case 1:
-                    L = 3
-                case 2:
-                    L = 4
-                case _:
-                    raise ValueError(f"Unrecognized modulation type: {mod_type}!")
+            L = self.L
             sigma = self.rn
             decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
-            path = decoder.decode(sig_samps, dbg_dict=dbg_dict_viterbi)
+            path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states
             symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
             bits_out = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
@@ -1151,6 +1175,60 @@ def update_results(self):
     self.plotdata.set_data("eye_ctle", eye_ctle)
     self.plotdata.set_data("eye_dfe", eye_dfe)
 
+    # Viterbi trellis
+    N_PATHS = 3
+    trellis_path_xs:     list[int]       = []
+    trellis_path_ys:     list[list[int]] = [[], [], []]
+    trellis_state_ys:    list[list[int]] = [[], [], []]
+    trellis_state_probs: list[list[int]] = [[], [], []]
+    if self.rx_use_viterbi:
+        trellis_path_ys     = []
+        trellis_state_ys    = []
+        trellis_state_probs = []
+
+        # Assemble pairs of lists of probabilities and previous states, by trellis column.
+        probss_prevss = list(zip(self.dbg_dict_viterbi["probs"],
+                                 self.dbg_dict_viterbi["prevs"]))
+        probss_prevss.reverse()  # We trace backwards through the trellis.
+        trellis_path_xs = range(len(probss_prevss))
+
+        # Start with the most probable final states.
+        prob_prev_pairs = list(enumerate(zip(*(probss_prevss[0]))))  # `enumerate()` provides correct y-index.
+        prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)    # Sort on state probability.
+        most_probable_pairs = [x[0] for x in prob_prev_pairs[:N_PATHS]]
+        trellis_path_ys.append(most_probable_pairs)
+
+        # Then, taking the remaining trellis columns one at a time...
+        for probs, prevs in probss_prevss:
+            trellis_path_ys.append([prevs[y] for y in trellis_path_ys[-1]])
+            state_probs: list[tuple[int, float]] = list(enumerate(probs))
+            state_probs.sort(key=lambda x: x[1], reverse=True)   # Sort on state probability.
+            trellis_state_ys.append([x[0] for x in state_probs[:N_PATHS]])
+            trellis_state_probs.append([x[1] for x in state_probs[:N_PATHS]])
+        trellis_path_ys = trellis_path_ys[:-1]  # Trim the extra element.
+
+        # Restore forward order of lists.
+        trellis_path_ys.reverse()
+        trellis_state_ys.reverse()
+        trellis_state_probs.reverse()
+
+        # Transpose the lists, to attain the proper data layout for plotting.
+        trellis_path_ys = list(zip(*trellis_path_ys))
+        trellis_state_ys = list(zip(*trellis_state_ys))
+        trellis_state_probs = list(zip(*trellis_state_probs))
+
+    self.plotdata.set_data("trellis_path_xs", trellis_path_xs)
+    self.plotdata.set_data("trellis_path1_ys", trellis_path_ys[0])
+    self.plotdata.set_data("trellis_path2_ys", trellis_path_ys[1])
+    self.plotdata.set_data("trellis_path3_ys", trellis_path_ys[2])
+    self.plotdata.set_data("trellis_state1_ys", trellis_state_ys[0])
+    self.plotdata.set_data("trellis_state2_ys", trellis_state_ys[1])
+    self.plotdata.set_data("trellis_state3_ys", trellis_state_ys[2])
+    self.plotdata.set_data("trellis_state1_probs", trellis_state_probs[0])
+    self.plotdata.set_data("trellis_state2_probs", trellis_state_probs[1])
+    self.plotdata.set_data("trellis_state3_probs", trellis_state_probs[2])
+    if hasattr(self, "plot_viterbi"):
+        self.plot_viterbi.components[0].value_range.high_setting = self.L ** self.rx_viterbi_symbols - 0.5
 
 def update_eyes(self):
     """Update the heat plots representing the eye diagrams.
