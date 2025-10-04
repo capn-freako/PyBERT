@@ -147,15 +147,15 @@ dfe_tap_tuners:
     - 0.0
     - 0.4
 - !!python/tuple
-    - true
+    - false
     - -0.15
     - 0.15
 - !!python/tuple
-    - true
+    - false
     - -0.05
     - 0.1
 - !!python/tuple
-    - true
+    - false
     - -0.05
     - 0.1
 - !!python/tuple

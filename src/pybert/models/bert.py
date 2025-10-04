@@ -613,12 +613,18 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             _states = decoder.states
             symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
             bits_out = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
+            # TEMP DBG
+            states_expects = list(map(lambda n_s: (n_s[1], decoder.expectation(n_s[0])),
+                                      enumerate(_states)))
+            print("\n\t".join([
+                "Post-Viterbi Debugging Info:",
+                f"Pulse response samples: {pulse_resp_samps}",
+                f"States & Expected Voltages: {states_expects}",
+                # f": {}",
+                ]), flush=True)
+            # END DBG
         self.viterbi_perf = nbits * nspb / (clock() - split_time)
         if self.debug:
-            # self.pulse_resp_samps = pulse_resp_samps
-            # self.sig_samps = sig_samps
-            # self.symbols_viterbi = symbols_viterbi
-            # self.symbols_dfe = dfe_rslts["decisions"]
             dbg_dict_viterbi.update({
                 "decoder": decoder,
                 "path": path,
@@ -633,40 +639,32 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     _check_sim_status()
 
     # Check the output BER.
-    start_ix = max(0, len(bits_out) - eye_bits)
-    end_ix = len(bits_out)
-    try:
-        auto_corr = (
-            1.0 * correlate(bits_out[start_ix: end_ix], bits[start_ix: end_ix], mode="same") /  # noqa: W504
-            sum(bits[start_ix: end_ix])
-        )
-    except Exception as err:
-        print(f"start_ix: {start_ix}, end_ix: {end_ix}, len(bits_out): {len(bits_out)}, len(bits): {len(bits)}")
-        raise
+    if len(bits_out) < nbits:
+        bits_out = pad(bits_out, (nbits - len(bits_out), 0))
+    else:
+        bits_out = bits_out[-nbits:]
+    bits_tst = bits_out[-eye_bits:]
+    auto_corr = (
+        1.0 * correlate(bits_tst, bits[-eye_bits:], mode="same") /  # noqa: W504
+        sum(bits[-eye_bits:])
+    )
     auto_corr = auto_corr[len(auto_corr) // 2:]
     self.auto_corr = auto_corr
     bit_dly = where(auto_corr == max(auto_corr))[0][0]
-    first_ref_bit = nbits - eye_bits
-    bits_ref = bits[first_ref_bit:]
-    first_tst_bit = first_ref_bit + bit_dly
-    bits_tst = bits_out[first_tst_bit:]
-    if len(bits_ref) > len(bits_tst):
-        bits_ref = bits_ref[: len(bits_tst)]
-    elif len(bits_tst) > len(bits_ref):
-        bits_tst = bits_tst[: len(bits_ref)]
+    bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
+    assert len(bits_ref) == len(bits_tst)
     try:
-        bit_errs = where(bits_tst ^ bits_ref)[0]
-        bit_errs = where(bits_tst ^ bits_ref, ones(len(bits_tst)), zeros(len(bits_tst)))
+        # bit_errs = where(bits_tst ^ bits_ref)[0]
+        bit_errs = where(bits_tst != bits_ref)[0]
     except:
         print(f"bits_tst: {bits_tst}")
         print(f"bits_ref: {bits_ref}")
-        print(f"first_ref_bit: {first_ref_bit}")
         print(f"len(bits): {len(bits)}")
-        print(f"first_tst_bit: {first_tst_bit}")
         print(f"len(bits_out): {len(bits_out)}")
         raise
-    n_errs = len(where(bit_errs == 1.0)[0])
-    if n_errs and False:  # pylint: disable=condition-evals-to-constant
+    n_errs = len(bit_errs)
+    # n_errs = len(where(bit_errs == 1.0)[0])
+    if False and n_errs:  # pylint: disable=condition-evals-to-constant
         self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
     self.bit_errs = bit_errs
     self.n_errs = n_errs
@@ -904,6 +902,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.pj_dfe   = pj
         self.rj_dfe   = rj
         self.pjDD_dfe = pjDD
+        assert rjDD != 0
         self.rjDD_dfe = rjDD
         self.mu_pos_dfe = mu_pos
         self.mu_neg_dfe = mu_neg
@@ -954,7 +953,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     except Exception as err:  # pylint: disable=broad-exception-caught
         self.log(f"The following error occured, while trying to update the plots:\n{err}")
         self.status = "Exception: plotting"
-        # raise
+        raise
 
 
 # Plot updating

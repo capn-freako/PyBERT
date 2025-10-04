@@ -32,6 +32,7 @@ def optimization_triplet():
 
     yield (thePyBERT, theHandler, theInfo)
 
+
 @pytest.fixture(scope="module")
 def pdut(request):
     """Return a parameterized PyBERT object that has already run the initial simulation."""
@@ -44,10 +45,30 @@ def pdut(request):
     dut.simulate(initial_run=True)
     yield dut
 
+
+@pytest.fixture(scope="module")
+def pdut_viterbi_vs_dfe(request):
+    """Return a parameterized PyBERT object that has run w/ & w/o Viterbi."""
+    cfg = request.param
+    assert isinstance(cfg, dict), "Fixture parameter must be a dictionary of PyBERT attributes!"
+    dut = PyBERT(run_simulation=False, gui=False)
+    for k, v in cfg.items():
+        assert hasattr(dut, k), f"Unrecognized PyBERT attribute: {k}!"
+        setattr(dut, k, v)
+    dut.rx_use_viterbi = False
+    dut.simulate(initial_run=True)
+    dut.n_errs_dfe = dut.n_errs
+    dut.rx_use_viterbi = True
+    dut.simulate(initial_run=True)
+    dut.n_errs_viterbi = dut.n_errs
+    yield dut
+
+
 @pytest.fixture(scope="module")
 def dut():
     """Return an initialized pybert object that has already run the initial simulation."""
     yield PyBERT(gui=False)
+
 
 @pytest.fixture(scope="module")
 def dut_imp_len():
@@ -57,6 +78,7 @@ def dut_imp_len():
     dut.simulate(initial_run=True)
     yield dut
 
+
 @pytest.fixture(scope="module")
 def dut_viterbi():
     """Return an initialized pybert object with Viterbi decoder enabled."""
@@ -64,6 +86,7 @@ def dut_viterbi():
     dut.rx_use_viterbi = True
     dut.simulate(initial_run=True)
     yield dut
+
 
 @pytest.fixture(scope="module")
 def dut_viterbi_stressed():
@@ -74,6 +97,7 @@ def dut_viterbi_stressed():
     dut.simulate(initial_run=True)
     yield dut
 
+
 @pytest.fixture(scope="module")
 def dut_viterbi_1p5mChannel():
     """Return a pybert object initialized using ``chnl_1p5.yaml``."""
@@ -81,8 +105,14 @@ def dut_viterbi_1p5mChannel():
     dut.load_configuration(Path("misc", "ViterbiTesting", "chnl_1p5.yaml"))
     assert dut.status == "Loaded configuration.", RuntimeError(
         "Configuration load failed!")
+    dut.rx_use_viterbi = False
     dut.simulate(initial_run=True)
+    dut.n_errs_dfe = dut.n_errs
+    dut.rx_use_viterbi = True
+    dut.simulate(initial_run=True)
+    dut.n_errs_viterbi = dut.n_errs
     yield dut
+
 
 @pytest.fixture(scope="module")
 def ibisami_rx_init():
@@ -97,6 +127,7 @@ def ibisami_rx_init():
     dut.simulate(initial_run=True)
     yield dut
 
+
 @pytest.fixture(scope="module")
 def ibisami_rx_getwave():
     """
@@ -110,6 +141,7 @@ def ibisami_rx_getwave():
     dut.rx_use_getwave = True
     dut.simulate(initial_run=True)
     yield dut
+
 
 @pytest.fixture(scope="module")
 def ibisami_rx_getwave_clocked():
