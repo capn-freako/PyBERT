@@ -47,20 +47,15 @@ def pdut(request):
 
 
 @pytest.fixture(scope="module")
-def pdut_viterbi_vs_dfe(request):
-    """Return a parameterized PyBERT object that has run w/ & w/o Viterbi."""
-    cfg = request.param
-    assert isinstance(cfg, dict), "Fixture parameter must be a dictionary of PyBERT attributes!"
+def cdut(request):
+    """Return a YAML file configured PyBERT object that has already run the initial simulation."""
+    yaml_file = request.param
+    assert isinstance(yaml_file, Path), "Fixture parameter must be a YAML file path!"
     dut = PyBERT(run_simulation=False, gui=False)
-    for k, v in cfg.items():
-        assert hasattr(dut, k), f"Unrecognized PyBERT attribute: {k}!"
-        setattr(dut, k, v)
-    dut.rx_use_viterbi = False
+    dut.load_configuration(yaml_file)
+    assert dut.status == "Loaded configuration.", RuntimeError(
+        "Configuration load failed!")
     dut.simulate(initial_run=True)
-    dut.n_errs_dfe = dut.n_errs
-    dut.rx_use_viterbi = True
-    dut.simulate(initial_run=True)
-    dut.n_errs_viterbi = dut.n_errs
     yield dut
 
 
@@ -85,32 +80,6 @@ def dut_viterbi():
     dut = PyBERT(run_simulation=False, gui=False)
     dut.rx_use_viterbi = True
     dut.simulate(initial_run=True)
-    yield dut
-
-
-@pytest.fixture(scope="module")
-def dut_viterbi_stressed():
-    """Return an initialized pybert object with Viterbi decoder enabled and eye stressed."""
-    dut = PyBERT(run_simulation=False, gui=False)
-    dut.rx_use_viterbi = True
-    dut.l_ch = 2.0
-    dut.simulate(initial_run=True)
-    yield dut
-
-
-@pytest.fixture(scope="module")
-def dut_viterbi_1p5mChannel():
-    """Return a pybert object initialized using ``chnl_1p5.yaml``."""
-    dut = PyBERT(run_simulation=False, gui=False)
-    dut.load_configuration(Path("misc", "ViterbiTesting", "chnl_1p5.yaml"))
-    assert dut.status == "Loaded configuration.", RuntimeError(
-        "Configuration load failed!")
-    dut.rx_use_viterbi = False
-    dut.simulate(initial_run=True)
-    dut.n_errs_dfe = dut.n_errs
-    dut.rx_use_viterbi = True
-    dut.simulate(initial_run=True)
-    dut.n_errs_viterbi = dut.n_errs
     yield dut
 
 

@@ -345,7 +345,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     sweep_results = List([])
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
-    n_errs = Int(0)  #: # of bit errors observed in last run.
+    n_errs_dfe = Int(0)  #: # of DFE bit errors observed in last run.
+    n_errs_viterbi = Int(0)  #: # of Viterbi bit errors observed in last run.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
@@ -984,7 +985,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_status_str(self):
         status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
-        err_str = f"    | BitErrs: {int(self.n_errs)}"
+        err_str = f"    | BitErrs: {int(self.n_errs_dfe)} ({int(self.n_errs_viterbi)})"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
         jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (
@@ -1432,7 +1433,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
         # Once the required data structure is filled in, we can create the plots.
         if update_plots:
-            make_plots(self, n_dfe_taps=len(self.dfe_tap_tuners))
+            n_dfe_taps = 0
+            for tap in self.dfe_tap_tuners:
+                if tap.enabled:
+                    n_dfe_taps += 1
+                else:
+                    break
+            make_plots(self, n_dfe_taps=n_dfe_taps)
 
     def load_configuration(self, filepath: Path):
         """Load in a configuration into pybert.

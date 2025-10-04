@@ -465,35 +465,38 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     #       clock times instead of our CDR. Note, however, that we still need the DFE to convert
     #       signal level to bits.
 
+    self.status = "Running DFE/CDR..."
+
     # By default, make a "dummy" DFE.
     _gain = 0.0
     _ideal = True
     _n_taps = 0
     limits = []
-    # Only make a "real" DFE if we're running the native PyBERT Rx model and not using Viterbi.
-    if not self.rx_use_ami and not self.rx_use_viterbi:
+    # Only make a "real" DFE if we're not running AMI_GetWave() w/ clocks.
+    if not (self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and clock_times):
         if any(tap.enabled for tap in dfe_tap_tuners):
             _gain = gain
             _ideal = self.sum_ideal
-            _n_taps = len(dfe_tap_tuners)
+            # _n_taps = len(dfe_tap_tuners)
+            _n_taps = 0
             for tuner in dfe_tap_tuners:
                 if tuner.enabled:
                     limits.append((tuner.min_val, tuner.max_val))
+                    _n_taps += 1
                 else:
-                    limits.append((0., 0.))
+                    # limits.append((0., 0.))
+                    break  # We're not yet supporting floating taps.
     dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
-
-    self.status = "Running DFE/CDR..."
 
     self.decision_scaler = 0.0
     self.dfe_scalar_values = []
     # Accommodate the singular special case.
     if self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and clock_times:
         sample_times = []
-        bits_out = []
+        bits_out_dfe = []
         sig_samps = []
         t_ix = 0
         clocks = zeros(len_t)
@@ -509,14 +512,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 break
             sig_samp = ffe_out[t_ix]
             _, _bits = dfe.decide(sig_samp)
-            bits_out.extend(_bits)
+            bits_out_dfe.extend(_bits)
             clocks[t_ix] = 1
             sample_times.append(sample_time)
             sig_samps.append(sig_samp)
     else:  # all other cases
         dbg_dict: dict[str, Any] = {}
         dfe_rslts = dfe.run(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
-        bits_out = dfe_rslts["bits"]
+        bits_out_dfe = dfe_rslts["bits"]
         sig_samps = dfe_rslts["sig_samps"]
         sample_times = dfe_rslts["clock_times"]
         tap_weights = dfe_rslts["tap_weights"]
@@ -524,22 +527,42 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
 
-    if len(bits_out) < nbits:
-        bits_out = pad(bits_out, (nbits - len(bits_out), 0))
-    else:
-        bits_out = bits_out[-nbits:]
-    bits_tst = bits_out[-eye_bits:]
-    auto_corr = (
-        1.0 * correlate(bits_tst, bits[-eye_bits:], mode="same") /  # noqa: W504
-        sum(bits[-eye_bits:])
-    )
-    auto_corr = auto_corr[len(auto_corr) // 2:]
-    self.auto_corr = auto_corr
-    bit_dly = where(auto_corr == max(auto_corr))[0][0]
-    print(f"\t`bit_dly`: {bit_dly}", flush=True)
-    bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
-    assert len(bits_ref) == len(bits_tst)
+    # Determine post-DFE BER.
+    def calc_ber(bits_out):
+        """
+        Calculate the BER of an output bit stream.
 
+        Args:
+            bits_out: Output bit stream.
+
+        Returns:
+            A pair consisting of
+
+            - The number of bit errors detected.
+            - The indices of the erroneous bits.
+        """
+
+        bits_out = resize_zero_pad(bits_out, nbits, pad_front=True)
+        bits_tst = bits_out[-eye_bits:]
+        auto_corr = (
+            1.0 * correlate(bits_tst, bits[-eye_bits:], mode="same") /  # noqa: W504
+            sum(bits[-eye_bits:])
+        )
+        auto_corr = auto_corr[len(auto_corr) // 2:]
+        self.auto_corr = auto_corr
+        bit_dly = where(auto_corr == max(auto_corr))[0][0]
+        print(f"\t`bit_dly`: {bit_dly}", flush=True)
+        bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
+        assert len(bits_ref) == len(bits_tst)
+        bit_errs = where(bits_tst != bits_ref)[0]
+        n_errs = len(bit_errs)
+
+        return n_errs, bit_errs
+
+    n_errs_dfe, bit_errs_dfe = calc_ber(bits_out_dfe)
+
+    # Calculate DFE responses.
+    # - First, calculate the impulse responses.
     if len(tap_weights) > 0:
         dfe_h = array(
             [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
@@ -548,8 +571,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         dfe_h = array([1.0] + list(zeros(nspui - 1)))
     dfe_out_h = convolve(ffe_out_h, dfe_h)[: len_h]
     dfe_h = resize_zero_pad(dfe_h, len(ctle_out_h))
-
-    # Calculate the remaining responses from the impulse responses.
+    # - Then, calculate the remaining responses from the impulse responses.
     dfe_s, dfe_p, dfe_H = calc_resps(t, dfe_h, ui, f)
     dfe_out_s, dfe_out_p, dfe_out_H = calc_resps(t, dfe_out_h, ui, f)
 
@@ -559,8 +581,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Apply Viterbi decoder if apropos.
     self.viterbi_perf = 0
+    n_errs_viterbi = -1
+    bit_errs_viterbi = []
     if self.rx_use_viterbi:
-        # Assemble the (nominally) UI-spaced samples of the Rx FFE output.
+        # Assemble the (nominally) UI-spaced samples of the Rx DFE output.
         sig_samps = []
         # - Avoid exception due to DFE predicting a last sample time beyond system time vector end.
         # - ("+ 1" ensures correct number of samples in either case.)
@@ -572,9 +596,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             while t[ix] < sample_time:
                 ix += 1
             sig_samps.append(ffe_out[ix])
-        # TEMP DBG
-        print(f"\tNumber of signal samples: {len(sig_samps)}", flush=True)
-        # END DBG
 
         self.dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
@@ -583,14 +604,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
             decoder: Union[FEC_Decoder, ViterbiDecoder_ISI] = FEC_Decoder(N)
-            path = decoder.decode(list(zip(bits_out[0::2], bits_out[1::2])), dbg_dict=self.dbg_dict_viterbi)
-            # path = decoder.decode(list(zip(bits_out[1::2], bits_out[0::2])), dbg_dict=dbg_dict_viterbi)  # worse
+            path = decoder.decode(list(zip(bits_out_dfe[0::2], bits_out_dfe[1::2])), dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states
-            bits_out = list(map(lambda ix: _states[ix][0], path))
+            bits_out_viterbi = list(map(lambda ix: _states[ix][0], path))
             if self.debug:  # Regenerate the observed symbols.
                 init_state = _states[path[0]][1:]
                 encoder = FEC_Encoder()  #init_state=init_state)
-                gbitss = encoder.encode(bits_out)
+                gbitss = encoder.encode(bits_out_viterbi)
                 symbols_viterbi: list[float] = []
                 for gbits in gbitss:
                     match gbits:
@@ -612,62 +632,25 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states
             symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
-            bits_out = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
-            # TEMP DBG
-            states_expects = list(map(lambda n_s: (n_s[1], decoder.expectation(n_s[0])),
-                                      enumerate(_states)))
-            print("\n\t".join([
-                "Post-Viterbi Debugging Info:",
-                f"Pulse response samples: {pulse_resp_samps}",
-                f"States & Expected Voltages: {states_expects}",
-                # f": {}",
-                ]), flush=True)
-            # END DBG
+            bits_out_viterbi = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
+
+        n_errs_viterbi, bit_errs_viterbi = calc_ber(bits_out_viterbi)
+
+        self.dbg_dict_viterbi.update({
+            "decoder": decoder,
+            "path": path,
+            "pulse_resp_samps": pulse_resp_samps,
+            "sig_samps": sig_samps,
+            "symbols_viterbi": symbols_viterbi,
+            "symbols_dfe": dfe_rslts["decisions"],
+            })
+
         self.viterbi_perf = nbits * nspb / (clock() - split_time)
-        if self.debug:
-            dbg_dict_viterbi.update({
-                "decoder": decoder,
-                "path": path,
-                "pulse_resp_samps": pulse_resp_samps,
-                "sig_samps": sig_samps,
-                "symbols_viterbi": symbols_viterbi,
-                "symbols_dfe": dfe_rslts["decisions"],
-                })
-            self.dbg_dict_viterbi = dbg_dict_viterbi
 
-    split_time = clock()
-    _check_sim_status()
-
-    # Check the output BER.
-    if len(bits_out) < nbits:
-        bits_out = pad(bits_out, (nbits - len(bits_out), 0))
-    else:
-        bits_out = bits_out[-nbits:]
-    bits_tst = bits_out[-eye_bits:]
-    auto_corr = (
-        1.0 * correlate(bits_tst, bits[-eye_bits:], mode="same") /  # noqa: W504
-        sum(bits[-eye_bits:])
-    )
-    auto_corr = auto_corr[len(auto_corr) // 2:]
-    self.auto_corr = auto_corr
-    bit_dly = where(auto_corr == max(auto_corr))[0][0]
-    bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
-    assert len(bits_ref) == len(bits_tst)
-    try:
-        # bit_errs = where(bits_tst ^ bits_ref)[0]
-        bit_errs = where(bits_tst != bits_ref)[0]
-    except:
-        print(f"bits_tst: {bits_tst}")
-        print(f"bits_ref: {bits_ref}")
-        print(f"len(bits): {len(bits)}")
-        print(f"len(bits_out): {len(bits_out)}")
-        raise
-    n_errs = len(bit_errs)
-    # n_errs = len(where(bit_errs == 1.0)[0])
-    if False and n_errs:  # pylint: disable=condition-evals-to-constant
-        self.log(f"pybert.models.bert.my_run_simulation(): Bit errors detected at indices: {bit_errs}.")
-    self.bit_errs = bit_errs
-    self.n_errs = n_errs
+    self.bit_errs_dfe     = bit_errs_dfe
+    self.n_errs_dfe       = n_errs_dfe
+    self.bit_errs_viterbi = bit_errs_viterbi
+    self.n_errs_viterbi   = n_errs_viterbi
 
     self.dfe_h = dfe_h
     self.dfe_s = dfe_s
@@ -682,6 +665,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     self.status = "Analyzing jitter..."
 
+    split_time = clock()
     _check_sim_status()
 
     # Save local variables to class instance for state preservation, performing unit conversion where necessary.
@@ -959,7 +943,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 # Plot updating
 # pylint: disable=too-many-locals,protected-access,too-many-statements
 def update_results(self):
-    """Updates all plot data used by GUI.
+    """
+    Updates all plot data used by GUI.
 
     Args:
         self(PyBERT): Reference to an instance of the *PyBERT* class.

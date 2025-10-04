@@ -45,13 +45,18 @@ def make_plots(self, n_dfe_taps):
     plot9.legend.labels = []
     for i in range(n_dfe_taps):
         name = f"tap{int(i + 1)}"
-        plot9.plot(
-            ("tap_weight_index", name + "_weights"),
-            type="line",
-            color="auto",
-            style=line_styles[i // 10],
-            name=name,
-        )
+        try:
+            plot9.plot(
+                ("tap_weight_index", name + "_weights"),
+                type="line",
+                color="auto",
+                style=line_styles[i // 10],
+                name=name,
+            )
+        except ValueError as err:
+            print(f"i: {i}", flush=True)
+            print(f"name: {name}", flush=True)
+            raise
         plot9.legend.labels.append(name)
     plot9.title = "DFE Adaptation"
     plot9.index_axis.title = "Sample Number"

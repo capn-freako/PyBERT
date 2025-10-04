@@ -28,13 +28,17 @@ from ..models.tx_tap import TxTapTuner
 
 
 
-def resize_zero_pad(x: Rvec, new_length: int) -> Rvec:
+def resize_zero_pad(x: Rvec, new_length: int, pad_front: bool = False) -> Rvec:
     """
     Resize an array, zero padding if necessary.
 
     Args:
         x: Array to resize.
         new_length: Desired new length of array.
+
+    Keyword Args:
+        pad_front: Apply any necessary padding to front of input vector when ``True``.
+            Default: ``False``
 
     Returns:
         Resized array, zero padded if longer than original.
@@ -51,7 +55,10 @@ def resize_zero_pad(x: Rvec, new_length: int) -> Rvec:
     if new_length <= len_x:
         return x[:new_length]
     else:
-        return pad(x, (0, new_length - len_x))
+        if pad_front:
+            return pad(x, (new_length - len_x, 0))
+        else:
+            return pad(x, (0, new_length - len_x))
 
 
 def moving_average(a: Rvec, n: int = 3) -> Rvec:
