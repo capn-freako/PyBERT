@@ -1,5 +1,5 @@
 !!python/object:pybert.configuration.PyBertCfg
-date_created: Sat Oct  4 17:09:58 2025
+date_created: Sun Oct  5 10:27:43 2025
 version: 9.1.3
 bit_rate: 10.0
 nbits: 20000
@@ -28,7 +28,7 @@ rs: 100.0
 cout: 0.5
 pn_mag: 0.0
 pn_freq: 11.0
-rn: 0.02
+rn: 0.05
 tx_taps:
 - !!python/tuple
     - false
@@ -121,11 +121,11 @@ rx_dll_file: ''
 rx_ibis_file: ''
 rx_use_ibis: false
 rx_use_viterbi: true
-rx_viterbi_symbols: 2
+rx_viterbi_symbols: 3
 rx_n_taps: 0
 rx_n_pre: 0
 sum_ideal: true
-decision_scaler: 0.12432590260712896
+decision_scaler: 0.12250242856438844
 gain: 5.0
 n_ave: 100.0
 sum_bw: 12.0

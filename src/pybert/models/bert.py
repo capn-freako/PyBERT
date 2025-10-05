@@ -551,7 +551,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         auto_corr = auto_corr[len(auto_corr) // 2:]
         self.auto_corr = auto_corr
         bit_dly = where(auto_corr == max(auto_corr))[0][0]
-        print(f"\t`bit_dly`: {bit_dly}", flush=True)
         bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
         assert len(bits_ref) == len(bits_tst)
         bit_errs = where(bits_tst != bits_ref)[0]
