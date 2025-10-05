@@ -42,13 +42,13 @@ from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
 from pyibisami.ami.parser import AmiName, AmiNode, ami_parse
-from .dfe     import DFE
-from .fec     import FEC_Encoder, FEC_Decoder
+
 from ..utility import (
     calc_eye,
     calc_jitter,
     calc_resps,
     find_crossings,
+    fst, snd,
     import_channel,
     make_bathtub,
     make_ctle,
@@ -57,6 +57,9 @@ from ..utility import (
     safe_log10,
     trim_impulse,
 )
+
+from .dfe     import DFE
+from .fec     import FEC_Encoder, FEC_Decoder
 from .viterbi import ViterbiDecoder, ViterbiDecoder_ISI
 
 clock = perf_counter
@@ -1160,56 +1163,84 @@ def update_results(self):
 
     # Viterbi trellis
     N_PATHS = 3
-    trellis_path_xs:     list[int]       = []
-    trellis_path_ys:     list[list[int]] = [[], [], []]
+    trellis_path_xs:     list[int] = []
+    trellis_path_ys:     list[int] = []
     trellis_state_ys:    list[list[int]] = [[], [], []]
     trellis_state_probs: list[list[int]] = [[], [], []]
+    trellis_x0: list[int] = []
+    trellis_y0: list[int] = []
+    trellis_x1: list[int] = []
+    trellis_y1: list[int] = []
     if self.rx_use_viterbi:
-        trellis_path_ys     = []
         trellis_state_ys    = []
         trellis_state_probs = []
 
-        # Assemble pairs of lists of probabilities and previous states, by trellis column.
+        # Assemble pairs of lists of probabilities and previous states, for each trellis column.
         probss_prevss = list(zip(self.dbg_dict_viterbi["probs"],
                                  self.dbg_dict_viterbi["prevs"]))
-        probss_prevss.reverse()  # We trace backwards through the trellis.
         trellis_path_xs = range(len(probss_prevss))
 
-        # Start with the most probable final states.
+        # Construct a sorted list of pairs for each trellis column, keeping only the 3 most probable.
+        # - `enumerate()` provides correct state index, which survives sorting/pruning.
+        prob_prev_pairss = list(map(lambda probs_prevs: list(enumerate(zip(*probs_prevs))), probss_prevss))
+        for prob_prev_pairs in prob_prev_pairss:
+            prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)  # Sort on state probability.
+            del prob_prev_pairs[3:]                                    # Keep only 3 most probable.
+
+        # Draw all possible transitions, weighted according to probability.
+        trans_prob_mat = self.dbg_dict_viterbi["decoder"].trans
+        point: TypeAlias = tuple[int, int]
+        paths: list[tuple[point, point, float]] = []  # (src, dst, prob)
+        for col, row__prob_prevs in enumerate(prob_prev_pairss[:-1]):
+            for row__prob_prev in row__prob_prevs:
+                row, (prob, prev) = row__prob_prev
+                paths.extend([((col, row), (col + 1, _row), trans_prob)
+                              for _row, trans_prob in enumerate(trans_prob_mat[row])
+                              if trans_prob])
+        src_pts, dst_pts, trans_probs = zip(*paths)
+        trellis_x0 = list(map(fst, src_pts))
+        trellis_y0 = list(map(snd, src_pts))
+        trellis_x1 = list(map(fst, dst_pts))
+        trellis_y1 = list(map(snd, dst_pts))
+
+        # Draw chosen trellis path.
+        probss_prevss.reverse()  # We trace backwards through the trellis.
+
+        # - Start with the most probable final state.
         prob_prev_pairs = list(enumerate(zip(*(probss_prevss[0]))))  # `enumerate()` provides correct y-index.
         prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)    # Sort on state probability.
-        most_probable_pairs = [x[0] for x in prob_prev_pairs[:N_PATHS]]
-        trellis_path_ys.append(most_probable_pairs)
+        trellis_path_ys.append(prob_prev_pairs[0][0])
 
-        # Then, taking the remaining trellis columns one at a time...
+        # - Then, taking the remaining trellis columns one at a time...
         for probs, prevs in probss_prevss:
-            trellis_path_ys.append([prevs[y] for y in trellis_path_ys[-1]])
+            trellis_path_ys.append(prevs[trellis_path_ys[-1]])
             state_probs: list[tuple[int, float]] = list(enumerate(probs))
             state_probs.sort(key=lambda x: x[1], reverse=True)   # Sort on state probability.
             trellis_state_ys.append([x[0] for x in state_probs[:N_PATHS]])
             trellis_state_probs.append([x[1] for x in state_probs[:N_PATHS]])
         trellis_path_ys = trellis_path_ys[:-1]  # Trim the extra element.
 
-        # Restore forward order of lists.
+        # - Restore forward order of lists.
         trellis_path_ys.reverse()
         trellis_state_ys.reverse()
         trellis_state_probs.reverse()
 
-        # Transpose the lists, to attain the proper data layout for plotting.
-        trellis_path_ys = list(zip(*trellis_path_ys))
+        # - Transpose the lists, to attain the proper data layout for plotting.
         trellis_state_ys = list(zip(*trellis_state_ys))
         trellis_state_probs = list(zip(*trellis_state_probs))
 
+    self.plotdata.set_data("trellis_x", [item for pair in zip(trellis_x0, trellis_x1) for item in pair])
+    self.plotdata.set_data("trellis_y", [item for pair in zip(trellis_y0, trellis_y1) for item in pair])
+
     self.plotdata.set_data("trellis_path_xs", trellis_path_xs)
-    self.plotdata.set_data("trellis_path1_ys", trellis_path_ys[0])
-    self.plotdata.set_data("trellis_path2_ys", trellis_path_ys[1])
-    self.plotdata.set_data("trellis_path3_ys", trellis_path_ys[2])
+    self.plotdata.set_data("trellis_path_ys", trellis_path_ys)
     self.plotdata.set_data("trellis_state1_ys", trellis_state_ys[0])
     self.plotdata.set_data("trellis_state2_ys", trellis_state_ys[1])
     self.plotdata.set_data("trellis_state3_ys", trellis_state_ys[2])
     self.plotdata.set_data("trellis_state1_probs", trellis_state_probs[0])
     self.plotdata.set_data("trellis_state2_probs", trellis_state_probs[1])
     self.plotdata.set_data("trellis_state3_probs", trellis_state_probs[2])
+
     if hasattr(self, "plot_viterbi"):
         self.plot_viterbi.components[0].value_range.high_setting = self.L ** self.rx_viterbi_symbols - 0.5
 

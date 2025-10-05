@@ -11,7 +11,7 @@ import numpy as np
 
 from chaco.api import (
     ColorBar, ColorMapper, DataRange1D, GridPlotContainer,
-    HPlotContainer, LinearMapper, LogMapper, Plot, TransformColorMapper
+    HPlotContainer, LinearMapper, LogMapper, Plot, SegmentPlot, TransformColorMapper
 )
 from chaco.default_colormaps import hot, viridis, wistia
 from chaco.tools.api import PanTool, ZoomTool
@@ -172,25 +172,25 @@ def make_plots(self, n_dfe_taps):
         data_func=safe_log10,
     )
     plot_viterbi = Plot(plotdata)
+    plot_viterbi.plot(("trellis_path_xs", "trellis_path_ys"), type="line", color="blue")
     plot_viterbi.plot(("trellis_path_xs", "trellis_state1_ys", "trellis_state1_probs"),
         type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=10)
-    plot_viterbi.plot(("trellis_path_xs", "trellis_path1_ys"), type="line", color="blue")
     plot_viterbi.plot(("trellis_path_xs", "trellis_state2_ys", "trellis_state2_probs"),
         type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=8)
-    plot_viterbi.plot(("trellis_path_xs", "trellis_path2_ys"), type="line", color="green")
     plot_viterbi.plot(("trellis_path_xs", "trellis_state3_ys", "trellis_state3_probs"),
         type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=6)
-    plot_viterbi.plot(("trellis_path_xs", "trellis_path3_ys"), type="line", color="red")
+    plot_viterbi.plot(("trellis_x", "trellis_y"),
+        type="segment", line_style="dash")
     plot_viterbi.index_range.low_setting  =  0
     plot_viterbi.index_range.high_setting = 10
     plot_viterbi.index_axis.tick_interval =  1
     plot_viterbi.value_range.low_setting  =  -0.5
     plot_viterbi.value_range.high_setting = self.L ** self.rx_viterbi_symbols + 0.5
     plot_viterbi.value_axis.tick_interval =  1
-    plot_viterbi.title = "Viterbi Decoder Trellis - Showing Probabilities of 3 Most Probable States"
+    plot_viterbi.title = "Viterbi Decoder Trellis - Showing Probabilities of 3 Most Probable States & Path Pruning"
     plot_viterbi.index_axis.title = "Symbol Index"
     plot_viterbi.value_axis.title = "State Index"
 
