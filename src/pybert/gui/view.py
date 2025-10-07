@@ -392,11 +392,11 @@ traits_view = View(
                                 enabled_when="rx_use_viterbi",
                                 tooltip="Number of symbols to include in MLSD trellis.",
                             ),
-                            Item(
-                                name="rx_viterbi_fec", label="Use FEC",
-                                enabled_when="rx_use_viterbi",
-                                tooltip="Use FEC, as opposed to ISI, for Viterbi decoding.",
-                            ),
+                            # Item(
+                            #     name="rx_viterbi_fec", label="Use FEC",
+                            #     enabled_when="rx_use_viterbi",
+                            #     tooltip="Use FEC, as opposed to ISI, for Viterbi decoding.",
+                            # ),
                         ),
                         label="Native",
                         show_border=True,
@@ -741,8 +741,6 @@ traits_view = View(
                 ),
                 VGroup(  # Rx FFE
                     HGroup(
-                        # Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
-                        # Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
                         Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
                     ),
                     Item(
@@ -855,8 +853,14 @@ traits_view = View(
             ),
             VGroup(
                 Item("plot_viterbi", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
-                Item("trellis_pan_control",
-                     editor=RangeEditor(low=0, high_name="trellis_max_x", mode="xslider"), show_label=False),
+                HGroup(
+                    Item("trellis_err_select", label="Error",
+                         editor=RangeEditor(low=0, high_name="trellis_max_x", mode="xslider"),),
+                    Item(label="of"),
+                    Item("trellis_max_err", style="readonly", show_label=False),
+                    Item("trellis_pan_control", label="Position", springy=True,
+                         editor=RangeEditor(low=0, high_name="trellis_max_x", mode="xslider"),),
+                ),
                 label="Viterbi",
                 id="plots_viterbi",
             ),

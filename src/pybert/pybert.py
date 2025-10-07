@@ -278,6 +278,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_viterbi_fec = Bool(False)  #: Use FEC, as opposed to ISI, for Viterbi decoding when True.
     trellis_max_x = Int(10_150)
     trellis_pan_control = Range(low=0, high='trellis_max_x', value=0)
+    trellis_max_err = Int(0)
+    trellis_err_select = Range(low=0, high='trellis_max_err', value=0)
 
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
@@ -983,7 +985,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         return info_str
 
     def _get_status_str(self):
-        status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
+        status_str = f"{self.status:30} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
         err_str = f"    | BitErrs: {int(self.n_errs_dfe)} ({int(self.n_errs_viterbi)})"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
@@ -1245,6 +1247,12 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _trellis_pan_control_changed(self, new_value):
         self.plot_viterbi.components[0].index_range.set_bounds(new_value, new_value + 10)
+    
+    def _trellis_err_select_changed(self, new_value):
+        # err_x = self.trellis_err_xs[new_value]
+        self.trellis_pan_control = self.trellis_err_xs[new_value] - 5
+        # self.plot_viterbi.components[0].index_range.set_bounds(
+        #     err_x - 5, err_x + 5)
     
     def _rx_viterbi_fec_changed(self, new_value):
         if new_value:

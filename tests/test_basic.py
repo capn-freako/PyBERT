@@ -17,7 +17,7 @@ class TestBasic(object):
 
     def test_ber(self, dut):
         """Test simulation bit errors."""
-        assert not dut.bit_errs, "Bit errors detected!"
+        assert dut.n_errs_dfe == 0, "Bit errors detected!"
 
     def test_dly(self, dut):
         """Test channel delay."""

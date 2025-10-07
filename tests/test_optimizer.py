@@ -74,5 +74,5 @@ class TestOptimizer(object):
         thePyBERT.rx_use_viterbi = True
         thePyBERT.simulate(initial_run=True)
         assert thePyBERT.status == "Ready.", "Status not 'Ready.'!"
-        n_errs = thePyBERT.bit_errs_viterbi
-        assert n_errs <= 0, f"{n_errs} bit errors from Viterbi decoder detected!"
+        n_errs = thePyBERT.n_errs_viterbi
+        assert n_errs == 0, f"{n_errs} bit errors from Viterbi decoder detected!"

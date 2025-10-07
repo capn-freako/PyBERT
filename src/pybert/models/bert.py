@@ -41,6 +41,8 @@ from numpy.typing import NDArray  # type: ignore
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
+from chaco.api import Plot
+
 from pyibisami.ami.parser import AmiName, AmiNode, ami_parse
 
 from ..utility import (
@@ -476,7 +478,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     _n_taps = 0
     limits = []
     # Only make a "real" DFE if we're not running AMI_GetWave() w/ clocks.
-    if not (self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and clock_times):
+    ami_getwave_clocks: bool = (  # "len(clock_times) > 1" because `ui_ests` relies on `diff()`.
+        self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and
+        clock_times is not None and len(clock_times) > 1 and clock_times[0] != -1)
+    if not (ami_getwave_clocks):
         if any(tap.enabled for tap in dfe_tap_tuners):
             _gain = gain
             _ideal = self.sum_ideal
@@ -496,8 +501,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     self.decision_scaler = 0.0
     self.dfe_scalar_values = []
-    # Accommodate the singular special case.
-    if self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and clock_times:
+    if ami_getwave_clocks:  # Accommodate the singular special case.
         sample_times = []
         bits_out_dfe = []
         sig_samps = []
@@ -519,6 +523,15 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             clocks[t_ix] = 1
             sample_times.append(sample_time)
             sig_samps.append(sig_samp)
+        dfe_rslts = {
+            "bits": bits_out_dfe,
+            "sig_samps": sig_samps,
+            "clock_times": sample_times,
+            "clocks": clocks,
+            "dfe_out": dfe_out,
+            "lockeds": [],
+            "ui_ests": array(sample_times).diff(),
+        }
     else:  # all other cases
         dbg_dict: dict[str, Any] = {}
         dfe_rslts = dfe.run(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
@@ -554,8 +567,16 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         auto_corr = auto_corr[len(auto_corr) // 2:]
         self.auto_corr = auto_corr
         bit_dly = where(auto_corr == max(auto_corr))[0][0]
-        bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
-        assert len(bits_ref) == len(bits_tst)
+        if bit_dly == 0:
+            bits_ref = bits[-eye_bits:]
+        else:
+            bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
+        if len(bits_ref) != len(bits_tst):
+            raise ValueError("\n\t".join([
+                "calc_ber():",
+                f"len(bits_ref): {len(bits_ref)}; len(bits_tst): {len(bits_tst)}",
+                f"bit_dly: {bit_dly}; len(bits): {len(bits)}",
+                ]))
         bit_errs = where(bits_tst != bits_ref)[0]
         n_errs = len(bit_errs)
 
@@ -597,12 +618,12 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         for sample_time in _sample_times:
             while t[ix] < sample_time:
                 ix += 1
-            sig_samps.append(ffe_out[ix])
+            sig_samps.append(dfe_out[ix])
 
         self.dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
-        pulse_resp_curs_ix = np.argmax(ffe_out_p)
-        pulse_resp_samps = np.array([ffe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
+        pulse_resp_curs_ix = np.argmax(dfe_out_p)
+        pulse_resp_samps = np.array([dfe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
             decoder: Union[FEC_Decoder, ViterbiDecoder_ISI] = FEC_Decoder(N)
@@ -982,15 +1003,35 @@ def update_results(self):
     self.plotdata.set_data("t_ns", t_ns_plot)
 
     # DFE.
+    PLOT_PADDING = 75
+    PLOT_PADDING_BOT = 50
+    # - Creating a new plot is the only way I've found that works.
+    dfe_plot = Plot(self.plotdata,
+        auto_colors=["magenta", "red",  "orange", "yellow", "green",
+                     "cyan",    "blue", "purple", "brown",  "black"],
+        padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT,
+    )
+    # - Create a trace for each active DFE tap.
     tap_weights = transpose(array(self.adaptation))
-    if len(tap_weights):
-        for k, tap_weight in enumerate(tap_weights):  # pylint: disable=undefined-loop-variable
-            self.plotdata.set_data(f"tap{k + 1}_weights", tap_weight)
+    line_styles = ["line", "dash"]
+    for i, tap_weight in enumerate(tap_weights):  # pylint: disable=undefined-loop-variable
+        name = f"tap{int(i + 1)}"
+        trace_name = name + "_weights"
+        self.plotdata.set_data(trace_name, tap_weight)
         self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))  # pylint: disable=undefined-loop-variable
-    else:
-        for k in range(len(self.dfe_tap_tuners)):
-            self.plotdata.set_data(f"tap{k + 1}_weights", zeros(10))
-        self.plotdata.set_data("tap_weight_index", list(range(10)))  # pylint: disable=undefined-loop-variable
+        # if hasattr(self, "_dfe_plot"):
+        if True:
+            # dfe_plot = self._dfe_plot
+            dfe_plot.plot(
+                ("tap_weight_index", trace_name),
+                type="line",
+                color="auto",
+                style=line_styles[i // 10],
+                name=name,
+            )
+            dfe_plot.legend.labels.append(name)
+    if hasattr(self, "plots_dfe") and self.plots_dfe is not None:
+        self.plots_dfe.components[1] = dfe_plot
 
     (bin_counts, bin_edges) = histogram(ui_ests, bins=100)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
@@ -1164,6 +1205,7 @@ def update_results(self):
     # Viterbi trellis
     N_PATHS = 3
     trellis_path_xs:     list[int] = []
+    trellis_err_xs:      list[int] = []
     trellis_path_ys:     list[int] = []
     trellis_state_ys:    list[list[int]] = [[], [], []]
     trellis_state_probs: list[list[int]] = [[], [], []]
@@ -1229,6 +1271,17 @@ def update_results(self):
         trellis_state_ys = list(zip(*trellis_state_ys))
         trellis_state_probs = list(zip(*trellis_state_probs))
 
+        # Calculate symbol error x-indices.
+        match self.mod_type:
+            case "NRZ":
+                trellis_err_xs = self.bit_errs_viterbi
+            case "Duo-binary":
+                trellis_err_xs = int(array(self.bit_errs_viterbi) / 1.6)
+            case "PAM-4":
+                trellis_err_xs = array(self.bit_errs_viterbi) // 2
+            case _:
+                raise ValueError(f"Unrecognized modulation type: {self.mod_type}!")
+
     self.plotdata.set_data("trellis_x", [item for pair in zip(trellis_x0, trellis_x1) for item in pair])
     self.plotdata.set_data("trellis_y", [item for pair in zip(trellis_y0, trellis_y1) for item in pair])
 
@@ -1240,6 +1293,11 @@ def update_results(self):
     self.plotdata.set_data("trellis_state1_probs", trellis_state_probs[0])
     self.plotdata.set_data("trellis_state2_probs", trellis_state_probs[1])
     self.plotdata.set_data("trellis_state3_probs", trellis_state_probs[2])
+
+    self.plotdata.set_data("trellis_err_xs", trellis_err_xs)
+    self.trellis_err_xs = trellis_err_xs
+    self.trellis_max_err = len(trellis_err_xs)
+    self.plotdata.set_data("trellis_err_ys", -0.25 * ones(len(trellis_err_xs)))
 
     if hasattr(self, "plot_viterbi"):
         self.plot_viterbi.components[0].value_range.high_setting = self.L ** self.rx_viterbi_symbols - 0.5

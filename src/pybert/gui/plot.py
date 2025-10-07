@@ -1,4 +1,5 @@
-"""Plot definitions for PyBERT class.
+"""
+Plot definitions for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -73,7 +74,12 @@ seg_map = {
 
 # pylint: disable=too-many-locals,too-many-statements
 def make_plots(self, n_dfe_taps):
-    """Create the plots used by the PyBERT GUI."""
+    """
+    Create the plots used by the PyBERT GUI.
+
+    Args:
+
+    """
 
     post_chnl_str = "Channel"
     post_tx_str = "+ Tx De-emphasis & Noise"
@@ -98,18 +104,13 @@ def make_plots(self, n_dfe_taps):
     plot9.legend.labels = []
     for i in range(n_dfe_taps):
         name = f"tap{int(i + 1)}"
-        try:
-            plot9.plot(
-                ("tap_weight_index", name + "_weights"),
-                type="line",
-                color="auto",
-                style=line_styles[i // 10],
-                name=name,
-            )
-        except ValueError as err:
-            print(f"i: {i}", flush=True)
-            print(f"name: {name}", flush=True)
-            raise
+        plot9.plot(
+            ("tap_weight_index", name + "_weights"),
+            type="line",
+            color="auto",
+            style=line_styles[i // 10],
+            name=name,
+        )
         plot9.legend.labels.append(name)
     plot9.title = "DFE Adaptation"
     plot9.index_axis.title = "Sample Number"
@@ -173,6 +174,7 @@ def make_plots(self, n_dfe_taps):
     )
     plot_viterbi = Plot(plotdata)
     plot_viterbi.plot(("trellis_path_xs", "trellis_path_ys"), type="line", color="blue")
+    plot_viterbi.plot(("trellis_err_xs", "trellis_err_ys"), type="scatter", color="red", marker="star")
     plot_viterbi.plot(("trellis_path_xs", "trellis_state1_ys", "trellis_state1_probs"),
         type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=10)
