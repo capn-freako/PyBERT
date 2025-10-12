@@ -208,7 +208,7 @@ def make_plots(self, n_dfe_taps):
     )
 
     colorbar = ColorBar(
-        index_mapper=LogMapper(range=cmap.range),
+        index_mapper=LogMapper(range=cmap.range),  # Causing InvalidValue exception after program launch.
         color_mapper=cmap,
         plot=plot_viterbi,
         orientation="v",

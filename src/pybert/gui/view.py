@@ -852,17 +852,21 @@ traits_view = View(
                 id="plots_bathtub",
             ),
             VGroup(
-                Item("plot_viterbi", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
+                Item("plot_viterbi", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False,
+                    enabled_when="rx_use_viterbi == True and n_errs_viterbi != -1",
+                ),
                 HGroup(
                     Item("trellis_err_select", label="Error",
-                         editor=RangeEditor(low=0, high_name="trellis_max_x", mode="xslider"),),
+                         editor=RangeEditor(low=0, high_name="trellis_max_err", mode="xslider"),),
                     Item(label="of"),
                     Item("trellis_max_err", style="readonly", show_label=False),
                     Item("trellis_pan_control", label="Position", springy=True,
                          editor=RangeEditor(low=0, high_name="trellis_max_x", mode="xslider"),),
+                    enabled_when="rx_use_viterbi == True and n_errs_viterbi != -1",
                 ),
                 label="Viterbi",
                 id="plots_viterbi",
+                enabled_when="rx_use_viterbi == True",  # ToDo: Doesn't work. Alternative?
             ),
             layout="tabbed",
             label="Results",
