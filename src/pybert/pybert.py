@@ -1249,10 +1249,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.plot_viterbi.components[0].index_range.set_bounds(new_value, new_value + 10)
     
     def _trellis_err_select_changed(self, new_value):
-        # err_x = self.trellis_err_xs[new_value]
-        self.trellis_pan_control = self.trellis_err_xs[new_value] - 5
-        # self.plot_viterbi.components[0].index_range.set_bounds(
-        #     err_x - 5, err_x + 5)
+        if new_value > 0:
+            self.trellis_pan_control = max(0, self.trellis_err_xs[new_value - 1] - 5)
     
     def _rx_viterbi_fec_changed(self, new_value):
         if new_value:
