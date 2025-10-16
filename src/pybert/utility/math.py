@@ -50,20 +50,28 @@ def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:
         yield val & 1
 
 
-def safe_log10(x):
-    "Guards against pesky 'Divide by 0' error messages."
+def safe_log10(x: float, min_val: float = 1e-20):
+    """
+    Guards against pesky 'Divide by 0' error messages.
+
+    Args:
+        x: Value to take log10 of.
+
+    Keyword Args:
+        min_val: Minimum input value to allow.
+            Default: 1e-20
+    """
 
     if hasattr(x, "__len__"):
-        x = where(x == 0, 1.0e-20 * ones(len(x)), x)
+        x = where(x <= 0, min_val * ones(len(x)), x)
     else:
-        if x == 0:
-            x = 1.0e-20
+        if x <= 0:
+            x = min_val
 
     try:
         return log10(x)
-    except:
-        print(f"x: {x}")
-        raise
+    except Exception as err:
+        raise ValueError(f"x: {x}") from err
 
 
 # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments

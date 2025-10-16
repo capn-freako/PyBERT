@@ -190,7 +190,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             with open(filepath, "rb") as pickle_file:
                 user_config = pickle.load(pickle_file)
         else:
-            raise InvalidFileType("Pybert does not support this file type.")
+            raise InvalidFileType("PyBERT does not support this file type.")
 
         # Right now the loads deserialize back into a `PyBertCfg` class.
         if not isinstance(user_config, PyBertCfg):

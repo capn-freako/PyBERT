@@ -1,4 +1,5 @@
-"""Plot definitions for PyBERT class.
+"""
+Plot definitions for PyBERT class.
 
 Original author: David Banas <capn.freako@gmail.com>
 
@@ -7,19 +8,78 @@ Original date:   February 21, 2015 (Copied from pybert.py, as part of a major co
 Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
 
-from chaco.api import ColorMapper, GridPlotContainer, Plot
+import numpy as np
+
+from chaco.api import (
+    ColorBar, ColorMapper, DataRange1D, GridPlotContainer,
+    HPlotContainer, LinearMapper, LogMapper, Plot, SegmentPlot, TransformColorMapper
+)
+from chaco.default_colormaps import hot, viridis, wistia
 from chaco.tools.api import PanTool, ZoomTool
 
-from pybert.models.bert import update_eyes
+from ..models.bert import update_eyes
+from ..utility.math import safe_log10
 
 PLOT_SPACING = 1
 PLOT_PADDING = 75
 PLOT_PADDING_BOT = 50
 
+seg_map = {
+    "red": [
+        (0.00, 0.00, 0.00),  # black
+        (0.00001, 0.00, 0.00),  # blue
+        (0.15, 0.00, 0.00),  # cyan
+        (0.30, 0.00, 0.00),  # green
+        (0.45, 1.00, 1.00),  # yellow
+        (0.60, 1.00, 1.00),  # orange
+        (0.75, 1.00, 1.00),  # red
+        (0.90, 1.00, 1.00),  # pink
+        (1.00, 1.00, 1.00),  # white
+    ],
+    "green": [
+        (0.00, 0.00, 0.00),  # black
+        (0.00001, 0.00, 0.00),  # blue
+        (0.15, 0.50, 0.50),  # cyan
+        (0.30, 0.50, 0.50),  # green
+        (0.45, 1.00, 1.00),  # yellow
+        (0.60, 0.50, 0.50),  # orange
+        (0.75, 0.00, 0.00),  # red
+        (0.90, 0.50, 0.50),  # pink
+        (1.00, 1.00, 1.00),  # white
+    ],
+    "blue": [
+        (0.00, 0.00, 0.00),  # black
+        (1e-18, 0.50, 0.50),  # blue
+        (0.15, 0.50, 0.50),  # cyan
+        (0.30, 0.00, 0.00),  # green
+        (0.45, 0.00, 0.00),  # yellow
+        (0.60, 0.00, 0.00),  # orange
+        (0.75, 0.00, 0.00),  # red
+        (0.90, 0.50, 0.50),  # pink
+        (1.00, 1.00, 1.00),  # white
+    ],
+    "alpha": [
+        (0.00, 1.00, 1.00),  # black
+        (0.00001, 1.00, 1.00),  # blue
+        (0.15, 1.50, 1.50),  # cyan
+        (0.30, 1.50, 1.50),  # green
+        (0.45, 1.00, 1.00),  # yellow
+        (0.60, 1.00, 1.00),  # orange
+        (0.75, 1.00, 1.00),  # red
+        (0.90, 1.00, 1.00),  # pink
+        (1.00, 1.00, 1.00),  # white
+    ]
+}
+
 
 # pylint: disable=too-many-locals,too-many-statements
 def make_plots(self, n_dfe_taps):
-    """Create the plots used by the PyBERT GUI."""
+    """
+    Create the plots used by the PyBERT GUI.
+
+    Args:
+
+    """
 
     post_chnl_str = "Channel"
     post_tx_str = "+ Tx De-emphasis & Noise"
@@ -105,6 +165,60 @@ def make_plots(self, n_dfe_taps):
     container_tune = GridPlotContainer(shape=(1, 1))
     container_tune.add(plot_h_tune)
     self.plot_h_tune = container_tune
+
+    # - Viterbi trellis
+    # - - Use a logarithmic color mapper, to better see differences at low probabilities.
+    cmap = TransformColorMapper.from_color_map(
+        viridis,
+        data_func=safe_log10,
+    )
+    plot_viterbi = Plot(plotdata)
+    plot_viterbi.plot(("trellis_path_xs", "trellis_path_ys"), type="line", color="blue")
+    plot_viterbi.plot(("trellis_err_xs", "trellis_err_ys"), type="scatter", color="red", marker="star")
+    plot_viterbi.plot(("trellis_path_xs", "trellis_state1_ys", "trellis_state1_probs"),
+        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
+        fill_alpha=0.5, marker_size=10)
+    plot_viterbi.plot(("trellis_path_xs", "trellis_state2_ys", "trellis_state2_probs"),
+        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
+        fill_alpha=0.5, marker_size=8)
+    plot_viterbi.plot(("trellis_path_xs", "trellis_state3_ys", "trellis_state3_probs"),
+        type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
+        fill_alpha=0.5, marker_size=6)
+    plot_viterbi.plot(("trellis_x", "trellis_y"),
+        type="segment", line_style="dash")
+    plot_viterbi.index_range.low_setting  =  0
+    plot_viterbi.index_range.high_setting = 10
+    plot_viterbi.index_axis.tick_interval =  1
+    plot_viterbi.value_range.low_setting  =  -0.5
+    plot_viterbi.value_range.high_setting = self.L ** self.rx_viterbi_symbols + 0.5
+    plot_viterbi.value_axis.tick_interval =  1
+    plot_viterbi.title = "Viterbi Decoder Trellis - Showing Probabilities of 3 Most Probable States & Path Pruning"
+    plot_viterbi.index_axis.title = "Symbol Index"
+    plot_viterbi.value_axis.title = "State Index"
+
+    plot_viterbi.tools.append(PanTool(plot_viterbi,
+        constrain=True, constrain_key=None, constrain_direction="x",
+        pan_keys_step=100.0, restrict_to_data=True))
+
+    container_viterbi = HPlotContainer(
+        plot_viterbi,
+        bgcolor="lightgray",
+        fill_padding=True,
+        spacing=10
+    )
+
+    colorbar = ColorBar(
+        index_mapper=LogMapper(range=cmap.range),  # Causing InvalidValue exception after program launch.
+        color_mapper=cmap,
+        plot=plot_viterbi,
+        orientation="v",
+        resizable="v",
+        width=30,
+        padding=20,
+        container=container_viterbi,
+    )
+
+    self.plot_viterbi = container_viterbi
 
     # - Impulse Responses tab
     plot_h_chnl = Plot(plotdata, padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING)
@@ -343,41 +457,6 @@ def make_plots(self, n_dfe_taps):
     self.plots_out = container_out
 
     # - Eye Diagrams tab
-    seg_map = {
-        "red": [
-            (0.00, 0.00, 0.00),  # black
-            (0.00001, 0.00, 0.00),  # blue
-            (0.15, 0.00, 0.00),  # cyan
-            (0.30, 0.00, 0.00),  # green
-            (0.45, 1.00, 1.00),  # yellow
-            (0.60, 1.00, 1.00),  # orange
-            (0.75, 1.00, 1.00),  # red
-            (0.90, 1.00, 1.00),  # pink
-            (1.00, 1.00, 1.00),  # white
-        ],
-        "green": [
-            (0.00, 0.00, 0.00),  # black
-            (0.00001, 0.00, 0.00),  # blue
-            (0.15, 0.50, 0.50),  # cyan
-            (0.30, 0.50, 0.50),  # green
-            (0.45, 1.00, 1.00),  # yellow
-            (0.60, 0.50, 0.50),  # orange
-            (0.75, 0.00, 0.00),  # red
-            (0.90, 0.50, 0.50),  # pink
-            (1.00, 1.00, 1.00),  # white
-        ],
-        "blue": [
-            (0.00, 0.00, 0.00),  # black
-            (1e-18, 0.50, 0.50),  # blue
-            (0.15, 0.50, 0.50),  # cyan
-            (0.30, 0.00, 0.00),  # green
-            (0.45, 0.00, 0.00),  # yellow
-            (0.60, 0.00, 0.00),  # orange
-            (0.75, 0.00, 0.00),  # red
-            (0.90, 0.50, 0.50),  # pink
-            (1.00, 1.00, 1.00),  # white
-        ]
-    }
     clr_map = ColorMapper.from_segment_map(seg_map)
     self.clr_map = clr_map
 

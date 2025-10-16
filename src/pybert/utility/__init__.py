@@ -14,6 +14,7 @@ A refactoring of the `pybert.utility` module, as per Issue #147.
 """
 
 from .channel import *
+from .functional import *
 from .ibisami import *
 from .jitter import *
 from .math import *

@@ -1,13 +1,13 @@
 !!python/object:pybert.configuration.PyBertCfg
-date_created: Sat Jun 21 14:15:20 2025
-version: 7.2.1
+date_created: Fri Oct  3 15:13:36 2025
+version: 9.1.3
 bit_rate: 10.0
 nbits: 20000
 pattern: PRBS-7
 seed: 1
 nspui: 32
 eye_bits: 10000
-mod_type: "NRZ"
+mod_type: NRZ
 debug: false
 f_max: 40.0
 f_step: 10.0
@@ -32,12 +32,12 @@ rn: 0.01
 tx_taps:
 - !!python/tuple
     - true
-    - -0.025
+    - -0.05
     - -0.05
     - 0.05
 - !!python/tuple
     - true
-    - 0.05000000000000002
+    - -0.1
     - -0.1
     - 0.1
 - !!python/tuple
@@ -122,12 +122,14 @@ rx_ibis_file: ''
 rx_use_ibis: false
 rx_use_viterbi: false
 rx_viterbi_symbols: 7
+rx_n_taps: 0
+rx_n_pre: 0
 sum_ideal: true
-decision_scaler: 0.015
-gain: 200.0
+decision_scaler: 0.06506319800837529
+gain: 5.0
 n_ave: 100.0
 sum_bw: 12.0
-use_agc: false
+use_agc: true
 delta_t: 0.1
 alpha: 0.01
 n_lock_ave: 500
@@ -141,6 +143,7 @@ min_mag_tune: 0.0
 max_mag_tune: 12.0
 step_mag_tune: 1.0
 ctle_enable_tune: true
+use_mmse: false
 dfe_tap_tuners:
 - !!python/tuple
     - true
@@ -151,11 +154,11 @@ dfe_tap_tuners:
     - -0.15
     - 0.15
 - !!python/tuple
-    - true
+    - false
     - -0.05
     - 0.1
 - !!python/tuple
-    - true
+    - false
     - -0.05
     - 0.1
 - !!python/tuple

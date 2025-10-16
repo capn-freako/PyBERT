@@ -120,8 +120,8 @@ rx_ami_file: ''
 rx_dll_file: ''
 rx_ibis_file: ''
 rx_use_ibis: false
-rx_use_viterbi: false
-rx_viterbi_symbols: 7
+rx_use_viterbi: true
+rx_viterbi_symbols: 3
 sum_ideal: true
 decision_scaler: 0.015
 gain: 200.0
@@ -147,15 +147,15 @@ dfe_tap_tuners:
     - 0.0
     - 0.4
 - !!python/tuple
-    - true
+    - false
     - -0.15
     - 0.15
 - !!python/tuple
-    - true
+    - false
     - -0.05
     - 0.1
 - !!python/tuple
-    - true
+    - false
     - -0.05
     - 0.1
 - !!python/tuple

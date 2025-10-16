@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from pybert import __version__
-from pybert.configuration import PyBertCfg
+from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.pybert import PyBERT
 
 
@@ -62,7 +62,7 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
         # Change a lot of settings throughout the different tabs of the application.
         user_config.eye_bits = 1234  # Normally 8000
         user_config.bit_rate = 20  # Normally 10
-        user_config.mod_type = [1]  # Normally [0]
+        user_config.mod_type = "Duo-binary"  # Normally "NRZ"
         user_config.pattern = "PRBS-23"  # Normally PRBS-7
         user_config.Rdc = 2  # Normally 0.1876
         user_config.rin = 85  # Normally 100
@@ -107,11 +107,16 @@ def test_load_config_from_pickle(dut, tmp_path: Path):
 
 @pytest.mark.usefixtures("dut")
 def test_load_config_from_invalid(dut, tmp_path: Path):
-    """When given an unsupported file suffix, no file should be read and an message logged."""
+    """
+    When given an unsupported file suffix,
+    an error message should be logged and an exception raised.
+    """
     save_file = tmp_path.joinpath("config.json")
     save_file.touch()
-    dut.load_configuration(save_file)
+    with pytest.raises(InvalidFileType) as excinfo:
+        dut.load_configuration(save_file)
 
+    assert "PyBERT does not support this file type." in str(excinfo.value)
     assert "This filetype is not currently supported." in dut.console_log
 
 
