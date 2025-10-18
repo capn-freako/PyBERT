@@ -12,8 +12,6 @@ from enable.component_editor import ComponentEditor
 from pyface.image_resource import ImageResource
 from traitsui.api import (  # CloseAction,
     Action,
-    CheckListEditor,
-    EnumEditor,
     FileEditor,
     Group,
     HGroup,
@@ -853,8 +851,7 @@ traits_view = View(
             ),
             VGroup(
                 Item("plot_viterbi", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False,
-                    enabled_when="rx_use_viterbi == True and n_errs_viterbi != -1",
-                ),
+                     enabled_when="rx_use_viterbi == True and n_errs_viterbi != -1",),
                 HGroup(
                     Item("trellis_err_select", label="Error",
                          editor=RangeEditor(low=0, high_name="trellis_max_err", mode="xslider"),),

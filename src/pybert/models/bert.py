@@ -11,15 +11,15 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from time import perf_counter
-from typing import Any, Callable, Optional, TypeAlias, Union
+from typing import Any, Callable, Optional, TypeAlias
 
 import numpy        as np
 import numpy.typing as npt
 import scipy.signal as sig
 from numpy import (  # type: ignore
     argmax,
+    append,
     array,
-    concatenate,
     convolve,
     correlate,
     diff,
@@ -45,6 +45,7 @@ from chaco.api import Plot
 
 from pyibisami.ami.parser import AmiName, AmiNode, ami_parse
 
+from ..common import Rvec
 from ..utility import (
     calc_eye,
     calc_jitter,
@@ -62,7 +63,7 @@ from ..utility import (
 
 from .dfe     import DFE
 from .fec     import FEC_Encoder, FEC_Decoder
-from .viterbi import ViterbiDecoder, ViterbiDecoder_ISI
+from .viterbi import ViterbiDecoder_ISI
 
 clock = perf_counter
 
@@ -255,7 +256,15 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         return ctle_h
 
     ctle_s = None
-    clock_times = None
+    dfe_out: Rvec = array([])
+    tap_weights: list[list[float]] = []
+    ui_ests: Rvec = array([])
+    clocks: Rvec = array([])
+    lockeds: list[bool] = []
+    clock_times: Rvec = array([])
+    bits_out_dfe: list[int] = []
+    sig_samps: Rvec = array([])
+    decisions: Rvec = array([])
     try:
         params: list[str] = []
         if self.tx_use_ami and self.tx_use_getwave:
@@ -353,16 +362,16 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 dfe_tap_keys.sort()
                 for dfe_tap_key in dfe_tap_keys:
                     _tap_weights.append(param_vals[dfe_tap_key])
-                tap_weights: list[list[float]] = list(array(_tap_weights).transpose())
+                tap_weights = list(array(_tap_weights).transpose())
                 if "cdr_locked" in param_vals:
                     _lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
                     _lockeds = _lockeds.repeat(len_t // len(_lockeds))
                     _lockeds = resize_zero_pad(_lockeds, len_t)
                 else:
                     _lockeds = zeros(len_t)
-                lockeds: list[bool] = list(map(bool, _lockeds))
+                lockeds = list(map(bool, _lockeds))
                 if "cdr_ui" in param_vals:
-                    ui_ests: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_ui")])
+                    ui_ests = array(param_vals[AmiName("cdr_ui")])
                     ui_ests = ui_ests.repeat(len_t // len(ui_ests))
                     ui_ests = resize_zero_pad(ui_ests, len_t)
                 else:
@@ -479,20 +488,17 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     limits = []
     # Only make a "real" DFE if we're not running AMI_GetWave() w/ clocks.
     ami_getwave_clocks: bool = (  # "len(clock_times) > 1" because `ui_ests` relies on `diff()`.
-        self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and
-        clock_times is not None and len(clock_times) > 1 and clock_times[0] != -1)
-    if not (ami_getwave_clocks):
+        self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and len(clock_times) > 1 and clock_times[0] != -1)
+    if not ami_getwave_clocks:
         if any(tap.enabled for tap in dfe_tap_tuners):
             _gain = gain
             _ideal = self.sum_ideal
-            # _n_taps = len(dfe_tap_tuners)
             _n_taps = 0
             for tuner in dfe_tap_tuners:
                 if tuner.enabled:
                     limits.append((tuner.min_val, tuner.max_val))
                     _n_taps += 1
                 else:
-                    # limits.append((0., 0.))
                     break  # We're not yet supporting floating taps.
     dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
@@ -502,13 +508,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.decision_scaler = 0.0
     self.dfe_scalar_values = []
     if ami_getwave_clocks:  # Accommodate the singular special case.
-        sample_times = []
-        bits_out_dfe = []
-        sig_samps = []
         t_ix = 0
         clocks = zeros(len_t)
         dfe_out = ffe_out
-        for clock_time in clock_times:
+        for clock_time in clock_times:  # type: ignore
             if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
                 break
             sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
@@ -518,28 +521,26 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 self.log("Went beyond system time vector end searching for next clock time!")
                 break
             sig_samp = ffe_out[t_ix]
-            _, _bits = dfe.decide(sig_samp)
+            decision, _bits = dfe.decide(sig_samp)
             bits_out_dfe.extend(_bits)
+            decisions = append(decisions, decision)
             clocks[t_ix] = 1
-            sample_times.append(sample_time)
-            sig_samps.append(sig_samp)
-        dfe_rslts = {
-            "bits": bits_out_dfe,
-            "sig_samps": sig_samps,
-            "clock_times": sample_times,
-            "clocks": clocks,
-            "dfe_out": dfe_out,
-            "lockeds": [],
-            "ui_ests": array(sample_times).diff(),
-        }
+            sig_samps = append(sig_samps, sig_samp)
+        tap_weights = []
+        ui_ests = diff(clock_times)  # type: ignore
+        lockeds = []
     else:  # all other cases
         dbg_dict: dict[str, Any] = {}
-        dfe_rslts = dfe.run(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
-        bits_out_dfe = dfe_rslts["bits"]
-        sig_samps = dfe_rslts["sig_samps"]
-        sample_times = dfe_rslts["clock_times"]
-        tap_weights = dfe_rslts["tap_weights"]
-        dfe_out = dfe_rslts["dfe_out"]
+        (dfe_out,
+         tap_weights,
+         ui_ests,
+         clocks,
+         lockeds,
+         clock_times,
+         bits_out_dfe,
+         sig_samps,
+         decisions
+         ) = dfe.run_dfe(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
 
@@ -572,11 +573,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:
             bits_ref = bits[-(bit_dly + eye_bits): -bit_dly]
         if len(bits_ref) != len(bits_tst):
-            raise ValueError("\n\t".join([
-                "calc_ber():",
-                f"len(bits_ref): {len(bits_ref)}; len(bits_tst): {len(bits_tst)}",
-                f"bit_dly: {bit_dly}; len(bits): {len(bits)}",
-                ]))
+            raise ValueError("\n\t".join(
+                ["calc_ber():",
+                 f"len(bits_ref): {len(bits_ref)}; len(bits_tst): {len(bits_tst)}",
+                 f"bit_dly: {bit_dly}; len(bits): {len(bits)}",
+                 ]))
         bit_errs = where(bits_tst != bits_ref)[0]
         n_errs = len(bit_errs)
 
@@ -608,17 +609,17 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     bit_errs_viterbi = []
     if self.rx_use_viterbi:
         # Assemble the (nominally) UI-spaced samples of the Rx DFE output.
-        sig_samps = []
+        sig_samps = array([])
         # - Avoid exception due to DFE predicting a last sample time beyond system time vector end.
         # - ("+ 1" ensures correct number of samples in either case.)
-        _sample_times = list(filter(lambda x: x <= t[-1], sample_times[-(eye_uis + 1):]))
+        _sample_times = list(filter(lambda x: x <= t[-1], clock_times[-(eye_uis + 1):]))
         # - Trap the case of the last one just making it through filtration.
         _sample_times = _sample_times[:eye_uis]
         ix = 0
         for sample_time in _sample_times:
             while t[ix] < sample_time:
                 ix += 1
-            sig_samps.append(dfe_out[ix])
+            sig_samps = append(sig_samps, dfe_out[ix])
 
         self.dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
@@ -626,13 +627,12 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         pulse_resp_samps = np.array([dfe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
-            decoder: Union[FEC_Decoder, ViterbiDecoder_ISI] = FEC_Decoder(N)
-            path = decoder.decode(list(zip(bits_out_dfe[0::2], bits_out_dfe[1::2])), dbg_dict=self.dbg_dict_viterbi)
-            _states = decoder.states
+            decoder_fec: FEC_Decoder = FEC_Decoder(N)
+            path = decoder_fec.decode(list(zip(bits_out_dfe[0::2], bits_out_dfe[1::2])), dbg_dict=self.dbg_dict_viterbi)
+            _states = decoder_fec.states
             bits_out_viterbi = list(map(lambda ix: _states[ix][0], path))
             if self.debug:  # Regenerate the observed symbols.
-                init_state = _states[path[0]][1:]
-                encoder = FEC_Encoder()  #init_state=init_state)
+                encoder = FEC_Encoder()
                 gbitss = encoder.encode(bits_out_viterbi)
                 symbols_viterbi: list[float] = []
                 for gbits in gbitss:
@@ -652,21 +652,25 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             L = self.L
             sigma = self.rn
             decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
-            path = decoder.decode(sig_samps, dbg_dict=self.dbg_dict_viterbi)
+            path = decoder.decode(list(sig_samps), dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states
             symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
             bits_out_viterbi = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
 
         n_errs_viterbi, bit_errs_viterbi = calc_ber(bits_out_viterbi)
 
-        self.dbg_dict_viterbi.update({
-            "decoder": decoder,
-            "path": path,
-            "pulse_resp_samps": pulse_resp_samps,
-            "sig_samps": sig_samps,
-            "symbols_viterbi": symbols_viterbi,
-            "symbols_dfe": dfe_rslts["decisions"],
-            })
+        self.dbg_dict_viterbi.update(
+            {"decoder": decoder,
+             "path": path,
+             "pulse_resp_samps": pulse_resp_samps,
+             "sig_samps": sig_samps,
+             "symbols_viterbi": symbols_viterbi,
+             "symbols_dfe": decisions,
+             })
+        if self.rx_viterbi_fec:
+            self.dbg_dict_viterbi["decoder"] = decoder_fec
+        else:
+            self.dbg_dict_viterbi["decoder"] = decoder
 
         self.viterbi_perf = nbits * nspb / (clock() - split_time)
 
@@ -684,7 +688,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.dfe_out_p = dfe_out_p
     self.dfe_out_H = dfe_out_H
     self.dfe_out = dfe_out
-    self.lockeds = dfe_rslts["lockeds"]
+    self.lockeds = lockeds
 
     self.status = "Analyzing jitter..."
 
@@ -693,9 +697,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Save local variables to class instance for state preservation, performing unit conversion where necessary.
     self.adaptation = tap_weights
-    self.ui_ests = array(dfe_rslts["ui_ests"]) * 1.0e12  # (ps)
-    self.clocks = dfe_rslts["clocks"]
-    self.clock_times = dfe_rslts["clock_times"]
+    self.ui_ests = ui_ests * 1.0e12  # (ps)
+    self.clocks = clocks
+    self.clock_times = clock_times
 
     # Analyze the jitter.
     self.thresh_tx = array([])
@@ -965,7 +969,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
 # Plot updating
 # pylint: disable=too-many-locals,protected-access,too-many-statements
-def update_results(self):
+def update_results(self) -> None:
     """
     Updates all plot data used by GUI.
 
@@ -1006,7 +1010,8 @@ def update_results(self):
     PLOT_PADDING = 75
     PLOT_PADDING_BOT = 50
     # - Creating a new plot is the only way I've found that works.
-    dfe_plot = Plot(self.plotdata,
+    dfe_plot = Plot(
+        self.plotdata,
         auto_colors=["magenta", "red",  "orange", "yellow", "green",
                      "cyan",    "blue", "purple", "brown",  "black"],
         padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT,
@@ -1019,17 +1024,14 @@ def update_results(self):
         trace_name = name + "_weights"
         self.plotdata.set_data(trace_name, tap_weight)
         self.plotdata.set_data("tap_weight_index", list(range(len(tap_weight))))  # pylint: disable=undefined-loop-variable
-        # if hasattr(self, "_dfe_plot"):
-        if True:
-            # dfe_plot = self._dfe_plot
-            dfe_plot.plot(
-                ("tap_weight_index", trace_name),
-                type="line",
-                color="auto",
-                style=line_styles[i // 10],
-                name=name,
-            )
-            dfe_plot.legend.labels.append(name)
+        dfe_plot.plot(
+            ("tap_weight_index", trace_name),
+            type="line",
+            color="auto",
+            style=line_styles[i // 10],
+            name=name,
+        )
+        dfe_plot.legend.labels.append(name)
     if hasattr(self, "plots_dfe") and self.plots_dfe is not None:
         self.plots_dfe.components[1] = dfe_plot
 
@@ -1207,8 +1209,8 @@ def update_results(self):
     trellis_path_xs:     list[int] = []
     trellis_err_xs:      list[int] = []
     trellis_path_ys:     list[int] = []
-    trellis_state_ys:    list[list[int]] = [[0], [0], [0]]
-    trellis_state_probs: list[list[int]] = [[1.0], [1.0], [1.0]]
+    trellis_state_ys:    list[list[int]]   = [[0],]   * N_PATHS
+    trellis_state_probs: list[list[float]] = [[1.0],] * N_PATHS
     trellis_x0: list[int] = []
     trellis_y0: list[int] = []
     trellis_x1: list[int] = []
@@ -1220,7 +1222,7 @@ def update_results(self):
         # Assemble pairs of lists of probabilities and previous states, for each trellis column.
         probss_prevss = list(zip(self.dbg_dict_viterbi["probs"],
                                  self.dbg_dict_viterbi["prevs"]))
-        trellis_path_xs = range(len(probss_prevss))
+        trellis_path_xs = list(range(len(probss_prevss)))
 
         # Construct a sorted list of pairs for each trellis column, keeping only the 3 most probable.
         # - `enumerate()` provides correct state index, which survives sorting/pruning.
@@ -1235,11 +1237,11 @@ def update_results(self):
         paths: list[tuple[point, point, float]] = []  # (src, dst, prob)
         for col, row__prob_prevs in enumerate(prob_prev_pairss[:-1]):
             for row__prob_prev in row__prob_prevs:
-                row, (prob, prev) = row__prob_prev
+                row, _ = row__prob_prev
                 paths.extend([((col, row), (col + 1, _row), trans_prob)
                               for _row, trans_prob in enumerate(trans_prob_mat[row])
                               if trans_prob])
-        src_pts, dst_pts, trans_probs = zip(*paths)
+        src_pts, dst_pts, _ = zip(*paths)
         trellis_x0 = list(map(fst, src_pts))
         trellis_y0 = list(map(snd, src_pts))
         trellis_x1 = list(map(fst, dst_pts))
@@ -1268,17 +1270,17 @@ def update_results(self):
         trellis_state_probs.reverse()
 
         # - Transpose the lists, to attain the proper data layout for plotting.
-        trellis_state_ys = list(zip(*trellis_state_ys))
-        trellis_state_probs = list(zip(*trellis_state_probs))
+        trellis_state_ys    = list(map(list, zip(*trellis_state_ys)))
+        trellis_state_probs = list(map(list, zip(*trellis_state_probs)))
 
         # Calculate symbol error x-indices.
         match self.mod_type:
             case "NRZ":
                 trellis_err_xs = self.bit_errs_viterbi
             case "Duo-binary":
-                trellis_err_xs = int(array(self.bit_errs_viterbi) / 1.6)
+                trellis_err_xs = self.bit_errs_viterbi
             case "PAM-4":
-                trellis_err_xs = array(self.bit_errs_viterbi) // 2
+                trellis_err_xs = list(array(self.bit_errs_viterbi) // 2)
             case _:
                 raise ValueError(f"Unrecognized modulation type: {self.mod_type}!")
 
@@ -1301,6 +1303,7 @@ def update_results(self):
 
     if hasattr(self, "plot_viterbi"):
         self.plot_viterbi.components[0].value_range.high_setting = self.L ** self.rx_viterbi_symbols - 0.5
+
 
 def update_eyes(self):
     """Update the heat plots representing the eye diagrams.

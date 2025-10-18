@@ -8,13 +8,11 @@ Original date:   February 21, 2015 (Copied from pybert.py, as part of a major co
 Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
 
-import numpy as np
-
 from chaco.api import (
-    ColorBar, ColorMapper, DataRange1D, GridPlotContainer,
-    HPlotContainer, LinearMapper, LogMapper, Plot, SegmentPlot, TransformColorMapper
+    ColorBar, ColorMapper, GridPlotContainer,
+    HPlotContainer, LogMapper, Plot, TransformColorMapper
 )
-from chaco.default_colormaps import hot, viridis, wistia
+from chaco.default_colormaps import viridis
 from chaco.tools.api import PanTool, ZoomTool
 
 from ..models.bert import update_eyes
@@ -175,16 +173,20 @@ def make_plots(self, n_dfe_taps):
     plot_viterbi = Plot(plotdata)
     plot_viterbi.plot(("trellis_path_xs", "trellis_path_ys"), type="line", color="blue")
     plot_viterbi.plot(("trellis_err_xs", "trellis_err_ys"), type="scatter", color="red", marker="star")
-    plot_viterbi.plot(("trellis_path_xs", "trellis_state1_ys", "trellis_state1_probs"),
+    plot_viterbi.plot(
+        ("trellis_path_xs", "trellis_state1_ys", "trellis_state1_probs"),
         type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=10)
-    plot_viterbi.plot(("trellis_path_xs", "trellis_state2_ys", "trellis_state2_probs"),
+    plot_viterbi.plot(
+        ("trellis_path_xs", "trellis_state2_ys", "trellis_state2_probs"),
         type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=8)
-    plot_viterbi.plot(("trellis_path_xs", "trellis_state3_ys", "trellis_state3_probs"),
+    plot_viterbi.plot(
+        ("trellis_path_xs", "trellis_state3_ys", "trellis_state3_probs"),
         type="cmap_scatter", outline_color="black", marker="circle", color_mapper=cmap,
         fill_alpha=0.5, marker_size=6)
-    plot_viterbi.plot(("trellis_x", "trellis_y"),
+    plot_viterbi.plot(
+        ("trellis_x", "trellis_y"),
         type="segment", line_style="dash")
     plot_viterbi.index_range.low_setting  =  0
     plot_viterbi.index_range.high_setting = 10
@@ -197,8 +199,8 @@ def make_plots(self, n_dfe_taps):
     plot_viterbi.value_axis.title = "State Index"
 
     plot_viterbi.tools.append(PanTool(plot_viterbi,
-        constrain=True, constrain_key=None, constrain_direction="x",
-        pan_keys_step=100.0, restrict_to_data=True))
+                                      constrain=True, constrain_key=None, constrain_direction="x",
+                                      pan_keys_step=100.0, restrict_to_data=True))
 
     container_viterbi = HPlotContainer(
         plot_viterbi,
@@ -207,7 +209,7 @@ def make_plots(self, n_dfe_taps):
         spacing=10
     )
 
-    colorbar = ColorBar(
+    colorbar = ColorBar(  # pylint: disable=unused-variable
         index_mapper=LogMapper(range=cmap.range),  # Causing InvalidValue exception after program launch.
         color_mapper=cmap,
         plot=plot_viterbi,
@@ -217,6 +219,7 @@ def make_plots(self, n_dfe_taps):
         padding=20,
         container=container_viterbi,
     )
+    container_viterbi.add(colorbar)
 
     self.plot_viterbi = container_viterbi
 

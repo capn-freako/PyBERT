@@ -262,13 +262,13 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         return decision, bits
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    def run(
+    def run_dfe(
         self,
         sample_times: Rvec,
         signal: Rvec,
         use_agc: bool = False,
         dbg_dict: Optional[dict[str, Any]] = None
-    ) -> dict[str, Any]:
+    ) -> tuple[Rvec, list[list[float]], Rvec, Rvec, list[bool], Rvec, list[int], Rvec, Rvec]:
 
         """
         Run the DFE on the input signal.
@@ -284,7 +284,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 Default: None
 
         Returns:
-            A dictionary containing the following key/value pairs
+            A tuuple containing the following
 
                 - "dfe_out": Samples of the summing node output, taken at the times given in *sample_times*.
                 - "tap_weights": List of list of tap weights showing how the DFE adapted over time.
@@ -410,17 +410,14 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         if dbg_dict is not None:
             dbg_dict["scalar_values"] = scalar_values
 
-        rslt: dict[str, Any] = {}
-        rslt.update({
-            "dfe_out": array(res),
-            "tap_weights": tap_weights,
-            "ui_ests": array(ui_ests),
-            "clocks": clocks,
-            "lockeds": lockeds,
-            "clock_times": clock_times,
-            "bits": array(bits),
-            "sig_samps": array(sig_samps),
-            "decisions": array(decisions),
-        })
-
-        return rslt
+        return (
+            array(res),
+            tap_weights,
+            array(ui_ests),
+            array(clocks),
+            lockeds,
+            array(clock_times),
+            bits,
+            array(sig_samps),
+            array(decisions)
+        )

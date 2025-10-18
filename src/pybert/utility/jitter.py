@@ -487,13 +487,6 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             mu_pos = 0
             sigma_pos = 0
             dd_soltn += [[err],]
-            # raise ValueError("\n\t".join([
-            #     "pybert.utility.jitter.calc_jitter(): Error fitting the positive tail!",
-            #     f"pos_peak_loc: {pos_peak_loc}",
-            #     f"neg_peak_loc: {neg_peak_loc}",
-            #     f"pos_tail_ix: {pos_tail_ix}",
-            #     f"neg_tail_ix: {neg_tail_ix}",
-            #     ])) from err
         try:
             popt, pcov = curve_fit(gaus_pdf, centers[1: neg_tail_ix + 1], hist_dd[1: neg_tail_ix + 1])
             mu_neg, sigma_neg = popt
@@ -505,31 +498,12 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             mu_neg = 0
             sigma_neg = 0
             dd_soltn += [[err],]
-            # raise ValueError("\n\t".join([
-            #     "pybert.utility.jitter.calc_jitter(): Error fitting the negative tail!",
-            #     f"pos_peak_loc: {pos_peak_loc}",
-            #     f"neg_peak_loc: {neg_peak_loc}",
-            #     f"pos_tail_ix: {pos_tail_ix}",
-            #     f"neg_tail_ix: {neg_tail_ix}",
-            #     ])) from err
     else:
         mu_pos = 0
         sigma_pos = 0
         mu_neg = 0
         sigma_neg = 0
     rjDD = (sigma_pos + sigma_neg) / 2
-    # TEMP DBG
-    if False and rjDD == 0:
-        raise ValueError("\n\t".join([
-            "pybert.utility.jitter.calc_jitter(): `rjDD` is zero!",
-            f"`dd_soltn`: {dd_soltn}",
-            f"`pos_tail_ixs`: {pos_tail_ixs}",
-            f"`neg_tail_ixs`: {neg_tail_ixs}",
-            f"`pos_peak_loc`: {pos_peak_loc}",
-            f"`neg_peak_loc`: {neg_peak_loc}",
-            f"`hist_dd`: {hist_dd}",
-            ]))
-    # END DBG
     if dbg_obj:
         dbg_obj.dd_soltn = dd_soltn  # type: ignore
 

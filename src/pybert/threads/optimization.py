@@ -11,9 +11,8 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 """
 
 import time
-import warnings
 
-from numpy import arange, array, convolve, delete, insert, log10, ones, pi, prod, where, zeros  # type: ignore
+from numpy import arange, array, convolve, delete, insert, ones, pi, prod, where, zeros  # type: ignore
 from numpy.fft import irfft, rfft  # type: ignore
 from scipy.interpolate import interp1d
 
@@ -27,8 +26,6 @@ from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights, 
 
 gDebugOptimize = False
 
-# Temporary, for debugging:
-warnings.filterwarnings("error", category=RuntimeWarning)
 
 # pylint: disable=no-member
 class OptThread(StoppableThread):
@@ -80,14 +77,14 @@ def mk_tap_weight_combs(tap_tuners: list[TxTapTuner]) -> list[Rvec]:
 
     # Check total number of combinations.
     n_combs = prod([int((tuner.max_val - tuner.min_val) / tuner.step + 1)
-                      if tuner.enabled else 1
-                      for tuner in tap_tuners])
+                    if tuner.enabled else 1
+                    for tuner in tap_tuners])
     if n_combs > 1_000_000:
         raise ValueError(
             f"Total number of combinations ({int(n_combs // 1e6)} M) is too great!")
 
     # Prime recursive helper, then trim priming from results.
-    rslts = _mk_tap_weight_combs([zeros(len(tap_tuners))], enumerate(tap_tuners))
+    rslts = _mk_tap_weight_combs([zeros(len(tap_tuners))], list(enumerate(tap_tuners)))
     rslts = list(filter(lambda xs: any(xs != 0.0), rslts))
     return rslts
 
@@ -287,7 +284,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                         noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
                         array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
                         array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
-                except:
+                except Exception:
                     print(f"curs_ix: {curs_ix}")
                     print(f"curs_amp: {curs_amp}")
                     print(f"h_tx: {h_tx}")
@@ -298,7 +295,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 fom = mmse_rslts["fom"]
                 try:
                     p_tot = resize_zero_pad(add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
-                                   nspui * (n_rx_weights + 5))
+                                            nspui * (n_rx_weights + 5))
                 except ValueError:  # Flags obviously non-optimum case.
                     continue
                 fom_better = fom
@@ -312,16 +309,12 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
             else:  # exhaustive sweep of Rx FFE tap weight combinations
                 fom_better = fom_max
                 for rx_weights in rx_weightss:
-                    try:  # FixMe: The line below is broken.
-                        try:
-                            p_tot = add_ffe_dfe(rx_weights, get_dfe_weights(dfe_taps, p_tx, nspui), nspui, p_tx)
-                        except ValueError:  # Flags obviously non-optimum case.
-                            continue
-                        curs_ix = where(p_tot == max(p_tot))[0][0]
-                        curs_amp = p_tot[curs_ix]
-                    except ValueError:
-                        # continue
-                        raise
+                    try:
+                        p_tot = add_ffe_dfe(rx_weights, array(get_dfe_weights(dfe_taps, p_tx, nspui)), nspui, p_tx)
+                    except ValueError:  # Flags obviously non-optimum case.
+                        continue
+                    curs_ix = where(p_tot == max(p_tot))[0][0]
+                    curs_amp = p_tot[curs_ix]
                     n_pre_isi = curs_ix // nspui
                     isi_sum = sum(abs(p_tot[curs_ix - n_pre_isi * nspui::nspui])) - abs(curs_amp)
                     try:
@@ -346,7 +339,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
             if fom_better > fom_max:
                 rx_weights_best = rx_weights_better.copy()
                 dfe_weights_best = dfe_weights_better.copy()
-                tx_weights_best = delete(tx_weights, tx_curs_pos)
+                tx_weights_best = list(delete(tx_weights, tx_curs_pos))
                 peak_mag_best = peak_mag
                 curs_ix = where(p_tot == max(p_tot))[0][0]
                 curs_amp = p_tot[curs_ix]

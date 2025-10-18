@@ -31,14 +31,13 @@ from pathlib import Path
 import numpy as np  # type: ignore
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
-from numpy import arange, array, cos, exp, pad, pi, sinc, where, zeros
+from numpy import arange, array, exp, pad, pi, where, zeros
 from numpy.fft import irfft, rfft  # type: ignore
 from numpy.random import randint  # type: ignore
 from traits.api import (
     Array,
     Bool,
     Button,
-    Enum,
     File,
     Float,
     HasTraits,
@@ -70,7 +69,7 @@ from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
-from pybert.models.fec import FEC_Encoder, FEC_Decoder
+from pybert.models.fec import FEC_Encoder
 from pybert.results import PyBertData
 from pybert.threads.optimization import OptThread
 from pybert.utility import (
@@ -1023,7 +1022,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _rx_n_taps_changed(self, new_value):
         if new_value < 0:
-            # self._rx_n_taps_changed(0)
             self.rx_n_taps = 0
             return
         for n, tuner in enumerate(self.ffe_tap_tuners):
@@ -1247,11 +1245,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _trellis_pan_control_changed(self, new_value):
         self.plot_viterbi.components[0].index_range.set_bounds(new_value, new_value + 10)
-    
+
     def _trellis_err_select_changed(self, new_value):
         if new_value > 0:
             self.trellis_pan_control = max(0, self.trellis_err_xs[new_value - 1] - 5)
-    
+
     def _rx_viterbi_fec_changed(self, new_value):
         if new_value:
             self.mod_type = "PAM-4"

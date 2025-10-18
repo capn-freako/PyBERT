@@ -27,7 +27,7 @@ def fst(xs: tuple[T, ...]) -> T:
     return xs[0]
 
 
-def snd(xs: tuple[S, T, ...]) -> T:
+def snd(xs: tuple[S, T, ...]) -> T:  # type: ignore
     """
     Python translation of Haskell ``snd()`` function.
 

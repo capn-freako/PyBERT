@@ -8,16 +8,13 @@ Original date: August 31, 2025
 Copyright (c) 2025 David Banas; all rights reserved World wide.
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Generic, Optional, TypeAlias, TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
-import scipy as sp
 
-from ..common               import TWOPI, Rvec, Rmat
+from ..common               import Rvec
 from ..models.viterbi       import ViterbiDecoder
 from ..utility.math         import all_combs
-from ..utility.functional   import fst
 
 S = TypeVar('S')                # generic state type
 X = TypeVar('X')                # generic observation type
@@ -74,12 +71,13 @@ class FEC_Encoder():
 
     @property
     def state(self):
+        """Current state of decoder."""
         return self._state
-    
+
 
 # Note: `int` is used for simplicity, but is expected to be bound to: [0,1], in all cases.
-Delay3Tap: TypeAlias = list[int]  # current input, previous input, etc.
-BitPair:   TypeAlias = tuple[int, int]            # lsb, msb
+Delay3Tap: TypeAlias = list[int]        # current input, previous input, etc.
+BitPair:   TypeAlias = tuple[int, int]  # lsb, msb
 
 
 class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
@@ -95,7 +93,7 @@ class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
 
         # Validate input.
         if L < 2:
-            raise ValueError(f"Minimum trellis depth is 2!")
+            raise ValueError("Minimum trellis depth is 2!")
 
         # Build state vectors, along with their expected observations.
         states = all_combs([[0, 1],] * 4)
@@ -120,7 +118,7 @@ class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
             [np.zeros(num_states), np.zeros(num_states)]]
         for g0 in range(2):
             for g1 in range(2):
-                pvec = np.array(list(map(lambda gs: float(2 - (abs(g0 - gs[0]) + abs(g1 - gs[1]))), expecteds)))
+                pvec = np.array(list(map(lambda gs: float(2 - (abs(g0 - gs[0]) + abs(g1 - gs[1]))), expecteds)))  # pylint: disable=cell-var-from-loop
                 pvec /= pvec.sum()  # Enforce PMF.
                 probs[g0][g1] = pvec.copy()
 

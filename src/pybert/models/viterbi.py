@@ -213,8 +213,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
 
 
 # Following is an example of creating a concrete Viterbi decoder, using the abstract model above.
-# State_ISI: TypeAlias = tuple[list[int], float]  # list of symbol values, expected voltage
-State_ISI: TypeAlias = list[int]  # list of symbol values, expected voltage
+State_ISI: TypeAlias = list[int]  # list of symbol indices
 
 
 class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
@@ -247,7 +246,7 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
 
         # Build state vectors and their expected voltage observations.
         states = all_combs([symbol_level_values] * N)
-        expecteds = [sum([pulse_resp_samps[n] * s[-(n + 1)] for n in range(N)]) for s in states]
+        expecteds = [sum(pulse_resp_samps[n] * s[-(n + 1)] for n in range(N)) for s in states]
 
         # Build state transition probability matrix.
         num_states = len(states)

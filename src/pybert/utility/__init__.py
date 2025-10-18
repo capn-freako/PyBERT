@@ -17,7 +17,7 @@ from .channel import *
 from .functional import *
 from .ibisami import *
 from .jitter import *
-from .math import *
+from .math import *  # type: ignore
 from .python import *
 from .sigproc import *
 from .sparam import *

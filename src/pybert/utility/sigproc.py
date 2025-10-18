@@ -12,7 +12,7 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 import re
 
-from typing import Optional, Sequence
+from typing import Optional
 
 from numpy import (  # type: ignore
     arange, argmax, array, convolve, cos, cumsum, diff, maximum,
@@ -25,7 +25,6 @@ from scipy.signal      import freqs, invres
 
 from ..common import Rvec, Cvec
 from ..models.tx_tap import TxTapTuner
-
 
 
 def resize_zero_pad(x: Rvec, new_length: int, pad_front: bool = False) -> Rvec:
@@ -54,11 +53,9 @@ def resize_zero_pad(x: Rvec, new_length: int, pad_front: bool = False) -> Rvec:
     len_x = len(x)
     if new_length <= len_x:
         return x[:new_length]
-    else:
-        if pad_front:
-            return pad(x, (new_length - len_x, 0))
-        else:
-            return pad(x, (0, new_length - len_x))
+    if pad_front:
+        return pad(x, (new_length - len_x, 0))
+    return pad(x, (0, new_length - len_x))
 
 
 def moving_average(a: Rvec, n: int = 3) -> Rvec:
