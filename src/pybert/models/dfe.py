@@ -182,7 +182,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         n_ave = self.n_ave
 
         # Calculate this step's corrections and add to running total.
-        corrections = array([old + new for (old, new) in zip(self.corrections, [val * error * gain for val in tap_values])])
+        corrections = array(
+            [old + new for (old, new) in zip(self.corrections, [val * error * gain for val in tap_values])])
 
         # Update the tap weights with the average corrections, if appropriate.
         if update:
@@ -203,7 +204,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         # Copy local values back to their respective class object variables.
         self.tap_weights = tap_weights
         self.tap_values = tap_values
-        self.corrections = corrections
+        self.corrections = corrections  # type: ignore
 
         return filter_out
 

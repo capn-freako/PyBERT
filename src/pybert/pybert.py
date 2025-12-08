@@ -56,12 +56,12 @@ from traits.etsconfig.api import ETSConfig
 from traitsui.message import message, error
 from scipy.interpolate import interp1d
 
-from pychopmarg import __version__ as PyChOpMarg_VERSION  # type: ignore
-
 from pyibisami import __version__ as PyAMI_VERSION  # type: ignore
 from pyibisami.ami.model import AMIModel
 from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
+
+from pychopmarg import __version__ as PyChOpMarg_VERSION  # type: ignore
 
 from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg

@@ -1181,13 +1181,13 @@ def update_results(self) -> None:
     height = 1000
     tiny_noise = normal(scale=1e-3, size=len(chnl_out[ignore_samps:]))  # to make channel eye easier to view.
     chnl_out_noisy = self.chnl_out[ignore_samps:] + tiny_noise
-    y_max = 1.1 * max(abs(array(chnl_out_noisy)))
+    y_max = 1.1 * np.max(abs(array(chnl_out_noisy)))
     eye_chnl = calc_eye(ui, samps_per_ui, height, chnl_out_noisy, y_max)
-    y_max = 1.1 * max(abs(array(self.rx_in[ignore_samps:])))
+    y_max = 1.1 * np.max(abs(array(self.rx_in[ignore_samps:])))
     eye_tx = calc_eye(ui, samps_per_ui, height, self.rx_in[ignore_samps:], y_max)
-    y_max = 1.1 * max(abs(array(self.ctle_out[ignore_samps:])))
+    y_max = 1.1 * np.max(abs(array(self.ctle_out[ignore_samps:])))
     eye_ctle = calc_eye(ui, samps_per_ui, height, self.ctle_out[ignore_samps:], y_max)
-    y_max = 1.1 * max(abs(array(self.dfe_out[ignore_samps:])))
+    y_max = 1.1 * np.max(abs(array(self.dfe_out[ignore_samps:])))
     self.dfe_eye_ymax = y_max
     i = 0
     len_clock_times = len(clock_times)

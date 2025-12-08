@@ -139,12 +139,12 @@ class ViterbiDecoder(ABC, Generic[S, X]):
                 [0 if self.trans[r][s] == 0
                  else trellis[-1][r][0] * self.trans[r][s] * self.prob(s, x)
                  for s in range(num_states)])
-            prevs = np.where(new_probs > probs, [r] * num_states, prevs)
+            prevs = np.where(new_probs > probs, [r] * num_states, prevs)  # type: ignore
             probs = np.maximum(new_probs, probs)
         # ToDo: Need to eliminate this possibility.
         if not probs.sum():  # Trap all zeros.
             self.log("WARNING: All probabilities zero while stepping trellis, using observation: {x}, and expected value: {s.expectation}!")
-            probs = np.array(
+            probs = np.array(  # type: ignore
                 [0.0 if self.trans[r][s] == 0 else 1.0
                  for s in range(num_states)])
         probs /= probs.sum()

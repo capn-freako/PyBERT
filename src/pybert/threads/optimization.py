@@ -209,9 +209,9 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         rx_weightss = [zeros(n_rx_weights)]  # For `n_trials` calculation only.
     else:
         try:
-            rx_weightss = mk_tap_weight_combs(rx_taps)
+            rx_weightss = mk_tap_weight_combs(rx_taps)  # type: ignore
             if not rx_weightss:  # Trap the "null FFE" case.
-                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]
+                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]  # type: ignore
         except ValueError as err:
             raise RuntimeError(
                 "\n".join([
