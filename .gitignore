@@ -146,6 +146,6 @@ pybert.log
 *.sublime-workspace
 *.gcbench
 *_cfg.yaml
-
+misc/Support
 # Metal (Apple GPU)
 metal.gputrace/

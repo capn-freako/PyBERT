@@ -8,6 +8,15 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
+# Change these to match your display.
+HIGH_RES = True
+HEIGHT   = 800
+WIDTH    = 1500
+# Don't change anything below this line!
+
+from pathlib import Path
+from typing import Any, Callable
+
 from enable.component_editor import ComponentEditor
 from pyface.image_resource import ImageResource
 from traitsui.api import (  # CloseAction,
@@ -31,7 +40,51 @@ from traitsui.api import (  # CloseAction,
 
 from pybert.gui.handler import MyHandler
 
-HIGH_RES = True
+def fname_formatter(
+    max_width: int = 50,
+    partial_dirname_ok: bool = False,
+    include_ext: bool = False
+) -> Callable[Any, str]:
+    """
+    Returns a filename formatter for use in GUI items.
+
+    Keyword Args:
+        max_width: Maximum number of characters allowed.
+            Default = 50
+
+        partial_dirname_ok: Allow partial directory names when ``True``.
+            Default = ``False``
+
+        include_ext: Include filename extension when ``True``.
+            Default = ``False``
+
+    Returns:
+        The filename formatting function.
+
+    Notes:
+        1. It is assumed that whatever gets passed into the returned function
+        can be turned into a valid file path, via ``str()``.
+    """
+
+    def fname_format(fname: Any) -> str:
+        fname_str = str(fname)
+        if not fname_str:
+            return ""
+        fpath = Path(str(fname)).resolve()
+        parts = list(fpath.parent.parts)
+        rslt = fpath.name if include_ext else fpath.stem
+        while parts and len(rslt) < max_width:
+            last_rslt = rslt
+            rslt = "/".join([parts.pop(), rslt])
+        if len(rslt) > max_width:
+            if partial_dirname_ok:
+                rslt = rslt[-max_width:]
+            else:
+                rslt = last_rslt
+        return rslt
+
+    return fname_format
+
 
 # Main window layout definition.
 traits_view = View(
@@ -179,7 +232,8 @@ traits_view = View(
                                 name="tx_ibis_file",
                                 label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
+                                editor=FileEditor(dialog_style="open", filter=["*.ibs"],
+                                                  format_func=fname_formatter(),),
                             ),
                             Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
@@ -227,7 +281,8 @@ traits_view = View(
                             Item(
                                 name="ch_file",
                                 label="File",
-                                editor=FileEditor(dialog_style="open"),
+                                editor=FileEditor(dialog_style="open",
+                                                  format_func=fname_formatter(),),
                             ),
                             HGroup(
                                 Item(
@@ -336,7 +391,8 @@ traits_view = View(
                                 name="rx_ibis_file",
                                 label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
+                                editor=FileEditor(dialog_style="open", filter=["*.ibs"],
+                                                  format_func=fname_formatter(),),
                             ),
                             Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
@@ -416,11 +472,13 @@ traits_view = View(
                     HGroup(
                         VGroup(
                             HGroup(
-                                Item(name="tx_ami_file", label="AMI File:", style="readonly", springy=True),
+                                Item(name="tx_ami_file", label="AMI File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="tx_ami_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                             HGroup(
-                                Item(name="tx_dll_file", label="DLL File:", style="readonly", springy=True),
+                                Item(name="tx_dll_file", label="DLL File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="tx_dll_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                         ),
@@ -477,11 +535,13 @@ traits_view = View(
                     HGroup(
                         VGroup(
                             HGroup(
-                                Item(name="rx_ami_file", label="AMI File:", style="readonly", springy=True),
+                                Item(name="rx_ami_file", label="AMI File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="rx_ami_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                             HGroup(
-                                Item(name="rx_dll_file", label="DLL File:", style="readonly", springy=True),
+                                Item(name="rx_dll_file", label="DLL File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="rx_dll_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                         ),
@@ -953,7 +1013,16 @@ traits_view = View(
     buttons=NoButtons,
     handler=MyHandler(),
     icon=ImageResource("icon.png"),
-    resizable=True,
     statusbar="status_str",
     title="PyBERT",
+
+    # This seems to be the only way, currently, to prevent long file paths
+    # from expanding the application window beyond the width of the screen:
+    width=WIDTH,
+    height=HEIGHT,
+    resizable=False,
+    # It probably necessitates a user-specific configuration file,
+    # which is probably overdue anyway, to allow opting out of a
+    # non-resizable window.
+    # Perhaps, a new FAQ entry in the meantime?
 )
