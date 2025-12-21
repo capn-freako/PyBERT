@@ -10,8 +10,7 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 # Change these to match your display.
 HIGH_RES = True
-HEIGHT   = 800
-WIDTH    = 1500
+
 # Don't change anything below this line!
 
 from pathlib import Path
@@ -1015,14 +1014,4 @@ traits_view = View(
     icon=ImageResource("icon.png"),
     statusbar="status_str",
     title="PyBERT",
-
-    # This seems to be the only way, currently, to prevent long file paths
-    # from expanding the application window beyond the width of the screen:
-    width=WIDTH,
-    height=HEIGHT,
-    resizable=False,
-    # It probably necessitates a user-specific configuration file,
-    # which is probably overdue anyway, to allow opting out of a
-    # non-resizable window.
-    # Perhaps, a new FAQ entry in the meantime?
 )
