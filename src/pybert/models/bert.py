@@ -512,7 +512,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     if ami_getwave_clocks:  # Accommodate the singular special case.
         t_ix = 0
         clocks = zeros(len_t)
-        ui_ests = []
+        ui_ests = array([])
         lockeds = []
         locked = False
         dfe_out = ffe_out
@@ -523,7 +523,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             ui_est = next_clock_time - clock_time
             locked = n_clks >= ignore_bits
             while t_ix < len_t and t[t_ix] < sample_time:
-                ui_ests.append(ui_est)
+                ui_ests = append(ui_ests, ui_est)
                 lockeds.append(locked)
                 t_ix += 1
             if t_ix >= len_t:
@@ -536,8 +536,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             clocks[t_ix] = 1
             sig_samps = append(sig_samps, sig_samp)
         tap_weights = []
-        # ui_ests = diff(clock_times)  # type: ignore
-        ui_ests = array(ui_ests)
     else:  # all other cases
         dbg_dict: dict[str, Any] = {}
         (dfe_out,

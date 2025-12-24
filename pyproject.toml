@@ -14,7 +14,8 @@ dependencies = [
     "enable>=6.1.0",
     "kiwisolver",
     "pychopmarg>=3.1.2",
-    "pyibis-ami>=7.2.10",
+    "pyibis-ami>=7.3.1",
+    # "pyibis-ami@file:PyAMI/",  # Useful for testing w/ PyAMI pre-release.
     "pyside6<6.7",
     "pyyaml>=6",
     "scikit-rf>=0.29",

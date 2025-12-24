@@ -8,10 +8,7 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
-# Change these to match your display.
-HIGH_RES = True
-
-# Don't change anything below this line!
+# pylint: disable=too-many-lines
 
 from pathlib import Path
 from typing import Any, Callable
@@ -39,11 +36,17 @@ from traitsui.api import (  # CloseAction,
 
 from pybert.gui.handler import MyHandler
 
+# Change these to match your display.
+HIGH_RES = True
+
+# Don't change anything below this line!
+
+
 def fname_formatter(
     max_width: int = 50,
     partial_dirname_ok: bool = False,
     include_ext: bool = False
-) -> Callable[Any, str]:
+) -> Callable[[Any,], str]:
     """
     Returns a filename formatter for use in GUI items.
 
