@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pipbert"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "9.1.7"
+version = "9.1.8"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           ]
 readme = "README.md"
@@ -14,7 +14,8 @@ dependencies = [
     "enable>=6.1.0",
     "kiwisolver",
     "pychopmarg>=3.1.2",
-    "pyibis-ami>=7.2.10",
+    "pyibis-ami>=7.3.1",
+    # "pyibis-ami@file:PyAMI/",  # Useful for testing w/ PyAMI pre-release.
     "pyside6<6.7",
     "pyyaml>=6",
     "scikit-rf>=0.29",

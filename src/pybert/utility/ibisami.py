@@ -70,10 +70,17 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     model_init.bit_time = ui
     model = AMIModel(dll_fname)
     model.initialize(model_init)
-    params_out = model.ami_params_out
+
+    # Required when DLL returns a null pointer, instead of an empty string, in `ami_params_out`.
+    # Note: Having `AmiModel` trap this case doesn't work, since Python strings don't offer `decode()`.
+    try:
+        params_out_str = model.ami_params_out.decode('utf-8')
+    except AttributeError:
+        params_out_str = ""
+
     msg = "\n".join([  # Python equivalent of Haskell's `unlines()`.
         f"Input parameters: {model.ami_params_in.decode('utf-8')}",
-        f"Output parameters: {params_out.decode('utf-8')}",
+        f"Output parameters: {params_out_str}",
         f"Message: {model.msg.decode('utf-8')}"])
 
     # Capture model's responses.
@@ -88,7 +95,7 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     # Generate model's output.
     if use_getwave:
         y, clks, params_out = model.getWave(x, bits_per_call=bits_per_call)
-        return (y, clks, h, out_h, msg, list(map(lambda p: p.decode('utf-8'), params_out)))  # type: ignore
+        return (y, clks, h, out_h, msg, params_out)
     try:
         y = convolve(x, out_h)[:len(x)]
     except Exception:

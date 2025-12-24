@@ -265,6 +265,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     bits_out_dfe: list[int] = []
     sig_samps: Rvec = array([])
     decisions: Rvec = array([])
+    ignore_bits: int = 0
     try:
         params: list[str] = []
         if self.tx_use_ami and self.tx_use_getwave:
@@ -282,6 +283,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             split_time = clock()
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
+                ignore_bits = self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ignore_Bits"])
                 ctle_out, _, ctle_h, ctle_out_h, msg, _params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
                 params = _params
@@ -510,12 +512,19 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     if ami_getwave_clocks:  # Accommodate the singular special case.
         t_ix = 0
         clocks = zeros(len_t)
+        ui_ests = array([])
+        lockeds = []
+        locked = False
         dfe_out = ffe_out
-        for clock_time in clock_times:  # type: ignore
+        for n_clks, (clock_time, next_clock_time) in enumerate(zip(clock_times, clock_times[1:])):  # type: ignore
             if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
                 break
             sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
+            ui_est = next_clock_time - clock_time
+            locked = n_clks >= ignore_bits
             while t_ix < len_t and t[t_ix] < sample_time:
+                ui_ests = append(ui_ests, ui_est)
+                lockeds.append(locked)
                 t_ix += 1
             if t_ix >= len_t:
                 self.log("Went beyond system time vector end searching for next clock time!")
@@ -527,8 +536,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             clocks[t_ix] = 1
             sig_samps = append(sig_samps, sig_samp)
         tap_weights = []
-        ui_ests = diff(clock_times)  # type: ignore
-        lockeds = []
     else:  # all other cases
         dbg_dict: dict[str, Any] = {}
         (dfe_out,
