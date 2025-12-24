@@ -31,7 +31,7 @@ from pathlib import Path
 import numpy as np  # type: ignore
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
-from numpy import arange, array, cos, exp, pad, pi, sinc, where, zeros
+from numpy import arange, array, exp, pad, pi, where, zeros
 from numpy.fft import irfft, rfft  # type: ignore
 from numpy.random import randint  # type: ignore
 from traits.api import (
@@ -48,6 +48,7 @@ from traits.api import (
     Property,
     Range,
     String,
+    Trait,
     cached_property,
     observe,
 )
@@ -55,12 +56,12 @@ from traits.etsconfig.api import ETSConfig
 from traitsui.message import message, error
 from scipy.interpolate import interp1d
 
-from pychopmarg import __version__ as PyChOpMarg_VERSION  # type: ignore
-
 from pyibisami import __version__ as PyAMI_VERSION  # type: ignore
 from pyibisami.ami.model import AMIModel
 from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
+
+from pychopmarg import __version__ as PyChOpMarg_VERSION  # type: ignore
 
 from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
@@ -68,6 +69,7 @@ from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
+from pybert.models.fec import FEC_Encoder
 from pybert.results import PyBertData
 from pybert.threads.optimization import OptThread
 from pybert.utility import (
@@ -119,7 +121,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     )
     seed = Int(1)  # LFSR seed. 0 means regenerate bits, using a new random seed, each run.
     nspui = Range(low=2, high=256, value=32)  #: Signal vector samples per unit interval.
-    mod_type   = List([0])                   #: 0 = NRZ; 1 = Duo-binary; 2 = PAM-4
+    mod_type   = Trait("NRZ", {"NRZ": 0, "Duo-binary": 1, "PAM-4": 2})
     do_sweep   = Bool(False)  #: Run sweeps? (Default = False)
     debug      = Bool(False)  #: Send log messages to terminal, as well as console, when True. (Default = False)
     thresh     = Float(3.0)   #: Spectral threshold for identifying periodic components (sigma). (Default = 3.0)
@@ -272,6 +274,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
     rx_viterbi_symbols = Int(4)  #: Number of symbols to track in Viterbi decoder.
+    rx_viterbi_fec = Bool(False)  #: Use FEC, as opposed to ISI, for Viterbi decoding when True.
+    trellis_max_x = Int(10_150)
+    trellis_pan_control = Range(low=0, high='trellis_max_x', value=0)
+    trellis_max_err = Int(0)
+    trellis_err_select = Range(low=0, high='trellis_max_err', value=0)
 
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
@@ -339,8 +346,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     sweep_results = List([])
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
-    bit_errs = Int(0)  #: # of bit errors observed in last run.
-    bit_errs_viterbi = Int(0)  #: # of bit errors observed in last run.
+    n_errs_dfe = Int(0)  #: # of DFE bit errors observed in last run.
+    n_errs_viterbi = Int(0)  #: # of Viterbi bit errors observed in last run.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # About
@@ -362,18 +369,19 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     jitter_info = Property(String, depends_on=["jitter_perf"])
     status_str = Property(String, depends_on=["status"])
     sweep_info = Property(String, depends_on=["sweep_results"])
-    t = Property(Array, depends_on=["ui", "nspui", "nbits"])
+    t = Property(Array, depends_on=["ui", "nspui", "nui"])
     t_ns = Property(Array, depends_on=["t"])
     f = Property(Array, depends_on=["f_step", "f_max"])
     w = Property(Array, depends_on=["f"])
     t_irfft = Property(Array, depends_on=["f"])
-    bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count"])
-    symbols = Property(Array, depends_on=["bits", "mod_type", "vod"])
+    L = Property(Int, depends_on=["mod_type"])
+    bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count", "rx_use_viterbi", "rx_viterbi_fec"])
+    symbols = Property(Array, depends_on=["bits", "vod"])
     ffe = Property(Array, depends_on=["tx_taps.value", "tx_taps.enabled"])
     rx_ffe = Property(Array, depends_on=["rx_taps.value", "rx_taps.enabled"])
-    ui = Property(Float, depends_on=["bit_rate", "mod_type"])
-    nui = Property(Int, depends_on=["nbits", "mod_type"])
-    eye_uis = Property(Int, depends_on=["eye_bits", "mod_type"])
+    ui = Property(Float, depends_on=["bit_rate", "mod_type", "rx_use_viterbi", "rx_viterbi_fec"])
+    nui = Property(Int, depends_on=["nbits", "mod_type", "rx_use_viterbi", "rx_viterbi_fec"])
+    eye_uis = Property(Int, depends_on=["eye_bits", "mod_type", "rx_use_viterbi", "rx_viterbi_fec"])
     dfe_out_p = Array()
 
     # Custom buttons, which we'll use in particular tabs.
@@ -571,7 +579,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     @cached_property
     def _get_bits(self):
-        "Generate the bit stream."
+        """Generate the bit stream."""
+
         pattern = self.pattern_
         seed = self.seed
         nbits = self.nbits
@@ -580,21 +589,18 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             seed = randint(128)
             while not seed:  # We don't want to seed our LFSR with zero.
                 seed = randint(128)
+
         bit_gen = lfsr_bits(pattern, seed)
         bits = [next(bit_gen) for _ in range(nbits)]
+
         return array(bits)
 
     @cached_property
     def _get_ui(self):
-        """
-        Returns the "unit interval" (i.e. - the nominal time span of each symbol moving through the channel).
-        """
+        """Returns the "unit interval" (i.e. - the nominal time span of each symbol moving through the channel)."""
 
-        mod_type = self.mod_type[0]
-        bit_rate = self.bit_rate * 1.0e9
-
-        ui = 1.0 / bit_rate
-        if mod_type == 2:  # PAM-4
+        ui = 1.0 / (self.bit_rate * 1.0e9)
+        if self.mod_type == "PAM-4" and not (self.rx_use_viterbi and self.rx_viterbi_fec):
             ui *= 2.0
 
         return ui
@@ -603,11 +609,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_nui(self):
         """Returns the number of unit intervals in the test vectors."""
 
-        mod_type = self.mod_type[0]
-        nbits = self.nbits
-
-        nui = nbits
-        if mod_type == 2:  # PAM-4
+        nui = self.nbits
+        if self.mod_type == "PAM-4" and not (self.rx_use_viterbi and self.rx_viterbi_fec):
             nui //= 2
 
         return nui
@@ -616,49 +619,31 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _get_eye_uis(self):
         """Returns the number of unit intervals to use for eye construction."""
 
-        mod_type = self.mod_type[0]
-        eye_bits = self.eye_bits
-
-        eye_uis = eye_bits
-        if mod_type == 2:  # PAM-4
+        eye_uis = self.eye_bits
+        if self.mod_type == "PAM-4" and not (self.rx_use_viterbi and self.rx_viterbi_fec):
             eye_uis //= 2
 
         return eye_uis
 
     @cached_property
-    def _get_ideal_h(self):
-        """Returns the ideal link impulse response."""
+    def _get_L(self):
+        """Number of symbols in alphabet."""
 
-        ui = self.ui.value
-        nspui = self.nspui
-        t = self.t
-        mod_type = self.mod_type[0]
-        ideal_type = self.ideal_type[0]
-
-        t = array(t) - t[-1] / 2.0
-
-        if ideal_type == 0:  # delta
-            ideal_h = zeros(len(t))
-            ideal_h[len(t) / 2] = 1.0
-        elif ideal_type == 1:  # sinc
-            ideal_h = sinc(t / (ui / 2.0))
-        elif ideal_type == 2:  # raised cosine
-            ideal_h = (cos(pi * t / (ui / 2.0)) + 1.0) / 2.0
-            ideal_h = where(t < -ui / 2.0, zeros(len(t)), ideal_h)
-            ideal_h = where(t >  ui / 2.0, zeros(len(t)), ideal_h)
-        else:
-            raise ValueError("PyBERT._get_ideal_h(): ERROR: Unrecognized ideal impulse response type.")
-
-        if mod_type == 1:  # Duo-binary relies upon the total link impulse response to perform the required addition.
-            ideal_h = 0.5 * (ideal_h + pad(ideal_h[:-1 * nspui], (nspui, 0), "constant", constant_values=(0, 0)))
-
-        return ideal_h
+        match(self.mod_type_):
+            case 0:  # NRZ
+                return 2
+            case 1:  # Duobinary
+                return 3
+            case 2:  # PAM-4
+                return 4
+            case _:  # Unrecognized!
+                raise ValueError("Unknown modulation type found!")
 
     @cached_property
     def _get_symbols(self):
         """Generate the symbol stream."""
 
-        mod_type = self.mod_type[0]
+        mod_type = self.mod_type_
         vod = self.vod
         bits = self.bits
 
@@ -671,17 +656,25 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             symbols = 2 * array(symbols) - 1
         elif mod_type == 2:  # PAM-4
             symbols = []
-            for bits in zip(bits[0::2], bits[1::2]):
-                if bits == (0, 0):
-                    symbols.append(-1.0)
-                elif bits == (0, 1):
-                    symbols.append(-1.0 / 3.0)
-                elif bits == (1, 0):
-                    symbols.append(1.0 / 3.0)
-                else:
-                    symbols.append(1.0)
+            if self.rx_use_viterbi and self.rx_viterbi_fec:
+                encoder = FEC_Encoder()
+                gbitss = encoder.encode(bits)
+            else:
+                gbitss = zip(bits[0::2], bits[1::2])
+            for gbits in gbitss:
+                match gbits:
+                    case (0, 0):
+                        symbols.append(-1.0)
+                    case (0, 1):
+                        symbols.append(-1.0 / 3.0)
+                    case (1, 1):  # Gray coding required for correct FEC Viterbi decoding.
+                        symbols.append(1.0 / 3.0)
+                    case (1, 0):
+                        symbols.append(1.0)
+                    case _:
+                        raise ValueError(f"Invalid bit pair: {gbits}!")
         else:
-            raise ValueError("ERROR: _get_symbols(): Unknown modulation type requested!")
+            raise ValueError(f"ERROR: _get_symbols(): Unknown modulation type: {mod_type}, requested!")
 
         return array(symbols) * vod
 
@@ -991,12 +984,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         return info_str
 
     def _get_status_str(self):
-        status_str = f"{self.status:20s} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
+        status_str = f"{self.status:30} | Perf. (Msmpls./min.): {self.total_perf * 60.0e-6:4.1f}"
         dly_str = f"    | ChnlDly (ns): {self.chnl_dly * 1000000000.0:5.3f}"
-        if self.bit_errs_viterbi >= 0:
-            err_str = f"    | BitErrs: {int(self.bit_errs)} ({int(self.bit_errs_viterbi)})"
-        else:
-            err_str = f"    | BitErrs: {int(self.bit_errs)}"
+        err_str = f"    | BitErrs: {int(self.n_errs_dfe)} ({int(self.n_errs_viterbi)})"
         pwr_str = f"    | TxPwr (mW): {self.rel_power * 1e3:3.0f}"
         status_str += dly_str + err_str + pwr_str
         jit_str = "    | Jitter (ps):  ISI=%6.1f  DCD=%6.1f  Pj=%6.1f (%6.1f)  Rj=%6.1f (%6.1f)" % (
@@ -1031,6 +1021,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.dfe.limits = limits
 
     def _rx_n_taps_changed(self, new_value):
+        if new_value < 0:
+            self.rx_n_taps = 0
+            return
         for n, tuner in enumerate(self.ffe_tap_tuners):
             if n >= new_value:
                 tuner.enabled = False
@@ -1041,6 +1034,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 tap.enabled = False
             else:
                 tap.enabled = True
+        if self.rx_n_pre >= new_value:
+            self.rx_n_pre = max(0, new_value - 1)
 
     @observe("rx_n_pre")
     def rx_n_pre_changed(self, event):
@@ -1237,15 +1232,27 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _nbits_changed(self):
         self.check_eye_bits()
 
-    def _eye_bits_changed(self):
+    def _eye_bits_changed(self, new_value):
         self.check_eye_bits()
         self.check_pat_len()
+        self.trellis_max_x = new_value - 10
 
     def _f_max_changed(self, new_value):
         fmax = 0.5e-9 / self.t[1]  # Nyquist frequency, given our sampling rate (GHz).
         if new_value > fmax:
             self.f_max = fmax
             self.log("`fMax` has been held at the Nyquist frequency.", alert=True)
+
+    def _trellis_pan_control_changed(self, new_value):
+        self.plot_viterbi.components[0].index_range.set_bounds(new_value, new_value + 10)
+
+    def _trellis_err_select_changed(self, new_value):
+        if new_value > 0:
+            self.trellis_pan_control = max(0, self.trellis_err_xs[new_value - 1] - 5)
+
+    def _rx_viterbi_fec_changed(self, new_value):
+        if new_value:
+            self.mod_type = "PAM-4"
 
     # This function has been pulled outside of the standard Traits/UI "depends_on / @cached_property" mechanism,
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
@@ -1430,7 +1437,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
         # Once the required data structure is filled in, we can create the plots.
         if update_plots:
-            make_plots(self, n_dfe_taps=len(self.dfe_tap_tuners))
+            n_dfe_taps = 0
+            for tap in self.dfe_tap_tuners:
+                if tap.enabled:
+                    n_dfe_taps += 1
+                else:
+                    break
+            make_plots(self, n_dfe_taps=n_dfe_taps)
 
     def load_configuration(self, filepath: Path):
         """Load in a configuration into pybert.
@@ -1444,9 +1457,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.status = "Loaded configuration."
         except InvalidFileType:
             self.log("This filetype is not currently supported.")
+            raise
         except Exception as err:  # pylint: disable=broad-exception-caught
             self.log("Failed to load configuration. See the console for more detail.")
             self.log(str(err))
+            raise
 
     def save_configuration(self, filepath: Path):
         """Save out a configuration from pybert.

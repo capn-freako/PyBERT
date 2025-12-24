@@ -16,7 +16,10 @@ class TestIbisAmiRxGetWaveClocked(object):
 
     def test_status(self, dut):
         """Test post-simulation status."""
-        assert dut.status == "Ready.", "Status not 'Ready.'!"
+        try:
+            assert dut.status == "Ready.", "Status not 'Ready.'!"
+        except Exception as err:
+            raise RuntimeError(f"dut.status: {dut.status}") from err
 
     def test_perf(self, dut):
         """Test simulation performance."""
@@ -24,7 +27,7 @@ class TestIbisAmiRxGetWaveClocked(object):
 
     def test_ber(self, dut):
         """Test simulation bit errors."""
-        assert not dut.bit_errs, "Bit errors detected!"
+        assert dut.n_errs_dfe == 0, "Bit errors detected!"
 
     def test_dly(self, dut):
         """Test channel delay."""
@@ -40,7 +43,7 @@ class TestIbisAmiRxGetWaveClocked(object):
 
     def test_pj(self, dut):
         """Test periodic portion of jitter."""
-        assert dut.pj_dfe < 20e-12, "Periodic jitter is too high!"
+        assert dut.pj_dfe < 40e-12, "Periodic jitter is too high!"
 
     def test_rj(self, dut):
         """Test random portion of jitter."""

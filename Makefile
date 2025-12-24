@@ -17,11 +17,14 @@ TOX_EXEC := ${PYTHON_EXEC} -m tox
 TOX_SKIP_ENV := format
 PYVERS := 310 311 312
 PLATFORMS := lin mac win
+
+# Uncomment the following line only if your changes to `PyIBIS-AMI` haven't altered its API;
+# otherwise leave it commented out (default).
+TYPE_STUB_SKIP := True
 TYPE_STUB_INFO := type_stubs.info
 TYPE_STUB_SRC_DIRS := PyAMI/src
 TYPE_STUB_SRCS := $(shell for DIR in ${TYPE_STUB_SRC_DIRS}; do find $${DIR} -name '*.py' 2>/dev/null; done)
 TYPE_STUB_DIR := type_stubs
-# ARGS = $(wordlist 2, $(words $(MAKECMDGOALS)), $(MAKECMDGOALS))
 
 # Put it first so that "make" without arguments is like "make help".
 dflt: help
@@ -57,8 +60,12 @@ type-check: ${TYPE_STUB_INFO}
 	${TOX_EXEC} run -e type-check
 
 ${TYPE_STUB_INFO}: ${TYPE_STUB_SRCS}
-	echo "" >${TYPE_STUB_INFO}
-	for FILE in ${TYPE_STUB_SRCS}; do stubgen -o ${TYPE_STUB_DIR} $${FILE} >> ${TYPE_STUB_INFO}; done
+ifdef TYPE_STUB_SKIP
+	@echo "Type stub generation for PyIBIS-AMI package skipped. (See Makefile.)" >${TYPE_STUB_INFO}
+else
+	@for FILE in ${TYPE_STUB_SRCS}; do stubgen -o ${TYPE_STUB_DIR} $${FILE} >> ${TYPE_STUB_INFO}; done
+endif
+	@cat ${TYPE_STUB_INFO}
 
 docs: ${VER_FILE}
 	. ./$< && ${TOX_EXEC} run -e docs

@@ -150,7 +150,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
     def update_thresholds(self):
         """Update decision thresholds."""
         decision_scaler = self.decision_scaler
-        match self.mod_type:
+        mod_type = self.mod_type
+        match mod_type:
             case 0:
                 thresholds = [0.0]
             case 1:
@@ -158,7 +159,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             case 2:
                 thresholds = [-decision_scaler * 2.0 / 3.0, 0.0, decision_scaler * 2.0 / 3.0]
             case _:
-                raise RuntimeError("Unrecognized modulation type!")
+                raise RuntimeError(f"Unrecognized modulation type: {mod_type}!")
         self.thresholds = thresholds
 
     def step(self, decision: float, error: float, update: bool):
@@ -181,7 +182,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         n_ave = self.n_ave
 
         # Calculate this step's corrections and add to running total.
-        corrections = array([old + new for (old, new) in zip(self.corrections, [val * error * gain for val in tap_values])])
+        corrections = array(
+            [old + new for (old, new) in zip(self.corrections, [val * error * gain for val in tap_values])])
 
         # Update the tap weights with the average corrections, if appropriate.
         if update:
@@ -202,7 +204,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         # Copy local values back to their respective class object variables.
         self.tap_weights = tap_weights
         self.tap_values = tap_values
-        self.corrections = corrections
+        self.corrections = corrections  # type: ignore
 
         return filter_out
 
@@ -245,10 +247,10 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         elif mod_type == 2:  # PAM-4
             if x > self.thresholds[2]:
                 decision = 1
-                bits = [1, 1]
+                bits = [1, 0]  # Gray coding
             elif x > self.thresholds[1]:
                 decision = 1.0 / 3.0
-                bits = [1, 0]
+                bits = [1, 1]  # Gray coding
             elif x > self.thresholds[0]:
                 decision = -1.0 / 3.0
                 bits = [0, 1]
@@ -261,21 +263,13 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         return decision, bits
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    def run(
+    def run_dfe(
         self,
         sample_times: Rvec,
         signal: Rvec,
         use_agc: bool = False,
         dbg_dict: Optional[dict[str, Any]] = None
-    ) -> tuple[
-        npt.NDArray[np.float64],
-        list[list[float]],
-        npt.NDArray[np.float64],
-        npt.NDArray[np.float64],
-        list[bool],
-        list[float],
-        npt.NDArray[np.integer[Any]]
-    ]:
+    ) -> tuple[Rvec, list[list[float]], Rvec, Rvec, list[bool], Rvec, list[int], Rvec, Rvec]:
 
         """
         Run the DFE on the input signal.
@@ -291,16 +285,18 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 Default: None
 
         Returns:
-            A tuple containing
+            A tuuple containing the following
 
-                - res: Samples of the summing node output, taken at the times given in *sample_times*.
-                - tap_weights: List of list of tap weights showing how the DFE adapted over time.
-                - ui_ests: List of unit interval estimates, showing how the CDR adapted.
-                - clocks: List of mostly zeros with ones at the recovered clocking instants.
+                - "dfe_out": Samples of the summing node output, taken at the times given in *sample_times*.
+                - "tap_weights": List of list of tap weights showing how the DFE adapted over time.
+                - "ui_ests": List of unit interval estimates, showing how the CDR adapted.
+                - "clocks": List of mostly zeros with ones at the recovered clocking instants.
                     Useful for overlaying the clock times on signal waveforms, in plots.
-                - lockeds: List of Booleans indicating state of CDR lock.
-                - clock_times: List of clocking instants, as recovered by the CDR.
-                - bits: List of recovered bits.
+                - "lockeds": List of Booleans indicating state of CDR lock.
+                - "clock_times": List of clocking instants, as recovered by the CDR.
+                - "bits": List of recovered bits.
+                - "sig_samps": Samples of the summing node output, taken at the clocking instants.
+                - "decisions": Symbol decisions made based on voltages sampled at clocking instants.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -333,6 +329,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         clocks = zeros(len(sample_times))
         clock_times = [next_clock_time]
         bits = []
+        sig_samps = []
+        decisions = []
         boundary_sample = 0
         slicer_samps = zeros(agc_n_ave)
         ave_samps = zeros(agc_n_ave)
@@ -366,6 +364,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 ui, locked = self.cdr.adapt(samples)
                 decision, new_bits = self.decide(sum_out)
                 bits.extend(new_bits)
+                sig_samps.append(sum_out)
+                decisions.append(decision)
                 slicer_output = decision * decision_scaler
                 error = sum_out - slicer_output
                 update = locked and (clk_cntr % n_ave) == 0
@@ -411,4 +411,14 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         if dbg_dict is not None:
             dbg_dict["scalar_values"] = scalar_values
 
-        return (array(res), tap_weights, array(ui_ests), clocks, lockeds, clock_times, array(bits))
+        return (
+            array(res),
+            tap_weights,
+            array(ui_ests),
+            array(clocks),
+            lockeds,
+            array(clock_times),
+            bits,
+            array(sig_samps),
+            array(decisions)
+        )

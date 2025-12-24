@@ -15,7 +15,7 @@ from typing import Any, Iterator, TypeVar
 
 from numpy import (  # type: ignore
     append, array, cumsum, exp, log10,
-    maximum, ones, pi, sqrt, where
+    maximum, pi, sqrt, where
 )
 from numpy.fft import fftshift  # type: ignore
 
@@ -50,22 +50,28 @@ def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:
         yield val & 1
 
 
-def safe_log10(x):
-    "Guards against pesky 'Divide by 0' error messages."
+def safe_log10(x: float | Rvec, min_val: float = 1e-20) -> float | Rvec:
+    """
+    Guards against pesky 'Divide by 0' error messages.
 
-    if hasattr(x, "__len__"):
-        x = where(x == 0, 1.0e-20 * ones(len(x)), x)
-    else:
-        if x == 0:
-            x = 1.0e-20
+    Args:
+        x: Value to take log10 of.
 
-    return log10(x)
+    Keyword Args:
+        min_val: Minimum input value to allow.
+            Default: 1e-20
+    """
+
+    try:
+        return log10(maximum(x, min_val))
+    except Exception as err:
+        raise ValueError(f"x: {x}") from err
 
 
 # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
 def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
                  rj: float = 0, mu_r: float = 0, mu_l: float = 0,
-                 extrap: bool = False) -> tuple[Rvec, tuple[int, int]]:
+                 extrap: bool = False) -> Rvec:
     """
     Generate the "bathtub" curve associated with a particular jitter PDF.
 

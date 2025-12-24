@@ -67,7 +67,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.seed = the_PyBERT.seed
         self.nspui = the_PyBERT.nspui
         self.eye_bits = the_PyBERT.eye_bits
-        self.mod_type = list(the_PyBERT.mod_type)  # See Issue #95 and PR #98 (jdpatt)
+        self.mod_type = the_PyBERT.mod_type
         self.debug = the_PyBERT.debug
         self.f_max = the_PyBERT.f_max
         self.f_step = the_PyBERT.f_step
@@ -190,7 +190,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             with open(filepath, "rb") as pickle_file:
                 user_config = pickle.load(pickle_file)
         else:
-            raise InvalidFileType("Pybert does not support this file type.")
+            raise InvalidFileType("PyBERT does not support this file type.")
 
         # Right now the loads deserialize back into a `PyBertCfg` class.
         if not isinstance(user_config, PyBertCfg):

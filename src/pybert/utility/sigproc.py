@@ -12,7 +12,7 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 import re
 
-from typing import Optional, Sequence
+from typing import Optional
 
 from numpy import (  # type: ignore
     arange, argmax, array, convolve, cos, cumsum, diff, maximum,
@@ -25,6 +25,37 @@ from scipy.signal      import freqs, invres
 
 from ..common import Rvec, Cvec
 from ..models.tx_tap import TxTapTuner
+
+
+def resize_zero_pad(x: Rvec, new_length: int, pad_front: bool = False) -> Rvec:
+    """
+    Resize an array, zero padding if necessary.
+
+    Args:
+        x: Array to resize.
+        new_length: Desired new length of array.
+
+    Keyword Args:
+        pad_front: Apply any necessary padding to front of input vector when ``True``.
+            Default: ``False``
+
+    Returns:
+        Resized array, zero padded if longer than original.
+
+    Notes:
+        1. This function is necessary to cover a funny corner case w/ NumPy.
+        The ``numpy.resize()`` function repeats the input array when asked to
+        extend its length, which is not what we want in PyBERT.
+        And the ``numpy.ndarray.resize()`` function, which zero pads instead,
+        is fragile, due to data ownership.
+    """
+
+    len_x = len(x)
+    if new_length <= len_x:
+        return x[:new_length]
+    if pad_front:
+        return pad(x, (new_length - len_x, 0))
+    return pad(x, (0, new_length - len_x))
 
 
 def moving_average(a: Rvec, n: int = 3) -> Rvec:
@@ -199,8 +230,7 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,  # noqa: F405
 
     tmax = 1 / f[1]
     n_samps = int(tmax / ts + 0.5)
-    _h = h.copy()
-    _h.resize(n_samps, refcheck=False)  # Accommodating Tox.
+    _h = resize_zero_pad(h, n_samps)
     H = rfft(_h)
     fmax = 0.5 / ts
     _f = arange(0, fmax + f[1], f[1])
@@ -429,8 +459,8 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
 
 
 def add_ffe_dfe(
-    # ffe_weights: list[float], dfe_weights: list[float], nspui: int, pr_ctle_out: Rvec
-    ffe_weights: Sequence[float], dfe_weights: Sequence[float], nspui: int, pr_ctle_out: Rvec
+    # ffe_weights: Sequence[float], dfe_weights: Sequence[float], nspui: int, pr_ctle_out: Rvec
+    ffe_weights: Rvec, dfe_weights: Rvec, nspui: int, pr_ctle_out: Rvec
 ) -> Rvec:
     """
     Add the effects of the FFE and DFE to the cumulative system pulse response at the CTLE output.
@@ -450,8 +480,11 @@ def add_ffe_dfe(
     """
 
     # Add the effect of FFE. (`sum()` is used to concatenate.)
-    h_ffe = array(sum([[ffe_weight] + [0] * (nspui - 1) for ffe_weight in ffe_weights], []))
-    p_tot = convolve(pr_ctle_out, h_ffe)[:len(pr_ctle_out)]
+    if len(ffe_weights) and ffe_weights.any():
+        h_ffe = array(sum([[ffe_weight] + [0] * (nspui - 1) for ffe_weight in ffe_weights], []))
+        p_tot = convolve(pr_ctle_out, h_ffe)[:len(pr_ctle_out)]
+    else:
+        p_tot = pr_ctle_out.copy()
     curs_ix = where(p_tot == max(p_tot))[0][0]
 
     # Test for obvious "to ignore" cases.

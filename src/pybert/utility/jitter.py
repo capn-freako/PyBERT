@@ -15,7 +15,7 @@ from typing import Optional
 import numpy as np
 from numpy import (  # type: ignore
     argmax, array, concatenate, diag, diff, flip,
-    histogram, mean, ones, real, reshape, resize, sign,
+    histogram, mean, ones, real, reshape, sign,
     sort, sqrt, where, zeros
 )
 from numpy.fft import fft, ifft  # type: ignore
@@ -25,7 +25,7 @@ from scipy.optimize import curve_fit
 from ..common import Rvec
 
 from .math import gaus_pdf
-from .sigproc import moving_average
+from .sigproc import moving_average, resize_zero_pad
 
 debug          = False
 
@@ -334,8 +334,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
     tie_risings  = jitter.take(list(range(0, len(jitter), 2)))  # type: ignore
     tie_fallings = jitter.take(list(range(1, len(jitter), 2)))  # type: ignore
-    tie_risings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)  # type: ignore
-    tie_fallings.resize(num_patterns * xings_per_pattern // 2, refcheck=False)  # type: ignore
+    tie_risings  = resize_zero_pad(tie_risings,  num_patterns * xings_per_pattern // 2)
+    tie_fallings = resize_zero_pad(tie_fallings, num_patterns * xings_per_pattern // 2)
     tie_risings  = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))
     tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
 
@@ -347,10 +347,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
 
     # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
-    _jitter = jitter.copy()
-    # "refcheck=False": accommodating Tox:
-    _jitter.resize(num_patterns * xings_per_pattern, refcheck=False)  # type: ignore
-    tie_ave = resize(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
+    _jitter = resize_zero_pad(jitter, num_patterns * xings_per_pattern)
+    tie_ave = resize_zero_pad(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
     tie_ind = jitter - tie_ave
     if zero_mean:
         tie_ind -= mean(tie_ind)
@@ -479,7 +477,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         dd_soltn[0].append(neg_tail_ix)
         # Don't send first or last histogram elements to curve fitter, due to their special nature.
         try:
-            popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix:-1] * 1e12, hist_dd[pos_tail_ix:-1] * 1e-12)
+            popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix:-1], hist_dd[pos_tail_ix:-1])
             mu_pos, sigma_pos = popt
             mu_pos    *= 1e-12  # back to (s)
             sigma_pos *= 1e-12
@@ -490,7 +488,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             sigma_pos = 0
             dd_soltn += [[err],]
         try:
-            popt, pcov = curve_fit(gaus_pdf, centers[1:neg_tail_ix] * 1e12, hist_dd[1:neg_tail_ix] * 1e-12)
+            popt, pcov = curve_fit(gaus_pdf, centers[1: neg_tail_ix + 1], hist_dd[1: neg_tail_ix + 1])
             mu_neg, sigma_neg = popt
             mu_neg    *= 1e-12  # back to (s)
             sigma_neg *= 1e-12

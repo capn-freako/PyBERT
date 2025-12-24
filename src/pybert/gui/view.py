@@ -8,11 +8,18 @@ Original date:   August 24, 2014 (Copied from pybert.py, as part of a major code
 Copyright (c) 2014 David Banas; all rights reserved World wide.
 """
 
+# Change these to match your display.
+HIGH_RES = True
+
+# Don't change anything below this line!
+
+from pathlib import Path
+from typing import Any, Callable
+
 from enable.component_editor import ComponentEditor
 from pyface.image_resource import ImageResource
 from traitsui.api import (  # CloseAction,
     Action,
-    CheckListEditor,
     FileEditor,
     Group,
     HGroup,
@@ -21,6 +28,7 @@ from traitsui.api import (  # CloseAction,
     MenuBar,
     NoButtons,
     ObjectColumn,
+    RangeEditor,
     Separator,
     TableEditor,
     TextEditor,
@@ -31,7 +39,51 @@ from traitsui.api import (  # CloseAction,
 
 from pybert.gui.handler import MyHandler
 
-HIGH_RES = True
+def fname_formatter(
+    max_width: int = 50,
+    partial_dirname_ok: bool = False,
+    include_ext: bool = False
+) -> Callable[Any, str]:
+    """
+    Returns a filename formatter for use in GUI items.
+
+    Keyword Args:
+        max_width: Maximum number of characters allowed.
+            Default = 50
+
+        partial_dirname_ok: Allow partial directory names when ``True``.
+            Default = ``False``
+
+        include_ext: Include filename extension when ``True``.
+            Default = ``False``
+
+    Returns:
+        The filename formatting function.
+
+    Notes:
+        1. It is assumed that whatever gets passed into the returned function
+        can be turned into a valid file path, via ``str()``.
+    """
+
+    def fname_format(fname: Any) -> str:
+        fname_str = str(fname)
+        if not fname_str:
+            return ""
+        fpath = Path(str(fname)).resolve()
+        parts = list(fpath.parent.parts)
+        rslt = fpath.name if include_ext else fpath.stem
+        while parts and len(rslt) < max_width:
+            last_rslt = rslt
+            rslt = "/".join([parts.pop(), rslt])
+        if len(rslt) > max_width:
+            if partial_dirname_ok:
+                rslt = rslt[-max_width:]
+            else:
+                rslt = last_rslt
+        return rslt
+
+    return fname_format
+
 
 # Main window layout definition.
 traits_view = View(
@@ -62,13 +114,12 @@ traits_view = View(
                                 name="mod_type",
                                 label="Modulation",
                                 tooltip="line signalling/modulation scheme",
-                                editor=CheckListEditor(values=[(0, "NRZ"), (1, "Duo-binary"), (2, "PAM-4")]),
                             ),
                             Item(
                                 name="rlm",
                                 label="RLM",
                                 tooltip="relative level mismatch",
-                                enabled_when="mod_type[0] == 2"
+                                enabled_when="mod_type_ == 2"
                             ),
                             label="Rate && Modulation",
                             show_border=True,
@@ -180,7 +231,8 @@ traits_view = View(
                                 name="tx_ibis_file",
                                 label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
+                                editor=FileEditor(dialog_style="open", filter=["*.ibs"],
+                                                  format_func=fname_formatter(),),
                             ),
                             Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
@@ -228,7 +280,8 @@ traits_view = View(
                             Item(
                                 name="ch_file",
                                 label="File",
-                                editor=FileEditor(dialog_style="open"),
+                                editor=FileEditor(dialog_style="open",
+                                                  format_func=fname_formatter(),),
                             ),
                             HGroup(
                                 Item(
@@ -337,7 +390,8 @@ traits_view = View(
                                 name="rx_ibis_file",
                                 label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"]),
+                                editor=FileEditor(dialog_style="open", filter=["*.ibs"],
+                                                  format_func=fname_formatter(),),
                             ),
                             Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
@@ -387,9 +441,15 @@ traits_view = View(
                                 tooltip="Apply MLSD to recovered symbols, using Viterbi algorithm.",
                             ),
                             Item(
-                                name="rx_viterbi_symbols", label="# Symbols",
+                                name="rx_viterbi_symbols", label="Trellis Depth",
+                                enabled_when="rx_use_viterbi",
                                 tooltip="Number of symbols to include in MLSD trellis.",
                             ),
+                            # Item(
+                            #     name="rx_viterbi_fec", label="Use FEC",
+                            #     enabled_when="rx_use_viterbi",
+                            #     tooltip="Use FEC, as opposed to ISI, for Viterbi decoding.",
+                            # ),
                         ),
                         label="Native",
                         show_border=True,
@@ -411,11 +471,13 @@ traits_view = View(
                     HGroup(
                         VGroup(
                             HGroup(
-                                Item(name="tx_ami_file", label="AMI File:", style="readonly", springy=True),
+                                Item(name="tx_ami_file", label="AMI File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="tx_ami_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                             HGroup(
-                                Item(name="tx_dll_file", label="DLL File:", style="readonly", springy=True),
+                                Item(name="tx_dll_file", label="DLL File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="tx_dll_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                         ),
@@ -472,11 +534,13 @@ traits_view = View(
                     HGroup(
                         VGroup(
                             HGroup(
-                                Item(name="rx_ami_file", label="AMI File:", style="readonly", springy=True),
+                                Item(name="rx_ami_file", label="AMI File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="rx_ami_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                             HGroup(
-                                Item(name="rx_dll_file", label="DLL File:", style="readonly", springy=True),
+                                Item(name="rx_dll_file", label="DLL File:", style="readonly", springy=True,
+                                     format_func=fname_formatter(),),
                                 Item(name="rx_dll_valid", label="Valid", style="simple", enabled_when="False"),
                             ),
                         ),
@@ -734,8 +798,6 @@ traits_view = View(
                 ),
                 VGroup(  # Rx FFE
                     HGroup(
-                        Item(name="btn_disable_ffe", show_label=False, tooltip="Disable all FFE taps."),
-                        Item(name="btn_enable_ffe",  show_label=False, tooltip="Enable all FFE taps."),
                         Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
                     ),
                     Item(
@@ -818,7 +880,7 @@ traits_view = View(
             ),
             Group(
                 Item("plots_H", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
-                label="Freq. Resp.",
+                label="Frequency",
                 id="plots_H",
             ),
             layout="tabbed",
@@ -845,6 +907,22 @@ traits_view = View(
                 Item("plots_bathtub", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False),
                 label="Bathtubs",
                 id="plots_bathtub",
+            ),
+            VGroup(
+                Item("plot_viterbi", editor=ComponentEditor(high_resolution=HIGH_RES), show_label=False,
+                     enabled_when="rx_use_viterbi == True and n_errs_viterbi != -1",),
+                HGroup(
+                    Item("trellis_err_select", label="Error",
+                         editor=RangeEditor(low=0, high_name="trellis_max_err", mode="xslider"),),
+                    Item(label="of"),
+                    Item("trellis_max_err", style="readonly", show_label=False),
+                    Item("trellis_pan_control", label="Position", springy=True,
+                         editor=RangeEditor(low=0, high_name="trellis_max_x", mode="xslider"),),
+                    enabled_when="rx_use_viterbi == True and n_errs_viterbi != -1",
+                ),
+                label="Viterbi",
+                id="plots_viterbi",
+                enabled_when="rx_use_viterbi == True",  # ToDo: Doesn't work. Alternative?
             ),
             layout="tabbed",
             label="Results",
@@ -934,7 +1012,6 @@ traits_view = View(
     buttons=NoButtons,
     handler=MyHandler(),
     icon=ImageResource("icon.png"),
-    resizable=True,
     statusbar="status_str",
     title="PyBERT",
 )
