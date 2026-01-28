@@ -27,13 +27,14 @@ from copy import deepcopy
 from datetime import datetime
 from os.path import dirname, join
 from pathlib import Path
+from typing import Any
 
-import numpy as np  # type: ignore
+import numpy as np
 import skrf as rf
 from chaco.api import ArrayPlotData, GridPlotContainer
 from numpy import arange, array, exp, pad, pi, where, zeros
-from numpy.fft import irfft, rfft  # type: ignore
-from numpy.random import randint  # type: ignore
+from numpy.fft import irfft, rfft
+from numpy.random import randint
 from traits.api import (
     Array,
     Bool,
@@ -129,7 +130,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # - Channel Control
     ch_file = File(
-        "", entries=5, filter=["*.s4p", "*.S4P", "*.csv", "*.CSV", "*.txt", "*.TXT", "*.*"]
+        "", entries=5, filter="*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT;*.*"
     )  #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     renumber = Bool(False)  #: Automically fix "1=>3/2=>4" port numbering? (Default = False)
@@ -146,8 +147,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     use_window = Bool(False)  #: Apply raised cosine to frequency response before FFT()-ing? (Default = False)
 
     # - EQ Tune
-    tx_tap_tuners = List(
-        [
+    tx_tap_tuners = List(  # type: ignore
+        [                  # type: ignore
             TxTapTuner(name="Pre-tap3",  pos=-3, enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
             TxTapTuner(name="Pre-tap2",  pos=-2, enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
             TxTapTuner(name="Pre-tap1",  pos=-1, enabled=True, min_val=-0.2,  max_val=0.2,  step=0.1),
@@ -163,8 +164,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     max_mag_tune = Float(12)  #: EQ optimizer CTLE peaking mag. max. (dB).
     step_mag_tune = Float(1)  #: EQ optimizer CTLE peaking mag. step (dB).
     ctle_enable_tune = Bool(True)  #: EQ optimizer CTLE enable
-    dfe_tap_tuners = List(
-        [TxTapTuner(name="Tap1",  enabled=True,  min_val=-0.2,  max_val=0.4,  value=0.0),
+    dfe_tap_tuners = List(  # type: ignore
+        [TxTapTuner(name="Tap1",  enabled=True,  min_val=-0.2,  max_val=0.4,  value=0.0),  # type: ignore
          TxTapTuner(name="Tap2",  enabled=True,  min_val=-0.15, max_val=0.15, value=0.0),
          TxTapTuner(name="Tap3",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
          TxTapTuner(name="Tap4",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
@@ -185,9 +186,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
          TxTapTuner(name="Tap19", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
          TxTapTuner(name="Tap20", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),]
     )  #: EQ optimizer list of DFE tap tuner objects.
-    ffe_tap_tuners = List(
+    ffe_tap_tuners = List(  # type: ignore
         [
-            TxTapTuner(name="Pre-tap5",   pos=-5,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
+            TxTapTuner(name="Pre-tap5",   pos=-5,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),  # type: ignore
             TxTapTuner(name="Pre-tap4",   pos=-4,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
             TxTapTuner(name="Pre-tap3",   pos=-3,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
             TxTapTuner(name="Pre-tap2",   pos=-2,  enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
@@ -219,9 +220,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     pn_mag = Float(0.01)  #: Periodic noise magnitude (V).
     pn_freq = Float(11)  #: Periodic noise frequency (MHz).
     rn = Float(0.01)  #: Standard deviation of Gaussian random noise (V).
-    tx_taps = List(
+    tx_taps = List(  # type: ignore
         [
-            TxTapTuner(name="Pre-tap3",  pos=-3, enabled=False, min_val=-0.05, max_val=0.05),
+            TxTapTuner(name="Pre-tap3",  pos=-3, enabled=False, min_val=-0.05, max_val=0.05),  # type: ignore
             TxTapTuner(name="Pre-tap2",  pos=-2, enabled=True, min_val=-0.1,  max_val=0.1),
             TxTapTuner(name="Pre-tap1",  pos=-1, enabled=True, min_val=-0.2,  max_val=0.2),
             TxTapTuner(name="Post-tap1", pos=1,  enabled=False, min_val=-0.2,  max_val=0.2),
@@ -235,16 +236,14 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     tx_use_ts4 = Bool(False)  #: (Bool)
     tx_use_getwave = Bool(False)  #: (Bool)
     tx_has_getwave = Bool(False)  #: (Bool)
-    tx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
+    tx_ami_file = File("", entries=5, filter="*.ami")  #: (File)
     tx_ami_valid = Bool(False)  #: (Bool)
-    tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
+    tx_dll_file = File("", entries=5, filter="*.dll;*.so")  #: (File)
     tx_dll_valid = Bool(False)  #: (Bool)
     tx_ibis_file = File(
         "",
         entries=5,
-        filter=[
-            "IBIS Models (*.ibs)|*.ibs",
-        ],
+        filter="IBIS Models (*.ibs)|*.ibs",
     )  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
     tx_use_ibis = Bool(False)  #: (Bool)
@@ -254,7 +253,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
     cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
-    ctle_file = File("", entries=5, filter=["*.csv"])  #: CTLE response file (when use_ctle_file = True).
+    ctle_file = File("", entries=5, filter="*.csv")  #: CTLE response file (when use_ctle_file = True).
     rx_bw = Float(12.0)  #: CTLE bandwidth (GHz).
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
@@ -265,11 +264,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_getwave = Bool(False)  #: (Bool)
     rx_has_getwave = Bool(False)  #: (Bool)
     rx_use_clocks = Bool(False)  #: (Bool)
-    rx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
+    rx_ami_file = File("", entries=5, filter="*.ami")  #: (File)
     rx_ami_valid = Bool(False)  #: (Bool)
-    rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
+    rx_dll_file = File("", entries=5, filter="*.dll;*.so")  #: (File)
     rx_dll_valid = Bool(False)  #: (Bool)
-    rx_ibis_file = File("", entries=5, filter=["*.ibs"])  #: (File)
+    rx_ibis_file = File("", entries=5, filter="*.ibs")  #: (File)
     rx_ibis_valid = Bool(False)  #: (Bool)
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
@@ -298,9 +297,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - Rx FFE
     rx_n_taps = Int(15)  #: Total number of taps in Rx FFE.
     rx_n_pre = Int(5)  #: Number of pre-cursor taps in Rx FFE.
-    rx_taps = List(
+    rx_taps = List(  # type: ignore
         [
-            TxTapTuner(name="Pre-tap5",   pos=-5,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
+            TxTapTuner(name="Pre-tap5",   pos=-5,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),  # type: ignore
             TxTapTuner(name="Pre-tap4",   pos=-4,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
             TxTapTuner(name="Pre-tap3",   pos=-3,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
             TxTapTuner(name="Pre-tap2",   pos=-2,  enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
@@ -324,8 +323,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     )  #: List of Rx FFE tap tuner objects.
 
     # Misc.
-    cfg_file = File("", entries=5, filter=["*.pybert_cfg"])  #: PyBERT configuration data storage file (File).
-    data_file = File("", entries=5, filter=["*.pybert_data"])  #: PyBERT results data storage file (File).
+    cfg_file = File("", entries=5, filter="*.pybert_cfg")  #: PyBERT configuration data storage file (File).
+    data_file = File("", entries=5, filter="*.pybert_data")  #: PyBERT results data storage file (File).
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
@@ -343,7 +342,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     status = String("Ready.")  #: PyBERT status (String).
     jitter_perf = Float(0.0)
     total_perf = Float(0.0)
-    sweep_results = List([])
+    sweep_results: List[Any, Any] = List()
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
     n_errs_dfe = Int(0)  #: # of DFE bit errors observed in last run.

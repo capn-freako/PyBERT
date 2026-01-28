@@ -175,13 +175,13 @@ def interp_s2p(ntwk: Network, f: Rvec) -> Network:
     if rs != 2:
         raise ValueError("Touchstone file must have 2 ports!")
 
-    extrap = ntwk.interpolate(f, fill_value="extrapolate", coords="polar", assume_sorted=True)
+    extrap: Network = ntwk.interpolate(f, fill_value="extrapolate", coords="polar", assume_sorted=True)  # type: ignore
     if extrap.f[-1] > 1e12:
         raise ValueError(f"Maximum frequency > 1 THz!\n\tf: {f}\n\textrap: {extrap}")
     s11 = cap_mag(extrap.s[:, 0, 0])
     s22 = cap_mag(extrap.s[:, 1, 1])
-    s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
-    s21 = ntwk.s21.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()
+    s12 = ntwk.s12.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()  # type: ignore
+    s21 = ntwk.s21.interpolate(f, fill_value=0, bounds_error=False, coords="polar", assume_sorted=True).s.flatten()  # type: ignore
     s = array(list(zip(zip(s11, s12), zip(s21, s22))))
     if ntwk.name is None:
         ntwk.name = "s2p"

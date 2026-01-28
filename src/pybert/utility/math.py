@@ -21,9 +21,7 @@ from numpy.fft import fftshift  # type: ignore
 
 from pybert.utility.sigproc import moving_average
 
-from ..common import Rvec
-
-T = TypeVar('T', Any, Any)
+from ..common import Rvec, T
 
 
 def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:

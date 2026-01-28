@@ -1038,7 +1038,8 @@ def update_results(self) -> None:
             style=line_styles[i // 10],
             name=name,
         )
-        dfe_plot.legend.labels.append(name)
+        if dfe_plot.legend:
+            dfe_plot.legend.labels.append(name)  # type: ignore
     if hasattr(self, "plots_dfe") and self.plots_dfe is not None:
         self.plots_dfe.components[1] = dfe_plot
 

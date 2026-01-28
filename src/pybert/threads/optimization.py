@@ -261,7 +261,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         _h_ctle = irfft(H_ctle)
         krnl = interp1d(t_ctle, _h_ctle, bounds_error=False, fill_value=0)
         h_ctle = krnl(t[:max_len])
-        h_ctle *= sum(_h_ctle) / sum(h_ctle)
+        h_ctle *= sum(_h_ctle) / sum(h_ctle)  # type: ignore
         p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
         ctle_H = rfft(resize_zero_pad(h_ctle, len(_t)))
         for tx_weights in tx_weightss:
