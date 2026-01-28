@@ -12,14 +12,14 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 import re
 
-from typing import Optional
+from typing import Any, Optional
 
-from numpy import (  # type: ignore
+from numpy import (
     arange, argmax, array, convolve, cos, cumsum, diff, maximum,
-    mean, minimum, ones, pad, pi, roll, sign, where, zeros
+    mean, minimum, ones, pad, pi, roll, sign, where, zeros, floating
 )
-from numpy.fft import rfft  # type: ignore
-from numpy.typing import NDArray, floating, _64Bit  # type: ignore
+from numpy.fft import rfft
+from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
 
@@ -359,7 +359,7 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
-def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: floating[_64Bit],
+def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: floating[Any],
              clock_times: Optional[Rvec] = None) -> NDArray:
     """
     Calculates the "eye" diagram of the input signal vector.

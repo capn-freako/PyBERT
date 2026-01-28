@@ -12,8 +12,8 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 
 import time
 
-from numpy import arange, array, convolve, delete, insert, ones, pi, prod, where, zeros  # type: ignore
-from numpy.fft import irfft, rfft  # type: ignore
+from numpy import arange, array, convolve, delete, insert, ones, pi, prod, where, zeros
+from numpy.fft import irfft, rfft
 from scipy.interpolate import interp1d
 
 from pychopmarg.optimize import mmse
@@ -209,9 +209,9 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         rx_weightss = [zeros(n_rx_weights)]  # For `n_trials` calculation only.
     else:
         try:
-            rx_weightss = mk_tap_weight_combs(rx_taps)  # type: ignore
+            rx_weightss = mk_tap_weight_combs(rx_taps)
             if not rx_weightss:  # Trap the "null FFE" case.
-                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]  # type: ignore
+                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]
         except ValueError as err:
             raise RuntimeError(
                 "\n".join([

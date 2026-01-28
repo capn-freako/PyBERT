@@ -16,7 +16,7 @@ from typing import Any, Callable, Optional, TypeAlias
 import numpy        as np
 import numpy.typing as npt
 import scipy.signal as sig
-from numpy import (  # type: ignore
+from numpy import (
     argmax,
     append,
     array,
@@ -35,9 +35,9 @@ from numpy import (  # type: ignore
     where,
     zeros,
 )
-from numpy.fft import rfft, irfft  # type: ignore
-from numpy.random import normal  # type: ignore
-from numpy.typing import NDArray  # type: ignore
+from numpy.fft import rfft, irfft
+from numpy.random import normal
+from numpy.typing import NDArray
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
@@ -335,14 +335,22 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     except:  # noqa: E722, pylint: disable=bare-except
                         return False
 
-                def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[np.float64]]:
+                # def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[np.float64]]:
+                def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[float]]:
                     "Retrieve all numeric values from an AMI node, encoding hierarchy in key names."
+
+                    def try_float(x: Any) -> float:
+                        """Type safe version of ``float()``."""
+                        if isnumeric(x):
+                            return float(x)
+                        raise ValueError(f"{x} is not numeric!")
+
                     pname = node[0]
                     vals  = node[1]
                     pname_hier = AmiName(prefix + pname)
                     first_val = vals[0]
                     if isnumeric(first_val):
-                        return {pname_hier: list(map(float, vals))}  # type: ignore
+                        return {pname_hier: list(map(try_float, vals))}
                     if type(first_val) == AmiNode:  # noqa: E721, pylint: disable=unidiomatic-typecheck
                         subdicts = list(map(lambda nd: get_numeric_values(pname_hier, nd), vals))  # type: ignore
                         rslt = {}
@@ -516,7 +524,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         lockeds = []
         locked = False
         dfe_out = ffe_out
-        for n_clks, (clock_time, next_clock_time) in enumerate(zip(clock_times, clock_times[1:])):  # type: ignore
+        for n_clks, (clock_time, next_clock_time) in enumerate(zip(clock_times, clock_times[1:])):
             if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
                 break
             sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
