@@ -16,7 +16,6 @@ dependencies = [
     "pychopmarg>=3.1.2",
     # "pyibis-ami@file:./PyAMI",  # DOES NOT WORK WITH `uv`!!!
     "pyibis-ami@file:///${PROJECT_ROOT}/PyAMI",
-    # "pyside6<6.7",
     "pyside6",
     "pyyaml>=6",
     "scikit-rf>=0.29",
@@ -91,21 +90,6 @@ ignore = [
     "D105", # Missing docstring in magic method
     "D107", # Missing docstring in __init__
 ]
-
-# [tool.mypy]
-# disable_error_code = ["syntax"]
-
-# [[tool.mypy.overrides]]
-# module = [
-#     "scipy.*",
-#     "skrf.*",
-#     "chaco.*",
-#     "enable.*",
-#     "pyface.*",
-#     "traits.*",
-#     "traitsui.*"
-# ]
-# ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
 module = [

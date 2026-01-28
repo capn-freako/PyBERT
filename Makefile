@@ -15,14 +15,6 @@ PYVERS := 3.10 3.11 3.12
 PROJ_VER := $(shell ${UV_EXEC} version | cut -f 2 -d ' ') 
 TEST_EXP ?= tests
 
-# Uncomment the following line only if your changes to `PyIBIS-AMI` haven't altered its API;
-# otherwise leave it commented out (default).
-TYPE_STUB_SKIP := True
-TYPE_STUB_INFO := type_stubs.info
-TYPE_STUB_SRC_DIRS := PyAMI/src
-TYPE_STUB_SRCS := $(shell for DIR in ${TYPE_STUB_SRC_DIRS}; do find $${DIR} -name '*.py' 2>/dev/null; done)
-TYPE_STUB_DIR := type_stubs
-
 # Put it first so that "make" without arguments is like "make help".
 dflt: help
 
@@ -41,7 +33,6 @@ lint:
 	${UVX_EXEC} flake8 --ignore=E501,E272,E241,E222,E221 ${SRC_DIR}
 
 type-check:
-# 	${UV_EXEC} run mypy --install-types --disable-error-code syntax --non-interactive ${SRC_DIR}
 	${UV_EXEC} run mypy --install-types ${SRC_DIR}
 
 docs:

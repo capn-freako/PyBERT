@@ -17,7 +17,7 @@ from .channel    import *   # noqa: F401,F403
 from .functional import *   # noqa: F401,F403
 from .ibisami    import *   # noqa: F401,F403
 from .jitter     import *   # noqa: F401,F403
-from .math       import *   # noqa: F401,F403 type: ignore
+from .math       import *   # noqa: F401,F403
 from .python     import *   # noqa: F401,F403
 from .sigproc    import *   # noqa: F401,F403
 from .sparam     import *   # noqa: F401,F403

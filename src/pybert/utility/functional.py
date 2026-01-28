@@ -8,8 +8,6 @@ Original date:   June 24, 2025
 Copyright (c) 2025 David Banas; all rights reserved World wide.
 """
 
-from typing import Any, TypeVar
-
 from ..common import S, T
 
 

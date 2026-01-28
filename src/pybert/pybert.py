@@ -27,7 +27,6 @@ from copy import deepcopy
 from datetime import datetime
 from os.path import dirname, join
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import skrf as rf
@@ -342,7 +341,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     status = String("Ready.")  #: PyBERT status (String).
     jitter_perf = Float(0.0)
     total_perf = Float(0.0)
-    sweep_results: List[Any, Any] = List()
+    sweep_results = List()  # type: ignore
     len_h = Int(0)
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
     n_errs_dfe = Int(0)  #: # of DFE bit errors observed in last run.
