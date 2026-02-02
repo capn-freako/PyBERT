@@ -335,22 +335,23 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                     except:  # noqa: E722, pylint: disable=bare-except
                         return False
 
-                # def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[np.float64]]:
                 def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[float]]:
                     "Retrieve all numeric values from an AMI node, encoding hierarchy in key names."
-
-                    def try_float(x: Any) -> float:
-                        """Type safe version of ``float()``."""
-                        if isnumeric(x):
-                            return float(x)
-                        raise ValueError(f"{x} is not numeric!")
 
                     pname = node[0]
                     vals  = node[1]
                     pname_hier = AmiName(prefix + pname)
                     first_val = vals[0]
                     if isnumeric(first_val):
-                        return {pname_hier: list(map(try_float, vals))}
+                        try:
+                            return {pname_hier: list(map(float, vals))}  # type: ignore
+                        except ValueError as err:
+                            raise ValueError("\n".join(
+                                [f"In parsing parameter: {pname_hier},",
+                                 "the first element in a list of expressions was numeric,",
+                                 "but at least one of the subsequent elements was not.",
+                                 "This is illegal according to the rules of AMI grammar!",
+                                 "Please, correct your `*.ami` file accordingly."])) from err
                     if type(first_val) == AmiNode:  # noqa: E721, pylint: disable=unidiomatic-typecheck
                         subdicts = list(map(lambda nd: get_numeric_values(pname_hier, nd), vals))  # type: ignore
                         rslt = {}

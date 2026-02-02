@@ -101,13 +101,19 @@ module = [
 ]
 follow_untyped_imports = true
 
+[tool.uv.workspace]
+members = [
+    "PyAMI",
+]
+
+[tool.uv.sources]
+pyibis-ami = { workspace = true, editable = true }
+
 [dependency-groups]
 dev = [
     "m2r2>=0.3.4",
     "mypy>=1.19.1",
     "pip>=25.3",
-    # "pyibis-ami@file:./PyAMI",  # DOES NOT WORK WITH `uv`!!!
-    "pyibis-ami@file:///${PROJECT_ROOT}/PyAMI",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
