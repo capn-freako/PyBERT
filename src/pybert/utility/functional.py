@@ -1,16 +1,14 @@
 """
 Functional programming utilities for PyBERT.
 
-Original author: David Banas <capn.freako@gmail.com>  
+Original author: David Banas <capn.freako@gmail.com>
+
 Original date:   June 24, 2025
 
 Copyright (c) 2025 David Banas; all rights reserved World wide.
 """
 
-from typing import Any, TypeVar
-
-S = TypeVar('S', Any, Any)
-T = TypeVar('T', Any, Any)
+from ..common import S, T
 
 
 def fst(xs: tuple[T, ...]) -> T:

@@ -11,19 +11,17 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
 from functools import reduce
-from typing import Any, Iterator, TypeVar
+from typing import Iterator
 
-from numpy import (  # type: ignore
+from numpy import (
     append, array, cumsum, exp, log10,
     maximum, pi, sqrt, where
 )
-from numpy.fft import fftshift  # type: ignore
+from numpy.fft import fftshift
 
 from pybert.utility.sigproc import moving_average
 
-from ..common import Rvec
-
-T = TypeVar('T', Any, Any)
+from ..common import Rvec, T
 
 
 def lfsr_bits(taps: list[int], seed: int) -> Iterator[int]:

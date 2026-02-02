@@ -12,8 +12,8 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 
 import time
 
-from numpy import arange, array, convolve, delete, insert, ones, pi, prod, where, zeros  # type: ignore
-from numpy.fft import irfft, rfft  # type: ignore
+from numpy import arange, array, convolve, delete, insert, ones, pi, prod, where, zeros
+from numpy.fft import irfft, rfft
 from scipy.interpolate import interp1d
 
 from pychopmarg.optimize import mmse
@@ -209,9 +209,9 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         rx_weightss = [zeros(n_rx_weights)]  # For `n_trials` calculation only.
     else:
         try:
-            rx_weightss = mk_tap_weight_combs(rx_taps)  # type: ignore
+            rx_weightss = mk_tap_weight_combs(rx_taps)
             if not rx_weightss:  # Trap the "null FFE" case.
-                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]  # type: ignore
+                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]
         except ValueError as err:
             raise RuntimeError(
                 "\n".join([
@@ -261,7 +261,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
         _h_ctle = irfft(H_ctle)
         krnl = interp1d(t_ctle, _h_ctle, bounds_error=False, fill_value=0)
         h_ctle = krnl(t[:max_len])
-        h_ctle *= sum(_h_ctle) / sum(h_ctle)
+        h_ctle *= sum(_h_ctle) / sum(h_ctle)  # type: ignore
         p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
         ctle_H = rfft(resize_zero_pad(h_ctle, len(_t)))
         for tx_weights in tx_weightss:

@@ -12,14 +12,14 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 import re
 
-from typing import Optional
+from typing import Any, Optional
 
-from numpy import (  # type: ignore
+from numpy import (
     arange, argmax, array, convolve, cos, cumsum, diff, maximum,
-    mean, minimum, ones, pad, pi, roll, sign, where, zeros
+    mean, minimum, ones, pad, pi, roll, sign, where, zeros, floating
 )
-from numpy.fft import rfft  # type: ignore
-from numpy.typing import NDArray  # type: ignore
+from numpy.fft import rfft
+from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
 
@@ -234,7 +234,7 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,  # noqa: F405
     H = rfft(_h)
     fmax = 0.5 / ts
     _f = arange(0, fmax + f[1], f[1])
-    krnl = interp1d(_f, H, kind="linear", assume_sorted=True)
+    krnl = interp1d(_f, H, kind="linear", assume_sorted=True)  # type: ignore
     _H = krnl(f)
 
     return (s, p, _H)
@@ -359,7 +359,7 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
-def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: float,
+def calc_eye(ui: float, samps_per_ui: int, height: int, ys: Rvec, y_max: floating[Any],
              clock_times: Optional[Rvec] = None) -> NDArray:
     """
     Calculates the "eye" diagram of the input signal vector.
@@ -500,7 +500,7 @@ def add_ffe_dfe(
     return p_tot
 
 
-def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int) -> list[float]:
+def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int) -> Rvec:
     """
     Get the ideal DFE tap weights, given the tap tuners and pulse response, using PRZF.
 
