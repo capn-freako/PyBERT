@@ -43,7 +43,7 @@ from scipy.interpolate import interp1d
 
 from chaco.api import Plot
 
-from pyibisami.ami.parser import AmiAtom, AmiName, AmiNode, ami_parse
+from pyibisami.ami.parser import AmiLeaf, AmiName, AmiNode, ami_parse
 
 from ..common import Rvec
 from ..utility import (
@@ -328,19 +328,15 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[float]]:
                     "Retrieve all numeric values from an AMI node, encoding hierarchy in key names."
 
-                    pname = node[0]
-                    pname_hier = AmiName(prefix + pname)
-                    vals  = node[1]
-                    if not vals:
-                        return {}
-                    if type(vals[0]) is AmiAtom:
-                        return {pname_hier: list(map(float, vals))}  # type: ignore
-                    else:
-                        subdicts = list(map(lambda nd: get_numeric_values(pname_hier, nd), vals))  # type: ignore
-                        rslt = {}
-                        for subdict in subdicts:
-                            rslt.update(subdict)
-                        return rslt
+                    pname_hier = AmiName(prefix + node.name)
+
+                    if isinstance(node, AmiLeaf):
+                        return {pname_hier: [float(x) for x in node.values]}
+
+                    out: dict[AmiName, list[float]] = {}
+                    for child in node.children:
+                        out.update(get_numeric_values(pname_hier, child))
+                    return out
 
                 # Concatenate results from all `GetWave()` calls.
                 # - The results from the first call establishes the valid key names,
