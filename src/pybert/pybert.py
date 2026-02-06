@@ -235,14 +235,14 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     tx_use_ts4 = Bool(False)  #: (Bool)
     tx_use_getwave = Bool(False)  #: (Bool)
     tx_has_getwave = Bool(False)  #: (Bool)
-    tx_ami_file = File("", entries=5, filter="*.ami")  #: (File)
+    tx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
     tx_ami_valid = Bool(False)  #: (Bool)
-    tx_dll_file = File("", entries=5, filter="*.dll;*.so")  #: (File)
+    tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     tx_dll_valid = Bool(False)  #: (Bool)
     tx_ibis_file = File(
         "",
         entries=5,
-        filter="IBIS Models (*.ibs)|*.ibs",
+        filter=["*.ibs"],
     )  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
     tx_use_ibis = Bool(False)  #: (Bool)
@@ -252,7 +252,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
     cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
-    ctle_file = File("", entries=5, filter="*.csv")  #: CTLE response file (when use_ctle_file = True).
+    ctle_file = File("", entries=5, filter=["*.csv"])  #: CTLE response file (when use_ctle_file = True).
     rx_bw = Float(12.0)  #: CTLE bandwidth (GHz).
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
@@ -263,11 +263,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_getwave = Bool(False)  #: (Bool)
     rx_has_getwave = Bool(False)  #: (Bool)
     rx_use_clocks = Bool(False)  #: (Bool)
-    rx_ami_file = File("", entries=5, filter="*.ami")  #: (File)
+    rx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
     rx_ami_valid = Bool(False)  #: (Bool)
-    rx_dll_file = File("", entries=5, filter="*.dll;*.so")  #: (File)
+    rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     rx_dll_valid = Bool(False)  #: (Bool)
-    rx_ibis_file = File("", entries=5, filter="*.ibs")  #: (File)
+    rx_ibis_file = File("", entries=5, filter=["*.ibs"])  #: (File)
     rx_ibis_valid = Bool(False)  #: (Bool)
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
@@ -322,8 +322,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     )  #: List of Rx FFE tap tuner objects.
 
     # Misc.
-    cfg_file = File("", entries=5, filter="*.pybert_cfg")  #: PyBERT configuration data storage file (File).
-    data_file = File("", entries=5, filter="*.pybert_data")  #: PyBERT results data storage file (File).
+    cfg_file = File("", entries=5, filter=["*.pybert_cfg"])  #: PyBERT configuration data storage file (File).
+    data_file = File("", entries=5, filter=["*.pybert_data"])  #: PyBERT results data storage file (File).
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
