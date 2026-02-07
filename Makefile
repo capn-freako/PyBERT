@@ -33,7 +33,7 @@ lint:
 	${UVX_EXEC} flake8 --ignore=E501,E272,E241,E222,E221 ${SRC_DIR}
 
 type-check:
-	${UV_EXEC} run mypy --install-types ${SRC_DIR}
+	${UV_EXEC} run mypy --install-types --follow-untyped-imports ${SRC_DIR}
 
 docs:
 	pushd ${DOCS_DIR}; PROJ_VER=${PROJ_VER} ${UV_EXEC} run sphinx-build -j auto -b html source/ build/; popd
