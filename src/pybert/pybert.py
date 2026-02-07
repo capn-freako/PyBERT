@@ -128,11 +128,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rlm        = Float(0.95)  #: Relative level mismatch. (Default = 0.95)
 
     # - Channel Control
-    ch_file = File(
-        "", entries=5, filter="*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT;*.*"
-    )  #: Channel file name.
+    ch_file = File("")  #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
-    renumber = Bool(False)  #: Automically fix "1=>3/2=>4" port numbering? (Default = False)
+    renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
     f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
@@ -239,11 +237,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     tx_ami_valid = Bool(False)  #: (Bool)
     tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     tx_dll_valid = Bool(False)  #: (Bool)
-    tx_ibis_file = File(
-        "",
-        entries=5,
-        filter=["*.ibs"],
-    )  #: (File)
+    tx_ibis_file = File("")  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
     tx_use_ibis = Bool(False)  #: (Bool)
 
@@ -252,7 +246,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
     cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
-    ctle_file = File("", entries=5, filter=["*.csv"])  #: CTLE response file (when use_ctle_file = True).
+    ctle_file = File("")  #: CTLE response file (when use_ctle_file = True).
     rx_bw = Float(12.0)  #: CTLE bandwidth (GHz).
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
@@ -267,7 +261,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_ami_valid = Bool(False)  #: (Bool)
     rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
     rx_dll_valid = Bool(False)  #: (Bool)
-    rx_ibis_file = File("", entries=5, filter=["*.ibs"])  #: (File)
+    rx_ibis_file = File("")  #: (File)
     rx_ibis_valid = Bool(False)  #: (Bool)
     rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)

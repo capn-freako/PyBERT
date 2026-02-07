@@ -234,8 +234,11 @@ traits_view = View(
                                 name="tx_ibis_file",
                                 label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"],
-                                                  format_func=fname_formatter(),),
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=["IBIS models (*.ibs)|*.ibs|All files (*.*)|*.*|"],
+                                    format_func=fname_formatter(),
+                                ),
                             ),
                             Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
@@ -283,8 +286,15 @@ traits_view = View(
                             Item(
                                 name="ch_file",
                                 label="File",
-                                editor=FileEditor(dialog_style="open",
-                                                  format_func=fname_formatter(),),
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=[
+                                        "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)|"
+                                        "*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|"
+                                        "All files (*.*)|*.*|",
+                                    ],
+                                    format_func=fname_formatter(),
+                                ),
                             ),
                             HGroup(
                                 Item(
@@ -393,8 +403,11 @@ traits_view = View(
                                 name="rx_ibis_file",
                                 label="File",
                                 springy=True,
-                                editor=FileEditor(dialog_style="open", filter=["*.ibs"],
-                                                  format_func=fname_formatter(),),
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=["IBIS models (*.ibs)|*.ibs|All files (*.*)|*.*|"],
+                                    format_func=fname_formatter(),
+                                ),
                             ),
                             Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
@@ -591,7 +604,7 @@ traits_view = View(
                                 Item(
                                     name="ctle_file",
                                     label="Filename",
-                                    editor=FileEditor(dialog_style="open"),
+                                    editor=FileEditor(dialog_style="open", filter=["*.csv"]),
                                 ),
                                 label="File",
                                 show_border=True,
