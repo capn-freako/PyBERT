@@ -236,7 +236,7 @@ traits_view = View(
                                 springy=True,
                                 editor=FileEditor(
                                     dialog_style="open",
-                                    filter=["IBIS models (*.ibs)|*.ibs|All files (*.*)|*.*|"],
+                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
                                     format_func=fname_formatter(),
                                 ),
                             ),
@@ -289,8 +289,7 @@ traits_view = View(
                                 editor=FileEditor(
                                     dialog_style="open",
                                     filter=[
-                                        "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)|"
-                                        "*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|"
+                                        "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
                                         "All files (*.*)|*.*|",
                                     ],
                                     format_func=fname_formatter(),
@@ -405,7 +404,7 @@ traits_view = View(
                                 springy=True,
                                 editor=FileEditor(
                                     dialog_style="open",
-                                    filter=["IBIS models (*.ibs)|*.ibs|All files (*.*)|*.*|"],
+                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
                                     format_func=fname_formatter(),
                                 ),
                             ),
