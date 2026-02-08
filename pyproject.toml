@@ -11,14 +11,20 @@ authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "enable>=6.1.0",
-    "kiwisolver",
+    "chaco==6.1.1",
+    "enable==6.1.0",
+    "traitsui==8.0.0",
+    "pyface==8.0.0",
+    "pyside6==6.10.2",
+    "kiwisolver==1.4.9",
+    "numpy==1.26.4",
+    "scikit-rf==1.10.0",
+    "scipy==1.14.0",
     "pychopmarg>=3.1.2",
     "pyibis-ami>=8",
-    "pyside6",
-    "pyyaml>=6",
-    "scikit-rf>=0.29",
-    "typing_extensions",
+    "click==8.3.1",
+    "parsec==3.17",
+    "pyyaml==6.0.3",
 ]
 keywords=["bert", "communication", "simulator"]
 classifiers=[
