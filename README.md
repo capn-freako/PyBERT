@@ -1,3 +1,5 @@
+![Downloads](https://img.shields.io/pypi/dm/pipbert)
+
 PyBERT
 ======
 
