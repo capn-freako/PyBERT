@@ -1,6 +1,11 @@
+![PyPI - Version](https://img.shields.io/pypi/v/pipbert)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipbert)
+![GitHub Repo stars](https://img.shields.io/github/stars/capn-freako/PyBERT)
+![GitHub forks](https://img.shields.io/github/forks/capn-freako/PyBERT)
 ![Downloads](https://img.shields.io/pypi/dm/pipbert)
 ![GitHub License](https://img.shields.io/github/license/capn-freako/PyBERT)
-
+![Read the Docs](https://img.shields.io/readthedocs/pybert)
+![Libraries.io dependency status for GitHub repo](https://img.shields.io/librariesio/github/capn-freako/PyBERT)
 
 PyBERT
 ======
