@@ -1,4 +1,6 @@
 ![Downloads](https://img.shields.io/pypi/dm/pipbert)
+![GitHub License](https://img.shields.io/github/license/capn-freako/PyBERT)
+
 
 PyBERT
 ======
