@@ -9,8 +9,8 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 """
 
 from typing import Any, Optional, TypeAlias, TypeVar  # pylint: disable=unused-import  # noqa: F401
-import numpy as np  # type: ignore  # pylint: disable=unused-import  # noqa: F401
-import numpy.typing as npt  # type: ignore
+import numpy as np  # pylint: disable=unused-import  # noqa: F401
+import numpy.typing as npt
 
 # Type variables, used to support generics.
 S = TypeVar('S', Any, Any)

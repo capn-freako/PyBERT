@@ -8,7 +8,7 @@ Copyright (c) 2022 David Banas; all rights reserved World wide.
 """
 import re
 from functools import reduce
-from parsec import count, generate, many, many1, none_of, regex, sepBy1, string  # type: ignore
+from parsec import count, generate, many, many1, none_of, regex, sepBy1, string
 
 
 class CSDF:  # pylint: disable=too-few-public-methods

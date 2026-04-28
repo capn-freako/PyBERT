@@ -10,7 +10,7 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
-from numpy import array, pi, power, sqrt  # type: ignore
+from numpy import array, pi, power, sqrt
 
 from ..common import Rvec, Cvec
 

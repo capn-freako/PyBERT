@@ -105,7 +105,7 @@ class PyBertData:
             raise ValueError("The data structure read in is NOT of type: ArrayPlotData!")
 
         # Load the reference plots.
-        for prop, value in user_results.the_data.arrays.items():
+        for prop, value in user_results.the_data.arrays.items():  # type: ignore
             pybert.plotdata.set_data(prop + "_ref", value)
 
         # Add reference plots, if necessary.

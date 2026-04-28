@@ -13,12 +13,12 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 from typing import Optional
 
 import numpy as np
-from numpy import (  # type: ignore
+from numpy import (
     argmax, array, concatenate, diag, diff, flip,
     histogram, mean, ones, real, reshape, sign,
     sort, sqrt, where, zeros
 )
-from numpy.fft import fft, ifft  # type: ignore
+from numpy.fft import fft, ifft
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 
@@ -332,8 +332,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # Do the jitter decomposition.
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))  # type: ignore
-    tie_fallings = jitter.take(list(range(1, len(jitter), 2)))  # type: ignore
+    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))
+    tie_fallings = jitter.take(list(range(1, len(jitter), 2)))
     tie_risings  = resize_zero_pad(tie_risings,  num_patterns * xings_per_pattern // 2)
     tie_fallings = resize_zero_pad(tie_fallings, num_patterns * xings_per_pattern // 2)
     tie_risings  = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))

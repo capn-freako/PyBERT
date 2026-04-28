@@ -16,7 +16,7 @@ from typing import Any, Callable, Optional, TypeAlias
 import numpy        as np
 import numpy.typing as npt
 import scipy.signal as sig
-from numpy import (  # type: ignore
+from numpy import (
     argmax,
     append,
     array,
@@ -35,15 +35,15 @@ from numpy import (  # type: ignore
     where,
     zeros,
 )
-from numpy.fft import rfft, irfft  # type: ignore
-from numpy.random import normal  # type: ignore
-from numpy.typing import NDArray  # type: ignore
+from numpy.fft import rfft, irfft
+from numpy.random import normal
+from numpy.typing import NDArray
 from scipy.signal import iirfilter, lfilter
 from scipy.interpolate import interp1d
 
 from chaco.api import Plot
 
-from pyibisami.ami.parser import AmiName, AmiNode, ami_parse
+from pyibisami.ami.parser import AmiLeaf, AmiName, AmiNode, ami_parse
 
 from ..common import Rvec
 from ..utility import (
@@ -269,9 +269,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     try:
         params: list[str] = []
         if self.tx_use_ami and self.tx_use_getwave:
-            tx_out, _, tx_h, tx_out_h, msg, _params = run_ami_model(
+            tx_out, _, tx_h, tx_out_h, msg, params = run_ami_model(
                 self.tx_dll_file, self._tx_cfg, True, ui, ts, chnl_h, x)
-            params = _params
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
             tx_getwave_params = list(map(ami_parse, params))
             self.log(f"Tx IBIS-AMI model GetWave() output parameters:\n{tx_getwave_params}")
@@ -284,9 +283,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
                 ignore_bits = self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ignore_Bits"])
-                ctle_out, _, ctle_h, ctle_out_h, msg, _params = run_ami_model(
+                ctle_out, _, ctle_h, ctle_out_h, msg, params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
-                params = _params
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                 _rx_getwave_params = list(map(ami_parse, params))
                 self.log(f"Rx IBIS-AMI model GetWave() output parameters:\n{_rx_getwave_params}")
@@ -319,40 +317,32 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             split_time = clock()
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
-                ctle_out, clock_times, ctle_h, ctle_out_h, msg, _params = run_ami_model(
+                ctle_out, clock_times, ctle_h, ctle_out_h, msg, params = run_ami_model(
                     self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
-                params = _params
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                 # Time evolution of (<root_name>: AmiName, <param_vals>: list[AmiNode]):
                 # (i.e. - There can be no `AmiAtom`s in the root tuple's second member.)
                 rx_getwave_params: list[tuple[AmiName, list[AmiNode]]] = list(map(ami_parse, params))
                 param_vals = {}
 
-                def isnumeric(x):
-                    try:
-                        _ = float(x)
-                        return True
-                    except:  # noqa: E722, pylint: disable=bare-except
-                        return False
-
-                def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[np.float64]]:
+                def get_numeric_values(prefix: AmiName, node: AmiNode) -> dict[AmiName, list[float]]:
                     "Retrieve all numeric values from an AMI node, encoding hierarchy in key names."
-                    pname = node[0]
-                    vals  = node[1]
-                    pname_hier = AmiName(prefix + pname)
-                    first_val = vals[0]
-                    if isnumeric(first_val):
-                        return {pname_hier: list(map(float, vals))}  # type: ignore
-                    if type(first_val) == AmiNode:  # noqa: E721, pylint: disable=unidiomatic-typecheck
-                        subdicts = list(map(lambda nd: get_numeric_values(pname_hier, nd), vals))  # type: ignore
-                        rslt = {}
-                        for subdict in subdicts:
-                            rslt.update(subdict)
-                        return rslt
-                    return {}
 
+                    pname_hier = AmiName(prefix + node.name)
+
+                    if isinstance(node, AmiLeaf):
+                        return {pname_hier: [float(x) for x in node.values]}
+
+                    out: dict[AmiName, list[float]] = {}
+                    for child in node.children:
+                        out.update(get_numeric_values(pname_hier, child))
+                    return out
+
+                # Concatenate results from all `GetWave()` calls.
+                # - The results from the first call establishes the valid key names,
                 for nd in rx_getwave_params[0][1]:
                     param_vals.update(get_numeric_values(AmiName(""), nd))
+                # - which we then use to build the various concatenated lists of values.
                 for rslt in rx_getwave_params[1:]:
                     for nd in rslt[1]:
                         vals_dict = get_numeric_values(AmiName(""), nd)
@@ -516,7 +506,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         lockeds = []
         locked = False
         dfe_out = ffe_out
-        for n_clks, (clock_time, next_clock_time) in enumerate(zip(clock_times, clock_times[1:])):  # type: ignore
+        for n_clks, (clock_time, next_clock_time) in enumerate(zip(clock_times, clock_times[1:])):
             if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
                 break
             sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
@@ -1038,7 +1028,8 @@ def update_results(self) -> None:
             style=line_styles[i // 10],
             name=name,
         )
-        dfe_plot.legend.labels.append(name)
+        if dfe_plot.legend:
+            dfe_plot.legend.labels.append(name)  # type: ignore
     if hasattr(self, "plots_dfe") and self.plots_dfe is not None:
         self.plots_dfe.components[1] = dfe_plot
 

@@ -204,7 +204,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         # Copy local values back to their respective class object variables.
         self.tap_weights = tap_weights
         self.tap_values = tap_values
-        self.corrections = corrections  # type: ignore
+        self.corrections = corrections
 
         return filter_out
 
@@ -390,14 +390,14 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                         ave_samps[-1] = ave_slicer_samps
                         n_ave_samps += 1
                         if n_ave_samps >= agc_n_ave:
-                            ave_ave_samps = mean(ave_samps)
+                            ave_ave_samps = float(mean(ave_samps))
                             match self.mod_type:
                                 case 0:
-                                    decision_scaler = ave_ave_samps         # type: ignore
+                                    decision_scaler = ave_ave_samps
                                 case 1:
-                                    decision_scaler = 1.5 * ave_ave_samps   # type: ignore
+                                    decision_scaler = 1.5 * ave_ave_samps
                                 case 2:
-                                    decision_scaler = 1.5 * ave_ave_samps   # type: ignore
+                                    decision_scaler = 1.5 * ave_ave_samps
                                 case _:
                                     raise RuntimeError("Unrecognized modulation type!")
                             scalar_values.append(decision_scaler)
