@@ -1550,6 +1550,18 @@ wheels = [
 ]
 
 [[package]]
+name = "lxml-html-clean"
+version = "0.4.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "lxml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/a4/5c62acfacd69ff4f5db395100f5cfb9b54e7ac8c69a235e4e939fd13f021/lxml_html_clean-0.4.4.tar.gz", hash = "sha256:58f39a9d632711202ed1d6d0b9b47a904e306c85de5761543b90e3e3f736acfb", size = 23899, upload-time = "2026-02-27T09:35:52.911Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/76/7ffc1d3005cf7749123bc47cb3ea343cd97b0ac2211bab40f57283577d0e/lxml_html_clean-0.4.4-py3-none-any.whl", hash = "sha256:ce2ef506614ecb85ee1c5fe0a2aa45b06a19514ec7949e9c8f34f06925cfabcb", size = 14565, upload-time = "2026-02-27T09:35:51.86Z" },
+]
+
+[[package]]
 name = "m2r2"
 version = "0.3.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2447,7 +2459,7 @@ wheels = [
 
 [[package]]
 name = "pyibis-ami"
-version = "8.1.0"
+version = "8.1.1"
 source = { editable = "PyAMI" }
 dependencies = [
     { name = "chaco" },
@@ -2455,16 +2467,20 @@ dependencies = [
     { name = "empy" },
     { name = "importlib-resources" },
     { name = "jupyter" },
+    { name = "lxml-html-clean" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "papermill" },
     { name = "parsec" },
+    { name = "reportlab" },
     { name = "scipy" },
+    { name = "types-reportlab" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "m2r2" },
+    { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
@@ -2482,16 +2498,20 @@ requires-dist = [
     { name = "empy", specifier = ">=3.3.4" },
     { name = "importlib-resources" },
     { name = "jupyter" },
+    { name = "lxml-html-clean", specifier = ">=0.4.4" },
     { name = "matplotlib", specifier = ">=3.6.1" },
     { name = "numpy", specifier = ">=1.26,<1.27" },
     { name = "papermill" },
     { name = "parsec", specifier = ">=3.15" },
+    { name = "reportlab", specifier = ">=4.4.10" },
     { name = "scipy", specifier = ">=1.9" },
+    { name = "types-reportlab", specifier = ">=4.4.10.20260223" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "m2r2", specifier = ">=0.3.4" },
+    { name = "mypy", specifier = ">=1.19.1" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
@@ -2742,6 +2762,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/22/f5/df4e9027acead3ecc63e50fe1e36aca1523e1719559c499951bb4b53188f/referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8", size = 78036, upload-time = "2025-10-13T15:30:48.871Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/58/ca301544e1fa93ed4f80d724bf5b194f6e4b945841c5bfd555878eea9fcb/referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231", size = 26766, upload-time = "2025-10-13T15:30:47.625Z" },
+]
+
+[[package]]
+name = "reportlab"
+version = "4.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "charset-normalizer" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/23/b8a8b9a5e596ce3de71237c8d6c6a976c763e930878b16340aff3d67ed53/reportlab-4.5.0.tar.gz", hash = "sha256:e595932789ab7a107ba253e83f7815622708a9fd49920d0d6a909880eb66ac75", size = 3914127, upload-time = "2026-04-29T09:12:26.785Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/13/bc43591a54dd38ac5c19e7e849f0311d879737a0d07e032e5be79849a5fb/reportlab-4.5.0-py3-none-any.whl", hash = "sha256:b8cc8996947d84e805368b47b2376070966f091d029351a0d8a1f238984c2c7f", size = 1957238, upload-time = "2026-04-29T09:12:22.904Z" },
 ]
 
 [[package]]
@@ -3356,6 +3389,15 @@ wheels = [
 ]
 
 [[package]]
+name = "types-reportlab"
+version = "4.5.0.20260509"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/b0/49340b03f2417ff19b02f3a93d2fbca4578c7e40c6f68286afbe2fcc3f30/types_reportlab-4.5.0.20260509.tar.gz", hash = "sha256:a36cbdb1227ed1977a3ec8bd5d629821bb4181e83d62e2238394d59a111ab358", size = 71893, upload-time = "2026-05-09T04:58:51.495Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/86/aa8a8d4721f6094e273b2635f15cd7a278bc300728c248ab14b255255d6c/types_reportlab-4.5.0.20260509-py3-none-any.whl", hash = "sha256:b64e452be52f469ae0820d809eefb3ae4929e815d1318407cebe79ec0153b6e8", size = 112848, upload-time = "2026-05-09T04:58:50.244Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3384,11 +3426,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.6.3"
+version = "2.7.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/24/5f1b3bdffd70275f6661c76461e25f024d5a38a46f04aaca912426a2b1d3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed", size = 435556, upload-time = "2026-01-07T16:24:43.925Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4", size = 131584, upload-time = "2026-01-07T16:24:42.685Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
 ]
 
 [[package]]
