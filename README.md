@@ -1,12 +1,31 @@
+![PyPI - Version](https://img.shields.io/pypi/v/pipbert)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipbert)
+![GitHub Repo stars](https://img.shields.io/github/stars/capn-freako/PyBERT)
+![GitHub forks](https://img.shields.io/github/forks/capn-freako/PyBERT)
+![Downloads](https://img.shields.io/pypi/dm/pipbert)
+![GitHub License](https://img.shields.io/github/license/capn-freako/PyBERT)
+![Read the Docs](https://img.shields.io/readthedocs/pybert)
+![Libraries.io dependency status for GitHub repo](https://img.shields.io/librariesio/github/capn-freako/PyBERT)
+
 PyBERT
 ======
 
-PyBERT is a serial communication link bit error rate tester simulator with a graphical user interface (GUI).
+_PyBERT_ is a serial communication link bit error rate tester simulator with a graphical user interface (GUI).
 
-It uses the Traits/UI package of the Enthought Python Distribution (EPD) <http://www.enthought.com/products/epd.php>,
-as well as the NumPy and SciPy packages.
+It uses the _Traits/UI_ package of the Enthought Python Distribution (EPD) <http://www.enthought.com/products/epd.php>,
+as well as the _NumPy_, _SciPy_, and _SciKit-RF_ packages.
 
-Notice: Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
+**Notice:** Before using this package for any purpose, you MUST read and understand the terms put forward in the accompanying "LICENSE" file.
+
+User Installation
+-----------------
+
+- <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
+
+Developer Installation
+----------------------
+
+- <https://github.com/capn-freako/PyBERT/wiki/Developer_Instructions>
 
 Wiki
 ----
@@ -23,26 +42,38 @@ Email List
 
 - <pybert@freelists.org>
 
-User Installation
------------------
+Building, Testing, and Distributing
+-----------------------------------
 
-- <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
+**Note:** As of February 2026, _Tox_ is no longer used in the PyBERT build/test/dist. infrastructure.
 
-Developer Installation
-----------------------
+The _PyBERT_ build/test/dist. infrastructure is a two level structure:
 
-- <https://github.com/capn-freako/PyBERT/wiki/dev_install>
+1. A make file provides the main interface for "normal" developers, offering the following targets:
 
-Testing
--------
+  ```
+  % make
+  Available targets:
+  ==================
+    check: Validate the 'pyproject.toml' file.
+    format: Reformats all Python source code. USE CAUTION!
+    lint: Run 'ruff' and 'flake8' over the source code.
+    type-check: Run type checking, via 'mypy', on the source code.
+    docs: Run 'sphinx' on the source code, to generate documentation.
+      To view the resultant API documentation, open 'docs/build/index.html' in a browser.
+    build: Build both the source tarball and wheel.
+    upload: Upload both the source tarball and wheel to PyPi.
+    upload_test: Upload both the source tarball and wheel to TestPyPi.
+    test: Run tests, using all supported Python versions.
+    clean: Remove all previous build results, virtual environments, and cache contents.
+    distclean: Runs a 'make clean' and removes 'dist/'.
+  ```
 
-Tox is used for the test runner and documentation builder.  By default, it will try to unit test
-for any installed/supported of versions and it will skip any missing versions.
-
-- `pip install tox`
-- `tox -p all`
-
-To run a single environment such as "docs" run: `tox -e docs`
+2. `uv` is now used, in place of `pip`, as the "back-end engine".
+If you peruse the `makefile`, you'll find that it uses `uv` extensively, to get its various jobs done.
+However, this use of `uv` should be transparent to typical developers.
+Understanding `uv` operation should only be necessary for those tinkering with the `makefile` itself.
+Everyone else should be able to use `make` exclusively for building, testing, and distributing.
 
 Documentation
 -------------
@@ -51,15 +82,16 @@ PyBERT documentation exists in 2 separate forms:
 
 - For developers:
 
-  - pybert/doc/build/html/index.html  (See testing on how to build the documentation)
-  - https://github.com/capn-freako/PyBERT/wiki/dev_install
+  - docs/build/index.html  (See the _docs_ `make` target, above.)
+  - https://github.com/capn-freako/PyBERT/wiki/Developer_Instructions
 
 - For users:
 
-  - Quick installation instructions at <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>
-  - The 'Help' tab of the PyBERT GUI
-  - The PyBERT FAQ at <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>
-  - Sending e-mail to David Banas at <capn.freako@gmail.com>
+  - Quick installation instructions at <https://github.com/capn-freako/PyBERT/wiki/instant_gratification>.
+  - "Hover tips", which exist for all user entry fields in the GUI.
+  - The 'Help' tab of the PyBERT GUI.
+  - The PyBERT FAQ at <https://github.com/capn-freako/PyBERT/wiki/pybert_faq>.
+  - Sending e-mail to David Banas at <capn.freako@gmail.com>.
 
 Acknowledgments
 ---------------
@@ -108,3 +140,5 @@ code base.
 
 **The entire SciKit-RF team** for creating and supporting an absolutely
 wonderful Python package for working with RF models and simulations.
+
+:)

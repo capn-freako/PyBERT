@@ -1,6 +1,6 @@
-=========
-CDR Model
-=========
+====================
+``.cdr`` - CDR Model
+====================
 
 .. automodule:: pybert.models.cdr
    :members:

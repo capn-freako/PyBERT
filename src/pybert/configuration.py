@@ -44,7 +44,7 @@ CONFIG_SAVE_WILDCARD = "|".join(
 """This sets the supported file types in the GUI's save-as dialog."""
 
 
-class PyBertCfg:
+class PyBertCfg:  # pylint: disable=too-many-instance-attributes
     """PyBERT simulation configuration data encapsulation class.
 
     This class is used to encapsulate that subset of the configuration
@@ -52,7 +52,7 @@ class PyBertCfg:
     clicks the "Save Config." button.
     """
 
-    def __init__(self, the_PyBERT, date_created: str, version: str):
+    def __init__(self, the_PyBERT, date_created: str, version: str):  # pylint: disable=too-many-statements
         """Copy just that subset of the supplied PyBERT instance's __dict__,
         which should be saved."""
 
@@ -65,20 +65,17 @@ class PyBertCfg:
         self.nbits = the_PyBERT.nbits
         self.pattern = the_PyBERT.pattern
         self.seed = the_PyBERT.seed
-        self.nspb = the_PyBERT.nspb
+        self.nspui = the_PyBERT.nspui
         self.eye_bits = the_PyBERT.eye_bits
-        self.mod_type = list(the_PyBERT.mod_type)  # See Issue #95 and PR #98 (jdpatt)
-        self.num_sweeps = the_PyBERT.num_sweeps
-        self.sweep_num = the_PyBERT.sweep_num
-        self.sweep_aves = the_PyBERT.sweep_aves
-        self.do_sweep = the_PyBERT.do_sweep
+        self.mod_type = the_PyBERT.mod_type
         self.debug = the_PyBERT.debug
+        self.f_max = the_PyBERT.f_max
+        self.f_step = the_PyBERT.f_step
 
         # Channel Control
         self.use_ch_file = the_PyBERT.use_ch_file
         self.ch_file = the_PyBERT.ch_file
         self.impulse_length = the_PyBERT.impulse_length
-        self.f_step = the_PyBERT.f_step
         self.Rdc = the_PyBERT.Rdc
         self.w0 = the_PyBERT.w0
         self.R0 = the_PyBERT.R0
@@ -86,6 +83,8 @@ class PyBertCfg:
         self.Z0 = the_PyBERT.Z0
         self.v0 = the_PyBERT.v0
         self.l_ch = the_PyBERT.l_ch
+        self.renumber = the_PyBERT.renumber
+        self.use_window = the_PyBERT.use_window
 
         # Tx
         self.vod = the_PyBERT.vod
@@ -96,11 +95,11 @@ class PyBertCfg:
         self.rn = the_PyBERT.rn
         tx_taps = []
         for tap in the_PyBERT.tx_taps:
-            tx_taps.append((tap.enabled, tap.value))
+            tx_taps.append((tap.enabled, tap.value, tap.min_val, tap.max_val))
         self.tx_taps = tx_taps
         self.tx_tap_tuners = []
         for tap in the_PyBERT.tx_tap_tuners:
-            self.tx_tap_tuners.append((tap.enabled, tap.value))
+            self.tx_tap_tuners.append((tap.enabled, tap.pos, tap.min_val, tap.max_val, tap.step))
         self.tx_use_ami = the_PyBERT.tx_use_ami
         self.tx_use_ts4 = the_PyBERT.tx_use_ts4
         self.tx_use_getwave = the_PyBERT.tx_use_getwave
@@ -118,10 +117,7 @@ class PyBertCfg:
         self.rx_bw = the_PyBERT.rx_bw
         self.peak_freq = the_PyBERT.peak_freq
         self.peak_mag = the_PyBERT.peak_mag
-        self.ctle_offset = the_PyBERT.ctle_offset
-        self.ctle_mode = the_PyBERT.ctle_mode
-        self.ctle_mode_tune = the_PyBERT.ctle_mode_tune
-        self.ctle_offset_tune = the_PyBERT.ctle_offset_tune
+        self.ctle_enable = the_PyBERT.ctle_enable
         self.rx_use_ami = the_PyBERT.rx_use_ami
         self.rx_use_ts4 = the_PyBERT.rx_use_ts4
         self.rx_use_getwave = the_PyBERT.rx_use_getwave
@@ -129,16 +125,18 @@ class PyBertCfg:
         self.rx_dll_file = the_PyBERT.rx_dll_file
         self.rx_ibis_file = the_PyBERT.rx_ibis_file
         self.rx_use_ibis = the_PyBERT.rx_use_ibis
+        self.rx_use_viterbi = the_PyBERT.rx_use_viterbi
+        self.rx_viterbi_symbols = the_PyBERT.rx_viterbi_symbols
+        self.rx_n_taps = the_PyBERT.rx_n_taps
+        self.rx_n_pre = the_PyBERT.rx_n_pre
 
         # DFE
-        self.use_dfe = the_PyBERT.use_dfe
-        self.use_dfe_tune = the_PyBERT.use_dfe_tune
         self.sum_ideal = the_PyBERT.sum_ideal
         self.decision_scaler = the_PyBERT.decision_scaler
         self.gain = the_PyBERT.gain
         self.n_ave = the_PyBERT.n_ave
-        self.n_taps = the_PyBERT.n_taps
         self.sum_bw = the_PyBERT.sum_bw
+        self.use_agc = the_PyBERT.use_agc
 
         # CDR
         self.delta_t = the_PyBERT.delta_t
@@ -150,8 +148,21 @@ class PyBertCfg:
         # Analysis
         self.thresh = the_PyBERT.thresh
 
+        # Optimization
+        self.rx_bw_tune = the_PyBERT.rx_bw_tune
+        self.peak_freq_tune = the_PyBERT.peak_freq_tune
+        self.peak_mag_tune = the_PyBERT.peak_mag_tune
+        self.min_mag_tune = the_PyBERT.min_mag_tune
+        self.max_mag_tune = the_PyBERT.max_mag_tune
+        self.step_mag_tune = the_PyBERT.step_mag_tune
+        self.ctle_enable_tune = the_PyBERT.ctle_enable_tune
+        self.use_mmse = the_PyBERT.use_mmse
+        self.dfe_tap_tuners = []
+        for tap in the_PyBERT.dfe_tap_tuners:
+            self.dfe_tap_tuners.append((tap.enabled, tap.min_val, tap.max_val))
+
     @staticmethod
-    def load_from_file(filepath: Union[str, Path], pybert):
+    def load_from_file(filepath: Union[str, Path], pybert):  # pylint: disable=too-many-branches
         """Apply all of the configuration settings to the pybert instance.
 
         Confirms that the file actually exists, is the correct extension and
@@ -179,7 +190,7 @@ class PyBertCfg:
             with open(filepath, "rb") as pickle_file:
                 user_config = pickle.load(pickle_file)
         else:
-            raise InvalidFileType("Pybert does not support this file type.")
+            raise InvalidFileType("PyBERT does not support this file type.")
 
         # Right now the loads deserialize back into a `PyBertCfg` class.
         if not isinstance(user_config, PyBertCfg):
@@ -188,13 +199,23 @@ class PyBertCfg:
         # Actually load values back into pybert using `setattr`.
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
-                for count, (enabled, val) in enumerate(value):
+                for count, (enabled, val, min_val, max_val) in enumerate(value):
                     setattr(pybert.tx_taps[count], "enabled", enabled)
                     setattr(pybert.tx_taps[count], "value", val)
+                    setattr(pybert.tx_taps[count], "min_val", min_val)
+                    setattr(pybert.tx_taps[count], "max_val", max_val)
             elif prop == "tx_tap_tuners":
-                for count, (enabled, val) in enumerate(value):
+                for count, (enabled, pos, min_val, max_val, step) in enumerate(value):
                     setattr(pybert.tx_tap_tuners[count], "enabled", enabled)
-                    setattr(pybert.tx_tap_tuners[count], "value", val)
+                    setattr(pybert.tx_tap_tuners[count], "pos", pos)
+                    setattr(pybert.tx_tap_tuners[count], "min_val", min_val)
+                    setattr(pybert.tx_tap_tuners[count], "max_val", max_val)
+                    setattr(pybert.tx_tap_tuners[count], "step", step)
+            elif prop == "dfe_tap_tuners":
+                for count, (enabled, min_val, max_val) in enumerate(value):
+                    setattr(pybert.dfe_tap_tuners[count], "enabled", enabled)
+                    setattr(pybert.dfe_tap_tuners[count], "min_val", min_val)
+                    setattr(pybert.dfe_tap_tuners[count], "max_val", max_val)
             elif prop in ("version", "date_created"):
                 pass  # Just including it for some good housekeeping.  Not currently used.
             else:

@@ -10,16 +10,18 @@ integration into the larger *PyBERT* framework.
 
 Copyright (c) 2019 by David Banas; All rights reserved World wide.
 """
-from typing import List, Sequence, Tuple
+from typing import List
 
 from numpy import array, mean, sign, where
+import numpy as np
+import numpy.typing as npt
 
 
-class CDR:
+class CDR:  # pylint: disable=too-many-instance-attributes
     """A class providing behavioral modeling of a 'bang- bang' clock data
     recovery (CDR) unit."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         delta_t: float,
         alpha: float,
@@ -30,20 +32,21 @@ class CDR:
     ):
         """
         Args:
-            delta_t (float): The proportional branch correction, in seconds.
-            alpha (float): The integral branch correction, normalized to
-                proportional branch correction.
-            ui (float): The nominal unit interval, in seconds.
-            n_lock_ave (Optional, int): Number of unit intervals to use for
-                determining lock. Defaults to 500.
-            rel_lock_tol(Optional, float): Lock tolerance, relative to
-                *delta_t*. Defaults to 0.01.
-            lock_sustain(Optional, int): Length of lock sustain vector
-                used to provide histerysis. Defaults to 500.
+            delta_t: The proportional branch correction, in seconds.
+            alpha: The integral branch correction, normalized to proportional branch correction.
+            ui: The nominal unit interval, in seconds.
+
+        Keyword Args:
+            n_lock_ave: Number of unit intervals to use for determining lock.
+                Default: 500.
+            rel_lock_tol: Lock tolerance, relative to ``delta_t``.
+                Default: 0.01.
+            lock_sustain: Length of lock sustain vector used to provide histerysis.
+                Default: 500.
 
         Notes:
-            The code does not care what units are actually used for
-            'delta_t' and 'ui'; only that they are the same.
+            1. The code does not care what units are actually used for
+            ``delta_t`` and ``ui``, only that they are the same.
         """
 
         self.delta_t = delta_t
@@ -70,7 +73,7 @@ class CDR:
 
         return self._locked
 
-    def adapt(self, samples: Sequence[float]) -> Tuple[float, bool]:
+    def adapt(self, samples: npt.NDArray[np.float64]) -> tuple[float, bool]:  # pylint: disable=too-many-locals
         """Adapt period/phase, according to 3 samples.
 
         Should be called, when the clock has just struck.
@@ -79,15 +82,14 @@ class CDR:
             (ui, locked) = adapt(samples)
 
         Args:
-            samples: A list of 3 samples of the input waveform, as follows:
+            samples: A list of 3 samples of the input waveform, as follows
 
                 - at the last clock time
                 - at the last unit interval boundary time
                 - at the current clock time
 
         Returns:
-            (float, bool): The new unit interval estimate, in seconds, and
-                a flag indicating 'locked' status.
+            The new unit interval estimate (s), and a flag indicating *locked* status.
         """
 
         integral_corrections = self.integral_corrections
@@ -101,7 +103,7 @@ class CDR:
 
         integral_correction = integral_corrections[-1]
 
-        samples = list(map(sign, samples))
+        samples = array(list(map(sign, samples)))
         if samples[0] == samples[2]:  # No transition; no correction.
             proportional_correction = 0.0
         elif samples[0] == samples[1]:  # Early clock; increase period.

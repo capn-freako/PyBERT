@@ -1,57 +1,77 @@
-.PHONY: tox format check clean test lint etags conda-build conda-skeleton chaco enable pyibis-ami pybert
+# Makefile for PyBERT project.
+#
+# Original author: David Banas <capn.freako@gmail.com>  
+# Original date:   February 10, 2015
+#
+# Copyright (c) 2015 David Banas; all rights reserved World wide.
 
-tox:
-	tox
+.PHONY: dflt help check tox format lint flake8 type-check docs upload test clean distclean
 
-format:
-	tox -e format
+SRC_DIR := src/pybert
+DOCS_DIR := docs
+UV_EXEC := uv
+UVX_EXEC := uvx
+PYVERS := 3.10 3.11 3.12
+PROJ_VER := $(shell ${UV_EXEC} version | cut -f 2 -d ' ') 
+TEST_EXP ?= tests
 
-lint:
-	tox -e pylint
+# Put it first so that "make" without arguments is like "make help".
+dflt: help
+
+# Prevent implicit rule searching for makefiles.
+$(MAKEFILE_LIST): ;
 
 check:
-	tox -e type-check
+	${UVX_EXEC} -w packaging>=24.2 validate-pyproject pyproject.toml
 
-test:
-	tox -e py38,py39,py310
+format:
+	${UVX_EXEC} isort src/ tests/
+	${UVX_EXEC} black src/ tests/
+
+lint:
+	${UVX_EXEC} ruff check ${SRC_DIR}
+	${UVX_EXEC} flake8 --ignore=E501,E272,E241,E222,E221 ${SRC_DIR}
+
+type-check:
+	${UV_EXEC} run mypy --install-types --follow-untyped-imports ${SRC_DIR}
 
 docs:
-	tox -e docs
+	pushd ${DOCS_DIR}; PROJ_VER=${PROJ_VER} ${UV_EXEC} run sphinx-build -j auto -b html source/ build/; popd
+
+build:
+	${UV_EXEC} build --clear --no-create-gitignore
+
+upload: build
+	${UVX_EXEC} uv-publish --repo pypi dist/*
+
+upload_test: build
+	${UVX_EXEC} uv-publish --repo testpypi dist/*
+
+test:
+	@for VERSION in $(PYVERS); do \
+        $(UV_EXEC) run --python $$VERSION pytest -vv \
+            --cov=pyibisami --cov-report=html \
+            --cov-report=term-missing $(TEST_EXP); \
+    done
 
 clean:
-	rm -rf .tox docs/_build/ .pytest_cache .venv
+	rm -rf .tox build/ docs/build/ .mypy_cache .pytest_cache .venv src/*.egg-info
 
-conda-build:
-	conda build conda.recipe/pybert
+distclean: clean
+	rm -rf dist/
 
-conda-skeleton:
-	rm -rf conda.recipe/pybert/ conda.recipe/pyibis-ami/ \
-	conda skeleton pypi --noarch-python --output-dir=conda.recipe pybert pyibis-ami
-
-etags:
-	etags -o TAGS pybert/*.py
-
-chaco:
-	conda build --numpy=1.16 conda.recipe/chaco
-	conda install --use-local chaco
-
-enable:
-	conda build --numpy=1.16 conda.recipe/enable
-	conda install --use-local enable
-
-pyibis-ami:
-	conda build --numpy=1.16 conda.recipe/pyibis-ami
-
-pyibis-ami_dev:
-	conda install -n pybert64 --use-local --only-deps PyAMI/
-	conda develop -n pybert64 PyAMI/
-
-pybert: pybert_bld pybert_inst
-pybert_bld:
-	conda build --numpy=1.16 conda.recipe/pybert
-pybert_inst:
-	conda install --use-local pybert
-
-pybert_dev: pybert_bld
-	conda install -n pybert64 --use-local --only-deps pybert
-	conda develop -n pybert64 .
+help:
+	@echo "Available targets:"
+	@echo "=================="
+	@echo "\tcheck: Validate the 'pyproject.toml' file."
+	@echo "\tformat: Reformats all Python source code. USE CAUTION!"
+	@echo "\tlint: Run 'ruff' and 'flake8' over the source code."
+	@echo "\ttype-check: Run type checking, via 'mypy', on the source code."
+	@echo "\tdocs: Run 'sphinx' on the source code, to generate documentation."
+	@echo "\t\tTo view the resultant API documentation, open 'docs/build/index.html' in a browser."
+	@echo "\tbuild: Build both the source tarball and wheel."
+	@echo "\tupload: Upload both the source tarball and wheel to PyPi."
+	@echo "\tupload_test: Upload both the source tarball and wheel to TestPyPi."
+	@echo "\ttest: Run tests, using all supported Python versions."
+	@echo "\tclean: Remove all previous build results, virtual environments, and cache contents."
+	@echo "\tdistclean: Runs a 'make clean' and removes 'dist/'."

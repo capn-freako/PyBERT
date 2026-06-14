@@ -1,5 +1,7 @@
 # pylint: disable=undefined-variable
 # type: ignore
+# flake8: noqa
+
 """Initialization file for Simbeor solver.
 
 .. moduleauthor:: David Banas <capn.freako@gmail.com>
@@ -26,15 +28,16 @@ from pybert.solvers import solver as slvr
 
 sdkdir = os.environ.get("SIMBEOR_SDK")
 __path__ = [osp.join(sdkdir, "python")]
-__all__ = [
-    "simbeor",
-]  # Should contain the name of each submodule.
-from . import *  # Makes each submodule available as: pybert.solvers.simbeor.simbeor, etc.
+# __all__ = [
+#     "simbeor",
+# ]  # Should contain the name of each submodule.
+# from . import *  # Makes each submodule available as: pybert.solvers.simbeor.simbeor, etc.
 
 
-class Solver(slvr.Solver):
+class Solver(slvr.Solver):  # pylint: disable=too-few-public-methods
     """Simbeor-specific override of `pybert.solver.Solver` class."""
 
+    # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements,unused-argument,too-many-positional-arguments
     def solve(
         self,
         ch_type: slvr.ChType = "microstrip_se",  #: Channel cross-sectional configuration.

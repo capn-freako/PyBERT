@@ -1,6 +1,6 @@
-===========================================
-BERT Model - Main simulation control logic.
-===========================================
+=======================================================
+``.bert`` - BERT Model - Main simulation control logic.
+=======================================================
 
 .. automodule:: pybert.models.bert
    :members:

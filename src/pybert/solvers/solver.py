@@ -18,12 +18,12 @@ from typing import List, Tuple
 ChType = Enum("ChType", "microstrip_se microstrip_diff stripline_se stripline_diff")
 
 
-class Solver(ABC):
+class Solver(ABC):  # pylint: disable=too-few-public-methods
     """Abstract base class providing a consistent interface to channel
     solver."""
 
     @abstractmethod
-    def solve(
+    def solve(  # pylint: disable=too-many-arguments,dangerous-default-value,too-many-positional-arguments
         self,
         ch_type: str = "microstrip_se",  #: Channel cross-sectional configuration.
         diel_const: float = 4.3,  #: Dielectric constant of substrate at ``des_freq`` (rel.).
@@ -34,7 +34,7 @@ class Solver(ABC):
         height: float = 0.127,  #: Trace height above/below ground plane (mm).
         separation: float = 0.508,  #: Trace separation (mm).
         roughness: float = 0.004,  #: Trace surface roughness (mm-rms).
-        fs: List[float] = None,  #: Angular frequency sample points (Hz).
+        fs: List[float] = [],  #: Angular frequency sample points (Hz).  # pylint: disable=dangerous-default-value
         lic_path: str = "",  #: Path to license file.
         lic_name: str = "",  #: Name of license type (if needed by solver).
         prj_name: str = "",  #: Name of project (if needed by solver).

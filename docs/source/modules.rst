@@ -1,19 +1,21 @@
-=================
-Top Level Modules
-=================
+===========================
+Modules in *PyBERT* Package
+===========================
 
-Main Module (`pybert.pybert`)
-*****************************
-
-.. automodule:: pybert.pybert
+Top Level Modules (``pybert``)
+******************************
 
 .. toctree::
    :maxdepth: 1
 
    pybert
+   common
+   configuration
+   results
+   cli
 
-Models (`pybert.models`)
-************************
+Models (``pybert.models``)
+**************************
 
 .. automodule:: pybert.models
 
@@ -21,11 +23,13 @@ Models (`pybert.models`)
    :maxdepth: 1
 
    bert
+   tx_tap
    dfe
    cdr
+   viterbi
 
-GUI Elements (`pybert.gui`)
-***************************
+GUI Elements (``pybert.gui``)
+*****************************
 
 .. automodule:: pybert.gui
 
@@ -34,25 +38,43 @@ GUI Elements (`pybert.gui`)
 
    view
    plot
+   handler
    help
 
-Miscellaneous
-*************
+Parsers (``pybert.parsers``)
+****************************
 
-pybert.configuration - Data structure for saving *PyBERT* configuration.
-------------------------------------------------------------------------
+.. automodule:: pybert.parsers
 
-.. automodule:: pybert.configuration
-   :members:
+.. toctree::
+   :maxdepth: 1
 
-pybert.results - Data structure for saving *PyBERT* results.
-------------------------------------------------------------
+   hspice
 
-.. automodule:: pybert.results
-   :members:
+Threads (``pybert.threads``)
+****************************
 
-pybert.utility - Various utilities used by other modules.
----------------------------------------------------------
+.. automodule:: pybert.threads
+
+.. toctree::
+   :maxdepth: 1
+
+   stoppable
+   sim
+   optimization
+
+Utility (``pybert.utility``)
+****************************
 
 .. automodule:: pybert.utility
-   :members:
+
+.. toctree::
+   :maxdepth: 1
+
+   channel
+   ibisami
+   jitter
+   math
+   python
+   sigproc
+   sparam
