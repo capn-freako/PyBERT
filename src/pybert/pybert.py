@@ -48,6 +48,7 @@ from traits.api import (
     Property,
     Range,
     String,
+    Str,
     Trait,
     cached_property,
     observe,
@@ -131,6 +132,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     ch_file = File("")  #: Channel file name.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
+    # - Channel Sweep
+    ch_files         = List(Str)   #: Touchstone file paths for channel sweep.
+    ch_file_selected = Str("")     #: Currently selected file in sweep list (for removal).
+    use_ch_files     = Bool(False) #: Enable channel-file sweep mode when True.
+    ch_sweep_results = List()      # type: ignore  # Per-channel ChSweepResult objects.
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
     f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
@@ -358,9 +364,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - Note: Don't make properties, which have a high calculation overhead,
     #         dependencies of other properties!
     #         This will slow the GUI down noticeably.
-    jitter_info = Property(String, depends_on=["jitter_perf"])
-    status_str = Property(String, depends_on=["status"])
-    sweep_info = Property(String, depends_on=["sweep_results"])
+    jitter_info   = Property(String, depends_on=["jitter_perf"])
+    status_str    = Property(String, depends_on=["status"])
+    sweep_info    = Property(String, depends_on=["sweep_results"])
+    ch_sweep_info = Property(String, depends_on=["ch_sweep_results"])
     t = Property(Array, depends_on=["ui", "nspui", "nui"])
     t_ns = Property(Array, depends_on=["t"])
     f = Property(Array, depends_on=["f_step", "f_max"])
@@ -388,6 +395,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     btn_sel_rx = Button(label="Select")
     btn_view_tx = Button(label="View")  # View IBIS model.
     btn_view_rx = Button(label="View")
+    btn_add_ch_file = Button(label="Add...")   #: Add a Touchstone file to the sweep list.
+    btn_del_ch_file = Button(label="Remove")   #: Remove the selected file from the sweep list.
 
     # Logger & Pop-up
     def log(self, msg, alert=False, exception=None):
@@ -967,6 +976,26 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         info_str += "    </TR>\n"
 
         for item in sweep_results:
+            info_str += '    <TR align="center">\n'
+            info_str += str(item)
+            info_str += "    </TR>\n"
+
+        info_str += "  </TABLE>\n"
+
+        return info_str
+
+    def _get_ch_sweep_info(self):
+        results = self.ch_sweep_results
+
+        info_str  = "<H2>Channel Sweep Results</H2>\n"
+        info_str += '  <TABLE border="1">\n'
+        info_str += '    <TR align="center">\n'
+        info_str += ("      <TH>Channel File</TH><TH>Bit Errors</TH>"
+                     "<TH>ISI (ps)</TH><TH>DCD (ps)</TH>"
+                     "<TH>PJ (ps)</TH><TH>RJ (ps)</TH>\n")
+        info_str += "    </TR>\n"
+
+        for item in results:
             info_str += '    <TR align="center">\n'
             info_str += str(item)
             info_str += "    </TR>\n"

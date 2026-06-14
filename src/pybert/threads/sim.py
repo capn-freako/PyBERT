@@ -1,6 +1,6 @@
 "Thread for running the PyBERT simulation."
 
-from pybert.models.bert import my_run_simulation
+from pybert.models.bert import my_run_ch_sweep, my_run_simulation
 from pybert.threads.stoppable import StoppableThread
 
 
@@ -13,9 +13,13 @@ class RunSimThread(StoppableThread):
         self.the_pybert = None
 
     def run(self):
-        """Run the simulation(s)."""
+        """Run a channel sweep or single simulation depending on configuration."""
         try:
-            my_run_simulation(self.the_pybert, aborted_sim=self.stopped)
+            pybert = self.the_pybert
+            if pybert.use_ch_files and pybert.ch_files:
+                my_run_ch_sweep(pybert, aborted_sim=self.stopped)
+            else:
+                my_run_simulation(pybert, aborted_sim=self.stopped)
         except RuntimeError as err:
             print(f"Error in `pybert.threads.sim.RunSimThread`: {err}")
             raise

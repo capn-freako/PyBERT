@@ -10,6 +10,8 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 # pylint: disable=too-many-lines
 
+from dataclasses import dataclass
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Callable, Optional, TypeAlias
 
@@ -72,6 +74,67 @@ AmiFloats: TypeAlias = tuple[AmiName, list["float | 'AmiFloats'"]]
 DEBUG           = False
 MIN_BATHTUB_VAL = 1.0e-12
 gFc             = 1.0e6  # Corner frequency of high-pass filter used to model capacitive coupling of periodic noise.
+
+
+@dataclass
+class ChSweepResult:
+    """Per-channel result from a channel Touchstone file sweep."""
+
+    ch_file: str
+    n_errs:  int
+    isi_ps:  float
+    dcd_ps:  float
+    pj_ps:   float
+    rj_ps:   float
+
+    def __str__(self) -> str:
+        name = Path(self.ch_file).name
+        return (f"<TD>{name}</TD><TD>{self.n_errs}</TD>"
+                f"<TD>{self.isi_ps:.1f}</TD><TD>{self.dcd_ps:.1f}</TD>"
+                f"<TD>{self.pj_ps:.1f}</TD><TD>{self.rj_ps:.1f}</TD>")
+
+
+def my_run_ch_sweep(self, aborted_sim: Optional[Callable[[], bool]] = None) -> None:
+    """Loop over self.ch_files, run a full simulation for each, populate self.ch_sweep_results.
+
+    Args:
+        self: Reference to an instance of the *PyBERT* class.
+
+    Keyword Args:
+        aborted_sim: Callable returning True when the user has requested abort.
+    """
+    ch_files = list(self.ch_files)  # snapshot — guard against mid-loop mutation
+    if not ch_files:
+        self.log("Channel sweep: ch_files list is empty.")
+        self.status = "Channel sweep: no files specified."
+        return
+
+    orig_ch_file  = self.ch_file
+    orig_use_file = self.use_ch_file
+
+    self.ch_sweep_results = []
+    try:
+        for i, fpath in enumerate(ch_files, 1):
+            self.status = f"Channel sweep {i}/{len(ch_files)}: {Path(fpath).name}"
+            self.ch_file     = fpath
+            self.use_ch_file = True
+            my_run_simulation(self, initial_run=(i == 1), update_plots=False,
+                              aborted_sim=aborted_sim)
+            result = ChSweepResult(
+                ch_file = fpath,
+                n_errs  = int(self.n_errs_dfe),
+                isi_ps  = self.isi_dfe * 1e12,
+                dcd_ps  = self.dcd_dfe * 1e12,
+                pj_ps   = self.pj_dfe  * 1e12,
+                rj_ps   = self.rj_dfe  * 1e12,
+            )
+            # Reassign entire list so Traits fires a change notification.
+            self.ch_sweep_results = self.ch_sweep_results + [result]
+    finally:
+        self.ch_file     = orig_ch_file
+        self.use_ch_file = orig_use_file
+
+    self.status = f"Channel sweep complete ({len(ch_files)} channels)."
 
 
 # pylint: disable=too-many-locals,protected-access,too-many-branches,too-many-statements

@@ -208,3 +208,26 @@ class MyHandler(Handler):
         if pybert.opt_thread and pybert.opt_thread.is_alive():
             pybert.opt_thread.stop()
             pybert.opt_thread.join(10)
+
+    def do_btn_add_ch_file(self, info):
+        """Open a file dialog and append the chosen Touchstone file to ch_files."""
+        pybert = info.object
+        dlg = FileDialog(
+            action="open",
+            title="Select Touchstone Channel File",
+            wildcard=(
+                "Touchstone files (*.s2p *.s4p *.S2P *.S4P)"
+                "|*.s2p;*.s4p;*.S2P;*.S4P|All files (*)|*"
+            ),
+        )
+        if dlg.open() == OK:
+            if dlg.path not in pybert.ch_files:
+                pybert.ch_files = pybert.ch_files + [dlg.path]
+
+    def do_btn_del_ch_file(self, info):
+        """Remove the currently selected file from ch_files."""
+        pybert = info.object
+        selected = pybert.ch_file_selected
+        if selected in pybert.ch_files:
+            pybert.ch_files = [f for f in pybert.ch_files if f != selected]
+        pybert.ch_file_selected = ""

@@ -85,6 +85,9 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.l_ch = the_PyBERT.l_ch
         self.renumber = the_PyBERT.renumber
         self.use_window = the_PyBERT.use_window
+        # Channel Sweep
+        self.use_ch_files = the_PyBERT.use_ch_files
+        self.ch_files     = list(the_PyBERT.ch_files)
 
         # Tx
         self.vod = the_PyBERT.vod
