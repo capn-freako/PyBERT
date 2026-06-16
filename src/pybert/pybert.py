@@ -128,7 +128,12 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rlm        = Float(0.95)  #: Relative level mismatch. (Default = 0.95)
 
     # - Channel Control
-    ch_file = File("")  #: Channel file name.
+    ch_file  = File("")        #: Channel file (for browsing).
+    ch_files = List(String)    #: Ordered list of channel files for composite interconnect.
+    btn_add_ch_file    = Button(label="Add")          #: Append ch_file to ch_files.
+    btn_remove_last    = Button(label="Remove Last")  #: Remove last entry from ch_files.
+    btn_clear_ch_files = Button(label="Clear")        #: Clear ch_files.
+    ch_files_display   = Property(String, depends_on=["ch_files"])  #: Formatted list display.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
@@ -523,7 +528,25 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             raise RuntimeError("CTLE peak magnitude out of range!")
         self.peak_mag_tune = val
 
+    # Channel file list button handlers
+    def _btn_add_ch_file_fired(self):
+        if self.ch_file:
+            self.ch_files = self.ch_files + [self.ch_file]
+
+    def _btn_remove_last_fired(self):
+        if self.ch_files:
+            self.ch_files = self.ch_files[:-1]
+
+    def _btn_clear_ch_files_fired(self):
+        self.ch_files = []
+
     # Dependent variable definitions
+    @cached_property
+    def _get_ch_files_display(self):
+        if not self.ch_files:
+            return "(none)"
+        return "\n".join(f"  {i+1}. {Path(fpath).name}" for i, fpath in enumerate(self.ch_files))
+
     @cached_property
     def _get_t(self):
         """Calculate the system time vector, in seconds."""
@@ -1079,7 +1102,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.tx_ibis_valid = False
             self.tx_use_ami = False
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, True, debug=self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
@@ -1141,7 +1164,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.rx_ibis_valid = False
             self.rx_use_ami = False
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, False, self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
@@ -1285,7 +1308,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
         if self.use_ch_file:
-            ch_s2p_pre = import_channel(self.ch_file, ts, f, renumber=self.renumber)
+            files = self.ch_files or ([self.ch_file] if self.ch_file else [])
+            if not files:
+                raise RuntimeError("'Use file' is checked but no channel files are specified!")
+            networks = [import_channel(fname, ts, f, renumber=self.renumber) for fname in files]
+            ch_s2p_pre = networks[0]
+            for ntwk in networks[1:]:
+                ch_s2p_pre = ch_s2p_pre ** ntwk
             self.log(str(ch_s2p_pre))
             H = ch_s2p_pre.s21.s.flatten()
         else:

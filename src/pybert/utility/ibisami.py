@@ -12,7 +12,10 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 from numpy import array, convolve
 
-from pyibisami.ami.model import AMIModel, AMIModelInitializer
+from pyibisami.ami.model import (
+    AMIModel, AMIModelInitializer,
+    IMP_RESP_GETW, IMP_RESP_INIT, OUT_RESP_GETW, OUT_RESP_INIT,
+)
 from pyibisami.ami.parser import AMIParamConfigurator
 
 from ..common import Rvec
@@ -86,11 +89,11 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     # Capture model's responses.
     resps = model.get_responses(bits_per_call=40)
     if use_getwave:
-        h = resps["imp_resp_getw"]
-        out_h = resps["out_resp_getw"][1]
+        h = resps[IMP_RESP_GETW]
+        out_h = resps[OUT_RESP_GETW][1]
     else:
-        h = resps["imp_resp_init"]
-        out_h = resps["out_resp_init"][1]
+        h = resps[IMP_RESP_INIT]
+        out_h = resps[OUT_RESP_INIT][1]
 
     # Generate model's output.
     if use_getwave:

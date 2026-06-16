@@ -282,31 +282,41 @@ traits_view = View(
                 ),
                 VGroup(  # Interconnect
                     VGroup(  # From File
-                        VGroup(
+                        Item(
+                            name="ch_file",
+                            label="Browse",
+                            editor=FileEditor(
+                                dialog_style="open",
+                                filter=[
+                                    "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
+                                    "All files (*.*)|*.*|",
+                                ],
+                                format_func=fname_formatter(),
+                            ),
+                        ),
+                        HGroup(
+                            Item(name="btn_add_ch_file",    show_label=False),
+                            Item(name="btn_remove_last",    show_label=False),
+                            Item(name="btn_clear_ch_files", show_label=False),
+                            spring,
+                        ),
+                        Item(
+                            name="ch_files_display",
+                            label="Queue",
+                            style="readonly",
+                            height=80,
+                        ),
+                        HGroup(
                             Item(
-                                name="ch_file",
-                                label="File",
-                                editor=FileEditor(
-                                    dialog_style="open",
-                                    filter=[
-                                        "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
-                                        "All files (*.*)|*.*|",
-                                    ],
-                                    format_func=fname_formatter(),
-                                ),
+                                name="use_ch_file",
+                                label="Use file",
+                                enabled_when="ch_files",
                             ),
-                            HGroup(
-                                Item(
-                                    name="use_ch_file",
-                                    label="Use file",
-                                    enabled_when="ch_file",
-                                ),
-                                Item(
-                                    name="renumber",
-                                    label="Fix port numbering",
-                                ),
-                                spring,
+                            Item(
+                                name="renumber",
+                                label="Fix port numbering",
                             ),
+                            spring,
                         ),
                         label="From File",
                         show_border=True,

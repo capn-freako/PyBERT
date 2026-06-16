@@ -74,7 +74,8 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
 
         # Channel Control
         self.use_ch_file = the_PyBERT.use_ch_file
-        self.ch_file = the_PyBERT.ch_file
+        self.ch_file  = the_PyBERT.ch_file
+        self.ch_files = list(the_PyBERT.ch_files)
         self.impulse_length = the_PyBERT.impulse_length
         self.Rdc = the_PyBERT.Rdc
         self.w0 = the_PyBERT.w0
