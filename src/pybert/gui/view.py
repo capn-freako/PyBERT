@@ -177,11 +177,11 @@ traits_view = View(
                             label="Tx Level && Noise",
                             show_border=True,
                         ),
-                    ),
-                    HGroup(
-                        Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
-                        label="Miscellaneous Options",
-                        show_border=True,
+                        VGroup(
+                            Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
+                            label="Misc.",
+                            show_border=True,
+                        ),
                     ),
                     label="Simulation Control",
                     show_border=True,
@@ -305,7 +305,12 @@ traits_view = View(
                                 name="renumber",
                                 label="Fix port numbering",
                             ),
-                            spring,
+                            Item(
+                                name="use_window",
+                                label="Apply window",
+                                tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
+                            ),
+                            # spring,
                         ),
                         label="From File",
                         show_border=True,
@@ -319,7 +324,7 @@ traits_view = View(
                                     tooltip="interconnect length",
                                 ),
                                 Item(label="m"),
-                                spring,
+                                # spring,
                             ),
                             HGroup(
                                 Item(
@@ -327,8 +332,10 @@ traits_view = View(
                                     label="Loss Tan.",
                                     tooltip="dielectric loss tangent",
                                 ),
-                                spring,
+                                # spring,
                             ),
+                        ),
+                        VGroup(
                             HGroup(
                                 Item(
                                     name="Z0",
@@ -336,7 +343,7 @@ traits_view = View(
                                     tooltip="characteristic differential impedance",
                                 ),
                                 Item(label="Ohms"),
-                                spring,
+                                # spring,
                             ),
                             HGroup(
                                 Item(
@@ -345,13 +352,13 @@ traits_view = View(
                                     tooltip="normalized propagation velocity",
                                 ),
                                 Item(label="c"),
-                                spring,
+                                # spring,
                             ),
                         ),
-                        spring,
+                        # spring,
                         VGroup(
                             HGroup(
-                                spring,
+                                # spring,
                                 Item(
                                     name="Rdc",
                                     label="Rdc",
@@ -360,7 +367,7 @@ traits_view = View(
                                 Item(label="Ohms"),
                             ),
                             HGroup(
-                                spring,
+                                # spring,
                                 Item(
                                     name="w0",
                                     label="w0",
@@ -368,8 +375,10 @@ traits_view = View(
                                 ),
                                 Item(label="rads./s"),
                             ),
+                        ),
+                        VGroup(
                             HGroup(
-                                spring,
+                                # spring,
                                 Item(
                                     name="R0",
                                     label="R0",
@@ -381,15 +390,6 @@ traits_view = View(
                         label="Native",
                         show_border=True,
                         enabled_when="use_ch_file == False",
-                    ),
-                    HGroup(  # Misc.
-                        Item(
-                            name="use_window",
-                            label="Apply window",
-                            tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
-                        ),
-                        label="Misc.",
-                        show_border=True,
                     ),
                     label="Interconnect",
                     show_border=True,
