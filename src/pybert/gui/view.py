@@ -72,12 +72,13 @@ def fname_formatter(
         fname_str = str(fname)
         if not fname_str:
             return ""
-        fpath = Path(str(fname)).resolve()
+        fpath = Path(fname_str).resolve()
         parts = list(fpath.parent.parts)
         rslt = fpath.name if include_ext else fpath.stem
+        last_rslt = rslt
         while parts and len(rslt) < max_width:
-            last_rslt = rslt
             rslt = "/".join([parts.pop(), rslt])
+            last_rslt = rslt
         if len(rslt) > max_width:
             if partial_dirname_ok:
                 rslt = rslt[-max_width:]
