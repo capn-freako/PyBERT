@@ -52,6 +52,7 @@ from traits.api import (
     cached_property,
     observe,
 )
+from pyface.api import OK, FileDialog  # pylint: disable=no-name-in-module
 from traits.etsconfig.api import ETSConfig
 from traitsui.message import message, error
 from scipy.interpolate import interp1d
@@ -530,8 +531,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # Channel file list button handlers
     def _btn_add_ch_file_fired(self):
-        if self.ch_file:
-            self.ch_files = self.ch_files + [self.ch_file]
+        dlg = FileDialog(
+            action="open",
+            wildcard="Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)"
+                     "|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|All files (*.*)|*.*|",
+        )
+        if dlg.open() == OK and dlg.path:
+            self.ch_files = self.ch_files + [dlg.path]
 
     def _btn_remove_last_fired(self):
         if self.ch_files:

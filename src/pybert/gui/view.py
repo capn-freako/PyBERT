@@ -283,18 +283,6 @@ traits_view = View(
                 ),
                 VGroup(  # Interconnect
                     VGroup(  # From File
-                        Item(
-                            name="ch_file",
-                            label="Browse",
-                            editor=FileEditor(
-                                dialog_style="open",
-                                filter=[
-                                    "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
-                                    "All files (*.*)|*.*|",
-                                ],
-                                format_func=fname_formatter(),
-                            ),
-                        ),
                         HGroup(
                             Item(name="btn_add_ch_file",    show_label=False),
                             Item(name="btn_remove_last",    show_label=False),
