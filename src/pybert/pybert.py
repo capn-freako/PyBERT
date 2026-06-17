@@ -131,10 +131,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - Channel Control
     ch_file  = File("")        #: Channel file (for browsing).
     ch_files = List(String)    #: Ordered list of channel files for composite interconnect.
-    btn_add_ch_file    = Button(label="Add")          #: Append ch_file to ch_files.
-    btn_remove_last    = Button(label="Remove Last")  #: Remove last entry from ch_files.
-    btn_clear_ch_files = Button(label="Clear")        #: Clear ch_files.
-    ch_files_display   = Property(String, depends_on=["ch_files"])  #: Formatted list display.
+    btn_add_ch_file    = Button(label="Add Section")          #: Append file to ``ch_files``.
+    btn_remove_last    = Button(label="Remove Last Section")  #: Remove last entry from ``ch_files``.
+    btn_clear_ch_files = Button(label="Clear All Sections")   #: Clear ``ch_files``.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
@@ -531,10 +530,15 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # Channel file list button handlers
     def _btn_add_ch_file_fired(self):
+        if self.ch_files:
+            wildcard="Touchstone files (*.s4p *.S4P)"
+            "|*.s4p;*.S4P|",
+        else:
+            wildcard="Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)"
+            "|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|All files (*.*)|*.*|",
         dlg = FileDialog(
             action="open",
-            wildcard="Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)"
-                     "|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|All files (*.*)|*.*|",
+            wildcard=wildcard,
         )
         if dlg.open() == OK and dlg.path:
             self.ch_files = self.ch_files + [dlg.path]
@@ -547,12 +551,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.ch_files = []
 
     # Dependent variable definitions
-    @cached_property
-    def _get_ch_files_display(self):
-        if not self.ch_files:
-            return "(none)"
-        return "\n".join(f"  {i+1}. {Path(fpath).name}" for i, fpath in enumerate(self.ch_files))
-
     @cached_property
     def _get_t(self):
         """Calculate the system time vector, in seconds."""

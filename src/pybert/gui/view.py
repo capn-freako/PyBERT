@@ -284,35 +284,45 @@ traits_view = View(
                 VGroup(  # Interconnect
                     VGroup(  # From File
                         HGroup(
-                            Item(name="btn_add_ch_file",    show_label=False),
-                            Item(name="btn_remove_last",    show_label=False),
-                            Item(name="btn_clear_ch_files", show_label=False),
+                            Item(
+                                name="btn_add_ch_file",
+                                show_label=False,
+                                enabled_when="not ch_files or ch_files[-1].extension in ['.s4p']",
+                            ),
+                            Item(name="btn_remove_last",    show_label=False, enabled_when="ch_files"),
+                            Item(name="btn_clear_ch_files", show_label=False, enabled_when="ch_files"),
                             spring,
                         ),
                         Item(
-                            name="ch_files_display",
-                            label="Queue",
+                            label="Note: For multi-section composite channels, all sections must be s4p files.",
+                        ),
+                        Item(
+                            name="ch_files",
                             style="readonly",
-                            height=80,
+                            show_label=False,
                         ),
                         HGroup(
                             Item(
                                 name="use_ch_file",
-                                label="Use file",
+                                label="Use file(s)",
                                 enabled_when="ch_files",
                             ),
+                            spring,
                             Item(
                                 name="renumber",
                                 label="Fix port numbering",
+                                tooltip='Convert "1->3" convention to "1->2".',
+                                enabled_when="use_ch_file",
                             ),
+                            spring,
                             Item(
                                 name="use_window",
                                 label="Apply window",
                                 tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
+                                enabled_when="use_ch_file",
                             ),
-                            # spring,
                         ),
-                        label="From File",
+                        label="From File(s)",
                         show_border=True,
                     ),
                     HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
