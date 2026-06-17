@@ -89,10 +89,10 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     # Capture model's responses.
     resps = model.get_responses(bits_per_call=40)
     if use_getwave:
-        h = resps[IMP_RESP_GETW]
+        h: Rvec = resps[IMP_RESP_GETW]  # type: ignore
         out_h = resps[OUT_RESP_GETW][1]
     else:
-        h = resps[IMP_RESP_INIT]
+        h = resps[IMP_RESP_INIT]  # type: ignore
         out_h = resps[OUT_RESP_INIT][1]
 
     # Generate model's output.

@@ -238,9 +238,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     tx_use_ts4 = Bool(False)  #: (Bool)
     tx_use_getwave = Bool(False)  #: (Bool)
     tx_has_getwave = Bool(False)  #: (Bool)
-    tx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
+    tx_ami_file = File("", entries=5, filter=["*.ami"])  # type: ignore
     tx_ami_valid = Bool(False)  #: (Bool)
-    tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
+    tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  # type: ignore
     tx_dll_valid = Bool(False)  #: (Bool)
     tx_ibis_file = File("")  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
@@ -262,9 +262,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_use_getwave = Bool(False)  #: (Bool)
     rx_has_getwave = Bool(False)  #: (Bool)
     rx_use_clocks = Bool(False)  #: (Bool)
-    rx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
+    rx_ami_file = File("", entries=5, filter=["*.ami"])  # type: ignore
     rx_ami_valid = Bool(False)  #: (Bool)
-    rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
+    rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  # type: ignore
     rx_dll_valid = Bool(False)  #: (Bool)
     rx_ibis_file = File("")  #: (File)
     rx_ibis_valid = Bool(False)  #: (Bool)
@@ -321,8 +321,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     )  #: List of Rx FFE tap tuner objects.
 
     # Misc.
-    cfg_file = File("", entries=5, filter=["*.pybert_cfg"])  #: PyBERT configuration data storage file (File).
-    data_file = File("", entries=5, filter=["*.pybert_data"])  #: PyBERT results data storage file (File).
+    #: PyBERT configuration data storage file (File).
+    cfg_file = File("", entries=5, filter=["*.pybert_cfg"])  # type: ignore
+    #: PyBERT results data storage file (File).
+    data_file = File("", entries=5, filter=["*.pybert_data"])  # type: ignore
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
@@ -531,10 +533,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # Channel file list button handlers
     def _btn_add_ch_file_fired(self):
         if self.ch_files:
-            wildcard="Touchstone files (*.s4p *.S4P)"
+            wildcard = "Touchstone files (*.s4p *.S4P)"
             "|*.s4p;*.S4P|",
         else:
-            wildcard="Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)"
+            wildcard = "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)"
             "|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|All files (*.*)|*.*|",
         dlg = FileDialog(
             action="open",
