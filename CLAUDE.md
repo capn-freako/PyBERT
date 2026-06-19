@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-All non-`make` commands must be prefixed with `.venv/bin/` (the project venv). The `Makefile` handles multi-version testing via `uv`.
+All non-`make` commands must be prefixed with `uv run`.
+The `Makefile` handles multi-version testing via `uv`.
 
 ```bash
 # Run the full test suite (current Python only, fastest)
-.venv/bin/pytest tests/
+uv run pytest tests/
 
 # Run a single test
-.venv/bin/pytest tests/test_basic.py::TestBasic::test_status
+uv run pytest tests/test_basic.py::TestBasic::test_status
 
 # Run tests across all supported Python versions (3.10, 3.11, 3.12)
 make test
@@ -21,12 +22,6 @@ make lint
 
 # Type check (mypy)
 make type-check
-
-# Format (isort + black, line-length 119) — USE CAUTION, reformats everything
-make format
-
-# Build docs (output: docs/build/index.html)
-make docs
 
 # Build package
 make build
