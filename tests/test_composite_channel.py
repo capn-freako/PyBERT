@@ -12,6 +12,15 @@ scikit-rf's ``**`` operator.  These tests verify that:
   4. Three-segment cascades work correctly.
   5. End-to-end PyBERT simulation completes without error when ``ch_files``
      contains two segments.
+
+Port-renumber tests (``TestPortRenumber``) additionally verify that
+``renumber=True`` correctly handles both common 4-port s4p conventions:
+
+  - "1→2" (standard): TX+/TX- on ports 1/3, RX+/RX- on ports 2/4; S21 is large.
+  - "1→3" (alternative): TX+/TX- on ports 1/2, RX+/RX- on ports 3/4; S31 is large.
+
+Both conventions must yield identical Sdd21 when ``renumber=True`` is used.
+Without renumbering, "1→3" files produce near-zero Sdd21.
 """
 
 import numpy as np
@@ -174,6 +183,168 @@ class TestCompositeCascadeUnit:
         np.testing.assert_allclose(
             np.abs(ab.s21.s.flatten()),
             np.abs(ba.s21.s.flatten()),
+            rtol=1e-3,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Helper for 4-port differential channels
+# ---------------------------------------------------------------------------
+
+def _make_4port_channel(freqs_hz: np.ndarray, length_m: float,
+                        convention: str = "1to2",
+                        z0: float = 50.0, velocity: float = 2e8,
+                        loss_db_per_m_at_1ghz: float = 2.0) -> skrf.Network:
+    """Return a balanced, lossy 4-port single-ended differential channel.
+
+    Two port-numbering conventions are supported:
+
+    - ``"1to2"`` (standard): TX+/TX- on ports 1/3, RX+/RX- on ports 2/4.
+      Forward path: 1→2 (S21 large) and 3→4 (S43 large).
+    - ``"1to3"`` (alternative): TX+/TX- on ports 1/2, RX+/RX- on ports 3/4.
+      Forward path: 1→3 (S31 large) and 2→4 (S42 large).
+
+    Both represent the same physical differential channel; only the port
+    labelling differs.  ``import_channel(..., renumber=True)`` must produce
+    the same Sdd21 from either file.
+    """
+    nf = len(freqs_hz)
+    alpha = loss_db_per_m_at_1ghz * np.sqrt(freqs_hz / 1e9) * (np.log(10) / 20)
+    beta = 2 * np.pi * freqs_hz / velocity
+    g = np.exp(-(alpha + 1j * beta) * length_m)
+
+    s = np.zeros((nf, 4, 4), dtype=complex)
+    if convention == "1to2":
+        s[:, 1, 0] = g;  s[:, 0, 1] = g   # S21, S12 — TX+→RX+
+        s[:, 3, 2] = g;  s[:, 2, 3] = g   # S43, S34 — TX-→RX-
+    elif convention == "1to3":
+        s[:, 2, 0] = g;  s[:, 0, 2] = g   # S31, S13 — TX+→RX+
+        s[:, 3, 1] = g;  s[:, 1, 3] = g   # S42, S24 — TX-→RX-
+    else:
+        raise ValueError(f"Unknown convention: {convention!r}")
+
+    return skrf.Network(f=freqs_hz, s=s, z0=z0)
+
+
+# ---------------------------------------------------------------------------
+# Port-renumber tests
+# ---------------------------------------------------------------------------
+
+class TestPortRenumber:
+    """Verify that renumber=True normalises both 4-port s4p port conventions."""
+
+    def test_1to2_convention_correct_without_renumber(self, tmp_path, freq_grid, sample_period):
+        """Standard 1→2 convention gives correct Sdd21 even with renumber=False."""
+        fs, ts = freq_grid, sample_period
+        L = 0.15
+        ntwk = _make_4port_channel(fs, L, convention="1to2")
+        fname = str(tmp_path / "ch_1to2.s4p")
+        ntwk.write_touchstone(fname)
+
+        result = import_channel(fname, ts, fs, renumber=False)
+
+        alpha = 2.0 * np.sqrt(fs / 1e9) * (np.log(10) / 20)
+        np.testing.assert_allclose(
+            np.abs(result.s21.s.flatten()),
+            np.exp(-alpha * L),
+            rtol=1e-3,
+        )
+
+    def test_1to3_convention_renumber_true_matches_1to2(self, tmp_path, freq_grid, sample_period):
+        """1→3 port numbering with renumber=True must yield the same Sdd21 as 1→2."""
+        fs, ts = freq_grid, sample_period
+        L = 0.15
+        f12 = str(tmp_path / "ch_1to2.s4p")
+        f13 = str(tmp_path / "ch_1to3.s4p")
+        _make_4port_channel(fs, L, convention="1to2").write_touchstone(f12)
+        _make_4port_channel(fs, L, convention="1to3").write_touchstone(f13)
+
+        result_12 = import_channel(f12, ts, fs, renumber=True)
+        result_13 = import_channel(f13, ts, fs, renumber=True)
+
+        np.testing.assert_allclose(
+            result_13.s21.s.flatten(),
+            result_12.s21.s.flatten(),
+            rtol=1e-3,
+        )
+
+    def test_1to3_convention_renumber_false_gives_zero_sdd21(self, tmp_path, freq_grid, sample_period):
+        """1→3 convention without renumbering must produce near-zero Sdd21."""
+        fs, ts = freq_grid, sample_period
+        fname = str(tmp_path / "ch_1to3_no_renumber.s4p")
+        _make_4port_channel(fs, length_m=0.15, convention="1to3").write_touchstone(fname)
+
+        result = import_channel(fname, ts, fs, renumber=False)
+
+        max_mag = np.max(np.abs(result.s21.s.flatten()))
+        assert max_mag < 1e-6, (
+            f"Expected Sdd21 ≈ 0 for un-renumbered 1→3 file; got max|S21| = {max_mag:.2e}"
+        )
+
+    def test_mixed_convention_cascade_12_then_13(self, tmp_path, freq_grid, sample_period):
+        """Cascading a 1→2 s4p then a 1→3 s4p (both renumber=True) matches all-1→2 reference."""
+        fs, ts = freq_grid, sample_period
+        L1, L2 = 0.10, 0.15
+
+        f1  = str(tmp_path / "seg1_12.s4p")
+        f2  = str(tmp_path / "seg2_13.s4p")
+        f2r = str(tmp_path / "seg2_12_ref.s4p")
+        _make_4port_channel(fs, L1, convention="1to2").write_touchstone(f1)
+        _make_4port_channel(fs, L2, convention="1to3").write_touchstone(f2)
+        _make_4port_channel(fs, L2, convention="1to2").write_touchstone(f2r)
+
+        n1  = import_channel(f1,  ts, fs, renumber=True)
+        n2  = import_channel(f2,  ts, fs, renumber=True)
+        n2r = import_channel(f2r, ts, fs, renumber=True)
+
+        composite = n1 ** n2
+        reference = n1 ** n2r
+
+        np.testing.assert_allclose(
+            composite.s21.s.flatten(),
+            reference.s21.s.flatten(),
+            rtol=1e-3,
+        )
+
+    def test_mixed_convention_cascade_13_then_12(self, tmp_path, freq_grid, sample_period):
+        """Cascading a 1→3 s4p then a 1→2 s4p (both renumber=True) matches combined-length model."""
+        fs, ts = freq_grid, sample_period
+        L1, L2 = 0.12, 0.08
+
+        f1 = str(tmp_path / "seg1_13.s4p")
+        f2 = str(tmp_path / "seg2_12.s4p")
+        _make_4port_channel(fs, L1, convention="1to3").write_touchstone(f1)
+        _make_4port_channel(fs, L2, convention="1to2").write_touchstone(f2)
+
+        n1 = import_channel(f1, ts, fs, renumber=True)
+        n2 = import_channel(f2, ts, fs, renumber=True)
+        composite = n1 ** n2
+
+        alpha = 2.0 * np.sqrt(fs / 1e9) * (np.log(10) / 20)
+        np.testing.assert_allclose(
+            np.abs(composite.s21.s.flatten()),
+            np.exp(-alpha * (L1 + L2)),
+            rtol=1e-3,
+        )
+
+    def test_both_1to3_cascade_renumber_true(self, tmp_path, freq_grid, sample_period):
+        """Two 1→3 s4p files cascaded with renumber=True must match two 1→2 files."""
+        fs, ts = freq_grid, sample_period
+        L1, L2 = 0.10, 0.10
+
+        f13a = str(tmp_path / "a_13.s4p");  f13b = str(tmp_path / "b_13.s4p")
+        f12a = str(tmp_path / "a_12.s4p");  f12b = str(tmp_path / "b_12.s4p")
+        _make_4port_channel(fs, L1, convention="1to3").write_touchstone(f13a)
+        _make_4port_channel(fs, L2, convention="1to3").write_touchstone(f13b)
+        _make_4port_channel(fs, L1, convention="1to2").write_touchstone(f12a)
+        _make_4port_channel(fs, L2, convention="1to2").write_touchstone(f12b)
+
+        composite_13 = import_channel(f13a, ts, fs, renumber=True) ** import_channel(f13b, ts, fs, renumber=True)
+        composite_12 = import_channel(f12a, ts, fs, renumber=True) ** import_channel(f12b, ts, fs, renumber=True)
+
+        np.testing.assert_allclose(
+            composite_13.s21.s.flatten(),
+            composite_12.s21.s.flatten(),
             rtol=1e-3,
         )
 
