@@ -131,9 +131,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - Channel Control
     ch_file  = File("")        #: Channel file (for browsing).
     ch_files = List(String)    #: Ordered list of channel files for composite interconnect.
-    btn_add_ch_file    = Button(label="Add Section")          #: Append file to ``ch_files``.
-    btn_remove_last    = Button(label="Remove Last Section")  #: Remove last entry from ``ch_files``.
-    btn_clear_ch_files = Button(label="Clear All Sections")   #: Clear ``ch_files``.
+    btn_add_ch_file    = Button(label="Add")          #: Append file to ``ch_files``.
+    btn_remove_last    = Button(label="Remove Last")  #: Remove last entry from ``ch_files``.
+    btn_clear_ch_files = Button(label="Clear All")   #: Clear ``ch_files``.
     use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
