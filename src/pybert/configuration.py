@@ -73,7 +73,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.f_step = the_PyBERT.f_step
 
         # Channel Control
-        self.use_ch_file = the_PyBERT.use_ch_file
+        self.inter_sel = the_PyBERT.inter_sel
         self.ch_file  = the_PyBERT.ch_file
         self.ch_files = list(the_PyBERT.ch_files)
         self.impulse_length = the_PyBERT.impulse_length
@@ -107,7 +107,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.tx_ami_file = the_PyBERT.tx_ami_file
         self.tx_dll_file = the_PyBERT.tx_dll_file
         self.tx_ibis_file = the_PyBERT.tx_ibis_file
-        self.tx_use_ibis = the_PyBERT.tx_use_ibis
+        self.tx_sel = the_PyBERT.tx_sel
 
         # Rx
         self.rin = the_PyBERT.rin
@@ -125,7 +125,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_ami_file = the_PyBERT.rx_ami_file
         self.rx_dll_file = the_PyBERT.rx_dll_file
         self.rx_ibis_file = the_PyBERT.rx_ibis_file
-        self.rx_use_ibis = the_PyBERT.rx_use_ibis
+        self.rx_sel = the_PyBERT.rx_sel
         self.rx_use_viterbi = the_PyBERT.rx_use_viterbi
         self.rx_viterbi_symbols = the_PyBERT.rx_viterbi_symbols
         self.rx_n_taps = the_PyBERT.rx_n_taps
@@ -219,6 +219,14 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
                     setattr(pybert.dfe_tap_tuners[count], "max_val", max_val)
             elif prop in ("version", "date_created"):
                 pass  # Just including it for some good housekeeping.  Not currently used.
+            elif prop == "use_ch_file":
+                # Renamed to inter_sel in v3.x; map old bool to new enum.
+                if value:
+                    setattr(pybert, "inter_sel", "single")
+            elif prop in ("tx_use_ibis", "rx_use_ibis"):
+                # Renamed to tx_sel/rx_sel; map old bool to new enum.
+                sel_attr = prop.replace("use_ibis", "sel")
+                setattr(pybert, sel_attr, "ibis" if value else "native")
             else:
                 setattr(pybert, prop, value)
 
