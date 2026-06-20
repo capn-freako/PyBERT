@@ -295,6 +295,12 @@ traits_view = View(
                             enabled_when="inter_sel != 'native'",
                         ),
                         Item(
+                            name="lane_sel",
+                            label="Lane",
+                            tooltip="Lane index (0-based) for 8- or 12-port Touchstone files.",
+                            enabled_when="inter_sel == 'single' and (ch_file.lower().endswith('.s8p') or ch_file.lower().endswith('.s12p'))",
+                        ),
+                        Item(
                             name="use_window",
                             label="Apply window",
                             tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
@@ -377,13 +383,13 @@ traits_view = View(
                             editor=FileEditor(
                                 dialog_style="open",
                                 filter=[
-                                    "Channel files (*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT)|*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
+                                    "Channel files (*.s2p;*.S2P;*.s4p;*.S4P;*.s8p;*.S8P;*.s12p;*.S12P;*.csv;*.CSV;*.txt;*.TXT)|*.s2p;*.S2P;*.s4p;*.S4P;*.s8p;*.S8P;*.s12p;*.S12P;*.csv;*.CSV;*.txt;*.TXT|",
                                     "All files (*)|*|",
                                 ],
                                 format_func=fname_formatter(),
                             ),
                         ),
-                        label="Single File (*.s2p, *.s4p, *.csv, *.txt)",
+                        label="Single File (*.s2p, *.s4p, *.s8p, *.s12p, *.csv, *.txt)",
                         visible_when="inter_sel == 'single'",
                         show_border=True,
                     ),

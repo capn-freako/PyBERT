@@ -134,6 +134,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     ch_file  = File("")        #: Channel file (for browsing).
     ch_files = List(File)    #: Ordered list of channel files for composite interconnect.
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
+    lane_sel = Int(0)       #: Lane index for 8/12-port Touchstone files (0-based). (Default = 0)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
     f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
@@ -1319,7 +1320,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 file = self.ch_file
                 if not file:
                     raise RuntimeError("'single' is selected but no channel file is specified!")
-                ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber)
+                ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber, lane=self.lane_sel)
                 self.log(str(ch_s2p_pre))
                 H = ch_s2p_pre.s21.s.flatten()
             case "multiple":
