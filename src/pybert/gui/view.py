@@ -252,8 +252,8 @@ traits_view = View(
                             spring,
                         ),
                         label="Native",
+                        visible_when="tx_sel == 'native'",
                         show_border=True,
-                        # enabled_when="tx_use_ibis == False",
                     ),
                     VGroup(
                         HGroup(
@@ -270,15 +270,15 @@ traits_view = View(
                             Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
                         HGroup(
-                            # Item(name="tx_use_ibis", label="Use IBIS"),
                             Item(name="btn_sel_tx", show_label=False),
                             Item(name="btn_view_tx", show_label=False),
                             enabled_when="tx_ibis_valid",
                         ),
                         Item(name="tx_use_ts4", label="Use on-die S-parameters.",
-                             # enabled_when="tx_use_ibis and tx_ibis_valid and tx_has_ts4",
+                             enabled_when="tx_ibis_valid and tx_has_ts4",
                         ),
                         label="IBIS",
+                        visible_when="tx_sel == 'ibis'",
                         show_border=True,
                     ),
                     label="Tx",
@@ -310,7 +310,6 @@ traits_view = View(
                                     tooltip="interconnect length",
                                 ),
                                 Item(label="m"),
-                                # spring,
                             ),
                             HGroup(
                                 Item(
@@ -318,7 +317,6 @@ traits_view = View(
                                     label="Loss Tan.",
                                     tooltip="dielectric loss tangent",
                                 ),
-                                # spring,
                             ),
                         ),
                         VGroup(
@@ -329,7 +327,6 @@ traits_view = View(
                                     tooltip="characteristic differential impedance",
                                 ),
                                 Item(label="Ohms"),
-                                # spring,
                             ),
                             HGroup(
                                 Item(
@@ -338,13 +335,10 @@ traits_view = View(
                                     tooltip="normalized propagation velocity",
                                 ),
                                 Item(label="c"),
-                                # spring,
                             ),
                         ),
-                        # spring,
                         VGroup(
                             HGroup(
-                                # spring,
                                 Item(
                                     name="Rdc",
                                     label="Rdc",
@@ -353,7 +347,6 @@ traits_view = View(
                                 Item(label="Ohms"),
                             ),
                             HGroup(
-                                # spring,
                                 Item(
                                     name="w0",
                                     label="w0",
@@ -364,7 +357,6 @@ traits_view = View(
                         ),
                         VGroup(
                             HGroup(
-                                # spring,
                                 Item(
                                     name="R0",
                                     label="R0",
@@ -374,6 +366,7 @@ traits_view = View(
                             ),
                         ),
                         label="Native",
+                        visible_when="inter_sel == 'native'",
                         show_border=True,
                     ),
                     HGroup(  # Single file
@@ -384,13 +377,14 @@ traits_view = View(
                             editor=FileEditor(
                                 dialog_style="open",
                                 filter=[
-                                    "Channel files (*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT)||",
-                                    "All files (*)|",
+                                    "Channel files (*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT)|*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
+                                    "All files (*)|*|",
                                 ],
                                 format_func=fname_formatter(),
                             ),
                         ),
                         label="Single File (*.s2p, *.s4p, *.csv, *.txt)",
+                        visible_when="inter_sel == 'single'",
                         show_border=True,
                     ),
                     VGroup(  # Multiple files
@@ -402,13 +396,14 @@ traits_view = View(
                                 editor=FileEditor(
                                     dialog_style="open",
                                     filter=[
-                                        "Touchstone 4-port files (*.s4p;*.S4P)",
+                                        "Touchstone 4-port files (*.s4p;*.S4P)|*.s4p;*.S4P|",
                                     ],
                                     format_func=fname_formatter(),
                                 ),
                             ),
                         ),
                         label="Multiple Files (single-ended *.s4p only)",
+                        visible_when="inter_sel == 'multiple'",
                         show_border=True,
                     ),
                     label="Interconnect",
@@ -455,15 +450,10 @@ traits_view = View(
                                 enabled_when="rx_use_viterbi",
                                 tooltip="Number of symbols to include in MLSD trellis.",
                             ),
-                            # Item(
-                            #     name="rx_viterbi_fec", label="Use FEC",
-                            #     enabled_when="rx_use_viterbi",
-                            #     tooltip="Use FEC, as opposed to ISI, for Viterbi decoding.",
-                            # ),
                         ),
                         label="Native",
+                        visible_when="rx_sel == 'native'",
                         show_border=True,
-                        # enabled_when="rx_use_ibis == False",
                     ),
                     VGroup(
                         HGroup(
@@ -480,15 +470,15 @@ traits_view = View(
                             Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
                         ),
                         HGroup(
-                            # Item(name="rx_use_ibis", label="Use IBIS"),
                             Item(name="btn_sel_rx", show_label=False),
                             Item(name="btn_view_rx", show_label=False),
                             enabled_when="rx_ibis_valid",
                         ),
                         Item(name="rx_use_ts4", label="Use on-die S-parameters.",
-                             # enabled_when="rx_use_ibis and rx_ibis_valid and rx_has_ts4",
+                             enabled_when="rx_ibis_valid and rx_has_ts4",
                         ),
                         label="IBIS",
+                        visible_when="rx_sel == 'ibis'",
                         show_border=True,
                     ),
                     label="Rx",

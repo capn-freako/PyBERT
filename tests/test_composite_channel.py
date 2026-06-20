@@ -374,7 +374,7 @@ class TestCompositeChannelIntegration:
         """PyBERT must reach 'Ready.' status when ch_files has two segments."""
         from pybert.pybert import PyBERT
         dut = PyBERT(run_simulation=False, gui=False)
-        dut.use_ch_file = True
+        dut.inter_sel = "multiple"
         dut.ch_files = two_segment_files
         dut.simulate(initial_run=True)
         assert dut.status == "Ready.", f"Unexpected status: {dut.status!r}"
@@ -383,7 +383,7 @@ class TestCompositeChannelIntegration:
         """Channel delay for two 0.1-m segments (v=2e8 m/s) should be ~1 ns."""
         from pybert.pybert import PyBERT
         dut = PyBERT(run_simulation=False, gui=False)
-        dut.use_ch_file = True
+        dut.inter_sel = "multiple"
         dut.ch_files = two_segment_files
         dut.simulate(initial_run=True)
         # Two 0.1 m segments at v=2e8 → τ = 0.2/2e8 = 1 ns; allow generous margin

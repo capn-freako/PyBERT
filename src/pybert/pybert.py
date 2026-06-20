@@ -53,7 +53,6 @@ from traits.api import (
     cached_property,
     observe,
 )
-from pyface.api import OK, FileDialog  # pylint: disable=no-name-in-module
 from traits.etsconfig.api import ETSConfig
 from traitsui.message import message, error
 from scipy.interpolate import interp1d
@@ -133,12 +132,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     inter_sel = Enum("native", "single", "multiple")
     # -- file(s)
     ch_file  = File("")        #: Channel file (for browsing).
-    # ch_files = List(String)    #: Ordered list of channel files for composite interconnect.
     ch_files = List(File)    #: Ordered list of channel files for composite interconnect.
-    # btn_add_ch_file    = Button(label="Add")          #: Append file to ``ch_files``.
-    # btn_remove_last    = Button(label="Remove Last")  #: Remove last entry from ``ch_files``.
-    # btn_clear_ch_files = Button(label="Clear All")   #: Clear ``ch_files``.
-    # use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
     f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
@@ -252,7 +246,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     tx_dll_valid = Bool(False)  #: (Bool)
     tx_ibis_file = File("")  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
-    # tx_use_ibis = Bool(False)  #: (Bool)
 
     # - Rx
     rx_sel = Enum("native", "ibis")
@@ -279,7 +272,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rx_dll_valid = Bool(False)  #: (Bool)
     rx_ibis_file = File("")  #: (File)
     rx_ibis_valid = Bool(False)  #: (Bool)
-    # rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
     rx_viterbi_symbols = Int(4)  #: Number of symbols to track in Viterbi decoder.
     rx_viterbi_fec = Bool(False)  #: Use FEC, as opposed to ISI, for Viterbi decoding when True.
@@ -540,28 +532,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if val > gMaxCTLEPeak or val < 0.0:
             raise RuntimeError("CTLE peak magnitude out of range!")
         self.peak_mag_tune = val
-
-    # Channel file list button handlers
-    def _btn_add_ch_file_fired(self):
-        if self.ch_files:
-            wildcard = "Touchstone files (*.s4p *.S4P)"
-            "|*.s4p;*.S4P|",
-        else:
-            wildcard = "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)"
-            "|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|All files (*.*)|*.*|",
-        dlg = FileDialog(
-            action="open",
-            wildcard=wildcard,
-        )
-        if dlg.open() == OK and dlg.path:
-            self.ch_files = self.ch_files + [dlg.path]
-
-    def _btn_remove_last_fired(self):
-        if self.ch_files:
-            self.ch_files = self.ch_files[:-1]
-
-    def _btn_clear_ch_files_fired(self):
-        self.ch_files = []
 
     # Dependent variable definitions
     @cached_property

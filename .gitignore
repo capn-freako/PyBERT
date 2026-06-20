@@ -111,6 +111,7 @@ parsec.py/
 # Temporary files
 .*
 !.*.yaml
+dummy*
 
 # Debugging output
 *_dbg.txt
