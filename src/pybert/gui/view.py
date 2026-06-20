@@ -21,6 +21,7 @@ from traitsui.api import (  # CloseAction,
     Group,
     HGroup,
     Item,
+    ListEditor,
     Menu,
     MenuBar,
     NoButtons,
@@ -229,31 +230,7 @@ traits_view = View(
             ),
             HGroup(  # "Channel"
                 VGroup(  # "Tx"
-                    VGroup(
-                        HGroup(
-                            Item(
-                                name="tx_ibis_file",
-                                label="File",
-                                springy=True,
-                                editor=FileEditor(
-                                    dialog_style="open",
-                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
-                                    format_func=fname_formatter(),
-                                ),
-                            ),
-                            Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
-                        ),
-                        HGroup(
-                            Item(name="tx_use_ibis", label="Use IBIS"),
-                            Item(name="btn_sel_tx", show_label=False),
-                            Item(name="btn_view_tx", show_label=False),
-                            enabled_when="tx_ibis_valid",
-                        ),
-                        Item(name="tx_use_ts4", label="Use on-die S-parameters.",
-                             enabled_when="tx_use_ibis and tx_ibis_valid and tx_has_ts4",),
-                        label="IBIS",
-                        show_border=True,
-                    ),
+                    Item("tx_sel", style="custom"),
                     VGroup(
                         HGroup(
                             Item(
@@ -276,54 +253,53 @@ traits_view = View(
                         ),
                         label="Native",
                         show_border=True,
-                        enabled_when="tx_use_ibis == False",
+                        # enabled_when="tx_use_ibis == False",
+                    ),
+                    VGroup(
+                        HGroup(
+                            Item(
+                                name="tx_ibis_file",
+                                label="File",
+                                springy=True,
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
+                                    format_func=fname_formatter(),
+                                ),
+                            ),
+                            Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        ),
+                        HGroup(
+                            # Item(name="tx_use_ibis", label="Use IBIS"),
+                            Item(name="btn_sel_tx", show_label=False),
+                            Item(name="btn_view_tx", show_label=False),
+                            enabled_when="tx_ibis_valid",
+                        ),
+                        Item(name="tx_use_ts4", label="Use on-die S-parameters.",
+                             # enabled_when="tx_use_ibis and tx_ibis_valid and tx_has_ts4",
+                        ),
+                        label="IBIS",
+                        show_border=True,
                     ),
                     label="Tx",
                     show_border=True,
                 ),
                 VGroup(  # Interconnect
-                    VGroup(  # From File
-                        HGroup(
-                            Item(
-                                name="btn_add_ch_file",
-                                show_label=False,
-                                enabled_when="not ch_files or ch_files[-1].extension in ['.s4p']",
-                            ),
-                            Item(name="btn_remove_last",    show_label=False, enabled_when="ch_files"),
-                            Item(name="btn_clear_ch_files", show_label=False, enabled_when="ch_files"),
-                            spring,
+                    HGroup(
+                        Item("inter_sel", style="custom", label="Model"),
+                        spring,
+                        Item(
+                            name="renumber",
+                            label="Fix port numbering",
+                            tooltip='Convert "1->3" convention to "1->2".',
+                            enabled_when="inter_sel != 'native'",
                         ),
                         Item(
-                            label="Note: For multi-section composite channels, all sections must be s4p files.",
+                            name="use_window",
+                            label="Apply window",
+                            tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
+                            enabled_when="inter_sel != 'native'",
                         ),
-                        Item(
-                            name="ch_files",
-                            style="readonly",
-                            show_label=False,
-                        ),
-                        HGroup(
-                            Item(
-                                name="use_ch_file",
-                                label="Use file(s)",
-                                enabled_when="ch_files",
-                            ),
-                            spring,
-                            Item(
-                                name="renumber",
-                                label="Fix port numbering",
-                                tooltip='Convert "1->3" convention to "1->2".',
-                                enabled_when="use_ch_file",
-                            ),
-                            spring,
-                            Item(
-                                name="use_window",
-                                label="Apply window",
-                                tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
-                                enabled_when="use_ch_file",
-                            ),
-                        ),
-                        label="From File(s)",
-                        show_border=True,
                     ),
                     HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
                         VGroup(
@@ -399,37 +375,47 @@ traits_view = View(
                         ),
                         label="Native",
                         show_border=True,
-                        enabled_when="use_ch_file == False",
+                    ),
+                    HGroup(  # Single file
+                        Item(
+                            name="ch_file",
+                            show_label=False,
+                            springy=True,
+                            editor=FileEditor(
+                                dialog_style="open",
+                                filter=[
+                                    "Channel files (*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT)||",
+                                    "All files (*)|",
+                                ],
+                                format_func=fname_formatter(),
+                            ),
+                        ),
+                        label="Single File (*.s2p, *.s4p, *.csv, *.txt)",
+                        show_border=True,
+                    ),
+                    VGroup(  # Multiple files
+                        Item(
+                            name="ch_files",
+                            style="custom",
+                            show_label=False,
+                            editor=ListEditor(
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=[
+                                        "Touchstone 4-port files (*.s4p;*.S4P)",
+                                    ],
+                                    format_func=fname_formatter(),
+                                ),
+                            ),
+                        ),
+                        label="Multiple Files (single-ended *.s4p only)",
+                        show_border=True,
                     ),
                     label="Interconnect",
                     show_border=True,
                 ),
                 VGroup(  # Rx
-                    VGroup(
-                        HGroup(
-                            Item(
-                                name="rx_ibis_file",
-                                label="File",
-                                springy=True,
-                                editor=FileEditor(
-                                    dialog_style="open",
-                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
-                                    format_func=fname_formatter(),
-                                ),
-                            ),
-                            Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
-                        ),
-                        HGroup(
-                            Item(name="rx_use_ibis", label="Use IBIS"),
-                            Item(name="btn_sel_rx", show_label=False),
-                            Item(name="btn_view_rx", show_label=False),
-                            enabled_when="rx_ibis_valid",
-                        ),
-                        Item(name="rx_use_ts4", label="Use on-die S-parameters.",
-                             enabled_when="rx_use_ibis and rx_ibis_valid and rx_has_ts4",),
-                        label="IBIS",
-                        show_border=True,
-                    ),
+                    Item("rx_sel", style="custom"),
                     VGroup(
                         HGroup(
                             Item(
@@ -477,7 +463,33 @@ traits_view = View(
                         ),
                         label="Native",
                         show_border=True,
-                        enabled_when="rx_use_ibis == False",
+                        # enabled_when="rx_use_ibis == False",
+                    ),
+                    VGroup(
+                        HGroup(
+                            Item(
+                                name="rx_ibis_file",
+                                label="File",
+                                springy=True,
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
+                                    format_func=fname_formatter(),
+                                ),
+                            ),
+                            Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        ),
+                        HGroup(
+                            # Item(name="rx_use_ibis", label="Use IBIS"),
+                            Item(name="btn_sel_rx", show_label=False),
+                            Item(name="btn_view_rx", show_label=False),
+                            enabled_when="rx_ibis_valid",
+                        ),
+                        Item(name="rx_use_ts4", label="Use on-die S-parameters.",
+                             # enabled_when="rx_use_ibis and rx_ibis_valid and rx_has_ts4",
+                        ),
+                        label="IBIS",
+                        show_border=True,
                     ),
                     label="Rx",
                     show_border=True,

@@ -204,10 +204,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Calculate Tx output power dissipation.
     ffe_out = convolve(symbols, ffe)[: len(symbols)]
-    if self.use_ch_file:
-        self.rel_power = mean(ffe_out**2) / self.rs
-    else:
-        self.rel_power = mean(ffe_out**2) / self.Z0
+    z_tx = self.Z0
+    if self.inter_sel != "native":
+        z_tx = self.rs
+    self.rel_power = mean(ffe_out**2) / z_tx
 
     # Generate the uncorrelated periodic noise. (Assume capacitive coupling.)
     # Generate the ideal rectangular aggressor waveform.

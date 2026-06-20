@@ -122,7 +122,7 @@ def import_time(filename: str, sample_per: float) -> Rvec:
     ts = []
     xs = []
     tmp = []
-    with open(filename, mode="rU", encoding="utf-8") as file:
+    with open(filename, mode="r", encoding="utf-8") as file:
         for line in file:
             try:
                 vals = [_f for _f in re.split("[, ;:]+", line) if _f]

@@ -296,6 +296,7 @@ def import_channel(filename: str, sample_per: float, fs: Rvec,
     if re.search(r"^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
         ts2N = interp_s2p(import_freq(filename, renumber=renumber), fs)
     else:  # simple 2-column time domain description (impulse or step).
+        print(f"import_channel(): `filename`: {filename}")
         h = import_time(filename, sample_per)
         # Fixme: an a.c. coupled channel breaks this naive approach!  # pylint: disable=fixme
         if h[-1] > (max(h) / 2.0):  # step response?
