@@ -392,11 +392,10 @@ class TestCompositeChannelIntegration:
         )
 
     def test_empty_ch_files_raises(self):
-        """Selecting use_ch_file=True with no files must raise RuntimeError."""
+        """Selecting inter_sel='multiple' with no files must raise RuntimeError."""
         from pybert.pybert import PyBERT
         dut = PyBERT(run_simulation=False, gui=False)
-        dut.use_ch_file = True
+        dut.inter_sel = "multiple"
         dut.ch_files = []
-        dut.ch_file = ""
         with pytest.raises(RuntimeError, match="no channel files"):
             dut.simulate(initial_run=True)
