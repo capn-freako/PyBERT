@@ -21,6 +21,7 @@ from traitsui.api import (  # CloseAction,
     Group,
     HGroup,
     Item,
+    ListEditor,
     Menu,
     MenuBar,
     NoButtons,
@@ -72,12 +73,13 @@ def fname_formatter(
         fname_str = str(fname)
         if not fname_str:
             return ""
-        fpath = Path(str(fname)).resolve()
+        fpath = Path(fname_str).resolve()
         parts = list(fpath.parent.parts)
         rslt = fpath.name if include_ext else fpath.stem
+        last_rslt = rslt
         while parts and len(rslt) < max_width:
-            last_rslt = rslt
             rslt = "/".join([parts.pop(), rslt])
+            last_rslt = rslt
         if len(rslt) > max_width:
             if partial_dirname_ok:
                 rslt = rslt[-max_width:]
@@ -176,11 +178,11 @@ traits_view = View(
                             label="Tx Level && Noise",
                             show_border=True,
                         ),
-                    ),
-                    HGroup(
-                        Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
-                        label="Miscellaneous Options",
-                        show_border=True,
+                        VGroup(
+                            Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
+                            label="Misc.",
+                            show_border=True,
+                        ),
                     ),
                     label="Simulation Control",
                     show_border=True,
@@ -228,31 +230,7 @@ traits_view = View(
             ),
             HGroup(  # "Channel"
                 VGroup(  # "Tx"
-                    VGroup(
-                        HGroup(
-                            Item(
-                                name="tx_ibis_file",
-                                label="File",
-                                springy=True,
-                                editor=FileEditor(
-                                    dialog_style="open",
-                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
-                                    format_func=fname_formatter(),
-                                ),
-                            ),
-                            Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
-                        ),
-                        HGroup(
-                            Item(name="tx_use_ibis", label="Use IBIS"),
-                            Item(name="btn_sel_tx", show_label=False),
-                            Item(name="btn_view_tx", show_label=False),
-                            enabled_when="tx_ibis_valid",
-                        ),
-                        Item(name="tx_use_ts4", label="Use on-die S-parameters.",
-                             enabled_when="tx_use_ibis and tx_ibis_valid and tx_has_ts4",),
-                        label="IBIS",
-                        show_border=True,
-                    ),
+                    Item("tx_sel", style="custom"),
                     VGroup(
                         HGroup(
                             Item(
@@ -274,42 +252,54 @@ traits_view = View(
                             spring,
                         ),
                         label="Native",
+                        visible_when="tx_sel == 'native'",
                         show_border=True,
-                        enabled_when="tx_use_ibis == False",
+                    ),
+                    VGroup(
+                        HGroup(
+                            Item(
+                                name="tx_ibis_file",
+                                label="File",
+                                springy=True,
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
+                                    format_func=fname_formatter(),
+                                ),
+                            ),
+                            Item(name="tx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        ),
+                        HGroup(
+                            Item(name="btn_sel_tx", show_label=False),
+                            Item(name="btn_view_tx", show_label=False),
+                            enabled_when="tx_ibis_valid",
+                        ),
+                        Item(name="tx_use_ts4", label="Use on-die S-parameters.",
+                             enabled_when="tx_ibis_valid and tx_has_ts4",
+                        ),
+                        label="IBIS",
+                        visible_when="tx_sel == 'ibis'",
+                        show_border=True,
                     ),
                     label="Tx",
                     show_border=True,
                 ),
                 VGroup(  # Interconnect
-                    VGroup(  # From File
-                        VGroup(
-                            Item(
-                                name="ch_file",
-                                label="File",
-                                editor=FileEditor(
-                                    dialog_style="open",
-                                    filter=[
-                                        "Channel files (*.s4p *.S4P *.csv *.CSV *.txt *.TXT)|*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
-                                        "All files (*.*)|*.*|",
-                                    ],
-                                    format_func=fname_formatter(),
-                                ),
-                            ),
-                            HGroup(
-                                Item(
-                                    name="use_ch_file",
-                                    label="Use file",
-                                    enabled_when="ch_file",
-                                ),
-                                Item(
-                                    name="renumber",
-                                    label="Fix port numbering",
-                                ),
-                                spring,
-                            ),
+                    HGroup(
+                        Item("inter_sel", style="custom", label="Model"),
+                        spring,
+                        Item(
+                            name="renumber",
+                            label="Fix port numbering",
+                            tooltip='Convert "1->3" convention to "1->2".',
+                            enabled_when="inter_sel != 'native'",
                         ),
-                        label="From File",
-                        show_border=True,
+                        Item(
+                            name="use_window",
+                            label="Apply window",
+                            tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
+                            enabled_when="inter_sel != 'native'",
+                        ),
                     ),
                     HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
                         VGroup(
@@ -320,7 +310,6 @@ traits_view = View(
                                     tooltip="interconnect length",
                                 ),
                                 Item(label="m"),
-                                spring,
                             ),
                             HGroup(
                                 Item(
@@ -328,8 +317,9 @@ traits_view = View(
                                     label="Loss Tan.",
                                     tooltip="dielectric loss tangent",
                                 ),
-                                spring,
                             ),
+                        ),
+                        VGroup(
                             HGroup(
                                 Item(
                                     name="Z0",
@@ -337,7 +327,6 @@ traits_view = View(
                                     tooltip="characteristic differential impedance",
                                 ),
                                 Item(label="Ohms"),
-                                spring,
                             ),
                             HGroup(
                                 Item(
@@ -346,13 +335,10 @@ traits_view = View(
                                     tooltip="normalized propagation velocity",
                                 ),
                                 Item(label="c"),
-                                spring,
                             ),
                         ),
-                        spring,
                         VGroup(
                             HGroup(
-                                spring,
                                 Item(
                                     name="Rdc",
                                     label="Rdc",
@@ -361,7 +347,6 @@ traits_view = View(
                                 Item(label="Ohms"),
                             ),
                             HGroup(
-                                spring,
                                 Item(
                                     name="w0",
                                     label="w0",
@@ -369,8 +354,9 @@ traits_view = View(
                                 ),
                                 Item(label="rads./s"),
                             ),
+                        ),
+                        VGroup(
                             HGroup(
-                                spring,
                                 Item(
                                     name="R0",
                                     label="R0",
@@ -380,47 +366,51 @@ traits_view = View(
                             ),
                         ),
                         label="Native",
+                        visible_when="inter_sel == 'native'",
                         show_border=True,
-                        enabled_when="use_ch_file == False",
                     ),
-                    HGroup(  # Misc.
+                    HGroup(  # Single file
                         Item(
-                            name="use_window",
-                            label="Apply window",
-                            tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
+                            name="ch_file",
+                            show_label=False,
+                            springy=True,
+                            editor=FileEditor(
+                                dialog_style="open",
+                                filter=[
+                                    "Channel files (*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT)|*.s2p;*.S2P;*.s4p;*.S4P;*.csv;*.CSV;*.txt;*.TXT|",
+                                    "All files (*)|*|",
+                                ],
+                                format_func=fname_formatter(),
+                            ),
                         ),
-                        label="Misc.",
+                        label="Single File (*.s2p, *.s4p, *.csv, *.txt)",
+                        visible_when="inter_sel == 'single'",
+                        show_border=True,
+                    ),
+                    VGroup(  # Multiple files
+                        Item(
+                            name="ch_files",
+                            style="custom",
+                            show_label=False,
+                            editor=ListEditor(
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=[
+                                        "Touchstone 4-port files (*.s4p;*.S4P)|*.s4p;*.S4P|",
+                                    ],
+                                    format_func=fname_formatter(),
+                                ),
+                            ),
+                        ),
+                        label="Multiple Files (single-ended *.s4p only)",
+                        visible_when="inter_sel == 'multiple'",
                         show_border=True,
                     ),
                     label="Interconnect",
                     show_border=True,
                 ),
                 VGroup(  # Rx
-                    VGroup(
-                        HGroup(
-                            Item(
-                                name="rx_ibis_file",
-                                label="File",
-                                springy=True,
-                                editor=FileEditor(
-                                    dialog_style="open",
-                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
-                                    format_func=fname_formatter(),
-                                ),
-                            ),
-                            Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
-                        ),
-                        HGroup(
-                            Item(name="rx_use_ibis", label="Use IBIS"),
-                            Item(name="btn_sel_rx", show_label=False),
-                            Item(name="btn_view_rx", show_label=False),
-                            enabled_when="rx_ibis_valid",
-                        ),
-                        Item(name="rx_use_ts4", label="Use on-die S-parameters.",
-                             enabled_when="rx_use_ibis and rx_ibis_valid and rx_has_ts4",),
-                        label="IBIS",
-                        show_border=True,
-                    ),
+                    Item("rx_sel", style="custom"),
                     VGroup(
                         HGroup(
                             Item(
@@ -460,15 +450,36 @@ traits_view = View(
                                 enabled_when="rx_use_viterbi",
                                 tooltip="Number of symbols to include in MLSD trellis.",
                             ),
-                            # Item(
-                            #     name="rx_viterbi_fec", label="Use FEC",
-                            #     enabled_when="rx_use_viterbi",
-                            #     tooltip="Use FEC, as opposed to ISI, for Viterbi decoding.",
-                            # ),
                         ),
                         label="Native",
+                        visible_when="rx_sel == 'native'",
                         show_border=True,
-                        enabled_when="rx_use_ibis == False",
+                    ),
+                    VGroup(
+                        HGroup(
+                            Item(
+                                name="rx_ibis_file",
+                                label="File",
+                                springy=True,
+                                editor=FileEditor(
+                                    dialog_style="open",
+                                    filter=["IBIS models (*.ibs)|*.ibs|", "All files (*.*)|*.*|"],
+                                    format_func=fname_formatter(),
+                                ),
+                            ),
+                            Item(name="rx_ibis_valid", label="Valid", style="simple", enabled_when="False"),
+                        ),
+                        HGroup(
+                            Item(name="btn_sel_rx", show_label=False),
+                            Item(name="btn_view_rx", show_label=False),
+                            enabled_when="rx_ibis_valid",
+                        ),
+                        Item(name="rx_use_ts4", label="Use on-die S-parameters.",
+                             enabled_when="rx_ibis_valid and rx_has_ts4",
+                        ),
+                        label="IBIS",
+                        visible_when="rx_sel == 'ibis'",
+                        show_border=True,
                     ),
                     label="Rx",
                     show_border=True,

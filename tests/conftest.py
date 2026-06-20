@@ -91,7 +91,7 @@ def ibisami_rx_init():
     """
     dut = PyBERT(run_simulation=False, gui=False)
     dut.rx_ibis_file = "models/ibisami/example_rx.ibs"
-    dut.rx_use_ibis = True
+    dut.rx_sel = "ibis"
     dut.rx_use_ami = True
     dut.simulate(initial_run=True)
     yield dut
@@ -105,7 +105,7 @@ def ibisami_rx_getwave():
     """
     dut = PyBERT(run_simulation=False, gui=False)
     dut.rx_ibis_file = "models/ibisami/example_rx.ibs"
-    dut.rx_use_ibis = True
+    dut.rx_sel = "ibis"
     dut.rx_use_ami = True
     dut.rx_use_getwave = True
     dut.simulate(initial_run=True)
@@ -120,7 +120,7 @@ def ibisami_rx_getwave_clocked():
     """
     dut = PyBERT(run_simulation=False, gui=False)
     dut.rx_ibis_file = "models/ibisami/example_rx.ibs"
-    dut.rx_use_ibis = True
+    dut.rx_sel = "ibis"
     dut.rx_use_ami = True
     dut.rx_use_getwave = True
     dut.rx_use_clocks = True

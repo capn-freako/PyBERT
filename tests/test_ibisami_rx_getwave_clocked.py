@@ -7,58 +7,61 @@ import numpy as np
 import pytest
 
 
-@pytest.mark.usefixtures("ibisami_rx_getwave_clocked")
 class TestIbisAmiRxGetWaveClocked(object):
     """
     Basic tests of a properly initialized PyBERT w/
-    user-defined channel impulse response length.
+    Rx IBIS-AMI model in bit-by-bit (GetWave) mode with clock times.
     """
 
-    def test_status(self, dut):
+    def test_rx_sel(self, ibisami_rx_getwave_clocked):
+        """Confirm that the Rx IBIS path is actually active."""
+        assert ibisami_rx_getwave_clocked.rx_sel == "ibis", "rx_sel was not set to 'ibis'!"
+
+    def test_status(self, ibisami_rx_getwave_clocked):
         """Test post-simulation status."""
         try:
-            assert dut.status == "Ready.", "Status not 'Ready.'!"
+            assert ibisami_rx_getwave_clocked.status == "Ready.", "Status not 'Ready.'!"
         except Exception as err:
-            raise RuntimeError(f"dut.status: {dut.status}") from err
+            raise RuntimeError(f"status: {ibisami_rx_getwave_clocked.status}") from err
 
-    def test_perf(self, dut):
+    def test_perf(self, ibisami_rx_getwave_clocked):
         """Test simulation performance."""
-        assert dut.total_perf > (1e6 / 60), "Performance dropped below 1 Msmpls/min.!"
+        assert ibisami_rx_getwave_clocked.total_perf > (1e6 / 60), "Performance dropped below 1 Msmpls/min.!"
 
-    def test_ber(self, dut):
+    def test_ber(self, ibisami_rx_getwave_clocked):
         """Test simulation bit errors."""
-        assert dut.n_errs_dfe == 0, "Bit errors detected!"
+        assert ibisami_rx_getwave_clocked.n_errs_dfe == 0, "Bit errors detected!"
 
-    def test_dly(self, dut):
+    def test_dly(self, ibisami_rx_getwave_clocked):
         """Test channel delay."""
-        assert dut.chnl_dly > 1e-9 and dut.chnl_dly < 10e-9, "Channel delay is out of range!"
+        assert ibisami_rx_getwave_clocked.chnl_dly > 1e-9 and ibisami_rx_getwave_clocked.chnl_dly < 10e-9, "Channel delay is out of range!"
 
-    def test_isi(self, dut):
+    def test_isi(self, ibisami_rx_getwave_clocked):
         """Test ISI portion of jitter."""
-        assert dut.isi_dfe < 50e-12, "ISI is too high!"
+        assert ibisami_rx_getwave_clocked.isi_dfe < 50e-12, "ISI is too high!"
 
-    def test_dcd(self, dut):
+    def test_dcd(self, ibisami_rx_getwave_clocked):
         """Test DCD portion of jitter."""
-        assert dut.dcd_dfe < 20e-12, "DCD is too high!"
+        assert ibisami_rx_getwave_clocked.dcd_dfe < 20e-12, "DCD is too high!"
 
-    def test_pj(self, dut):
+    def test_pj(self, ibisami_rx_getwave_clocked):
         """Test periodic portion of jitter."""
-        assert dut.pj_dfe < 40e-12, "Periodic jitter is too high!"
+        assert ibisami_rx_getwave_clocked.pj_dfe < 40e-12, "Periodic jitter is too high!"
 
-    def test_rj(self, dut):
+    def test_rj(self, ibisami_rx_getwave_clocked):
         """Test random portion of jitter."""
-        assert dut.rj_dfe < 20e-12, "Random jitter is too high!"
+        assert ibisami_rx_getwave_clocked.rj_dfe < 20e-12, "Random jitter is too high!"
 
-    def test_lock(self, dut):
+    def test_lock(self, ibisami_rx_getwave_clocked):
         """Test CDR lock, by ensuring that last 20% of locked indication vector
         is all True."""
-        _lockeds = dut.lockeds
+        _lockeds = ibisami_rx_getwave_clocked.lockeds
         assert all(_lockeds[4 * len(_lockeds) // 5 :]), "CDR lock is unstable!"
 
-    def test_adapt(self, dut):
+    def test_adapt(self, ibisami_rx_getwave_clocked):
         """Test DFE lock, by ensuring that last 20% of all coefficient vectors
         are stable to within +/-20% of their mean."""
-        _weights = dut.adaptation  # rows = step; cols = tap
+        _weights = ibisami_rx_getwave_clocked.adaptation  # rows = step; cols = tap
         _ws = np.array(list(zip(*_weights[4 * len(_weights) // 5 :])))  # zip(*x) = unzip(x)
         _means = list(map(lambda xs: sum(xs) / len(xs), _ws))
         assert all(

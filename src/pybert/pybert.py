@@ -38,6 +38,7 @@ from traits.api import (
     Array,
     Bool,
     Button,
+    Enum,
     File,
     Float,
     HasTraits,
@@ -127,13 +128,16 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     thresh     = Float(3.0)   #: Spectral threshold for identifying periodic components (sigma). (Default = 3.0)
     rlm        = Float(0.95)  #: Relative level mismatch. (Default = 0.95)
 
-    # - Channel Control
-    ch_file = File("")  #: Channel file name.
-    use_ch_file = Bool(False)  #: Import channel description from file? (Default = False)
+    # - Interconnect Control
+    inter_sel = Enum("native", "single", "multiple")
+    # -- file(s)
+    ch_file  = File("")        #: Channel file (for browsing).
+    ch_files = List(File)    #: Ordered list of channel files for composite interconnect.
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
     f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
+    # -- native
     Rdc = Float(0.1876)  #: Channel d.c. resistance (Ohms/m).
     w0 = Float(10e6)  #: Channel transition frequency (rads./s).
     R0 = Float(1.452)  #: Channel skin effect resistance (Ohms/m).
@@ -211,6 +215,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     use_mmse = Bool(True)
 
     # - Tx
+    tx_sel = Enum("native", "ibis")
+    # -- native
     vod = Float(1.0)  #: Tx differential output voltage (V)
     rs = Float(100)  #: Tx source impedance (Ohms)
     cout = Range(low=0.001, high=1000, value=0.5)  #: Tx parasitic output capacitance (pF)
@@ -228,20 +234,22 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         ]
     )  #: List of Tx deemphasis tap tuner objects.
     rel_power = Float(1.0)  #: Tx power dissipation (W).
+    # -- ibis
     tx_use_ami = Bool(False)  #: (Bool)
     tx_has_ts4 = Bool(False)  #: (Bool)
     tx_use_ts4 = Bool(False)  #: (Bool)
     tx_use_getwave = Bool(False)  #: (Bool)
     tx_has_getwave = Bool(False)  #: (Bool)
-    tx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
+    tx_ami_file = File("", entries=5, filter=["*.ami"])  # type: ignore
     tx_ami_valid = Bool(False)  #: (Bool)
-    tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
+    tx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  # type: ignore
     tx_dll_valid = Bool(False)  #: (Bool)
     tx_ibis_file = File("")  #: (File)
     tx_ibis_valid = Bool(False)  #: (Bool)
-    tx_use_ibis = Bool(False)  #: (Bool)
 
     # - Rx
+    rx_sel = Enum("native", "ibis")
+    # -- native
     rin = Float(100)  #: Rx input impedance (Ohm)
     cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
     cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
@@ -251,19 +259,19 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
     peak_mag = Float(gPeakMag)  #: CTLE peaking magnitude (dB)
     ctle_enable = Bool(True)  #: CTLE enable.
+    # -- ibis
     rx_use_ami = Bool(False)  #: (Bool)
     rx_has_ts4 = Bool(False)  #: (Bool)
     rx_use_ts4 = Bool(False)  #: (Bool)
     rx_use_getwave = Bool(False)  #: (Bool)
     rx_has_getwave = Bool(False)  #: (Bool)
     rx_use_clocks = Bool(False)  #: (Bool)
-    rx_ami_file = File("", entries=5, filter=["*.ami"])  #: (File)
+    rx_ami_file = File("", entries=5, filter=["*.ami"])  # type: ignore
     rx_ami_valid = Bool(False)  #: (Bool)
-    rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  #: (File)
+    rx_dll_file = File("", entries=5, filter=["*.dll", "*.so"])  # type: ignore
     rx_dll_valid = Bool(False)  #: (Bool)
     rx_ibis_file = File("")  #: (File)
     rx_ibis_valid = Bool(False)  #: (Bool)
-    rx_use_ibis = Bool(False)  #: (Bool)
     rx_use_viterbi = Bool(False)  #: (Bool)
     rx_viterbi_symbols = Int(4)  #: Number of symbols to track in Viterbi decoder.
     rx_viterbi_fec = Bool(False)  #: Use FEC, as opposed to ISI, for Viterbi decoding when True.
@@ -316,8 +324,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     )  #: List of Rx FFE tap tuner objects.
 
     # Misc.
-    cfg_file = File("", entries=5, filter=["*.pybert_cfg"])  #: PyBERT configuration data storage file (File).
-    data_file = File("", entries=5, filter=["*.pybert_data"])  #: PyBERT results data storage file (File).
+    #: PyBERT configuration data storage file (File).
+    cfg_file = File("", entries=5, filter=["*.pybert_cfg"])  # type: ignore
+    #: PyBERT results data storage file (File).
+    data_file = File("", entries=5, filter=["*.pybert_data"])  # type: ignore
 
     # Plots (plot containers, actually)
     plotdata = ArrayPlotData()
@@ -1079,7 +1089,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.tx_ibis_valid = False
             self.tx_use_ami = False
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, True, debug=self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
@@ -1141,7 +1151,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.rx_ibis_valid = False
             self.rx_use_ami = False
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, False, self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
@@ -1284,30 +1294,46 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         len_f = len(f)
 
         # Form the pre-on-die S-parameter 2-port network for the channel.
-        if self.use_ch_file:
-            ch_s2p_pre = import_channel(self.ch_file, ts, f, renumber=self.renumber)
-            self.log(str(ch_s2p_pre))
-            H = ch_s2p_pre.s21.s.flatten()
-        else:
-            # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
-            # - Grab model parameters from PyBERT instance.
-            l_ch = self.l_ch
-            v0 = self.v0 * 3.0e8
-            R0 = self.R0
-            w0 = self.w0
-            Rdc = self.Rdc
-            Z0 = self.Z0
-            Theta0 = self.Theta0
-            # - Calculate propagation constant, characteristic impedance, and transfer function.
-            gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
-            self.Zc = Zc
-            H = exp(-l_ch * gamma)  # pylint: disable=invalid-unary-operand-type
-            self.H = H
-            # - Use the transfer function and characteristic impedance to form "perfectly matched" network.
-            tmp = np.array(list(zip(zip(zeros(len_f), H), zip(H, zeros(len_f)))))
-            ch_s2p_pre = rf.Network(s=tmp, f=f / 1e9, z0=Zc)
-            # - And, finally, renormalize to driver impedance.
-            ch_s2p_pre.renormalize(Rs)
+        match(self.inter_sel):
+            case "native":
+                # Construct PyBERT default channel model (i.e. - Howard Johnson's UTP model).
+                # - Grab model parameters from PyBERT instance.
+                l_ch = self.l_ch
+                v0 = self.v0 * 3.0e8
+                R0 = self.R0
+                w0 = self.w0
+                Rdc = self.Rdc
+                Z0 = self.Z0
+                Theta0 = self.Theta0
+                # - Calculate propagation constant, characteristic impedance, and transfer function.
+                gamma, Zc = calc_gamma(R0, w0, Rdc, Z0, v0, Theta0, w)
+                self.Zc = Zc
+                H = exp(-l_ch * gamma)  # pylint: disable=invalid-unary-operand-type
+                self.H = H
+                # - Use the transfer function and characteristic impedance to form "perfectly matched" network.
+                tmp = np.array(list(zip(zip(zeros(len_f), H), zip(H, zeros(len_f)))))
+                ch_s2p_pre = rf.Network(s=tmp, f=f / 1e9, z0=Zc)
+                # - And, finally, renormalize to driver impedance.
+                ch_s2p_pre.renormalize(Rs)
+            case "single":
+                file = self.ch_file
+                if not file:
+                    raise RuntimeError("'single' is selected but no channel file is specified!")
+                ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber)
+                self.log(str(ch_s2p_pre))
+                H = ch_s2p_pre.s21.s.flatten()
+            case "multiple":
+                files = self.ch_files
+                if not files:
+                    raise RuntimeError("'multiple' is selected but no channel files are specified!")
+                networks = [import_channel(fname, ts, f, renumber=self.renumber) for fname in files]
+                ch_s2p_pre = networks[0]
+                for ntwk in networks[1:]:
+                    ch_s2p_pre = ch_s2p_pre ** ntwk
+                self.log(str(ch_s2p_pre))
+                H = ch_s2p_pre.s21.s.flatten()
+            case _:
+                raise RuntimeError("Unrecognized interconnect type!")
         ch_s2p_pre.name = "ch_s2p_pre"
         self.ch_s2p_pre = ch_s2p_pre
         ch_s2p = ch_s2p_pre  # In case neither set of on-die S-parameters is being invoked, below.
@@ -1337,7 +1363,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 res = ntwk2**s2p
             return (res, ts4N, ntwk2)
 
-        if self.tx_use_ibis:
+        if self.tx_sel == "ibis":
             model = self._tx_ibis.model
             Rs = model.zout * 2
             Cs = model.ccomp[0] / 2  # They're in series.
@@ -1348,7 +1374,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
                 self.ts4N = ts4N
                 self.ntwk = ntwk
-        if self.rx_use_ibis:
+        if self.rx_sel == "ibis":
             model = self._rx_ibis.model
             RL = model.zin * 2
             Cp = model.ccomp[0] / 2

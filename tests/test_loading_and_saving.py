@@ -12,6 +12,32 @@ from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.pybert import PyBERT
 
 
+def test_load_old_bool_traits_compat(tmp_path: Path):
+    """Old configs using Bool traits (use_ch_file, rx_use_ibis, tx_use_ibis) load correctly
+    via the backward-compat mapping added in configuration.py:222-229."""
+    dut = PyBERT(run_simulation=False, gui=False)
+
+    # Build a minimal old-format config via pickle, injecting the old Bool keys.
+    config = PyBertCfg(dut, "string_time", "test.test.test")
+    config.use_ch_file  = True   # old name; should map to inter_sel = "single"
+    config.rx_use_ibis  = True   # old name; should map to rx_sel    = "ibis"
+    config.tx_use_ibis  = False  # old name; should map to tx_sel    = "native"
+    # Remove the new-style attrs so load_from_file only sees the old keys.
+    for attr in ("inter_sel", "rx_sel", "tx_sel"):
+        config.__dict__.pop(attr, None)
+
+    save_file = tmp_path / "compat.pybert_cfg"
+    with open(save_file, "wb") as f:
+        pickle.dump(config, f)
+
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+
+    assert dut2.inter_sel == "single", f"Expected inter_sel='single', got {dut2.inter_sel!r}"
+    assert dut2.rx_sel    == "ibis",   f"Expected rx_sel='ibis',   got {dut2.rx_sel!r}"
+    assert dut2.tx_sel    == "native", f"Expected tx_sel='native', got {dut2.tx_sel!r}"
+
+
 @pytest.mark.parametrize("filepath_converter", [str, Path])
 @pytest.mark.usefixtures("dut")
 def test_save_config_as_yaml(dut, filepath_converter, tmp_path: Path):
