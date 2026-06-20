@@ -1,12 +1,16 @@
-"""Unit tests for 8- and 12-port Touchstone lane extraction.
+"""Unit tests for 8- and 12-port Touchstone lane extraction and FEXT analysis.
 
 Verifies that ``import_freq`` correctly extracts the requested differential
-lane from multi-port single-ended S-parameter files.
+lane from multi-port single-ended S-parameter files, and that ``import_fext``
+returns the correct FEXT transfer functions for aggressor lanes.
 
 Port ordering convention (N-port, L = N/4 lanes):
     Lane k occupies ports [4k, 4k+1, 4k+2, 4k+3] (0-indexed), representing
     (+A, +B, −A, −B) respectively.  ``import_freq`` re-orders them to
     (+A, −A, +B, −B) before calling ``sdd_21()``.
+
+FEXT path from aggressor j to victim k uses aggressor input ports (4j, 4j+2)
+and victim output ports (4k+1, 4k+3), assembled as (TX+, TX−, RX+, RX−).
 """
 
 import tempfile
@@ -15,7 +19,7 @@ import numpy as np
 import pytest
 import skrf
 
-from pybert.utility.sparam import import_freq
+from pybert.utility.sparam import import_freq, import_fext
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +71,44 @@ def _build_multilane_network(lane_s2p_list: list[skrf.Network]) -> skrf.Network:
         s[:, p_mB, p_pA] = -2 * s21
         # reciprocal direction
         s[:, p_pA, p_mB] = -2 * lane.s[:, 0, 1]
+
+    return skrf.Network(f=freqs, s=s, z0=z0)
+
+
+def _build_multilane_network_with_fext(
+    lane_s2p_list: list[skrf.Network],
+    fext_matrix: dict[tuple[int, int], skrf.Network],
+) -> skrf.Network:
+    """
+    Assemble L lanes and optional FEXT paths into a 4L-port single-ended Network.
+
+    ``lane_s2p_list[k]`` is the thru-path for lane k (built as in
+    ``_build_multilane_network``).
+
+    ``fext_matrix[(j, k)]`` is the desired Sdd21 for the FEXT path from aggressor j
+    to victim k.  The SE element set is ``s[4k+3, 4j] = -2·T_fext``, which makes
+    the extracted Sdd21 equal to T_fext (same derivation as for the thru paths).
+    """
+    L = len(lane_s2p_list)
+    N = 4 * L
+    n_freqs = lane_s2p_list[0].f.size
+    freqs = lane_s2p_list[0].f
+
+    s = np.zeros((n_freqs, N, N), dtype=complex)
+    z0 = np.full((n_freqs, N), 50.0)
+
+    # Thru paths.
+    for k, lane in enumerate(lane_s2p_list):
+        p_pA, p_mB = 4 * k, 4 * k + 3
+        s[:, p_mB, p_pA] = -2 * lane.s[:, 1, 0]
+        s[:, p_pA, p_mB] = -2 * lane.s[:, 0, 1]
+
+    # FEXT paths: from aggressor j input (+A=4j) to victim k output (-B=4k+3).
+    for (j, k), fext_ntwk in fext_matrix.items():
+        p_Aj = 4 * j        # aggressor j +A input
+        p_Bk = 4 * k + 3   # victim k -B output
+        s[:, p_Bk, p_Aj] = -2 * fext_ntwk.s[:, 1, 0]
+        s[:, p_Aj, p_Bk] = -2 * fext_ntwk.s[:, 0, 1]
 
     return skrf.Network(f=freqs, s=s, z0=z0)
 
@@ -151,3 +193,67 @@ class TestImportFreqMultilane:
 
         with pytest.raises(ValueError, match="1, 2, 4, 8, or 12"):
             import_freq(path)
+
+
+class TestImportFext:
+    """Verify FEXT extraction from multi-lane Touchstone files."""
+
+    def test_8port_returns_one_fext_network(self, freqs, tmp_path):
+        """An 8-port file with victim=lane 0 should yield exactly one FEXT network (lane 1)."""
+        lanes = [_make_tline_s2p(freqs, loss_db=d) for d in (2.0, 5.0)]
+        ntwk8 = _build_multilane_network_with_fext(lanes, {})
+        path = str(tmp_path / "test.s8p")
+        ntwk8.write_touchstone(path)
+
+        result = import_fext(path, freqs, victim_lane=0)
+        assert len(result) == 1
+
+    def test_12port_returns_two_fext_networks(self, freqs, tmp_path):
+        """A 12-port file with victim=lane 1 should yield two FEXT networks (lanes 0, 2)."""
+        lanes = [_make_tline_s2p(freqs, loss_db=d) for d in (1.0, 3.0, 6.0)]
+        ntwk12 = _build_multilane_network_with_fext(lanes, {})
+        path = str(tmp_path / "test.s12p")
+        ntwk12.write_touchstone(path)
+
+        result = import_fext(path, freqs, victim_lane=1)
+        assert len(result) == 2
+
+    def test_fext_s21_matches_reference(self, freqs, tmp_path):
+        """Extracted FEXT Sdd21 should match the reference FEXT 2-port network."""
+        lane0 = _make_tline_s2p(freqs, loss_db=2.0)
+        lane1 = _make_tline_s2p(freqs, loss_db=5.0)
+        fext_ref = _make_tline_s2p(freqs, loss_db=20.0)  # heavy FEXT attenuation
+
+        ntwk8 = _build_multilane_network_with_fext(
+            [lane0, lane1],
+            fext_matrix={(1, 0): fext_ref},  # aggressor=lane1, victim=lane0
+        )
+        path = str(tmp_path / "test.s8p")
+        ntwk8.write_touchstone(path)
+
+        result = import_fext(path, freqs, victim_lane=0)
+        assert len(result) == 1
+        np.testing.assert_allclose(
+            np.abs(result[0].s[:, 1, 0]),
+            np.abs(fext_ref.s[:, 1, 0]),
+            rtol=1e-6,
+            err_msg="FEXT Sdd21 magnitude does not match reference",
+        )
+
+    def test_non_multilane_file_returns_empty(self, freqs, tmp_path):
+        """A 2-port or 4-port file should return an empty list (no FEXT)."""
+        lane = _make_tline_s2p(freqs, loss_db=3.0)
+        path = str(tmp_path / "test.s2p")
+        lane.write_touchstone(path)
+
+        assert import_fext(path, freqs, victim_lane=0) == []
+
+    def test_victim_lane_out_of_range_raises(self, freqs, tmp_path):
+        """victim_lane out of range for the file's lane count must raise ValueError."""
+        lanes = [_make_tline_s2p(freqs)] * 2
+        ntwk8 = _build_multilane_network_with_fext(lanes, {})
+        path = str(tmp_path / "test.s8p")
+        ntwk8.write_touchstone(path)
+
+        with pytest.raises(ValueError, match="victim_lane=2 out of range"):
+            import_fext(path, freqs, victim_lane=2)

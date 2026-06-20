@@ -274,6 +274,61 @@ def import_freq(filename: str, renumber: bool = False, lane: int = 0) -> Network
     return one_port_2_two_port(ntwk)
 
 
+def import_fext(filename: str, fs: Rvec, victim_lane: int, renumber: bool = False) -> list[Network]:
+    """
+    Extract FEXT transfer functions for all aggressor lanes in a multi-lane Touchstone file.
+
+    For each lane j ≠ ``victim_lane`` in an 8- or 12-port file, returns the 2-port
+    differential network representing the far-end crosstalk path from lane j's input
+    ports to the victim's output ports, interpolated onto ``fs``.
+
+    Args:
+        filename: Path to the Touchstone file (must be .s8p or .s12p).
+        fs: Frequency grid to interpolate onto (Hz).
+        victim_lane: 0-based index of the victim lane.
+
+    Keyword Args:
+        renumber: Passed through to ``sdd_21()`` for the victim-channel extraction;
+            always ``False`` for cross-lane (FEXT) paths.
+            Default: False
+
+    Returns:
+        One interpolated 2-port FEXT network per aggressor lane, in lane-index order
+        (skipping ``victim_lane``).  Returns an empty list if the file has fewer than
+        8 ports.
+
+    Raises:
+        ValueError: If ``victim_lane`` is out of range for the file's port count.
+
+    Notes:
+        Port ordering convention: same as ``import_freq()`` — lane k occupies
+        single-ended ports [4k, 4k+1, 4k+2, 4k+3] as (+A, +B, −A, −B).
+        The FEXT path from aggressor j to victim k uses aggressor input ports
+        (4j, 4j+2) and victim output ports (4k+1, 4k+3).
+    """
+    ext = os.path.splitext(filename)[1][1:]
+    if not re.search(r"^s\d+p$", ext, re.ASCII | re.IGNORECASE):
+        return []
+    ntwk = Network(filename, f_unit="Hz")
+    (_, rs, cs) = ntwk.s.shape
+    if rs != cs or rs not in (8, 12):
+        return []
+    L = rs // 4
+    k = victim_lane
+    if not (0 <= k < L):
+        raise ValueError(f"victim_lane={k} out of range for {rs}-port file (valid: 0..{L - 1})")
+    result = []
+    for j in range(L):
+        if j == k:
+            continue
+        # Aggressor j input: 4j (+A), 4j+2 (−A).  Victim k output: 4k+1 (+B), 4k+3 (−B).
+        # Subnetwork port order → (TX+, TX−, RX+, RX−) as sdd_21() expects.
+        ports = [4 * j, 4 * j + 2, 4 * k + 1, 4 * k + 3]
+        fext_2p = sdd_21(ntwk.subnetwork(ports))  # renumber intentionally omitted for cross-lane
+        result.append(interp_s2p(fext_2p, fs))
+    return result
+
+
 def import_channel(filename: str, sample_per: float, fs: Rvec,
                    zref: float = 100, renumber: bool = False, lane: int = 0) -> Network:
     """

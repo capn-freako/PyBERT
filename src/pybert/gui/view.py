@@ -301,6 +301,12 @@ traits_view = View(
                             enabled_when="inter_sel == 'single' and (ch_file.lower().endswith('.s8p') or ch_file.lower().endswith('.s12p'))",
                         ),
                         Item(
+                            name="include_fext",
+                            label="Include FEXT",
+                            tooltip="Model unused lanes as aggressors and add their FEXT to the noise floor.",
+                            enabled_when="inter_sel == 'single' and (ch_file.lower().endswith('.s8p') or ch_file.lower().endswith('.s12p'))",
+                        ),
+                        Item(
                             name="use_window",
                             label="Apply window",
                             tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
