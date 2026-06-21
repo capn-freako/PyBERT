@@ -356,9 +356,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # COM (Channel Operating Margin) — computed post-simulation via PyChOpMarg.
-    enable_com = Bool(False)   #: Compute COM after each simulation run when True. (Default = False)
-    com_value  = Float(-999.0) #: COM value (dB); -999.0 means not computed.
-    com_msg    = String("")    #: Status/error message from the last COM computation attempt.
+    enable_com   = Bool(False)  #: Compute COM after each simulation run when True. (Default = False)
+    com_cfg_file = File("")     #: Optional COM configuration spreadsheet (.xls/.xlsx); uses IEEE 802.3dj defaults when empty.
+    com_value    = Float(-999.0)  #: COM value (dB); -999.0 means not computed.
+    com_msg      = String("")   #: Status/error message from the last COM computation attempt.
 
     # About
     perf_info = Property(String, depends_on=["total_perf"])

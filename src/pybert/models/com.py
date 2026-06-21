@@ -21,6 +21,7 @@ def calc_com(
     fext_files: Optional[list[str]] = None,
     next_files: Optional[list[str]] = None,
     com_params: Optional[COMParams] = None,
+    cfg_file: Optional[str] = None,
 ) -> float:
     """
     Calculate the Channel Operating Margin (COM) using PyChOpMarg.
@@ -33,8 +34,12 @@ def calc_com(
             Default: None (no FEXT aggressors)
         next_files: Paths to NEXT aggressor Touchstone (.s4p) files.
             Default: None (no NEXT aggressors)
-        com_params: COM configuration parameters for the desired standard.
+        com_params: COM configuration parameters. Ignored when ``cfg_file`` is given.
             Default: None (uses IEEE 802.3dj parameters)
+        cfg_file: Path to a COM configuration spreadsheet (.xls/.xlsx).
+            When provided, parameters are loaded from this file instead of using
+            ``com_params`` or the IEEE 802.3dj defaults.
+            Default: None
 
     Returns:
         COM value (dB).
@@ -42,8 +47,12 @@ def calc_com(
     Raises:
         RuntimeError: If EQ optimization fails.
         ValueError: If channel file format is unsupported.
+        ImportError: If ``cfg_file`` is given but ``xlrd`` is not installed.
     """
-    if com_params is None:
+    if cfg_file:
+        from pychopmarg.excel import get_com_params  # requires pandas + xlrd
+        com_params = get_com_params(Path(cfg_file))
+    elif com_params is None:
         com_params = IEEE_8023dj
     channels: dict[str, list[Path]] = {
         "THRU": [Path(thru_file)],

@@ -996,14 +996,16 @@ def compute_com(self) -> None:
     if not ch_file or not ch_file.lower().endswith(".s4p"):
         return
 
+    cfg_file = str(self.com_cfg_file) if self.com_cfg_file else None
+    cfg_desc = f"'{self.com_cfg_file}'" if cfg_file else "IEEE 802.3dj defaults"
     self.com_msg = "RUNNING"
     self.status = "Computing COM (may take several minutes)..."
-    self.log("COM: starting IEEE 802.3dj calculation (this may take several minutes)...")
+    self.log(f"COM: starting calculation using {cfg_desc} (this may take several minutes)...")
     try:
-        com_value = calc_com(ch_file)
+        com_value = calc_com(ch_file, cfg_file=cfg_file)
         self.com_value = com_value
         self.com_msg = ""
-        self.log(f"COM (IEEE 802.3dj): {com_value:.2f} dB")
+        self.log(f"COM ({cfg_desc}): {com_value:.2f} dB")
         self.status = "Ready."
     except Exception as err:  # pylint: disable=broad-exception-caught
         self.com_value = -999.0

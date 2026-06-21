@@ -319,6 +319,26 @@ traits_view = View(
                             enabled_when="inter_sel == 'single' and ch_file.lower().endswith('.s4p')",
                         ),
                     ),
+                    HGroup(  # COM configuration spreadsheet (optional)
+                        Item(
+                            name="com_cfg_file",
+                            show_label=False,
+                            springy=True,
+                            editor=FileEditor(
+                                dialog_style="open",
+                                filter=[
+                                    "COM config files (*.xls;*.xlsx)|*.xls;*.xlsx|",
+                                    "All files (*)|*|",
+                                ],
+                                format_func=fname_formatter(),
+                            ),
+                            tooltip="Optional COM configuration spreadsheet (.xls/.xlsx). Leave blank to use IEEE 802.3dj defaults.",
+                            enabled_when="enable_com",
+                        ),
+                        label="COM Config (optional; blank = IEEE 802.3dj defaults)",
+                        visible_when="enable_com and inter_sel == 'single' and ch_file.lower().endswith('.s4p')",
+                        show_border=True,
+                    ),
                     HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
                         VGroup(
                             HGroup(
