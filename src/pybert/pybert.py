@@ -358,10 +358,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # COM (Channel Operating Margin) — computed post-simulation via PyChOpMarg.
     enable_com = Bool(False)   #: Compute COM after each simulation run when True. (Default = False)
     com_value  = Float(-999.0) #: COM value (dB); -999.0 means not computed.
+    com_msg    = String("")    #: Status/error message from the last COM computation attempt.
 
     # About
     perf_info = Property(String, depends_on=["total_perf"])
-    com_info = Property(String, depends_on=["com_value"])
+    com_info = Property(String, depends_on=["com_value", "com_msg"])
 
     # Help
     instructions = help_str
@@ -977,9 +978,14 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _get_com_info(self):
         com_value = self.com_value
+        com_msg   = self.com_msg
         info_str = "<H1>Channel Operating Margin (COM)</H1>\n"
         info_str += "<p>Computed via <em>PyChOpMarg</em> using IEEE 802.3dj parameters.</p>\n"
-        if com_value <= -999.0:
+        if com_msg.startswith("ERROR:"):
+            info_str += f"<p><strong>COM failed:</strong> {com_msg[6:].strip()}</p>\n"
+        elif com_msg == "RUNNING":
+            info_str += "<p><strong>COM:</strong> Computing (may take several minutes)&hellip;</p>\n"
+        elif com_value <= -999.0:
             info_str += "<p><strong>COM:</strong> Not computed.</p>\n"
             info_str += "<p>(Enable <em>Compute COM</em> in the Interconnect panel and use a single .s4p channel file.)</p>\n"
         else:

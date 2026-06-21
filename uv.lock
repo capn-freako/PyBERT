@@ -14,6 +14,7 @@ resolution-markers = [
 [manifest]
 members = [
     "pipbert",
+    "pychopmarg",
     "pyibis-ami",
 ]
 
@@ -2321,7 +2322,7 @@ requires-dist = [
     { name = "kiwisolver", specifier = "==1.4.9" },
     { name = "numpy", specifier = "==1.26.4" },
     { name = "parsec", specifier = "==3.17" },
-    { name = "pychopmarg", specifier = ">=3.1.2" },
+    { name = "pychopmarg", editable = "PyChOpMarg" },
     { name = "pyface", specifier = "==8.0.0" },
     { name = "pyibis-ami", editable = "PyAMI" },
     { name = "pyside6", specifier = "==6.10.2" },
@@ -2498,16 +2499,20 @@ wheels = [
 [[package]]
 name = "pychopmarg"
 version = "3.1.2"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "PyChOpMarg" }
 dependencies = [
     { name = "click" },
     { name = "numpy" },
     { name = "scikit-rf" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/2c/3640c691d2523617768f7f83e0d1e7466a1a04d521c3b1165dd6d215dec9/pychopmarg-3.1.2.tar.gz", hash = "sha256:d9308b0e50d4be362c9fa8c41649b6b9bb2d20821d008801d02a8f484734f899", size = 45358, upload-time = "2025-07-25T12:35:35.276Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/07/62d828fcfc801a7e34e719877af87bbd2626d6c3f01329d07c8de359a527/pychopmarg-3.1.2-py3-none-any.whl", hash = "sha256:9031fa5970ce19d226d52530771c71420bd785ea44993de557580e27b226bb9f", size = 53800, upload-time = "2025-07-25T12:35:33.962Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "click" },
+    { name = "numpy" },
+    { name = "scikit-rf", specifier = ">=0.29" },
+    { name = "typing-extensions" },
 ]
 
 [[package]]

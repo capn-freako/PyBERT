@@ -32,6 +32,19 @@ class TestComAttribute:
         dut.com_value = 5.3
         assert "5.30" in dut.com_info
 
+    def test_com_info_running(self):
+        """com_info reports 'Computing' when com_msg is RUNNING."""
+        dut = PyBERT(run_simulation=False, gui=False)
+        dut.com_msg = "RUNNING"
+        assert "Computing" in dut.com_info
+
+    def test_com_info_error(self):
+        """com_info surfaces the error message when COM failed."""
+        dut = PyBERT(run_simulation=False, gui=False)
+        dut.com_msg = "ERROR: some error detail"
+        assert "failed" in dut.com_info
+        assert "some error detail" in dut.com_info
+
 
 @pytest.mark.skipif(not EXAMPLE_THRU.exists(), reason="PyChOpMarg example data not available.")
 @pytest.mark.slow

@@ -113,10 +113,12 @@ follow_untyped_imports = true
 [tool.uv.workspace]
 members = [
     "PyAMI",
+    "PyChOpMarg",
 ]
 
 [tool.uv.sources]
 pyibis-ami = { workspace = true, editable = true }
+pychopmarg = { workspace = true, editable = true }
 
 [dependency-groups]
 dev = [

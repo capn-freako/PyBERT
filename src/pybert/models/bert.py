@@ -955,9 +955,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         raise
 
     _check_sim_status()
-    compute_com(self)
 
-    # Update plots.
+    # Update plots first so the user sees simulation results immediately,
+    # before the (potentially long-running) COM computation starts.
     try:
         if update_plots:
             update_results(self)
@@ -970,6 +970,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.log(f"The following error occured, while trying to update the plots:\n{err}")
         self.status = "Exception: plotting"
         raise
+
+    compute_com(self)
 
 
 def compute_com(self) -> None:
@@ -994,17 +996,20 @@ def compute_com(self) -> None:
     if not ch_file or not ch_file.lower().endswith(".s4p"):
         return
 
-    prev_status = self.status
-    self.status = "Computing COM..."
+    self.com_msg = "RUNNING"
+    self.status = "Computing COM (may take several minutes)..."
+    self.log("COM: starting IEEE 802.3dj calculation (this may take several minutes)...")
     try:
         com_value = calc_com(ch_file)
         self.com_value = com_value
+        self.com_msg = ""
         self.log(f"COM (IEEE 802.3dj): {com_value:.2f} dB")
+        self.status = "Ready."
     except Exception as err:  # pylint: disable=broad-exception-caught
         self.com_value = -999.0
+        self.com_msg = f"ERROR: {err}"
         self.log(f"COM calculation failed: {err}")
-    finally:
-        self.status = prev_status
+        self.status = "Ready."
 
 
 # Plot updating
