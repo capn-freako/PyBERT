@@ -356,7 +356,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # COM (Channel Operating Margin) — computed post-simulation via PyChOpMarg.
-    com_value = Float(-999.0)  #: COM value (dB); -999.0 means not computed.
+    enable_com = Bool(False)   #: Compute COM after each simulation run when True. (Default = False)
+    com_value  = Float(-999.0) #: COM value (dB); -999.0 means not computed.
 
     # About
     perf_info = Property(String, depends_on=["total_perf"])
@@ -980,7 +981,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         info_str += "<p>Computed via <em>PyChOpMarg</em> using IEEE 802.3dj parameters.</p>\n"
         if com_value <= -999.0:
             info_str += "<p><strong>COM:</strong> Not computed.</p>\n"
-            info_str += "<p>(COM is only computed when a single .s4p channel file is used.)</p>\n"
+            info_str += "<p>(Enable <em>Compute COM</em> in the Interconnect panel and use a single .s4p channel file.)</p>\n"
         else:
             info_str += f"<p><strong>COM:</strong> {com_value:.2f} dB</p>\n"
         return info_str

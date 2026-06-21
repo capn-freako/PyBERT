@@ -980,12 +980,14 @@ def compute_com(self) -> None:
         self: Reference to a PyBERT instance.
 
     Notes:
-        1. COM is only computed when ``inter_sel == "single"`` and the channel
-           file is a ``.s4p`` Touchstone file.
+        1. COM is only computed when ``enable_com`` is True, ``inter_sel == "single"``,
+           and the channel file is a ``.s4p`` Touchstone file.
         2. Uses IEEE 802.3dj parameters by default.
         3. Exceptions are caught and logged; ``self.com_value`` is left at its
            sentinel value (``-999.0``) when computation fails or is skipped.
     """
+    if not self.enable_com:
+        return
     if self.inter_sel != "single":
         return
     ch_file = str(self.ch_file)

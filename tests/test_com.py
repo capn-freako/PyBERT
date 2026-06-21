@@ -12,11 +12,15 @@ EXAMPLE_THRU = Path(__file__).parent.parent / "PyChOpMarg" / "chnl_data" / "exam
 
 
 class TestComAttribute:
-    """Verify that PyBERT exposes com_value correctly."""
+    """Verify that PyBERT exposes com_value and enable_com correctly."""
+
+    def test_enable_com_default(self, dut):
+        """COM computation is disabled by default."""
+        assert dut.enable_com is False, "enable_com should default to False."
 
     def test_com_value_default(self, dut):
-        """COM value defaults to sentinel when using the native channel model."""
-        assert dut.com_value == -999.0, "com_value should be -999.0 (not computed) for native channel."
+        """COM value defaults to sentinel when COM is disabled or native channel is used."""
+        assert dut.com_value == -999.0, "com_value should be -999.0 (not computed) when COM is disabled."
 
     def test_com_info_not_computed(self, dut):
         """com_info reports 'Not computed' when COM was not run."""

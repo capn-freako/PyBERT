@@ -312,6 +312,12 @@ traits_view = View(
                             tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
                             enabled_when="inter_sel != 'native'",
                         ),
+                        Item(
+                            name="enable_com",
+                            label="Compute COM",
+                            tooltip="Compute Channel Operating Margin (COM) via PyChOpMarg after each run. Requires a single .s4p channel file.",
+                            enabled_when="inter_sel == 'single' and ch_file.lower().endswith('.s4p')",
+                        ),
                     ),
                     HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
                         VGroup(
