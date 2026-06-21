@@ -355,8 +355,12 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     n_errs_viterbi = Int(0)  #: # of Viterbi bit errors observed in last run.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
+    # COM (Channel Operating Margin) — computed post-simulation via PyChOpMarg.
+    com_value = Float(-999.0)  #: COM value (dB); -999.0 means not computed.
+
     # About
     perf_info = Property(String, depends_on=["total_perf"])
+    com_info = Property(String, depends_on=["com_value"])
 
     # Help
     instructions = help_str
@@ -968,6 +972,17 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         info_str += "    </TR>\n"
         info_str += "  </TABLE>\n"
 
+        return info_str
+
+    def _get_com_info(self):
+        com_value = self.com_value
+        info_str = "<H1>Channel Operating Margin (COM)</H1>\n"
+        info_str += "<p>Computed via <em>PyChOpMarg</em> using IEEE 802.3dj parameters.</p>\n"
+        if com_value <= -999.0:
+            info_str += "<p><strong>COM:</strong> Not computed.</p>\n"
+            info_str += "<p>(COM is only computed when a single .s4p channel file is used.)</p>\n"
+        else:
+            info_str += f"<p><strong>COM:</strong> {com_value:.2f} dB</p>\n"
         return info_str
 
     def _get_sweep_info(self):

@@ -987,6 +987,7 @@ traits_view = View(
                 Item("perf_info", style="readonly", show_label=False),
                 label="Performance",
             ),
+            Group(Item("com_info", style="readonly", show_label=False), label="COM"),
             Group(Item("instructions", style="readonly", show_label=False), label="User's Guide"),
             Group(Item("console_log", style="custom", show_label=False), label="Console", id="console"),
             layout="tabbed",

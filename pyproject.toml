@@ -77,6 +77,9 @@ wrap-summaries = 0
 minversion = "7.0"
 addopts = "-vv --durations=3"
 xfail_strict=true
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.pylint.master]
 fail-under = 9.0
