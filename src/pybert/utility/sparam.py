@@ -223,9 +223,9 @@ def H_2_s2p(H: Cvec, Zc: Cvec, fs: Rvec, Zref: float = 50) -> Network:
     return Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_freq(filename: str, renumber: bool = False) -> Network:
+def import_freq(filename: str, renumber: bool = False, lane: int = 0) -> Network:
     """
-    Read in a 1, 2, or 4-port Touchstone file, and return an equivalent 2-port network.
+    Read in a 1, 2, 4, 8, or 12-port Touchstone file, and return an equivalent 2-port network.
 
     Args:
         filename: Name of Touchstone file to read in.
@@ -233,26 +233,40 @@ def import_freq(filename: str, renumber: bool = False) -> Network:
     Keyword Args:
         renumber: Automatically detect/fix "1=>3/2=>4" port numbering, when True.
             Default = False
+        lane: 0-based lane index, used only for 8- and 12-port files.
+            Default = 0
 
     Returns:
         2-port differential network.
 
     Raises:
-        ValueError: If Touchstone file is not 1, 2, or 4-port.
+        ValueError: If Touchstone file is not 1, 2, 4, 8, or 12-port.
+        ValueError: If ``lane`` is out of range for the given port count.
 
     Notes:
         1. A 4-port Touchstone file is assumed single-ended,
         and the "DD" quadrant of its mixed-mode equivalent gets returned.
+        2. An 8- or 12-port file is assumed to contain L = N/4 differential lanes,
+        with ports ordered as **(+A, +B, −A, −B)** for each lane in groups of four:
+        Lane k occupies single-ended ports [4k, 4k+1, 4k+2, 4k+3] (0-indexed),
+        mapped to the 4-port sub-network as [4k, 4k+2, 4k+1, 4k+3] so that
+        ``sdd_21()`` receives them in (+A, −A, +B, −B) order.
     """
     # Import and sanity check the Touchstone file.
     ntwk = Network(filename, f_unit="Hz")
     (_, rs, cs) = ntwk.s.shape
     if rs != cs:
         raise ValueError("Non-square Touchstone file S-matrix!")
-    if rs not in (1, 2, 4):
-        raise ValueError(f"Touchstone file must have 1, 2, or 4 ports!\n{ntwk}")
+    if rs not in (1, 2, 4, 8, 12):
+        raise ValueError(f"Touchstone file must have 1, 2, 4, 8, or 12 ports!\n{ntwk}")
 
     # Convert to a 2-port network.
+    if rs in (8, 12):
+        L = rs // 4
+        if not (0 <= lane < L):
+            raise ValueError(f"lane={lane} out of range for {rs}-port file (valid: 0..{L - 1})")
+        ports = [4 * lane, 4 * lane + 2, 4 * lane + 1, 4 * lane + 3]
+        return sdd_21(ntwk.subnetwork(ports), renumber=renumber)
     if rs == 4:  # 4-port Touchstone files are assumed single-ended!
         return sdd_21(ntwk, renumber=renumber)
     if rs == 2:
@@ -260,8 +274,63 @@ def import_freq(filename: str, renumber: bool = False) -> Network:
     return one_port_2_two_port(ntwk)
 
 
+def import_fext(filename: str, fs: Rvec, victim_lane: int, renumber: bool = False) -> list[Network]:
+    """
+    Extract FEXT transfer functions for all aggressor lanes in a multi-lane Touchstone file.
+
+    For each lane j ≠ ``victim_lane`` in an 8- or 12-port file, returns the 2-port
+    differential network representing the far-end crosstalk path from lane j's input
+    ports to the victim's output ports, interpolated onto ``fs``.
+
+    Args:
+        filename: Path to the Touchstone file (must be .s8p or .s12p).
+        fs: Frequency grid to interpolate onto (Hz).
+        victim_lane: 0-based index of the victim lane.
+
+    Keyword Args:
+        renumber: Passed through to ``sdd_21()`` for the victim-channel extraction;
+            always ``False`` for cross-lane (FEXT) paths.
+            Default: False
+
+    Returns:
+        One interpolated 2-port FEXT network per aggressor lane, in lane-index order
+        (skipping ``victim_lane``).  Returns an empty list if the file has fewer than
+        8 ports.
+
+    Raises:
+        ValueError: If ``victim_lane`` is out of range for the file's port count.
+
+    Notes:
+        Port ordering convention: same as ``import_freq()`` — lane k occupies
+        single-ended ports [4k, 4k+1, 4k+2, 4k+3] as (+A, +B, −A, −B).
+        The FEXT path from aggressor j to victim k uses aggressor input ports
+        (4j, 4j+2) and victim output ports (4k+1, 4k+3).
+    """
+    ext = os.path.splitext(filename)[1][1:]
+    if not re.search(r"^s\d+p$", ext, re.ASCII | re.IGNORECASE):
+        return []
+    ntwk = Network(filename, f_unit="Hz")
+    (_, rs, cs) = ntwk.s.shape
+    if rs != cs or rs not in (8, 12):
+        return []
+    L = rs // 4
+    k = victim_lane
+    if not (0 <= k < L):
+        raise ValueError(f"victim_lane={k} out of range for {rs}-port file (valid: 0..{L - 1})")
+    result = []
+    for j in range(L):
+        if j == k:
+            continue
+        # Aggressor j input: 4j (+A), 4j+2 (−A).  Victim k output: 4k+1 (+B), 4k+3 (−B).
+        # Subnetwork port order → (TX+, TX−, RX+, RX−) as sdd_21() expects.
+        ports = [4 * j, 4 * j + 2, 4 * k + 1, 4 * k + 3]
+        fext_2p = sdd_21(ntwk.subnetwork(ports))  # renumber intentionally omitted for cross-lane
+        result.append(interp_s2p(fext_2p, fs))
+    return result
+
+
 def import_channel(filename: str, sample_per: float, fs: Rvec,
-                   zref: float = 100, renumber: bool = False) -> Network:
+                   zref: float = 100, renumber: bool = False, lane: int = 0) -> Network:
     """
     Read in a channel description file.
 
@@ -275,6 +344,8 @@ def import_channel(filename: str, sample_per: float, fs: Rvec,
             Default: 100
         renumber: Automatically fix "1=>3/2=>4" port numbering when True.
             Default: False
+        lane: 0-based lane index for 8- and 12-port Touchstone files.
+            Default: 0
 
     Returns:
         2-port network description of channel.
@@ -294,7 +365,7 @@ def import_channel(filename: str, sample_per: float, fs: Rvec,
     """
     extension = os.path.splitext(filename)[1][1:]
     if re.search(r"^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
-        ts2N = interp_s2p(import_freq(filename, renumber=renumber), fs)
+        ts2N = interp_s2p(import_freq(filename, renumber=renumber, lane=lane), fs)
     else:  # simple 2-column time domain description (impulse or step).
         h = import_time(filename, sample_per)
         # Fixme: an a.c. coupled channel breaks this naive approach!  # pylint: disable=fixme

@@ -226,6 +226,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     noise = pn + normal(scale=rn, size=(len(x),))
     self.noise = noise
 
+    # Add FEXT interference: each aggressor lane's signal through its FEXT impulse response.
+    # Assumes all aggressor lanes carry the same PRBS pattern as the victim (coherent worst case).
+    for h_fext in getattr(self, "fext_h", []):
+        noise = noise + convolve(x, h_fext)[: len(noise)]
+
     # Tx and Rx modeling are not separable in all cases.
     # So, we model each of the 4 possible combinations explicitly.
     # For the purposes of tallying possible combinations,

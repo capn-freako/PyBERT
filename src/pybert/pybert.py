@@ -76,6 +76,7 @@ from pybert.threads.optimization import OptThread
 from pybert.utility import (
     calc_gamma,
     import_channel,
+    import_fext,
     lfsr_bits,
     raised_cosine,
     safe_log10,
@@ -134,6 +135,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     ch_file  = File("")        #: Channel file (for browsing).
     ch_files = List(File)    #: Ordered list of channel files for composite interconnect.
     renumber = Bool(False)  #: Automatically fix "1=>3/2=>4" port numbering? (Default = False)
+    lane_sel     = Int(0)        #: Lane index for 8/12-port Touchstone files (0-based). (Default = 0)
+    include_fext = Bool(False)   #: Add FEXT from aggressor lanes to simulation noise? (Default = False)
     f_step = Float(10)  #: Frequency step to use when constructing H(f) (MHz). (Default = 10 MHz)
     f_max = Float(40)  #: Frequency maximum to use when constructing H(f) (GHz). (Default = 40 GHz)
     impulse_length = Float(0.0)  #: Impulse response length. (Determined automatically, when 0.)
@@ -1319,7 +1322,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 file = self.ch_file
                 if not file:
                     raise RuntimeError("'single' is selected but no channel file is specified!")
-                ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber)
+                ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber, lane=self.lane_sel)
                 self.log(str(ch_s2p_pre))
                 H = ch_s2p_pre.s21.s.flatten()
             case "multiple":
@@ -1437,6 +1440,27 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.t_ns_chnl = array(t[start_ix: start_ix + len(chnl_h)]) * 1.0e9
         self.chnl_s = chnl_s
         self.chnl_p = chnl_p
+
+        # Compute FEXT impulse responses when enabled.
+        # Each aggressor lane's signal convolved with its FEXT impulse response
+        # is added to the noise floor in my_run_simulation().
+        self.fext_h = []
+        if self.include_fext and self.inter_sel == "single":
+            for fext_ntwk in import_fext(self.ch_file, f, self.lane_sel, renumber=self.renumber):
+                fext_term = fext_ntwk.copy()
+                fext_z0 = fext_term.z0.copy()
+                fext_z0[:, 0] = Zs
+                fext_z0[:, 1] = Zt
+                fext_term.renormalize(fext_z0)
+                fext_H = fext_term.s21.s.flatten() * np.sqrt(fext_term.z0[:, 1] / fext_term.z0[:, 0])
+                if self.use_window:
+                    h = irfft(raised_cosine(fext_H))
+                else:
+                    h = irfft(fext_H)
+                krnl = interp1d(t_irfft, h, kind="cubic", bounds_error=False, fill_value=0, assume_sorted=True)
+                h_t = krnl(t) * t[1] / t_irfft[1]
+                h_t, _ = trim_impulse(h_t, min_len=min_len, max_len=max_len, front_porch=True, kept_energy=0.999)
+                self.fext_h.append(h_t)
 
         return chnl_h
 
