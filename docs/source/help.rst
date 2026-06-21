@@ -1,6 +1,6 @@
-=================
-GUI - Help Screen
-=================
+=============================
+``.help`` - GUI - Help Screen
+=============================
 
 .. automodule:: pybert.gui.help
    :members:

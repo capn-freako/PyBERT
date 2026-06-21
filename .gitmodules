@@ -4,6 +4,6 @@
 [submodule "chaco"]
 	path = chaco
 	url = https://github.com/enthought/chaco.git
-[submodule "parsec.py"]
-	path = parsec.py
-	url = https://github.com/capn-freako/parsec.py.git
+[submodule "PyChOpMarg"]
+	path = PyChOpMarg
+	url = git@github.com:capn-freako/PyChOpMarg.git

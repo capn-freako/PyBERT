@@ -8,8 +8,34 @@ import pytest
 import yaml
 
 from pybert import __version__
-from pybert.configuration import PyBertCfg
+from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.pybert import PyBERT
+
+
+def test_load_old_bool_traits_compat(tmp_path: Path):
+    """Old configs using Bool traits (use_ch_file, rx_use_ibis, tx_use_ibis) load correctly
+    via the backward-compat mapping added in configuration.py:222-229."""
+    dut = PyBERT(run_simulation=False, gui=False)
+
+    # Build a minimal old-format config via pickle, injecting the old Bool keys.
+    config = PyBertCfg(dut, "string_time", "test.test.test")
+    config.use_ch_file  = True   # old name; should map to inter_sel = "single"
+    config.rx_use_ibis  = True   # old name; should map to rx_sel    = "ibis"
+    config.tx_use_ibis  = False  # old name; should map to tx_sel    = "native"
+    # Remove the new-style attrs so load_from_file only sees the old keys.
+    for attr in ("inter_sel", "rx_sel", "tx_sel"):
+        config.__dict__.pop(attr, None)
+
+    save_file = tmp_path / "compat.pybert_cfg"
+    with open(save_file, "wb") as f:
+        pickle.dump(config, f)
+
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+
+    assert dut2.inter_sel == "single", f"Expected inter_sel='single', got {dut2.inter_sel!r}"
+    assert dut2.rx_sel    == "ibis",   f"Expected rx_sel='ibis',   got {dut2.rx_sel!r}"
+    assert dut2.tx_sel    == "native", f"Expected tx_sel='native', got {dut2.tx_sel!r}"
 
 
 @pytest.mark.parametrize("filepath_converter", [str, Path])
@@ -60,9 +86,9 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
     with open(save_file, "r", encoding="UTF-8") as saved_config_file:
         user_config = yaml.load(saved_config_file, Loader=yaml.Loader)
         # Change a lot of settings throughout the different tabs of the application.
-        user_config.nbits = 1234  # Normally 8000
+        user_config.eye_bits = 1234  # Normally 8000
         user_config.bit_rate = 20  # Normally 10
-        user_config.mod_type = [1]  # Normally [0]
+        user_config.mod_type = "Duo-binary"  # Normally "NRZ"
         user_config.pattern = "PRBS-23"  # Normally PRBS-7
         user_config.Rdc = 2  # Normally 0.1876
         user_config.rin = 85  # Normally 100
@@ -78,7 +104,7 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
     # All items should exist in both, so fail if one isn't found.
     for name in user_config.__dict__.keys():
         # These are handled differently so skip them.
-        if name not in ["tx_taps", "tx_tap_tuners", "version", "date_created"]:
+        if name not in ["tx_taps", "tx_tap_tuners", "dfe_tap_tuners", "version", "date_created"]:
             # Test the values
             assert getattr(user_config, name) == getattr(dut, name)
 
@@ -107,11 +133,16 @@ def test_load_config_from_pickle(dut, tmp_path: Path):
 
 @pytest.mark.usefixtures("dut")
 def test_load_config_from_invalid(dut, tmp_path: Path):
-    """When given an unsupported file suffix, no file should be read and an message logged."""
+    """
+    When given an unsupported file suffix,
+    an error message should be logged and an exception raised.
+    """
     save_file = tmp_path.joinpath("config.json")
     save_file.touch()
-    dut.load_configuration(save_file)
+    with pytest.raises(InvalidFileType) as excinfo:
+        dut.load_configuration(save_file)
 
+    assert "PyBERT does not support this file type." in str(excinfo.value)
     assert "This filetype is not currently supported." in dut.console_log
 
 

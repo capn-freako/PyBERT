@@ -7,15 +7,16 @@ Original date:   January 7, 2022
 Copyright (c) 2022 David Banas; all rights reserved World wide.
 """
 import re
-
+from functools import reduce
 from parsec import count, generate, many, many1, none_of, regex, sepBy1, string
 
 
-class CSDF:
+class CSDF:  # pylint: disable=too-few-public-methods
     """Common Simulation Data Format (CSDF)"""
 
     def __init__(self, hdr, nms, wvs):
-        assert len(nms) == int(hdr["NODES"])
+        if len(nms) != int(hdr["NODES"]):
+            raise ValueError(f"Length of `nms` ({len(nms)}) must equal `hdr['NODES']` ({int(hdr['NODES'])})")
         self.header = {}
         self.header.update(hdr)
         self.names = nms
@@ -76,6 +77,7 @@ def csdf_data():
     wvs = yield many1(wave_samps)
     return CSDF(
         dict(map(lambda pr: (pr[0], "".join(pr[1])), hdr)),
-        list(map(lambda cs: "".join(cs), nms)),
+        # list(map(lambda cs: "".join(cs), nms)),
+        list(reduce("".join, nms)),
         list(map(lambda pr: (float(pr[0]), pr[1]), wvs)),
     )

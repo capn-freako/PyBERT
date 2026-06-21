@@ -8,7 +8,7 @@ from pybert.gui.view import traits_view
 from pybert.pybert import PyBERT
 
 
-@click.group(invoke_without_command=True, context_settings=dict(help_option_names=["-h", "--help"]))
+@click.group(invoke_without_command=True, context_settings={"help_option_names": ['-h', '--help']})
 @click.pass_context
 @click.version_option(version=__version__)
 @click.option("--config-file", "-c", type=click.Path(exists=True), help="Load an existing configuration file.")
@@ -29,7 +29,7 @@ def cli(ctx, config_file, results):
         pybert.configure_traits(view=traits_view)
 
 
-@cli.command(context_settings=dict(help_option_names=["-h", "--help"]))
+@cli.command(context_settings={"help_option_names": ['-h', '--help']})
 @click.argument("config-file", type=click.Path(exists=True))
 @click.option("--results", "-r", type=click.Path(), help="Override the results filename.")
 def sim(config_file, results):

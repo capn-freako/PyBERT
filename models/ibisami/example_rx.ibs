@@ -1,0 +1,83 @@
+
+
+[IBIS Ver]   7.1
+[File Name]  example_rx.ibs
+[File Rev]   v0.1
+
+[Date]       2024-07-05
+
+[Source]     ibisami public domain infrastructure
+
+[Disclaimer]
+THIS MODEL IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS MODEL, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+[Notes]
+This IBIS file was generated using the template file: "generic.ibs.em".
+
+[Copyright]    Copyright (c) 2016 David Banas; all rights reserved World wide.
+[Component]    Example_Rx
+[Manufacturer] (n/a)
+
+[Package]
+
+R_pkg     0.10     0.00     0.50
+L_pkg    10.00n    0.10n   50.00n
+C_pkg     1.00p    0.01p    5.00p
+
+
+[Pin]  signal_name        model_name            R_pin  L_pin  C_pin
+1p     Tx_1_P             example_rx
+1n     Tx_1_N             example_rx
+2p     Tx_2_P             example_rx
+2n     Tx_2_N             example_rx
+3p     Tx_3_P             example_rx
+3n     Tx_3_N             example_rx
+
+[Diff_Pin] inv_pin vdiff tdelay_typ tdelay_min tdelay_max
+1p           1n     0.1V     NA         NA         NA
+2p           2n     0.1V     NA         NA         NA
+3p           3n     0.1V     NA         NA         NA
+
+[Model]   example_rx
+Model_type   Input
+
+C_comp     1.00p    0.01p    5.00p
+Vinl = 0.875
+Vinh = 0.925
+
+
+[Algorithmic Model]
+Executable linux_gcc4.1.2_32          example_rx_x86.so         example_rx.ami
+Executable linux_gcc4.1.2_64          example_rx_x86_amd64.so   example_rx.ami
+Executable Windows_VisualStudio_32    example_rx_x86.dll        example_rx.ami
+Executable Windows_VisualStudio_64    example_rx_x86_amd64.dll  example_rx.ami
+[End Algorithmic Model]
+
+[Temperature_Range]     25.0      0.0    100.0
+[Voltage_Range]         1.80     1.62     1.98
+
+
+[GND Clamp]
+-1.80    -1.000e+01    -1.000e+01    -1.000e+01
+0.00     0.000e+00     0.000e+00     0.000e+00 
+1.80     1.800e-02     2.000e-02     1.636e-02 
+3.60     3.600e-02     4.000e-02     3.273e-02 
+
+[Power Clamp]
+-1.80    1.000e+01     1.000e+01     1.000e+01 
+0.00     -0.000e+00    -0.000e+00    -0.000e+00
+1.80     -1.800e-02    -2.000e-02    -1.636e-02
+3.60     -3.600e-02    -4.000e-02    -3.273e-02
+
+
+
+[END]
