@@ -61,6 +61,7 @@ from ..utility import (
     trim_impulse,
 )
 
+from .com     import calc_com
 from .dfe     import DFE
 from .fec     import FEC_Encoder, FEC_Decoder
 from .viterbi import ViterbiDecoder_ISI
@@ -954,7 +955,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         raise
 
     _check_sim_status()
-    # Update plots.
+
+    # Update plots first so the user sees simulation results immediately,
+    # before the (potentially long-running) COM computation starts.
     try:
         if update_plots:
             update_results(self)
@@ -967,6 +970,48 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.log(f"The following error occured, while trying to update the plots:\n{err}")
         self.status = "Exception: plotting"
         raise
+
+    compute_com(self)
+
+
+def compute_com(self) -> None:
+    """
+    Compute the COM metric via PyChOpMarg and store it in ``self.com_value``.
+
+    Args:
+        self: Reference to a PyBERT instance.
+
+    Notes:
+        1. COM is only computed when ``enable_com`` is True, ``inter_sel == "single"``,
+           and the channel file is a ``.s4p`` Touchstone file.
+        2. Uses IEEE 802.3dj parameters by default.
+        3. Exceptions are caught and logged; ``self.com_value`` is left at its
+           sentinel value (``-999.0``) when computation fails or is skipped.
+    """
+    if not self.enable_com:
+        return
+    if self.inter_sel != "single":
+        return
+    ch_file = str(self.ch_file)
+    if not ch_file or not ch_file.lower().endswith(".s4p"):
+        return
+
+    cfg_file = str(self.com_cfg_file) if self.com_cfg_file else None
+    cfg_desc = f"'{self.com_cfg_file}'" if cfg_file else "IEEE 802.3dj defaults"
+    self.com_msg = "RUNNING"
+    self.status = "Computing COM (may take several minutes)..."
+    self.log(f"COM: starting calculation using {cfg_desc} (this may take several minutes)...")
+    try:
+        com_value = calc_com(ch_file, cfg_file=cfg_file)
+        self.com_value = com_value
+        self.com_msg = ""
+        self.log(f"COM ({cfg_desc}): {com_value:.2f} dB")
+        self.status = "Ready."
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        self.com_value = -999.0
+        self.com_msg = f"ERROR: {err}"
+        self.log(f"COM calculation failed: {err}")
+        self.status = "Ready."
 
 
 # Plot updating

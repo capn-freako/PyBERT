@@ -21,6 +21,8 @@ dependencies = [
     "scikit-rf==1.10.0",
     "scipy==1.14.0",
     "pychopmarg>=3.1.2",
+    "xlrd>=2.0.1",
+    "pandas>=2.0",
     "pyibis-ami>=8.1",
     "click==8.3.1",
     "parsec==3.17",
@@ -77,6 +79,9 @@ wrap-summaries = 0
 minversion = "7.0"
 addopts = "-vv --durations=3"
 xfail_strict=true
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.pylint.master]
 fail-under = 9.0
@@ -110,10 +115,12 @@ follow_untyped_imports = true
 [tool.uv.workspace]
 members = [
     "PyAMI",
+    "PyChOpMarg",
 ]
 
 [tool.uv.sources]
 pyibis-ami = { workspace = true, editable = true }
+pychopmarg = { workspace = true, editable = true }
 
 [dependency-groups]
 dev = [
