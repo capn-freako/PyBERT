@@ -9,6 +9,7 @@ from pybert.models.com import calc_com
 from pybert.pybert import PyBERT
 
 EXAMPLE_THRU = Path(__file__).parent.parent / "PyChOpMarg" / "chnl_data" / "example2_THRU.s4p"
+EXAMPLE_CNFG = Path(__file__).parent.parent / "PyChOpMarg" / "config" / "config_com_ieee8023dj_PyChOpMarg_vs_MATLAB.xls"
 
 
 class TestComAttribute:
@@ -46,18 +47,19 @@ class TestComAttribute:
         assert "some error detail" in dut.com_info
 
 
-@pytest.mark.skipif(not EXAMPLE_THRU.exists(), reason="PyChOpMarg example data not available.")
-@pytest.mark.slow
+@pytest.mark.skipif(not (EXAMPLE_THRU.exists() and EXAMPLE_CNFG.exists()),
+                    reason="PyChOpMarg example data not available.")
+# @pytest.mark.slow  # Not necessary since editing `../../PyChOpMarg/config/config_com_ieee8023dj_PyChOpMarg_vs_MATLAB.xls`.
 class TestCalcCom:
-    """Integration tests that call the real COM calculation (slow)."""
+    """Integration tests that call the real COM calculation."""
 
     def test_calc_com_returns_float(self):
         """calc_com() returns a finite float for the example THRU channel."""
-        result = calc_com(str(EXAMPLE_THRU))
+        result = calc_com(str(EXAMPLE_THRU), cfg_file=str(EXAMPLE_CNFG))
         assert isinstance(result, float)
         assert math.isfinite(result), f"COM result is not finite: {result}"
 
     def test_calc_com_reasonable_range(self):
         """COM value for the example channel should be within a plausible range (-20 to 50 dB)."""
-        result = calc_com(str(EXAMPLE_THRU))
+        result = calc_com(str(EXAMPLE_THRU), cfg_file=str(EXAMPLE_CNFG))
         assert -20.0 <= result <= 50.0, f"COM = {result:.2f} dB is outside the expected range."
