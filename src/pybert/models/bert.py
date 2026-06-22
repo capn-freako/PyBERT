@@ -276,7 +276,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         params: list[str] = []
         if self.tx_use_ami and self.tx_use_getwave:
             tx_out, _, tx_h, tx_out_h, msg, params = run_ami_model(
-                self.tx_dll_file, self._tx_cfg, True, ui, ts, chnl_h, x)
+                self.tx_dll_file, self._tx_cfg, True, ui, ts, chnl_h, x,
+                fext_hs=getattr(self, "fext_h", []))
             self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
             tx_getwave_params = list(map(ami_parse, params))
             self.log(f"Tx IBIS-AMI model GetWave() output parameters:\n{tx_getwave_params}")
@@ -297,7 +298,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             else:  # Rx is either AMI_Init() or PyBERT native.
                 if self.rx_use_ami:  # Rx Init()
                     _, _, ctle_h, ctle_out_h, msg, _ = run_ami_model(
-                        self.rx_dll_file, self._rx_cfg, False, ui, ts, chnl_h, tx_out)
+                        self.rx_dll_file, self._rx_cfg, False, ui, ts, chnl_h, tx_out,
+                        fext_hs=getattr(self, "fext_h", []))
                     self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                     ctle_out = convolve(tx_out, ctle_out_h)[:len(tx_out)]
                 else:                # PyBERT native Rx
@@ -307,7 +309,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:  # Tx is either AMI_Init() or PyBERT native.
             if self.tx_use_ami:  # Tx is AMI_Init().
                 rx_in, _, tx_h, tx_out_h, msg, _ = run_ami_model(
-                    self.tx_dll_file, self._tx_cfg, False, ui, ts, chnl_h, x)
+                    self.tx_dll_file, self._tx_cfg, False, ui, ts, chnl_h, x,
+                    fext_hs=getattr(self, "fext_h", []))
                 self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
                 rx_in += noise
             else:                # Tx is PyBERT native.
