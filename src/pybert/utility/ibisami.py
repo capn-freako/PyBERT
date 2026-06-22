@@ -10,8 +10,6 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
-from ctypes import c_double
-
 import numpy as np
 from numpy import array, convolve
 
@@ -75,10 +73,6 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
                 "You've requested to use the `AMI_Init()` function of an IBIS-AMI model, which doesn't return an impulse response!")
 
     # Load and initialize the model.
-    # When FEXT channels are provided, build the full impulse response matrix
-    # (thru channel as row 0, each FEXT channel as a subsequent row) and pass
-    # it directly to AMIModelInitializer via optional_args to avoid the
-    # channel_response property setter overwriting row_size.
     row_size = len(chnl_h)
     if fext_hs:
         fext_rows = [
@@ -86,16 +80,12 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
             for h in fext_hs
         ]
         all_rows = np.concatenate([chnl_h / ts] + fext_rows)
-        Matrix = c_double * len(all_rows)
-        model_init = AMIModelInitializer(
-            param_cfg.input_ami_params,
-            info_params=param_cfg.info_ami_params,
-            channel_response=Matrix(*all_rows),
-            row_size=row_size,
-            num_aggressors=len(fext_hs),
-            sample_interval=c_double(ts),
-            bit_time=c_double(ui),
-        )
+        model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)
+        model_init.sample_interval = ts         # Must be set before 'channel_response'!
+        model_init.channel_response = all_rows  # Setter sets row_size = total matrix length.
+        model_init.row_size = row_size          # Restore per-row size after matrix assignment.
+        model_init.num_aggressors = len(fext_hs)
+        model_init.bit_time = ui
     else:
         model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)
         model_init.sample_interval = ts  # Must be set, before 'channel_response'!

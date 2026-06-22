@@ -229,6 +229,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Add FEXT interference: each aggressor lane's signal through its FEXT impulse response.
     # Assumes all aggressor lanes carry the same PRBS pattern as the victim (coherent worst case).
+    # These channels are also passed to AMI_Init() below as aggressors — complementary, not double-counting:
+    # the noise here is the physical crosstalk in the received signal; the aggressors let the AMI model cancel it.
     for h_fext in getattr(self, "fext_h", []):
         noise = noise + convolve(x, h_fext)[: len(noise)]
 
@@ -291,7 +293,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             if self.rx_use_ami and self.rx_use_getwave:
                 ignore_bits = self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ignore_Bits"])
                 ctle_out, _, ctle_h, ctle_out_h, msg, params = run_ami_model(
-                    self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h))
+                    self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, convolve(tx_out, chnl_h),
+                    fext_hs=getattr(self, "fext_h", []))
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                 _rx_getwave_params = list(map(ami_parse, params))
                 self.log(f"Rx IBIS-AMI model GetWave() output parameters:\n{_rx_getwave_params}")
@@ -327,7 +330,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.status = "Running CTLE..."
             if self.rx_use_ami and self.rx_use_getwave:
                 ctle_out, clock_times, ctle_h, ctle_out_h, msg, params = run_ami_model(
-                    self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in)
+                    self.rx_dll_file, self._rx_cfg, True, ui, ts, tx_out_h, rx_in,
+                    fext_hs=getattr(self, "fext_h", []))
                 self.log(f"Rx IBIS-AMI model initialization results:\n{msg}")
                 # Time evolution of (<root_name>: AmiName, <param_vals>: list[AmiNode]):
                 # (i.e. - There can be no `AmiAtom`s in the root tuple's second member.)
