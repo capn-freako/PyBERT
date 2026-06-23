@@ -1025,7 +1025,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.rj_dfe * 1.0e12,
             self.rjDD_dfe * 1.0e12,
         )
-        status_str += jit_str
+        com_str = f"    | COM: {self.com_value:.2f} dB"
+        status_str += jit_str + com_str
 
         return status_str
 

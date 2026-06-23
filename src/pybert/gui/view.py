@@ -180,6 +180,18 @@ traits_view = View(
                         ),
                         VGroup(
                             Item(name="debug", label="Debug", tooltip="Enable to log extra information to console."),
+                            Item(
+                                name="enable_com",
+                                label="Compute COM",
+                                tooltip="Compute Channel Operating Margin (COM) via PyChOpMarg after each run. Requires a single .s4p channel file.",
+                                enabled_when="inter_sel == 'single' and ch_file.lower().endswith('.s4p')",
+                            ),
+                            Item(
+                                name="include_fext",
+                                label="Include FEXT",
+                                tooltip="Model unused lanes as aggressors and add their FEXT to the noise floor.",
+                                enabled_when="inter_sel == 'single' and (ch_file.lower().endswith('.s8p') or ch_file.lower().endswith('.s12p'))",
+                            ),
                             label="Misc.",
                             show_border=True,
                         ),
@@ -295,49 +307,11 @@ traits_view = View(
                             enabled_when="inter_sel != 'native'",
                         ),
                         Item(
-                            name="lane_sel",
-                            label="Lane",
-                            tooltip="Lane index (0-based) for 8- or 12-port Touchstone files.",
-                            enabled_when="inter_sel == 'single' and (ch_file.lower().endswith('.s8p') or ch_file.lower().endswith('.s12p'))",
-                        ),
-                        Item(
-                            name="include_fext",
-                            label="Include FEXT",
-                            tooltip="Model unused lanes as aggressors and add their FEXT to the noise floor.",
-                            enabled_when="inter_sel == 'single' and (ch_file.lower().endswith('.s8p') or ch_file.lower().endswith('.s12p'))",
-                        ),
-                        Item(
                             name="use_window",
                             label="Apply window",
                             tooltip="Apply raised cosine window to frequency response before FFT()'ing.",
                             enabled_when="inter_sel != 'native'",
                         ),
-                        Item(
-                            name="enable_com",
-                            label="Compute COM",
-                            tooltip="Compute Channel Operating Margin (COM) via PyChOpMarg after each run. Requires a single .s4p channel file.",
-                            enabled_when="inter_sel == 'single' and ch_file.lower().endswith('.s4p')",
-                        ),
-                    ),
-                    HGroup(  # COM configuration spreadsheet (optional)
-                        Item(
-                            name="com_cfg_file",
-                            show_label=False,
-                            springy=True,
-                            editor=FileEditor(
-                                dialog_style="open",
-                                filter=[
-                                    "COM config files (*.xls;*.xlsx)|*.xls;*.xlsx|",
-                                    "All files (*)|*|",
-                                ],
-                                format_func=fname_formatter(),
-                            ),
-                            tooltip="Optional COM configuration spreadsheet (.xls/.xlsx). Leave blank to use IEEE 802.3dj defaults.",
-                            enabled_when="enable_com",
-                        ),
-                        label="COM Config (optional; blank = IEEE 802.3dj defaults)",
-                        visible_when="enable_com and inter_sel == 'single' and ch_file.lower().endswith('.s4p')",
-                        show_border=True,
                     ),
                     HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
                         VGroup(
@@ -418,14 +392,44 @@ traits_view = View(
                                     "Channel files (*.s2p;*.S2P;*.s4p;*.S4P;*.s8p;*.S8P;*.s12p;*.S12P;*.csv;*.CSV;*.txt;*.TXT)|*.s2p;*.S2P;*.s4p;*.S4P;*.s8p;*.S8P;*.s12p;*.S12P;*.csv;*.CSV;*.txt;*.TXT|",
                                     "All files (*)|*|",
                                 ],
-                                format_func=fname_formatter(),
+                                format_func=fname_formatter(include_ext=True),
                             ),
                         ),
                         label="Single File (*.s2p, *.s4p, *.s8p, *.s12p, *.csv, *.txt)",
                         visible_when="inter_sel == 'single'",
                         show_border=True,
                     ),
-                    VGroup(  # Multiple files
+                    HGroup(
+                        Item(
+                            name="lane_sel",
+                            label="Victim Lane",
+                            tooltip="Lane index (0-based) for 8- or 12-port Touchstone files.",
+                            enabled_when="inter_sel == 'single' and (ch_file.lower().endswith('.s8p') or ch_file.lower().endswith('.s12p'))",
+                        ),
+                        spring,
+                        show_border=False,
+                        visible_when="inter_sel == 'single'",
+                    ),
+                    HGroup(  # COM configuration spreadsheet file
+                        Item(
+                            name="com_cfg_file",
+                            show_label=False,
+                            springy=True,
+                            editor=FileEditor(
+                                dialog_style="open",
+                                filter=[
+                                    "COM config files (*.xls;*.xlsx)|*.xls;*.xlsx|",
+                                    "All files (*)|*|",
+                                ],
+                                format_func=fname_formatter(),
+                            ),
+                            tooltip="Optional COM configuration spreadsheet (.xls/.xlsx). Leave blank to use IEEE 802.3dj defaults.",
+                        ),
+                        label="COM Config (optional; blank = IEEE 802.3dj defaults)",
+                        visible_when="enable_com and inter_sel == 'single' and ch_file.lower().endswith('.s4p')",
+                        show_border=True,
+                    ),
+                    HGroup(  # Multiple files
                         Item(
                             name="ch_files",
                             style="custom",
@@ -1013,7 +1017,7 @@ traits_view = View(
                 Item("perf_info", style="readonly", show_label=False),
                 label="Performance",
             ),
-            Group(Item("com_info", style="readonly", show_label=False), label="COM"),
+            # Group(Item("com_info", style="readonly", show_label=False), label="COM"),
             Group(Item("instructions", style="readonly", show_label=False), label="User's Guide"),
             Group(Item("console_log", style="custom", show_label=False), label="Console", id="console"),
             layout="tabbed",
