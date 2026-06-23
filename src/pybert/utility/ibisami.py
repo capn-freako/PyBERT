@@ -10,6 +10,7 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
+import numpy as np
 from numpy import array, convolve
 
 from pyibisami.ami.model import (
@@ -23,7 +24,8 @@ from ..common import Rvec
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
 def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: bool,
-                  ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0  # noqa: F405
+                  ui: float, ts: float, chnl_h: Rvec, x: Rvec, bits_per_call: int = 0,  # noqa: F405
+                  fext_hs: list[Rvec] | None = None  # noqa: F405
                   ) -> tuple[Rvec, Rvec, Rvec, Rvec, str, list[str]]:  # noqa: F405
     """
     Run a simulation of an IBIS-AMI model.
@@ -40,6 +42,10 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
     Keyword Args:
         bits_per_call: Number of bits per call of ``GetWave()``.
             Default: 0 (Means "Use existing value.")
+        fext_hs: List of FEXT channel impulse responses (V/sample), one per aggressor lane.
+            When provided, the full impulse response matrix (thru + FEXT rows) is passed to
+            ``AMI_Init()``, enabling cross-talk modeling in the AMI model.
+            Default: None (no aggressors; only the thru channel is passed)
 
     Returns:
         A tuple consisting of
@@ -67,10 +73,24 @@ def run_ami_model(dll_fname: str, param_cfg: AMIParamConfigurator, use_getwave: 
                 "You've requested to use the `AMI_Init()` function of an IBIS-AMI model, which doesn't return an impulse response!")
 
     # Load and initialize the model.
-    model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)
-    model_init.sample_interval = ts  # Must be set, before 'channel_response'!
-    model_init.channel_response = chnl_h / ts
-    model_init.bit_time = ui
+    row_size = len(chnl_h)
+    if fext_hs:
+        fext_rows = [
+            np.pad(h / ts, (0, max(0, row_size - len(h))))[:row_size]
+            for h in fext_hs
+        ]
+        all_rows = np.concatenate([chnl_h / ts] + fext_rows)
+        model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)
+        model_init.sample_interval = ts         # Must be set before 'channel_response'!
+        model_init.channel_response = all_rows  # Setter sets row_size = total matrix length.
+        model_init.row_size = row_size          # Restore per-row size after matrix assignment.
+        model_init.num_aggressors = len(fext_hs)
+        model_init.bit_time = ui
+    else:
+        model_init = AMIModelInitializer(param_cfg.input_ami_params, info_params=param_cfg.info_ami_params)
+        model_init.sample_interval = ts  # Must be set, before 'channel_response'!
+        model_init.channel_response = chnl_h / ts
+        model_init.bit_time = ui
     model = AMIModel(dll_fname)
     model.initialize(model_init)
 
