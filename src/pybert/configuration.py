@@ -112,12 +112,14 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.tx_dll_file = the_PyBERT.tx_dll_file
         self.tx_ibis_file = the_PyBERT.tx_ibis_file
         self.tx_sel = the_PyBERT.tx_sel
+        self.tx_eq_sel = the_PyBERT.tx_eq_sel
 
         # Rx
         self.rin = the_PyBERT.rin
         self.cin = the_PyBERT.cin
         self.cac = the_PyBERT.cac
         self.use_ctle_file = the_PyBERT.use_ctle_file
+        self.ctle_sel = the_PyBERT.ctle_sel
         self.ctle_file = the_PyBERT.ctle_file
         self.rx_bw = the_PyBERT.rx_bw
         self.peak_freq = the_PyBERT.peak_freq
@@ -130,6 +132,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_dll_file = the_PyBERT.rx_dll_file
         self.rx_ibis_file = the_PyBERT.rx_ibis_file
         self.rx_sel = the_PyBERT.rx_sel
+        self.rx_eq_sel = the_PyBERT.rx_eq_sel
         self.rx_use_viterbi = the_PyBERT.rx_use_viterbi
         self.rx_viterbi_symbols = the_PyBERT.rx_viterbi_symbols
         self.rx_n_taps = the_PyBERT.rx_n_taps
@@ -221,6 +224,12 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
                     setattr(pybert.dfe_tap_tuners[count], "enabled", enabled)
                     setattr(pybert.dfe_tap_tuners[count], "min_val", min_val)
                     setattr(pybert.dfe_tap_tuners[count], "max_val", max_val)
+            elif prop in ("tx_eq_sel", "rx_eq_sel"):
+                lower_map = {"native": "Native", "ibis-ami": "IBIS-AMI"}
+                setattr(pybert, prop, lower_map.get(str(value).lower(), value))
+            elif prop == "ctle_sel":
+                lower_map = {"native": "Native", "file": "File"}
+                setattr(pybert, prop, lower_map.get(str(value).lower(), value))
             elif prop in ("version", "date_created"):
                 pass  # Just including it for some good housekeeping.  Not currently used.
             elif prop == "use_ch_file":

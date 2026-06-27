@@ -159,22 +159,15 @@ traits_view = View(
                             show_border=True,
                         ),
                         VGroup(
-                            HGroup(
-                                Item(name="vod", label="Vod", tooltip="Tx output voltage into matched load"),
-                                Item(label="V"),
-                            ),
-                            HGroup(
-                                Item(name="rn", label="Rn", tooltip="standard deviation of random noise"),
-                                Item(label="V"),
-                            ),
-                            HGroup(
-                                Item(name="pn_mag", label="Pn", tooltip="peak magnitude of periodic noise"),
-                                Item(label="V"),
-                            ),
-                            HGroup(
-                                Item(name="pn_freq", label="f(Pn)", tooltip="frequency of periodic noise"),
-                                Item(label="MHz"),
-                            ),
+                            Item(name="vod", label="Vod", tooltip="Tx output voltage into matched load"),
+                            Item(label="V"),
+                            Item(name="rn", label="Rn", tooltip="standard deviation of random noise"),
+                            Item(label="V"),
+                            Item(name="pn_mag", label="Pn", tooltip="peak magnitude of periodic noise"),
+                            Item(label="V"),
+                            Item(name="pn_freq", label="f(Pn)", tooltip="frequency of periodic noise"),
+                            Item(label="MHz"),
+                            columns=2,
                             label="Tx Level && Noise",
                             show_border=True,
                         ),
@@ -200,42 +193,31 @@ traits_view = View(
                     show_border=True,
                 ),
                 VGroup(
-                    HGroup(
-                        Item(
-                            name="impulse_length",
-                            label="Impulse Response Length",
-                            tooltip="Manual impulse response length override",
-                        ),
-                        Item(label="ns"),
-                        spring,
+                    Item(
+                        name="impulse_length",
+                        label="Impulse Response Length",
+                        tooltip="Manual impulse response length override",
                     ),
-                    HGroup(
-                        Item(
-                            name="thresh",
-                            label="Pj Threshold",
-                            tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
-                        ),
-                        Item(label="sigma"),
-                        spring,
+                    Item(label="ns"),
+                    Item(
+                        name="thresh",
+                        label="Pj Threshold",
+                        tooltip="Threshold for identifying periodic jitter spectral elements. (sigma)",
                     ),
-                    HGroup(
-                        Item(
-                            name="f_max",
-                            label="fMax",
-                            tooltip="Maximum frequency used for plotting, modeling, and signal processing. (GHz)",
-                        ),
-                        Item(label="GHz"),
-                        spring,
+                    Item(label="sigma"),
+                    Item(
+                        name="f_max",
+                        label="fMax",
+                        tooltip="Maximum frequency used for plotting, modeling, and signal processing. (GHz)",
                     ),
-                    HGroup(
-                        Item(
-                            name="f_step",
-                            label="fStep",
-                            tooltip="Frequency step used for plotting, modeling, and signal processing. (MHz)",
-                        ),
-                        Item(label="MHz"),
-                        spring,
+                    Item(label="GHz"),
+                    Item(
+                        name="f_step",
+                        label="fStep",
+                        tooltip="Frequency step used for plotting, modeling, and signal processing. (MHz)",
                     ),
+                    Item(label="MHz"),
+                    columns=2,
                     label="Analysis Parameters",
                     show_border=True,
                 ),
@@ -244,28 +226,21 @@ traits_view = View(
                 VGroup(  # "Tx"
                     Item("tx_sel", style="custom"),
                     VGroup(
-                        HGroup(
-                            Item(
-                                name="rs",
-                                label="Tx_Rs",
-                                tooltip="Tx differential source impedance",
-                            ),
-                            Item(label="Ohms"),
-                            spring,
+                        Item(
+                            name="rs",
+                            label="Tx_Rs",
+                            tooltip="Tx differential source impedance",
                         ),
-                        HGroup(
-                            Item(
-                                name="cout",
-                                label="Tx_Cout",
-                                tooltip="Tx parasitic output capacitance (each pin)",
-                                editor=TextEditor(auto_set=False, enter_set=True, evaluate=float),
-                            ),
-                            Item(label="pF"),
-                            spring,
+                        Item(label="Ohms"),
+                        Item(
+                            name="cout",
+                            label="Tx_Cout",
+                            tooltip="Tx parasitic output capacitance (each pin)",
+                            editor=TextEditor(auto_set=False, enter_set=True, evaluate=float),
                         ),
-                        label="Native",
+                        Item(label="pF"),
+                        columns=2,
                         visible_when="tx_sel == 'native'",
-                        show_border=True,
                     ),
                     VGroup(
                         HGroup(
@@ -289,10 +264,10 @@ traits_view = View(
                         Item(name="tx_use_ts4", label="Use on-die S-parameters.",
                              enabled_when="tx_ibis_valid and tx_has_ts4",
                         ),
-                        label="IBIS",
+                        # label="IBIS",
                         visible_when="tx_sel == 'ibis'",
-                        show_border=True,
                     ),
+                    spring,
                     label="Tx",
                     show_border=True,
                 ),
@@ -313,70 +288,23 @@ traits_view = View(
                             enabled_when="inter_sel != 'native'",
                         ),
                     ),
-                    HGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
-                        VGroup(
-                            HGroup(
-                                Item(
-                                    name="l_ch",
-                                    label="Length",
-                                    tooltip="interconnect length",
-                                ),
-                                Item(label="m"),
-                            ),
-                            HGroup(
-                                Item(
-                                    name="Theta0",
-                                    label="Loss Tan.",
-                                    tooltip="dielectric loss tangent",
-                                ),
-                            ),
-                        ),
-                        VGroup(
-                            HGroup(
-                                Item(
-                                    name="Z0",
-                                    label="Z0",
-                                    tooltip="characteristic differential impedance",
-                                ),
-                                Item(label="Ohms"),
-                            ),
-                            HGroup(
-                                Item(
-                                    name="v0",
-                                    label="v_rel",
-                                    tooltip="normalized propagation velocity",
-                                ),
-                                Item(label="c"),
-                            ),
-                        ),
-                        VGroup(
-                            HGroup(
-                                Item(
-                                    name="Rdc",
-                                    label="Rdc",
-                                    tooltip="d.c. resistance",
-                                ),
-                                Item(label="Ohms"),
-                            ),
-                            HGroup(
-                                Item(
-                                    name="w0",
-                                    label="w0",
-                                    tooltip="transition frequency",
-                                ),
-                                Item(label="rads./s"),
-                            ),
-                        ),
-                        VGroup(
-                            HGroup(
-                                Item(
-                                    name="R0",
-                                    label="R0",
-                                    tooltip="skin effect resistance",
-                                ),
-                                Item(label="Ohms"),
-                            ),
-                        ),
+                    VGroup(  # Native (i.e. - Howard Johnson's) interconnect model.
+                        Item(name="l_ch", label="Length", tooltip="interconnect length"),
+                        Item(label="m"),
+                        Item(name="Theta0", label="Loss Tan.", tooltip="dielectric loss tangent"),
+                        Item(label=""),
+                        Item(name="Z0", label="Z0", tooltip="characteristic differential impedance"),
+                        Item(label="Ohms"),
+                        Item(name="v0", label="v_rel", tooltip="normalized propagation velocity"),
+                        Item(label="c"),
+                        Item(name="Rdc", label="Rdc", tooltip="d.c. resistance"),
+                        Item(label="Ohms"),
+                        Item(name="w0", label="w0", tooltip="transition frequency"),
+                        Item(label="rads./s"),
+                        Item(name="R0", label="R0", tooltip="skin effect resistance"),
+                        Item(label="Ohms"),
+                        spring,
+                        columns=2,
                         label="Native",
                         visible_when="inter_sel == 'native'",
                         show_border=True,
@@ -434,6 +362,7 @@ traits_view = View(
                             name="ch_files",
                             style="custom",
                             show_label=False,
+                            springy=True,
                             editor=ListEditor(
                                 editor=FileEditor(
                                     dialog_style="open",
@@ -448,6 +377,7 @@ traits_view = View(
                         visible_when="inter_sel == 'multiple'",
                         show_border=True,
                     ),
+                    spring,
                     label="Interconnect",
                     show_border=True,
                 ),
@@ -493,9 +423,8 @@ traits_view = View(
                                 tooltip="Number of symbols to include in MLSD trellis.",
                             ),
                         ),
-                        label="Native",
+                        # label="Native",
                         visible_when="rx_sel == 'native'",
-                        show_border=True,
                     ),
                     VGroup(
                         HGroup(
@@ -519,15 +448,16 @@ traits_view = View(
                         Item(name="rx_use_ts4", label="Use on-die S-parameters.",
                              enabled_when="rx_ibis_valid and rx_has_ts4",
                         ),
-                        label="IBIS",
+                        # label="IBIS",
                         visible_when="rx_sel == 'ibis'",
-                        show_border=True,
                     ),
+                    spring,
                     label="Rx",
                     show_border=True,
                 ),
                 label="Channel",
                 show_border=True,
+                springy=True,
             ),
             label="Config.",
             id="config",
@@ -535,6 +465,7 @@ traits_view = View(
         # "Equalization" tab.
         HGroup(  # Channel Parameters
             VGroup(  # Tx EQ
+                Item("tx_eq_sel", style="custom"),
                 VGroup(
                     HGroup(
                         VGroup(
@@ -551,16 +482,10 @@ traits_view = View(
                         ),
                         VGroup(
                             Item(
-                                name="tx_use_ami",
-                                label="Use AMI",
-                                tooltip="You must select both files, first.",
-                                enabled_when="tx_ami_valid == True and tx_dll_valid == True",
-                            ),
-                            Item(
                                 name="tx_use_getwave",
                                 label="Use GetWave",
                                 tooltip="Use the model's GetWave() function.",
-                                enabled_when="tx_use_ami and tx_has_getwave",
+                                enabled_when="tx_has_getwave",
                             ),
                             Item(
                                 "btn_cfg_tx",
@@ -571,11 +496,12 @@ traits_view = View(
                         ),
                     ),
                     label="IBIS-AMI",
-                    show_border=True,
+                    visible_when="tx_eq_sel == 'IBIS-AMI'",
                 ),
                 VGroup(
                     Item(
                         name="tx_taps",
+                        springy=True,
                         editor=TableEditor(
                             columns=[
                                 ObjectColumn(name="name", editable=False),
@@ -591,13 +517,15 @@ traits_view = View(
                         show_label=False,
                     ),
                     label="Native",
-                    show_border=True,
-                    enabled_when="tx_use_ami == False",
+                    springy=True,
+                    visible_when="tx_eq_sel == 'Native'",
                 ),
                 label="Tx Equalization",
                 show_border=True,
+                springy=True,
             ),
             VGroup(  # Rx EQ
+                Item("rx_eq_sel", style="custom"),
                 VGroup(
                     HGroup(
                         VGroup(
@@ -614,16 +542,10 @@ traits_view = View(
                         ),
                         VGroup(
                             Item(
-                                name="rx_use_ami",
-                                label="Use AMI",
-                                tooltip="You must select both files, first.",
-                                enabled_when="rx_ami_valid == True and rx_dll_valid == True",
-                            ),
-                            Item(
                                 name="rx_use_getwave",
                                 label="Use GetWave",
                                 tooltip="Use the model's GetWave() function.",
-                                enabled_when="rx_use_ami and rx_has_getwave",
+                                enabled_when="rx_has_getwave",
                             ),
                             Item(
                                 name="rx_use_clocks",
@@ -640,63 +562,34 @@ traits_view = View(
                         ),
                     ),
                     label="IBIS-AMI",
-                    show_border=True,
+                    visible_when="rx_eq_sel == 'IBIS-AMI'",
                 ),
                 VGroup(
                     HGroup(
                         VGroup(  # CTLE
-                            Item(name="ctle_enable", label="Enable", tooltip="CTLE enable",),
+                            Item(name="ctle_enable", label="Enable", tooltip="CTLE enable"),
+                            Item("ctle_sel", style="custom", enabled_when="ctle_enable"),
                             HGroup(  # File
-                                Item(
-                                    name="use_ctle_file",
-                                    label="Use",
-                                    tooltip="Select CTLE impulse/step response from file.",
-                                    enabled_when="ctle_file",
-                                ),
                                 Item(
                                     name="ctle_file",
                                     label="Filename",
+                                    springy=True,
                                     editor=FileEditor(dialog_style="open", filter=["*.csv"]),
                                 ),
-                                label="File",
-                                show_border=True,
+                                visible_when="ctle_sel == 'File'",
                             ),
-                            VGroup(  # Model
-                                HGroup(
-                                    Item(
-                                        name="peak_freq",
-                                        label="CTLE fp",
-                                        tooltip="CTLE peaking frequency (GHz)",
-                                        enabled_when="use_ctle_file == False",
-                                    ),
-                                    Item(label="GHz"),
-                                    spring,
-                                    Item(
-                                        name="rx_bw",
-                                        label="Bandwidth",
-                                        tooltip="unequalized signal path bandwidth (GHz).",
-                                        enabled_when="use_ctle_file == False",
-                                    ),
-                                    Item(label="GHz"),
-                                ),
-                                HGroup(
-                                    Item(
-                                        name="peak_mag",
-                                        label="CTLE boost",
-                                        tooltip="CTLE peaking magnitude (dB)",
-                                        format_str="%4.1f",
-                                        enabled_when="use_ctle_file == False",
-                                    ),
-                                    Item(label="dB"),
-                                    spring,
-                                ),
-                                label="Model",
-                                show_border=True,
-                                enabled_when="use_ctle_file == False",
+                            VGroup(  # Native model
+                                Item(name="peak_freq", label="CTLE fp", tooltip="CTLE peaking frequency (GHz)"),
+                                Item(label="GHz"),
+                                Item(name="rx_bw", label="Bandwidth", tooltip="unequalized signal path bandwidth (GHz)."),
+                                Item(label="GHz"),
+                                Item(name="peak_mag", label="CTLE boost", tooltip="CTLE peaking magnitude (dB)", format_str="%4.1f"),
+                                Item(label="dB"),
+                                columns=2,
+                                visible_when="ctle_sel == 'Native'",
                             ),
                             label="CTLE",
                             show_border=True,
-                            enabled_when="rx_use_ami == False",
                         ),
                         VGroup(  # CDR
                             HGroup(
@@ -783,11 +676,11 @@ traits_view = View(
                         ),
                     ),
                     label="Native",
-                    show_border=True,
-                    enabled_when="rx_use_ami == False",
+                    visible_when="rx_eq_sel == 'Native'",
                 ),
                 label="Rx Equalization",
                 show_border=True,
+                springy=True,
             ),
             label="Equalization",
             id="equalization",
@@ -824,31 +717,22 @@ traits_view = View(
                 VGroup(  # Rx CTLE
                     Item(name="ctle_enable_tune", label="Enable", tooltip="CTLE enable",),
                     VGroup(
-                        HGroup(
-                            Item(name="peak_freq_tune", label="fp", tooltip="CTLE peaking frequency (GHz)",
-                                 enabled_when="ctle_enable_tune",),
-                            Item(label="GHz"),
-                        ),
-                        HGroup(
-                            Item(name="rx_bw_tune", label="BW", tooltip="unequalized signal path bandwidth (GHz).",
-                                 enabled_when="ctle_enable_tune",),
-                            Item(label="GHz"),
-                        ),
-                        HGroup(
-                            Item(name="min_mag_tune", label="Min.", tooltip="CTLE peaking magnitude minimum (dB)",
-                                 format_str="%4.1f", enabled_when="ctle_enable_tune",),
-                            Item(label="dB"),
-                        ),
-                        HGroup(
-                            Item(name="max_mag_tune", label="Max.", tooltip="CTLE peaking magnitude maximum (dB)",
-                                 format_str="%4.1f", enabled_when="ctle_enable_tune",),
-                            Item(label="dB"),
-                        ),
-                        HGroup(
-                            Item(name="step_mag_tune", label="Step", tooltip="CTLE peaking magnitude step (dB)",
-                                 format_str="%4.1f", enabled_when="ctle_enable_tune",),
-                            Item(label="dB"),
-                        ),
+                        Item(name="peak_freq_tune", label="fp", tooltip="CTLE peaking frequency (GHz)",
+                             enabled_when="ctle_enable_tune",),
+                        Item(label="GHz"),
+                        Item(name="rx_bw_tune", label="BW", tooltip="unequalized signal path bandwidth (GHz).",
+                             enabled_when="ctle_enable_tune",),
+                        Item(label="GHz"),
+                        Item(name="min_mag_tune", label="Min.", tooltip="CTLE peaking magnitude minimum (dB)",
+                             format_str="%4.1f", enabled_when="ctle_enable_tune",),
+                        Item(label="dB"),
+                        Item(name="max_mag_tune", label="Max.", tooltip="CTLE peaking magnitude maximum (dB)",
+                             format_str="%4.1f", enabled_when="ctle_enable_tune",),
+                        Item(label="dB"),
+                        Item(name="step_mag_tune", label="Step", tooltip="CTLE peaking magnitude step (dB)",
+                             format_str="%4.1f", enabled_when="ctle_enable_tune",),
+                        Item(label="dB"),
+                        columns=2,
                         label="Configuration",
                         show_border=True,
                         enabled_when="ctle_enable_tune",

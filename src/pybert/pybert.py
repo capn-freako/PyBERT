@@ -219,6 +219,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # - Tx
     tx_sel = Enum("native", "ibis")
+    tx_eq_sel = Enum("Native", "IBIS-AMI")
     # -- native
     vod = Float(1.0)  #: Tx differential output voltage (V)
     rs = Float(100)  #: Tx source impedance (Ohms)
@@ -252,11 +253,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # - Rx
     rx_sel = Enum("native", "ibis")
+    rx_eq_sel = Enum("Native", "IBIS-AMI")
     # -- native
     rin = Float(100)  #: Rx input impedance (Ohm)
     cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
     cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
+    ctle_sel = Enum("Native", "File")
     ctle_file = File("")  #: CTLE response file (when use_ctle_file = True).
     rx_bw = Float(12.0)  #: CTLE bandwidth (GHz).
     peak_freq = Float(gPeakFreq)  #: CTLE peaking frequency (GHz)
@@ -1109,12 +1112,23 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.rx_taps = rx_taps
         self.ffe_tap_tuners = ffe_tap_tuners
 
+    def _tx_sel_changed(self, new):
+        if new != "ibis":
+            self.tx_eq_sel = "Native"
+
+    def _tx_eq_sel_changed(self, new):
+        if new == "IBIS-AMI" and not (self.tx_sel == "ibis" and self.tx_ami_valid and self.tx_dll_valid):
+            self.log("Tx equalization: select an IBIS model with AMI configuration before switching to IBIS-AMI mode.")
+            return
+        self.tx_use_ami = new == "IBIS-AMI"
+
     def _tx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
         dName = ""
         try:
             self.tx_ibis_valid = False
             self.tx_use_ami = False
+            self.tx_eq_sel = "Native"
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
             ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
@@ -1171,12 +1185,26 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             error_message = f"Failed to open DLL/SO file!\n{err}"
             self.log(error_message, alert=True)
 
+    def _ctle_sel_changed(self, new):
+        self.use_ctle_file = new == "File"
+
+    def _rx_sel_changed(self, new):
+        if new != "ibis":
+            self.rx_eq_sel = "Native"
+
+    def _rx_eq_sel_changed(self, new):
+        if new == "IBIS-AMI" and not (self.rx_sel == "ibis" and self.rx_ami_valid and self.rx_dll_valid):
+            self.log("Rx equalization: select an IBIS model with AMI configuration before switching to IBIS-AMI mode.")
+            return
+        self.rx_use_ami = new == "IBIS-AMI"
+
     def _rx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
         dName = ""
         try:
             self.rx_ibis_valid = False
             self.rx_use_ami = False
+            self.rx_eq_sel = "Native"
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
             ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")

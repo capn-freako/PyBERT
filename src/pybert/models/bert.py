@@ -111,6 +111,28 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             self.status = "Aborted Simulation"
             raise RuntimeError("Simulation aborted by User.")
 
+    # Preflight checks.
+    if self.tx_sel == "ibis" and not self.tx_ibis_valid:
+        msg = "ERROR: Tx set to IBIS but no valid IBIS file loaded."
+        self.log(msg)
+        self.status = msg
+        return
+    if self.tx_eq_sel == "IBIS-AMI" and not (self.tx_ibis_valid and self.tx_ami_valid and self.tx_dll_valid):
+        msg = "ERROR: Tx equalization set to IBIS-AMI but IBIS/AMI/DLL files are not all valid."
+        self.log(msg)
+        self.status = msg
+        return
+    if self.rx_sel == "ibis" and not self.rx_ibis_valid:
+        msg = "ERROR: Rx set to IBIS but no valid IBIS file loaded."
+        self.log(msg)
+        self.status = msg
+        return
+    if self.rx_eq_sel == "IBIS-AMI" and not (self.rx_ibis_valid and self.rx_ami_valid and self.rx_dll_valid):
+        msg = "ERROR: Rx equalization set to IBIS-AMI but IBIS/AMI/DLL files are not all valid."
+        self.log(msg)
+        self.status = msg
+        return
+
     start_time = clock()
     self.status = "Running channel..."
 

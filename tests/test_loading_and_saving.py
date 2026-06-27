@@ -147,6 +147,71 @@ def test_load_config_from_invalid(dut, tmp_path: Path):
 
 
 @pytest.mark.usefixtures("dut")
+def test_new_eq_selector_traits_round_trip(dut, tmp_path: Path):
+    """tx_eq_sel, rx_eq_sel, and ctle_sel survive a yaml save/load round-trip."""
+    # tx_eq_sel stays "Native" without valid AMI — set it via internal path to bypass guard.
+    dut.ctle_sel = "File"  # no guard on this one
+
+    save_file = tmp_path / "eq_sel.yaml"
+    dut.save_configuration(save_file)
+
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+
+    assert dut2.tx_eq_sel == "Native",  f"tx_eq_sel: expected 'Native', got {dut2.tx_eq_sel!r}"
+    assert dut2.rx_eq_sel == "Native",  f"rx_eq_sel: expected 'Native', got {dut2.rx_eq_sel!r}"
+    assert dut2.ctle_sel  == "File",    f"ctle_sel:  expected 'File',   got {dut2.ctle_sel!r}"
+
+
+def test_ctle_sel_syncs_use_ctle_file():
+    """Setting ctle_sel drives use_ctle_file."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    assert dut.use_ctle_file is False
+    dut.ctle_sel = "File"
+    assert dut.use_ctle_file is True, "use_ctle_file should be True when ctle_sel='File'"
+    dut.ctle_sel = "Native"
+    assert dut.use_ctle_file is False, "use_ctle_file should be False when ctle_sel='Native'"
+
+
+def test_eq_sel_case_insensitive_load(tmp_path: Path):
+    """tx_eq_sel, rx_eq_sel, ctle_sel load correctly when written in any case in the config file."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    save_file = tmp_path / "case_test.yaml"
+    dut.save_configuration(save_file)
+
+    with open(save_file, "r", encoding="UTF-8") as f:
+        cfg = yaml.load(f, Loader=yaml.Loader)
+    cfg.tx_eq_sel = "native"     # lowercase
+    cfg.rx_eq_sel = "NATIVE"     # uppercase
+    cfg.ctle_sel  = "FILE"       # uppercase
+    with open(save_file, "w", encoding="UTF-8") as f:
+        yaml.dump(cfg, f)
+
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+
+    assert dut2.tx_eq_sel == "Native", f"Expected 'Native', got {dut2.tx_eq_sel!r}"
+    assert dut2.rx_eq_sel == "Native", f"Expected 'Native', got {dut2.rx_eq_sel!r}"
+    assert dut2.ctle_sel  == "File",   f"Expected 'File',   got {dut2.ctle_sel!r}"
+
+
+def test_eq_sel_guard_no_ami():
+    """tx_eq_sel/rx_eq_sel log a warning and leave tx_use_ami/rx_use_ami False when AMI not configured."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    assert dut.tx_ami_valid is False
+    assert dut.rx_ami_valid is False
+
+    dut.tx_eq_sel = "IBIS-AMI"
+    assert dut.tx_eq_sel  == "IBIS-AMI", "selector should accept the click (no snap-back)"
+    assert dut.tx_use_ami is False,       "tx_use_ami must not be armed when guard fires"
+    assert "IBIS-AMI mode" in dut.console_log, "guard should log a warning"
+
+    dut.rx_eq_sel = "IBIS-AMI"
+    assert dut.rx_eq_sel  == "IBIS-AMI", "selector should accept the click (no snap-back)"
+    assert dut.rx_use_ami is False,       "rx_use_ami must not be armed when guard fires"
+
+
+@pytest.mark.usefixtures("dut")
 def test_load_results_from_pickle(dut, tmp_path: Path):
     """Make sure that pybert can correctly load a pickle file."""
     save_file = tmp_path.joinpath("config.pybert_data")
