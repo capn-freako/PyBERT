@@ -465,6 +465,7 @@ traits_view = View(
         # "Equalization" tab.
         HGroup(  # Channel Parameters
             VGroup(  # Tx EQ
+                Item("tx_eq_sel", style="custom"),
                 VGroup(
                     HGroup(
                         VGroup(
@@ -481,16 +482,10 @@ traits_view = View(
                         ),
                         VGroup(
                             Item(
-                                name="tx_use_ami",
-                                label="Use AMI",
-                                tooltip="You must select both files, first.",
-                                enabled_when="tx_ami_valid == True and tx_dll_valid == True",
-                            ),
-                            Item(
                                 name="tx_use_getwave",
                                 label="Use GetWave",
                                 tooltip="Use the model's GetWave() function.",
-                                enabled_when="tx_use_ami and tx_has_getwave",
+                                enabled_when="tx_has_getwave",
                             ),
                             Item(
                                 "btn_cfg_tx",
@@ -501,11 +496,12 @@ traits_view = View(
                         ),
                     ),
                     label="IBIS-AMI",
-                    show_border=True,
+                    visible_when="tx_eq_sel == 'IBIS-AMI'",
                 ),
                 VGroup(
                     Item(
                         name="tx_taps",
+                        springy=True,
                         editor=TableEditor(
                             columns=[
                                 ObjectColumn(name="name", editable=False),
@@ -521,13 +517,15 @@ traits_view = View(
                         show_label=False,
                     ),
                     label="Native",
-                    show_border=True,
-                    enabled_when="tx_use_ami == False",
+                    springy=True,
+                    visible_when="tx_eq_sel == 'Native'",
                 ),
                 label="Tx Equalization",
                 show_border=True,
+                springy=True,
             ),
             VGroup(  # Rx EQ
+                Item("rx_eq_sel", style="custom"),
                 VGroup(
                     HGroup(
                         VGroup(
@@ -544,16 +542,10 @@ traits_view = View(
                         ),
                         VGroup(
                             Item(
-                                name="rx_use_ami",
-                                label="Use AMI",
-                                tooltip="You must select both files, first.",
-                                enabled_when="rx_ami_valid == True and rx_dll_valid == True",
-                            ),
-                            Item(
                                 name="rx_use_getwave",
                                 label="Use GetWave",
                                 tooltip="Use the model's GetWave() function.",
-                                enabled_when="rx_use_ami and rx_has_getwave",
+                                enabled_when="rx_has_getwave",
                             ),
                             Item(
                                 name="rx_use_clocks",
@@ -570,63 +562,34 @@ traits_view = View(
                         ),
                     ),
                     label="IBIS-AMI",
-                    show_border=True,
+                    visible_when="rx_eq_sel == 'IBIS-AMI'",
                 ),
                 VGroup(
                     HGroup(
                         VGroup(  # CTLE
-                            Item(name="ctle_enable", label="Enable", tooltip="CTLE enable",),
+                            Item(name="ctle_enable", label="Enable", tooltip="CTLE enable"),
+                            Item("ctle_sel", style="custom", enabled_when="ctle_enable"),
                             HGroup(  # File
-                                Item(
-                                    name="use_ctle_file",
-                                    label="Use",
-                                    tooltip="Select CTLE impulse/step response from file.",
-                                    enabled_when="ctle_file",
-                                ),
                                 Item(
                                     name="ctle_file",
                                     label="Filename",
+                                    springy=True,
                                     editor=FileEditor(dialog_style="open", filter=["*.csv"]),
                                 ),
-                                label="File",
-                                show_border=True,
+                                visible_when="ctle_sel == 'File'",
                             ),
-                            VGroup(  # Model
-                                HGroup(
-                                    Item(
-                                        name="peak_freq",
-                                        label="CTLE fp",
-                                        tooltip="CTLE peaking frequency (GHz)",
-                                        enabled_when="use_ctle_file == False",
-                                    ),
-                                    Item(label="GHz"),
-                                    spring,
-                                    Item(
-                                        name="rx_bw",
-                                        label="Bandwidth",
-                                        tooltip="unequalized signal path bandwidth (GHz).",
-                                        enabled_when="use_ctle_file == False",
-                                    ),
-                                    Item(label="GHz"),
-                                ),
-                                HGroup(
-                                    Item(
-                                        name="peak_mag",
-                                        label="CTLE boost",
-                                        tooltip="CTLE peaking magnitude (dB)",
-                                        format_str="%4.1f",
-                                        enabled_when="use_ctle_file == False",
-                                    ),
-                                    Item(label="dB"),
-                                    spring,
-                                ),
-                                label="Model",
-                                show_border=True,
-                                enabled_when="use_ctle_file == False",
+                            VGroup(  # Native model
+                                Item(name="peak_freq", label="CTLE fp", tooltip="CTLE peaking frequency (GHz)"),
+                                Item(label="GHz"),
+                                Item(name="rx_bw", label="Bandwidth", tooltip="unequalized signal path bandwidth (GHz)."),
+                                Item(label="GHz"),
+                                Item(name="peak_mag", label="CTLE boost", tooltip="CTLE peaking magnitude (dB)", format_str="%4.1f"),
+                                Item(label="dB"),
+                                columns=2,
+                                visible_when="ctle_sel == 'Native'",
                             ),
                             label="CTLE",
                             show_border=True,
-                            enabled_when="rx_use_ami == False",
                         ),
                         VGroup(  # CDR
                             HGroup(
@@ -713,11 +676,11 @@ traits_view = View(
                         ),
                     ),
                     label="Native",
-                    show_border=True,
-                    enabled_when="rx_use_ami == False",
+                    visible_when="rx_eq_sel == 'Native'",
                 ),
                 label="Rx Equalization",
                 show_border=True,
+                springy=True,
             ),
             label="Equalization",
             id="equalization",
