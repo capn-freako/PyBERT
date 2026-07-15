@@ -9,24 +9,24 @@ version = "10.0.0"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           ]
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 dependencies = [
-    "chaco==6.1.1",
-    "enable==6.1.0",
-    "traitsui==8.0.0",
-    "pyface==8.0.0",
-    "pyside6==6.10.2",
-    "kiwisolver==1.4.9",
-    "numpy==1.26.4",
-    "scikit-rf==1.10.0",
-    "scipy==1.14.0",
+    "chaco>=6.1.1",
+    "enable>=6.1.0",
+    "traitsui>=8.0.0",
+    "pyface>=8.0.0",
+    "pyside6>=6.10.2",
+    "kiwisolver>=1.4.9",
+    "numpy>=1.26",
+    "scikit-rf>=1.10.0",
+    "scipy>=1.14.0",
     "pychopmarg>=3.1.2",
     "xlrd>=2.0.1",
     "pandas>=2.0",
     "pyibis-ami>=8.1",
-    "click==8.3.1",
-    "parsec==3.17",
-    "pyyaml==6.0.3",
+    "click>=8.3.1",
+    "parsec>=3.17",
+    "pyyaml>=6.0.3",
 ]
 keywords=["bert", "communication", "simulator"]
 classifiers=[
@@ -41,6 +41,7 @@ classifiers=[
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
     "Topic :: Adaptive Technologies",
     "Topic :: Scientific/Engineering",
