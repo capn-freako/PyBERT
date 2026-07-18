@@ -77,6 +77,7 @@ from pybert.utility import (
     calc_gamma,
     import_channel,
     import_fext,
+    import_freq,
     lfsr_bits,
     raised_cosine,
     safe_log10,
@@ -1374,6 +1375,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 file = self.ch_file
                 if not file:
                     raise RuntimeError("'single' is selected but no channel file is specified!")
+                ch_s2p_pre_noninterp = import_freq(file, renumber=self.renumber)
+                self.ch_s2p_pre_noninterp = ch_s2p_pre_noninterp
                 ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber, lane=self.lane_sel)
                 self.log(str(ch_s2p_pre))
                 H = ch_s2p_pre.s21.s.flatten()

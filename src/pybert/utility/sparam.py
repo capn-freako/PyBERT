@@ -14,7 +14,7 @@ import os.path
 import re
 
 from cmath import phase, rect
-from numpy import array, diff, ones, pi, where, zeros
+from numpy import array, diff, ones, pad, pi, where, zeros
 from numpy.fft import fft
 from skrf import Network
 from skrf.network import one_port_2_two_port
@@ -376,3 +376,34 @@ def import_channel(filename: str, sample_per: float, fs: Rvec,
         H = fft(h * sample_per)[:Nf]  # Keep the positive frequencies only.
         ts2N = H_2_s2p(H, zref * ones(len(H)), fs, Zref=zref)
     return ts2N
+
+
+def pulse_response(ntwk: Network, ui: float) -> tuple[Rvec, Rvec]:
+    """
+    Return the pulse response of a 2-port *SciKit-RF* network.
+
+    Args:
+        ntwk: The *SciKit-RF* netowrk (2-port).
+        ui: The unit interval (s).
+
+    Returns:
+        A pair containing
+
+        - the time index values for the returned pulse response, and
+        - the network pulse response.
+
+    Raises:
+        ValueError: If the given network is not 2-port.
+    """
+
+    # Import and sanity check the Touchstone file.
+    (_, rs, cs) = ntwk.s.shape
+    if rs != 2 or rs != cs:
+        raise ValueError(f"Touchstone file must have 2 ports!\n{ntwk}")
+
+    # Calculate the pulse response.
+    t, s = ntwk.step_response()
+    t -= t[0]
+    s = s[:, 1, 0]
+    ui_ix = where(t >= ui)[0][0]
+    return (t, s - pad(s, (ui_ix, 0))[:len(s)])
