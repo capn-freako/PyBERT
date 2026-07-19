@@ -342,7 +342,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
     tie_risings_ave  = tie_risings.mean(axis=0)
     tie_fallings_ave = tie_fallings.mean(axis=0)
-    isi = max(np.ptp(tie_risings_ave), np.ptp(tie_fallings_ave))
+    isi = float(max(np.ptp(tie_risings_ave), np.ptp(tie_fallings_ave)))
     isi = min(isi, ui)  # Cap the ISI at the unit interval.
     dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
 

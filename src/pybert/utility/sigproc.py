@@ -14,7 +14,6 @@ import re
 
 from typing import Any, Optional
 
-import numpy as np
 from numpy import (
     arange, argmax, array, convolve, cos, cumsum, diff, maximum,
     mean, minimum, ones, pad, pi, roll, sign, where, zeros, floating
@@ -542,7 +541,7 @@ def get_peak_info(t: Rvec, y: Rvec) -> tuple[int, float, float]:
         - the peak value itself.
     """
 
-    pk_ix   = np.argmax(y)
-    pk_time = t[pk_ix]
-    pk_amp  = y[pk_ix]
+    pk_ix   = int(argmax(y))
+    pk_time: float = t[pk_ix]
+    pk_amp: float  = y[pk_ix]
     return (pk_ix, pk_time, pk_amp)
