@@ -11,7 +11,7 @@ SRC_DIR := src/pybert
 DOCS_DIR := docs
 UV_EXEC := uv
 UVX_EXEC := uvx
-PYVERS := 3.10 3.11 3.12
+PYVERS := 3.10 3.11 3.12 3.13
 PROJ_VER := $(shell ${UV_EXEC} version | cut -f 2 -d ' ') 
 TEST_EXP ?= tests
 

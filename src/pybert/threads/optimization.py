@@ -303,7 +303,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 if not trials_run % trials_run_inc:
                     pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
                     time.sleep(0.001)
-                    if pybert.opt_thread.stopped():
+                    if pybert.opt_thread and pybert.opt_thread.stopped():
                         pybert.status = "Optimization aborted by user."
                         raise RuntimeError("Optimization aborted by user.")
             else:  # exhaustive sweep of Rx FFE tap weight combinations
@@ -333,7 +333,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                     if not trials_run % trials_run_inc:
                         pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
                         time.sleep(0.001)
-                        if pybert.opt_thread.stopped():
+                        if pybert.opt_thread and pybert.opt_thread.stopped():
                             pybert.status = "Optimization aborted by user."
                             raise RuntimeError("Optimization aborted by user.")
             if fom_better > fom_max:
