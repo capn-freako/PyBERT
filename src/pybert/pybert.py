@@ -68,6 +68,7 @@ from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots
+from pybert.models.ami_param import AmiParamTuner
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
 from pybert.models.fec import FEC_Encoder
@@ -92,6 +93,26 @@ gPeakFreq    =     5.0  # CTLE peaking frequency (GHz)
 gPeakMag     =     1.7  # CTLE peaking magnitude (dB)
 gCTLEOffset  =     0.0  # CTLE d.c. offset (dB)
 gNtaps       =     5
+
+
+def _mk_ami_tap_tuners(pcfg: AMIParamConfigurator) -> list:
+    """Build a fresh list of `AmiParamTuner`s from an AMI model's tunable
+    (i.e. - 'In'/'InOut', 'Range' format) Model_Specific parameters."""
+    tuners = []
+    for branch_names, param in pcfg.tunable_params:
+        pmin, pmax = float(param.pmin), float(param.pmax)
+        step = (pmax - pmin) / 10 or 1.0
+        tuners.append(AmiParamTuner(
+            name="_".join(branch_names[1:]),  # Drop the "Model_Specific" root.
+            branch_names=branch_names,
+            enabled=False,
+            min_val=pmin,
+            max_val=pmax,
+            step=step,
+            value=float(param.pvalue),
+            is_int=param.ptype == "Integer",
+        ))
+    return tuners
 
 
 class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
@@ -215,6 +236,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             TxTapTuner(name="Post-tap14", pos=14,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
         ]
     )  #: EQ optimizer list of RxTapTuner objects.
+    tx_ami_tap_tuners = List(Instance(AmiParamTuner), [])  # type: ignore
+    #: EQ optimizer list of Tx IBIS-AMI Model_Specific parameter tuner objects.
+    rx_ami_tap_tuners = List(Instance(AmiParamTuner), [])  # type: ignore
+    #: EQ optimizer list of Rx IBIS-AMI Model_Specific parameter tuner objects.
     opt_thread = Instance(OptThread)  #: EQ optimization thread.
     use_mmse = Bool(True)
 
@@ -1152,6 +1177,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _tx_ami_file_changed(self, new_value):
         try:
             self.tx_ami_valid = False
+            self.tx_ami_tap_tuners = []
             if new_value:
                 self.log(f"Parsing Tx AMI file, '{new_value}'...")
                 with open(new_value, mode="r", encoding="utf-8") as pfile:
@@ -1169,6 +1195,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.tx_has_ts4 = False
                 self._tx_cfg = pcfg
+                self.tx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)
                 self.tx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
@@ -1229,6 +1256,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _rx_ami_file_changed(self, new_value):
         try:
             self.rx_ami_valid = False
+            self.rx_ami_tap_tuners = []
             if new_value:
                 with open(new_value, mode="r", encoding="utf-8") as pfile:
                     pcfg = AMIParamConfigurator(pfile.read())
@@ -1246,6 +1274,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.rx_has_ts4 = False
                 self._rx_cfg = pcfg
+                self.rx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)
                 self.rx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"

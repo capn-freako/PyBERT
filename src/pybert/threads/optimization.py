@@ -20,11 +20,14 @@ from pychopmarg.optimize import mmse
 from pychopmarg.noise import NoiseCalc
 
 from pybert.common import Rvec
+from pybert.models.ami_param import AmiParamTuner
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
 from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights, resize_zero_pad, safe_log10
+from pybert.utility.ibisami import run_ami_model
 
 gDebugOptimize = False
+gAmiTrialCap = 2_000  # Much lower than the native tap-weight cap: each trial invokes a real AMI_Init() call.
 
 
 # pylint: disable=no-member
@@ -40,7 +43,7 @@ class OptThread(StoppableThread):
         time.sleep(0.001)
 
         try:
-            tx_weights, rx_peaking, rx_weights, fom, valid = coopt(pybert)
+            tx_weights, rx_peaking, rx_weights, fom, valid, tx_ami_vals, rx_ami_vals = coopt(pybert)
         except RuntimeError as err:
             pybert.log(f"{err}")
             pybert.status = "User abort."
@@ -54,6 +57,12 @@ class OptThread(StoppableThread):
         pybert.peak_mag_tune = rx_peaking
         for k, rx_weight in enumerate(rx_weights):
             pybert.ffe_tap_tuners[k].value = rx_weight
+        # `coopt()` already committed the winning AMI parameter values into
+        # `pybert._tx_cfg`/`pybert._rx_cfg`; just refresh the tuner tables' displayed values.
+        for k, val in enumerate(tx_ami_vals):
+            pybert.tx_ami_tap_tuners[k].value = val
+        for k, val in enumerate(rx_ami_vals):
+            pybert.rx_ami_tap_tuners[k].value = val
         pybert.status = f"Finished. (SNR: {20 * safe_log10(fom):5.1f} dB)"
 
 
@@ -124,7 +133,58 @@ def _mk_tap_weight_combs(weightss: list[Rvec], enumerated_tuners: list[tuple[int
     return _mk_tap_weight_combs(new_weightss, tail)
 
 
-def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
+def mk_ami_param_combs(tuners: list[AmiParamTuner]) -> list[Rvec]:
+    """
+    Make all AMI Model_Specific parameter value combinations possible from a
+    list of AMI parameter tuners.
+
+    Unlike `mk_tap_weight_combs()`, a *disabled* parameter holds at its
+    current (last configured) value here, rather than being forced to zero --
+    an AMI parameter's "off" state is whatever it's already configured to be,
+    not necessarily 0 (which may not even be a legal value for it).
+
+    Args:
+        tuners: List of AMI parameter tuner control objects.
+
+    Return:
+        List of all possible parameter value combinations.
+
+    Raises:
+        ValueError: If total number of combinations is too large.
+    """
+
+    n_combs = prod([int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+                    if (tuner.enabled and tuner.step) else 1
+                    for tuner in tuners])
+    if n_combs > gAmiTrialCap:
+        raise ValueError(
+            f"Total number of AMI parameter combinations ({int(n_combs)}) is too great!"
+            f" (Cap: {gAmiTrialCap}, since each trial invokes the real AMI model.)")
+
+    seed = array([tuner.value for tuner in tuners])
+    return _mk_ami_param_combs([seed], list(enumerate(tuners)))
+
+
+def _mk_ami_param_combs(valuess: list[Rvec], enumerated_tuners: list[tuple[int, AmiParamTuner]]) -> list[Rvec]:
+    "Recursive helper function. (See `_mk_tap_weight_combs()`.)"
+
+    if not enumerated_tuners:
+        return valuess
+
+    head, *tail = enumerated_tuners
+    n, tuner = head
+    if not (tuner.enabled and tuner.step):
+        return _mk_ami_param_combs(valuess, tail)
+    param_vals = arange(tuner.min_val, tuner.max_val + tuner.step, tuner.step)
+    new_valuess = []
+    for values in valuess:
+        for val in param_vals:
+            values[n] = round(val) if tuner.is_int else val
+            new_valuess.append(values.copy())
+    return _mk_ami_param_combs(new_valuess, tail)
+
+
+def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, Rvec]:  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
     """
     Co-optimize the Tx/Rx linear equalization, assuming ideal bounded DFE.
 
@@ -134,11 +194,18 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     Returns:
         A tuple containing
 
-            - the optimum Tx FFE tap weights,
-            - the optimum Rx CTLE peaking,
-            - the optimum Rx FFE tap weights,
-            - the figure of merit for the returned settings, and
-            - the status of the optimization attempt (`True` = success).
+            - the optimum native Tx FFE tap weights (empty, if Tx is IBIS-AMI),
+            - the optimum native Rx CTLE peaking (0, if Rx is IBIS-AMI),
+            - the optimum native Rx FFE tap weights (empty, if Rx is IBIS-AMI),
+            - the figure of merit for the returned settings,
+            - the status of the optimization attempt (`True` = success),
+            - the optimum Tx IBIS-AMI parameter values (empty, if Tx is native), and
+            - the optimum Rx IBIS-AMI parameter values (empty, if Rx is native).
+
+        When Tx and/or Rx is IBIS-AMI, the winning parameter values have
+        already been committed to `pybert._tx_cfg`/`pybert._rx_cfg` (the
+        live objects `my_run_simulation()` reads), so no separate "Use EQ"
+        step is required for them.
 
     Raises:
         RuntimeError: If user opts to abort.
@@ -157,6 +224,8 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     rx_n_pre  = pybert.rx_n_pre
     max_len   = 100 * pybert.nspui
     num_levels = pybert.mod_type_ + 2
+    tx_use_ami = pybert.tx_use_ami
+    rx_use_ami = pybert.rx_use_ami
 
     # Find number of enabled DFE taps. (No support for floating taps, yet.)
     n_dfe_taps = 0
@@ -176,69 +245,14 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     h_chnl = pybert.calc_chnl_h()
     t = pybert.t
     ui = pybert.ui
+    ts = t[1]
     nspui = pybert.nspui
     f = pybert.f
     _, p_chnl, _ = calc_resps(t, h_chnl, ui, f)
     pybert.plotdata.set_data("p_chnl", p_chnl)
 
-    # Calculate Tx tap weight candidates.
-    n_enabled_weights = len(list(filter(lambda t: t.enabled, tx_taps)))
-    tx_curs_pos = max(0, -tx_taps[0].pos)  # list position at which to insert main tap
-    try:
-        tx_weightss = mk_tap_weight_combs(pybert.tx_tap_tuners)
-    except ValueError as err:
-        raise RuntimeError(
-            "\n".join([
-                f"{err}",
-                "Sorry, that's more Tx tap weight combinations than I can handle.",
-                "I had to abort the EQ optimization in your stead.",
-            ])) from err
-
-    tx_weightss = list(map(lambda ws: insert(ws, tx_curs_pos, 1 - sum(abs(ws))), tx_weightss))
-
-    # Calculate CTLE gain candidates.
-    if pybert.ctle_enable_tune:
-        peak_mags = arange(min_mag, max_mag + step_mag, step_mag)
-    else:
-        peak_mags = array([0])
-
-    # Calculate Rx FFE tap weight candidates.
-    n_rx_weights = len(rx_taps)
-    n_enabled_rx_weights = len(list(filter(lambda t: t.enabled, rx_taps)))
-    if pybert.use_mmse:
-        rx_weightss = [zeros(n_rx_weights)]  # For `n_trials` calculation only.
-    else:
-        try:
-            rx_weightss = mk_tap_weight_combs(rx_taps)
-            if not rx_weightss:  # Trap the "null FFE" case.
-                rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]
-        except ValueError as err:
-            raise RuntimeError(
-                "\n".join([
-                    f"{err}",
-                    "Sorry, that's more Rx FFE tap weight combinations than I can handle.",
-                    "I had to abort the EQ optimization in your stead.",
-                ])) from err
-
-    # Calculate and report the total number of trials, as well as some other misc. info.
-    if pybert.use_mmse:
-        n_trials = len(peak_mags) * len(tx_weightss)
-    else:
-        n_trials = len(peak_mags) * len(tx_weightss) * len(rx_weightss)
-    trials_run_inc = n_trials // 100 or 1
-
-    pybert.log("\n".join([
-        "Optimizing linear EQ...",
-        f"\tTime step: {t[1] * 1e12:5.1f} ps",
-        f"\tUnit interval: {ui * 1e12:5.1f} ps",
-        f"\tOversampling factor: {nspui}",
-        f"\tNumber of enabled Tx taps: {n_enabled_weights}",
-        f"\tTx cursor tap position: {tx_curs_pos}",
-        f"\tNumber of enabled Rx FFE taps: {n_enabled_rx_weights}",
-        f"\tRunning {n_trials} trials.",
-        ""]))
-
     # Calculate `f_t` and interpolated channel frequency response.
+    # (Needed below, for MMSE scoring.)
     dt = t[1] - t[0]            # `t` assumed uniformly sampled throughout.
     fN = 0.5 / dt               # Nyquist frequency
     f0 = 100e6                  # fundamental frequency
@@ -247,6 +261,155 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     krnl = interp1d(f, pybert.chnl_H, bounds_error=False, fill_value=0)
     chnl_H = krnl(f_t)
 
+    # An AMI model's own Init()-returned impulse response slots directly into the same
+    # convolution cascade used for native EQ (both are just LTI impulse responses), so a
+    # Tx/Rx AMI candidate is evaluated by really invoking `AMI_Init()`, in place of the
+    # closed-form tap/CTLE math. See this feature's design doc for the full rationale.
+    # Stand-in "no channel" for Tx-AMI candidates: a unit impulse on the same sample grid as
+    # `h_chnl` (PyAMI's generic response post-processing needs at least `nspui` samples to work).
+    identity_h = zeros(len(h_chnl))
+    identity_h[0] = 1.0
+
+    # --- Calculate Rx-side (CTLE or Rx-AMI) candidates. ---
+    rx_candidates: list[dict] = []
+    if rx_use_ami:
+        rx_ami_tuners = pybert.rx_ami_tap_tuners
+        rx_returns_impulse = bool(pybert._rx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]))
+        if not rx_returns_impulse:
+            if any(tuner.enabled for tuner in rx_ami_tuners):
+                pybert.log(
+                    "This AMI model only supports GetWave(); Rx parameter optimization isn't supported yet"
+                    " -- configure it manually via the 'Configure' button.")
+            rx_combs = [array([tuner.value for tuner in rx_ami_tuners])]
+        else:
+            try:
+                rx_combs = mk_ami_param_combs(rx_ami_tuners)
+            except ValueError as err:
+                raise RuntimeError(
+                    "\n".join([
+                        f"{err}",
+                        "Sorry, that's more Rx AMI parameter combinations than I can handle.",
+                        "I had to abort the EQ optimization in your stead.",
+                    ])) from err
+        for comb in rx_combs:
+            for tuner, val in zip(rx_ami_tuners, comb):
+                if tuner.enabled:
+                    pybert._rx_cfg.set_param_val(list(tuner.branch_names), float(val))
+            if rx_returns_impulse:
+                _, _, _, out_h, _, _ = run_ami_model(
+                    pybert.rx_dll_file, pybert._rx_cfg, False, ui, ts, h_chnl, zeros(1))
+                _, p_ctle_out, _ = calc_resps(t, out_h, ui, f)
+            else:  # GetWave-only model: can't sweep it; fall back to the unequalized channel.
+                p_ctle_out = p_chnl
+            rx_candidates.append(
+                {"peak_mag": 0.0, "rx_ami_vals": comb, "p_ctle_out": p_ctle_out, "ctle_H": None})
+    else:
+        if pybert.ctle_enable_tune:
+            peak_mags = arange(min_mag, max_mag + step_mag, step_mag)
+        else:
+            peak_mags = array([0])
+        for peak_mag in peak_mags:
+            _, H_ctle = make_ctle(rx_bw, peak_freq, peak_mag, w_ctle)
+            _h_ctle = irfft(H_ctle)
+            krnl_ctle = interp1d(t_ctle, _h_ctle, bounds_error=False, fill_value=0)
+            h_ctle = krnl_ctle(t[:max_len])
+            h_ctle *= sum(_h_ctle) / sum(h_ctle)  # type: ignore
+            p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
+            ctle_H = rfft(resize_zero_pad(h_ctle, len(_t)))
+            rx_candidates.append(
+                {"peak_mag": peak_mag, "rx_ami_vals": None, "p_ctle_out": p_ctle_out, "ctle_H": ctle_H})
+
+    # --- Calculate Tx-side (native FFE taps or Tx-AMI) candidates. ---
+    tx_candidates: list[dict] = []
+    if tx_use_ami:
+        tx_ami_tuners = pybert.tx_ami_tap_tuners
+        tx_returns_impulse = bool(pybert._tx_cfg.fetch_param_val(["Reserved_Parameters", "Init_Returns_Impulse"]))
+        if not tx_returns_impulse:
+            if any(tuner.enabled for tuner in tx_ami_tuners):
+                pybert.log(
+                    "This AMI model only supports GetWave(); Tx parameter optimization isn't supported yet"
+                    " -- configure it manually via the 'Configure' button.")
+            tx_combs = [array([tuner.value for tuner in tx_ami_tuners])]
+        else:
+            try:
+                tx_combs = mk_ami_param_combs(tx_ami_tuners)
+            except ValueError as err:
+                raise RuntimeError(
+                    "\n".join([
+                        f"{err}",
+                        "Sorry, that's more Tx AMI parameter combinations than I can handle.",
+                        "I had to abort the EQ optimization in your stead.",
+                    ])) from err
+        for comb in tx_combs:
+            for tuner, val in zip(tx_ami_tuners, comb):
+                if tuner.enabled:
+                    pybert._tx_cfg.set_param_val(list(tuner.branch_names), float(val))
+            if tx_returns_impulse:
+                _, _, h_tx, _, _, _ = run_ami_model(
+                    pybert.tx_dll_file, pybert._tx_cfg, False, ui, ts, identity_h, zeros(1))
+            else:  # GetWave-only model: can't sweep it; pass the signal through unmodified.
+                h_tx = array([1.0])
+            tx_candidates.append({"tx_weights": None, "tx_ami_vals": comb, "h_tx": h_tx})
+        tx_curs_pos = 0
+    else:
+        tx_curs_pos = max(0, -tx_taps[0].pos)  # list position at which to insert main tap
+        try:
+            tx_weightss = mk_tap_weight_combs(pybert.tx_tap_tuners)
+        except ValueError as err:
+            raise RuntimeError(
+                "\n".join([
+                    f"{err}",
+                    "Sorry, that's more Tx tap weight combinations than I can handle.",
+                    "I had to abort the EQ optimization in your stead.",
+                ])) from err
+        tx_weightss = list(map(lambda ws: insert(ws, tx_curs_pos, 1 - sum(abs(ws))), tx_weightss))
+        for tx_weights in tx_weightss:
+            # sum = concatenate
+            h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
+            tx_candidates.append({"tx_weights": tx_weights, "tx_ami_vals": None, "h_tx": h_tx})
+
+    # --- Calculate Rx FFE tap weight candidates. (Native Rx only; AMI Rx implements its own EQ.) ---
+    effective_use_mmse = pybert.use_mmse and not rx_use_ami
+    n_rx_weights = len(rx_taps)
+    if not rx_use_ami:
+        if effective_use_mmse:
+            rx_weightss = [zeros(n_rx_weights)]  # For `n_trials` calculation only.
+        else:
+            try:
+                rx_weightss = mk_tap_weight_combs(rx_taps)
+                if not rx_weightss:  # Trap the "null FFE" case.
+                    rx_weightss = [array([0.0] * rx_n_pre + [1.0] + [0.0] * (rx_n_taps - rx_n_pre - 1))]
+            except ValueError as err:
+                raise RuntimeError(
+                    "\n".join([
+                        f"{err}",
+                        "Sorry, that's more Rx FFE tap weight combinations than I can handle.",
+                        "I had to abort the EQ optimization in your stead.",
+                    ])) from err
+
+    # Calculate and report the total number of trials, as well as some other misc. info.
+    if rx_use_ami or effective_use_mmse:
+        n_trials = len(rx_candidates) * len(tx_candidates)
+    else:
+        n_trials = len(rx_candidates) * len(tx_candidates) * len(rx_weightss)
+    trials_run_inc = n_trials // 100 or 1
+
+    n_enabled_tx = len(list(filter(lambda t: t.enabled, (pybert.tx_ami_tap_tuners if tx_use_ami else tx_taps))))
+    n_enabled_rx = len(list(filter(lambda t: t.enabled, (pybert.rx_ami_tap_tuners if rx_use_ami else rx_taps))))
+    tx_desc = (f"IBIS-AMI ({n_enabled_tx} enabled param(s))" if tx_use_ami
+               else f"native ({n_enabled_tx} enabled tap(s), cursor at {tx_curs_pos})")
+    rx_desc = (f"IBIS-AMI ({n_enabled_rx} enabled param(s))" if rx_use_ami
+               else f"native ({n_enabled_rx} enabled FFE tap(s))")
+    pybert.log("\n".join([
+        "Optimizing linear EQ...",
+        f"\tTime step: {t[1] * 1e12:5.1f} ps",
+        f"\tUnit interval: {ui * 1e12:5.1f} ps",
+        f"\tOversampling factor: {nspui}",
+        f"\tTx equalization: {tx_desc}",
+        f"\tRx equalization: {rx_desc}",
+        f"\tRunning {n_trials} trials.",
+        ""]))
+
     # Run the optimization loop.
     fom_max = -1000.
     peak_mag_best = 0.
@@ -254,22 +417,18 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     dfe_weights = zeros(len(dfe_taps))
     rx_weights_best = zeros(rx_n_taps)
     dfe_weights_best = zeros(len(dfe_taps))
-    tx_weights_best = [0.0] * len(tx_taps)
+    tx_weights_best: list = [0.0] * len(tx_taps)
     del tx_weights_best[tx_curs_pos]
-    for peak_mag in peak_mags:  # pylint: disable=too-many-nested-blocks
-        _, H_ctle = make_ctle(rx_bw, peak_freq, peak_mag, w_ctle)
-        _h_ctle = irfft(H_ctle)
-        krnl = interp1d(t_ctle, _h_ctle, bounds_error=False, fill_value=0)
-        h_ctle = krnl(t[:max_len])
-        h_ctle *= sum(_h_ctle) / sum(h_ctle)  # type: ignore
-        p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
-        ctle_H = rfft(resize_zero_pad(h_ctle, len(_t)))
-        for tx_weights in tx_weightss:
-            # sum = concatenate
-            h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
+    tx_ami_best: Rvec = array([])
+    rx_ami_best: Rvec = array([])
+    for rx_cand in rx_candidates:  # pylint: disable=too-many-nested-blocks
+        p_ctle_out = rx_cand["p_ctle_out"]
+        ctle_H = rx_cand["ctle_H"]
+        for tx_cand in tx_candidates:
+            h_tx = tx_cand["h_tx"]
             p_tx = convolve(p_ctle_out, h_tx)
             p_tx = resize_zero_pad(p_tx, len(_t))
-            if pybert.use_mmse:
+            if effective_use_mmse:
                 curs_ix = where(p_tx == max(p_tx))[0][0]
                 curs_amp = p_tx[curs_ix]
                 n_pre_isi = curs_ix // nspui
@@ -288,7 +447,6 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                     print(f"curs_ix: {curs_ix}")
                     print(f"curs_amp: {curs_amp}")
                     print(f"h_tx: {h_tx}")
-                    print(f"tx_weights: {tx_weights}")
                     raise
                 rx_weights_better = mmse_rslts["rx_taps"]
                 dfe_weights_better = mmse_rslts["dfe_tap_weights"]
@@ -299,6 +457,22 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
                 except ValueError:  # Flags obviously non-optimum case.
                     continue
                 fom_better = fom
+                trials_run += 1
+                if not trials_run % trials_run_inc:
+                    pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
+                    time.sleep(0.001)
+                    if pybert.opt_thread and pybert.opt_thread.stopped():
+                        pybert.status = "Optimization aborted by user."
+                        raise RuntimeError("Optimization aborted by user.")
+            elif rx_use_ami:  # Rx implements its own EQ internally; nothing left to design.
+                curs_ix = where(p_tx == max(p_tx))[0][0]
+                curs_amp = p_tx[curs_ix]
+                n_pre_isi = curs_ix // nspui
+                isi_sum = sum(abs(p_tx[curs_ix - n_pre_isi * nspui::nspui])) - abs(curs_amp)
+                fom_better = curs_amp / isi_sum
+                rx_weights_better = zeros(rx_n_taps)
+                dfe_weights_better = zeros(len(dfe_taps))
+                p_tot = p_tx
                 trials_run += 1
                 if not trials_run % trials_run_inc:
                     pybert.status = f"Optimizing EQ...({100 * trials_run // n_trials}%)"
@@ -339,8 +513,15 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
             if fom_better > fom_max:
                 rx_weights_best = rx_weights_better.copy()
                 dfe_weights_best = dfe_weights_better.copy()
-                tx_weights_best = list(delete(tx_weights, tx_curs_pos))
-                peak_mag_best = peak_mag
+                if tx_cand["tx_weights"] is not None:
+                    tx_weights_best = list(delete(tx_cand["tx_weights"], tx_curs_pos))
+                    tx_ami_best = array([])
+                else:
+                    tx_weights_best = []
+                    tx_ami_best = tx_cand["tx_ami_vals"].copy()
+                peak_mag_best = rx_cand["peak_mag"]
+                rx_ami_best = (rx_cand["rx_ami_vals"].copy()
+                               if rx_cand["rx_ami_vals"] is not None else array([]))
                 curs_ix = where(p_tot == max(p_tot))[0][0]
                 curs_amp = p_tot[curs_ix]
                 n_pre_isi = curs_ix // nspui
@@ -358,4 +539,17 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool]:  # pyl
     for k, dfe_weight in enumerate(dfe_weights_best):  # pylint: disable=possibly-used-before-assignment
         dfe_taps[k].value = dfe_weight
 
-    return (tx_weights_best, peak_mag_best, list(rx_weights_best), fom_max, True)  # pylint: disable=possibly-used-before-assignment
+    # Commit the winning AMI parameter values. `_tx_cfg`/`_rx_cfg` are exactly the live
+    # objects `my_run_simulation()` reads, so this step *is* the "Use EQ" commit, for AMI --
+    # unlike native EQ, no separate copy-into-live-traits step is needed.
+    if tx_use_ami and len(tx_ami_best):
+        for tuner, val in zip(pybert.tx_ami_tap_tuners, tx_ami_best):
+            if tuner.enabled:
+                pybert._tx_cfg.set_param_val(list(tuner.branch_names), float(val))
+    if rx_use_ami and len(rx_ami_best):
+        for tuner, val in zip(pybert.rx_ami_tap_tuners, rx_ami_best):
+            if tuner.enabled:
+                pybert._rx_cfg.set_param_val(list(tuner.branch_names), float(val))
+
+    return (  # pylint: disable=possibly-used-before-assignment
+        tx_weights_best, peak_mag_best, list(rx_weights_best), fom_max, True, tx_ami_best, rx_ami_best)

@@ -186,16 +186,35 @@ class MyHandler(Handler):
         if pybert.opt_thread and pybert.opt_thread.is_alive():
             pass
         else:
-            n_trials = int((pybert.max_mag_tune - pybert.min_mag_tune) / pybert.step_mag_tune + 1)
-            for tuner in pybert.tx_tap_tuners:
-                if tuner.enabled:
-                    n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
-            if not pybert.use_mmse:
+            # Each AMI-side trial invokes a real `AMI_Init()` DLL call, orders of magnitude
+            # slower than the pure `numpy.convolve()` trials used for native EQ, so AMI-active
+            # sweeps are held to a much lower trial cap.
+            ami_active = pybert.tx_use_ami or pybert.rx_use_ami
+            if pybert.rx_use_ami:
+                n_trials = 1
+                for tuner in pybert.rx_ami_tap_tuners:
+                    if tuner.enabled and tuner.step:
+                        n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+            else:
+                n_trials = int((pybert.max_mag_tune - pybert.min_mag_tune) / pybert.step_mag_tune + 1)
+            if pybert.tx_use_ami:
+                for tuner in pybert.tx_ami_tap_tuners:
+                    if tuner.enabled and tuner.step:
+                        n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+            else:
+                for tuner in pybert.tx_tap_tuners:
+                    if tuner.enabled:
+                        n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+            if not pybert.rx_use_ami and not pybert.use_mmse:
                 for tuner in pybert.ffe_tap_tuners:
                     if tuner.enabled:
                         n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
-            if n_trials > 1_000_000:
-                usr_resp = pybert.alert(f"You've opted to run over {n_trials // 1_000_000} million trials!\nAre you sure?")
+            trial_cap = 2_000 if ami_active else 1_000_000
+            if n_trials > trial_cap:
+                extra = " (each invoking the real AMI model)" if ami_active else ""
+                usr_resp = pybert.alert(
+                    f"You've opted to run {n_trials} trials{extra},"
+                    f" over the recommended cap of {trial_cap}!\nAre you sure?")
                 if not usr_resp:
                     return
             pybert.opt_thread = OptThread()

@@ -750,7 +750,9 @@ traits_view = View(
                 ),
                 VGroup(  # Rx FFE
                     HGroup(
-                        Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
+                        Item(name="use_mmse", label="Use MMSE", enabled_when="not rx_use_ami",
+                             tooltip="Use COM style MMSE optimization. (Unavailable when Rx is IBIS-AMI;"
+                                     " the cursor/ISI figure of merit is used instead.)"),
                     ),
                     Item(
                         name="ffe_tap_tuners",
@@ -805,6 +807,60 @@ traits_view = View(
                     ),
                     label="Rx DFE",
                     show_border=True,
+                ),
+                VGroup(  # Tx IBIS-AMI Model_Specific parameters.
+                    Item(
+                        name="tx_ami_tap_tuners",
+                        editor=TableEditor(
+                            columns=[
+                                ObjectColumn(name="name", editable=False),
+                                ObjectColumn(name="enabled"),
+                                ObjectColumn(name="min_val"),
+                                ObjectColumn(name="max_val"),
+                                ObjectColumn(name="step"),
+                                ObjectColumn(name="value", format="%+.4g", editable=False),
+                            ],
+                            configurable=False,
+                            reorderable=False,
+                            sortable=False,
+                            selection_mode="cell",
+                            auto_size=True,
+                            rows=6,
+                            orientation="horizontal",
+                            is_grid_cell=True,
+                        ),
+                        show_label=False,
+                    ),
+                    label="Tx AMI Params",
+                    show_border=True,
+                    visible_when="tx_sel=='ibis' and tx_ami_valid",
+                ),
+                VGroup(  # Rx IBIS-AMI Model_Specific parameters.
+                    Item(
+                        name="rx_ami_tap_tuners",
+                        editor=TableEditor(
+                            columns=[
+                                ObjectColumn(name="name", editable=False),
+                                ObjectColumn(name="enabled"),
+                                ObjectColumn(name="min_val"),
+                                ObjectColumn(name="max_val"),
+                                ObjectColumn(name="step"),
+                                ObjectColumn(name="value", format="%+.4g", editable=False),
+                            ],
+                            configurable=False,
+                            reorderable=False,
+                            sortable=False,
+                            selection_mode="cell",
+                            auto_size=True,
+                            rows=6,
+                            orientation="horizontal",
+                            is_grid_cell=True,
+                        ),
+                        show_label=False,
+                    ),
+                    label="Rx AMI Params",
+                    show_border=True,
+                    visible_when="rx_sel=='ibis' and rx_ami_valid",
                 ),
             ),
             Item(
