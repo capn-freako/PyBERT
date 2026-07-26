@@ -687,6 +687,16 @@ traits_view = View(
         ),
         # "Optimizer" tab.
         VGroup(
+            HGroup(  # AMI search budget.
+                Item(
+                    name="ami_opt_trials",
+                    label="AMI trial budget",
+                    tooltip="Number of TPE-guided (Optuna) trials to run against the real AMI"
+                            " model(s). Only used when Tx and/or Rx equalization is IBIS-AMI;"
+                            " each trial invokes a real AMI_Init() call.",
+                ),
+                visible_when="tx_use_ami or rx_use_ami",
+            ),
             HGroup(  # EQ Config.
                 Group(  # Tx FFE Config.
                     Item(
@@ -713,6 +723,7 @@ traits_view = View(
                     ),
                     label="Tx FFE",
                     show_border=True,
+                    visible_when="tx_sel=='native'",
                 ),
                 VGroup(  # Rx CTLE
                     Item(name="ctle_enable_tune", label="Enable", tooltip="CTLE enable",),
@@ -747,6 +758,7 @@ traits_view = View(
                     ),
                     label="Rx CTLE",
                     show_border=True,
+                    visible_when="rx_sel=='native'",
                 ),
                 VGroup(  # Rx FFE
                     HGroup(
@@ -778,6 +790,7 @@ traits_view = View(
                     ),
                     label="Rx FFE",
                     show_border=True,
+                    visible_when="rx_sel=='native'",
                 ),
                 VGroup(  # DFE
                     HGroup(
@@ -807,6 +820,7 @@ traits_view = View(
                     ),
                     label="Rx DFE",
                     show_border=True,
+                    visible_when="rx_sel=='native'",
                 ),
                 VGroup(  # Tx IBIS-AMI Model_Specific parameters.
                     Item(

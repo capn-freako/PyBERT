@@ -15,6 +15,7 @@ length bug caught during development) that a purely-native-EQ test can't.
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -174,4 +175,26 @@ class TestTxAmiOptimizer:
         assert valid
         assert any("GetWave" in msg for msg in logs)
         # Falls back to a single "as configured" pass -- values pass through unchanged.
+        assert list(tx_ami_best) == [t.value for t in dut.tx_ami_tap_tuners]
+
+    def test_empty_search_space_skips_optuna(self):
+        "Nothing enabled anywhere: one fixed evaluation, no Optuna study created."
+        dut = PyBERT(run_simulation=False, gui=False)
+        pcfg = AMIParamConfigurator(TX_AMI_CONTENT)
+        dut._tx_cfg = pcfg
+        dut.tx_dll_file = str(TX_SO_PATH)
+        dut.tx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)  # All disabled by default.
+        dut.tx_use_ami = True
+        dut.ctle_enable_tune = False  # Zero out the native Rx-side dimension too.
+
+        with patch("optuna.create_study") as mock_create_study:
+            (tx_weights_best, _peak_mag_best, _rx_weights_best, fom_max,
+             valid, tx_ami_best, rx_ami_best) = coopt(dut)
+
+        mock_create_study.assert_not_called()
+        assert valid
+        assert fom_max > -1000.0
+        assert not tx_weights_best
+        assert not len(rx_ami_best)
+        # The single fixed evaluation used each tuner's current (unswept) value.
         assert list(tx_ami_best) == [t.value for t in dut.tx_ami_tap_tuners]

@@ -260,6 +260,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     #: EQ optimizer list of Rx IBIS-AMI Model_Specific parameter tuner objects.
     opt_thread = Instance(OptThread)  #: EQ optimization thread.
     use_mmse = Bool(True)
+    ami_opt_trials = Int(100)
+    #: Number of TPE-guided (Optuna) trials to run against the real AMI model(s),
+    #: when Tx and/or Rx equalization is IBIS-AMI. Each trial invokes a real
+    #: `AMI_Init()` DLL call, so this is a much smaller number than a native grid search.
 
     # - Tx
     tx_sel = Enum("native", "ibis")
