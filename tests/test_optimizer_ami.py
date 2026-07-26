@@ -61,11 +61,15 @@ class TestRxAmiTunerWiring:
     def test_tuners_populated_from_ami_file(self):
         dut = _mk_rx_ami_dut()
         names = {t.name for t in dut.rx_ami_tap_tuners}
-        # Every 'In'/'InOut', 'Range'-format Model_Specific parameter should show up...
+        # Range-format parameters...
         assert {"ctle_mag", "ctle_bandwidth", "ctle_dcgain", "dfe_vout", "dfe_gain"} <= names
-        # ...but List/Boolean-format parameters (e.g. 'ctle_mode', 'debug_dbg_enable') should not.
-        assert "ctle_mode" not in names
-        assert not any(n.startswith("debug") for n in names)
+        # ...Boolean parameters...
+        assert "debug_dbg_enable" in names
+        # ...and contiguous Integer/List "mode selector" parameters (these gate whether
+        # their sibling Range parameters have *any* effect -- e.g. ctle_mag is a no-op
+        # unless ctle_mode is also swept/enabled) all show up.
+        assert "ctle_mode" in names
+        assert "dfe_mode" in names
         # Opt-in only: nothing enabled by default.
         assert all(not t.enabled for t in dut.rx_ami_tap_tuners)
 
@@ -89,13 +93,35 @@ class TestRxAmiOptimizer:
         assert all(w == 0.0 for w in rx_weights_best)  # No native Rx FFE when Rx is AMI.
         assert len(rx_ami_best) == len(dut.rx_ami_tap_tuners)
 
-        # Winning values must already be committed into the live `_rx_cfg`
-        # (this *is* the "Use EQ" step, for AMI parameters).
-        for tuner, val in zip(dut.rx_ami_tap_tuners, rx_ami_best):
-            committed = dut._rx_cfg.fetch_param_val(list(tuner.branch_names))
-            assert val == committed
+        # Winning values must already be committed into the live `_rx_cfg` (this *is* the
+        # "Use EQ" step, for AMI parameters) -- re-derive tuners from `_rx_cfg`'s current
+        # state (handles Range/Boolean/List-format params uniformly) and compare.
+        committed_tuners = _mk_ami_tap_tuners(dut._rx_cfg)
+        for tuner, val, committed in zip(dut.rx_ami_tap_tuners, rx_ami_best, committed_tuners):
+            assert val == committed.value
             if not tuner.enabled:
                 assert val == tuner.value  # Disabled params hold at their configured value.
+
+    def test_mode_selector_gates_sibling_range_param(self):
+        """Regression: a real-world 'mode selector' pattern. `ctle_mag` has *no* effect on
+        the model unless `ctle_mode` is also set to 'Manual' -- enabling only `ctle_mag`
+        used to silently optimize to a meaningless result (always the sweep's first/seed
+        value, since no candidate could ever out-score another)."""
+        dut = _mk_rx_ami_dut()
+        for tuner in dut.rx_ami_tap_tuners:
+            if tuner.name in ("ctle_mode", "ctle_mag"):
+                tuner.enabled = True
+
+        (*_rest, valid, _tx_ami_best, rx_ami_best) = coopt(dut)
+
+        assert valid
+        names = [t.name for t in dut.rx_ami_tap_tuners]
+        ctle_mode_val = rx_ami_best[names.index("ctle_mode")]
+        ctle_mag_val = rx_ami_best[names.index("ctle_mag")]
+        assert ctle_mode_val == 1.0  # "Manual" -- CTLE actually engaged.
+        assert ctle_mag_val > 0.0  # A genuine, non-trivial optimum was found.
+        assert dut._rx_cfg.input_ami_params["ctle_mode"] == 1
+        assert dut._rx_cfg.input_ami_params["ctle_mag"] == ctle_mag_val
 
 
 @needs_tx_so

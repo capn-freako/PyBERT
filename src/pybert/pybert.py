@@ -97,20 +97,38 @@ gNtaps       =     5
 
 def _mk_ami_tap_tuners(pcfg: AMIParamConfigurator) -> list:
     """Build a fresh list of `AmiParamTuner`s from an AMI model's tunable
-    (i.e. - 'In'/'InOut', 'Range' format) Model_Specific parameters."""
+    Model_Specific parameters (see `AMIParamConfigurator.tunable_params` for
+    exactly which ones qualify: Range-format, Boolean, and contiguous
+    Integer/List "mode selector" parameters)."""
     tuners = []
     for branch_names, param in pcfg.tunable_params:
-        pmin, pmax = float(param.pmin), float(param.pmax)
-        step = (pmax - pmin) / 10 or 1.0
+        tname = "_".join(branch_names[1:])  # Drop the "Model_Specific" root.
+        if param.pformat == "Range":
+            pmin, pmax = float(param.pmin), float(param.pmax)
+            step = (pmax - pmin) / 10 or 1.0
+            is_int = param.ptype == "Integer"
+            value = float(param.pvalue)
+        elif param.pformat == "Value" and param.ptype == "Boolean":
+            pmin, pmax, step, is_int = 0.0, 1.0, 1.0, True
+            value = float(param.pvalue)
+        else:  # List-format Integer "mode selector" (contiguous legal values).
+            vals = [float(v) for v in param.pvalue]
+            pmin, pmax, step, is_int = min(vals), max(vals), 1.0, True
+            # `pvalue`, for 'List' format, is the list of *legal* values, not the
+            # current one -- that lives on the Trait `make_gui_items()` registered.
+            try:
+                value = float(pcfg.trait_get(tname + "_")[tname + "_"])
+            except Exception:  # pylint: disable=broad-exception-caught
+                value = float(pcfg.trait_get(tname)[tname])
         tuners.append(AmiParamTuner(
-            name="_".join(branch_names[1:]),  # Drop the "Model_Specific" root.
+            name=tname,
             branch_names=branch_names,
             enabled=False,
             min_val=pmin,
             max_val=pmax,
             step=step,
-            value=float(param.pvalue),
-            is_int=param.ptype == "Integer",
+            value=value,
+            is_int=is_int,
         ))
     return tuners
 
