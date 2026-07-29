@@ -1457,7 +1457,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         # Rx input resistances, so that `chnl_h` alone captures its effect,
         # keeping it consistent w/ all the other (derived) pulse responses
         # (`tx_p`, `ffe_out_p`, `dfe_out_p`, etc.), which are computed from it.
-        chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w) * (Rs + RL) / RL
+        chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
         if self.use_window:
             chnl_h = irfft(raised_cosine(chnl_H))
         else:
