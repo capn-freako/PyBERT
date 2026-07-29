@@ -663,6 +663,15 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         mod_type = self.mod_type_
         vod = self.vod
         bits = self.bits
+        Rs = self.rs
+        RL = self.rin
+
+        if self.tx_sel == "ibis":
+            model = self._tx_ibis.model
+            Rs = model.zout * 2
+        if self.rx_sel == "ibis":
+            model = self._rx_ibis.model
+            RL = model.zin * 2
 
         if mod_type == 0:  # NRZ
             symbols = 2 * bits - 1
@@ -693,7 +702,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         else:
             raise ValueError(f"ERROR: _get_symbols(): Unknown modulation type: {mod_type}, requested!")
 
-        return array(symbols) * vod
+        # Here, we apply the effect of the natural voltage divider formed by
+        # the Tx output and Rx input resistances.
+        # (We omit that when calculating the fully terminated channel response,
+        # in keeping w/ common convention.)
+        return array(symbols) * vod * RL / (Rs + RL)
 
     @cached_property
     def _get_ffe(self):
@@ -1451,7 +1464,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         _z = ch_s2p.s21.z0.flatten()
         if len(_z) == 1:
             _z = _z * np.ones(len(w))
-        chnl_H = 2 * calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
+        # Removing the effect of the resistive divider, as per convention.
+        # (This gets reinserted, in `_get_symbols()`, above.)
+        chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w) * (Rs + RL) / RL
         if self.use_window:
             chnl_h = irfft(raised_cosine(chnl_H))
         else:
