@@ -140,6 +140,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     if not self.seed:
         self.run_count += 1  # Force regeneration of bit stream.
 
+    # Seed NumPy's global RNG, so that noise generation (below) is reproducible run-to-run,
+    # matching the semantics already used for LFSR bit-stream generation (`self.seed == 0`
+    # means the user wants fresh randomness each run). Without this, the noise realization
+    # depends on however many random draws unrelated code/tests happened to make beforehand,
+    # making simulation results (and any tests asserting on them) order-dependent/flaky.
+    np.random.seed(self.seed if self.seed else None)
+
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
     t_irfft = self.t_irfft
