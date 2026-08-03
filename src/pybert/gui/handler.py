@@ -186,18 +186,30 @@ class MyHandler(Handler):
         if pybert.opt_thread and pybert.opt_thread.is_alive():
             pass
         else:
-            n_trials = int((pybert.max_mag_tune - pybert.min_mag_tune) / pybert.step_mag_tune + 1)
-            for tuner in pybert.tx_tap_tuners:
-                if tuner.enabled:
-                    n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
-            if not pybert.use_mmse:
-                for tuner in pybert.ffe_tap_tuners:
+            if pybert.tx_use_ami or pybert.rx_use_ami:
+                # A TPE (Optuna) search drives the AMI-active side(s): a fixed, user-set
+                # trial budget (each trial invokes a real `AMI_Init()` DLL call), not a
+                # combinatorial grid size.
+                n_trials = pybert.ami_opt_trials
+                if n_trials > 1_000:
+                    usr_resp = pybert.alert(
+                        f"You've opted to run {n_trials} trials, each invoking the real AMI model,"
+                        " over the recommended cap of 1000!\nAre you sure?")
+                    if not usr_resp:
+                        return
+            else:
+                n_trials = int((pybert.max_mag_tune - pybert.min_mag_tune) / pybert.step_mag_tune + 1)
+                for tuner in pybert.tx_tap_tuners:
                     if tuner.enabled:
                         n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
-            if n_trials > 1_000_000:
-                usr_resp = pybert.alert(f"You've opted to run over {n_trials // 1_000_000} million trials!\nAre you sure?")
-                if not usr_resp:
-                    return
+                if not pybert.use_mmse:
+                    for tuner in pybert.ffe_tap_tuners:
+                        if tuner.enabled:
+                            n_trials *= int((tuner.max_val - tuner.min_val) / tuner.step + 1)
+                if n_trials > 1_000_000:
+                    usr_resp = pybert.alert(f"You've opted to run over {n_trials // 1_000_000} million trials!\nAre you sure?")
+                    if not usr_resp:
+                        return
             pybert.opt_thread = OptThread()
             pybert.opt_thread.pybert = pybert
             pybert.opt_thread.start()

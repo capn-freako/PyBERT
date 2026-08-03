@@ -687,6 +687,16 @@ traits_view = View(
         ),
         # "Optimizer" tab.
         VGroup(
+            HGroup(  # AMI search budget.
+                Item(
+                    name="ami_opt_trials",
+                    label="AMI trial budget",
+                    tooltip="Number of TPE-guided (Optuna) trials to run against the real AMI"
+                            " model(s). Only used when Tx and/or Rx equalization is IBIS-AMI;"
+                            " each trial invokes a real AMI_Init() call.",
+                ),
+                visible_when="tx_use_ami or rx_use_ami",
+            ),
             HGroup(  # EQ Config.
                 Group(  # Tx FFE Config.
                     Item(
@@ -713,6 +723,7 @@ traits_view = View(
                     ),
                     label="Tx FFE",
                     show_border=True,
+                    visible_when="tx_sel=='native'",
                 ),
                 VGroup(  # Rx CTLE
                     Item(name="ctle_enable_tune", label="Enable", tooltip="CTLE enable",),
@@ -747,10 +758,13 @@ traits_view = View(
                     ),
                     label="Rx CTLE",
                     show_border=True,
+                    visible_when="rx_sel=='native'",
                 ),
                 VGroup(  # Rx FFE
                     HGroup(
-                        Item(name="use_mmse", label="Use MMSE", tooltip="Use COM style MMSE optimization."),
+                        Item(name="use_mmse", label="Use MMSE", enabled_when="not rx_use_ami",
+                             tooltip="Use COM style MMSE optimization. (Unavailable when Rx is IBIS-AMI;"
+                                     " the cursor/ISI figure of merit is used instead.)"),
                     ),
                     Item(
                         name="ffe_tap_tuners",
@@ -776,6 +790,7 @@ traits_view = View(
                     ),
                     label="Rx FFE",
                     show_border=True,
+                    visible_when="rx_sel=='native'",
                 ),
                 VGroup(  # DFE
                     HGroup(
@@ -805,6 +820,61 @@ traits_view = View(
                     ),
                     label="Rx DFE",
                     show_border=True,
+                    visible_when="rx_sel=='native'",
+                ),
+                VGroup(  # Tx IBIS-AMI Model_Specific parameters.
+                    Item(
+                        name="tx_ami_tap_tuners",
+                        editor=TableEditor(
+                            columns=[
+                                ObjectColumn(name="name", editable=False),
+                                ObjectColumn(name="enabled"),
+                                ObjectColumn(name="min_val"),
+                                ObjectColumn(name="max_val"),
+                                ObjectColumn(name="step"),
+                                ObjectColumn(name="value", format="%+.4g", editable=False),
+                            ],
+                            configurable=False,
+                            reorderable=False,
+                            sortable=False,
+                            selection_mode="cell",
+                            auto_size=True,
+                            rows=6,
+                            orientation="horizontal",
+                            is_grid_cell=True,
+                        ),
+                        show_label=False,
+                    ),
+                    label="Tx AMI Params",
+                    show_border=True,
+                    visible_when="tx_sel=='ibis' and tx_ami_valid",
+                ),
+                VGroup(  # Rx IBIS-AMI Model_Specific parameters.
+                    Item(
+                        name="rx_ami_tap_tuners",
+                        editor=TableEditor(
+                            columns=[
+                                ObjectColumn(name="name", editable=False),
+                                ObjectColumn(name="enabled"),
+                                ObjectColumn(name="min_val"),
+                                ObjectColumn(name="max_val"),
+                                ObjectColumn(name="step"),
+                                ObjectColumn(name="value", format="%+.4g", editable=False),
+                            ],
+                            configurable=False,
+                            reorderable=False,
+                            sortable=False,
+                            selection_mode="cell",
+                            auto_size=True,
+                            rows=6,
+                            orientation="horizontal",
+                            is_grid_cell=True,
+                        ),
+                        show_label=False,
+                    ),
+                    label="Rx AMI Params",
+                    show_border=True,
+                    visible_when="rx_sel=='ibis' and rx_ami_valid",
                 ),
             ),
             Item(
