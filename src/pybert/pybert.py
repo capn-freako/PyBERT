@@ -74,6 +74,7 @@ from pybert.models.fec import FEC_Encoder
 from pybert.results import PyBertData
 from pybert.threads.optimization import OptThread
 from pybert.utility import (
+    calc_G,
     calc_gamma,
     import_channel,
     import_fext,
@@ -1375,8 +1376,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 file = self.ch_file
                 if not file:
                     raise RuntimeError("'single' is selected but no channel file is specified!")
-                ch_s2p_pre_noninterp = import_freq(file, renumber=self.renumber)
-                self.ch_s2p_pre_noninterp = ch_s2p_pre_noninterp
                 ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber, lane=self.lane_sel)
                 self.log(str(ch_s2p_pre))
                 H = ch_s2p_pre.s21.s.flatten()
@@ -1449,19 +1448,16 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.ch_s2p = ch_s2p
 
         # Calculate channel impulse response.
-        Zs = Rs / (1 + 1j * w * Rs * Cs)  # Tx termination impedance
-        Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
-        ch_s2p_term = ch_s2p.copy()
-        ch_s2p_term_z0 = ch_s2p.z0.copy()
-        ch_s2p_term_z0[:, 0] = Zs
-        ch_s2p_term_z0[:, 1] = Zt
-        ch_s2p_term.renormalize(ch_s2p_term_z0)
-        ch_s2p_term.name = "ch_s2p_term"
-        self.ch_s2p_term = ch_s2p_term
-
-        # We take the transfer function, H, to be a ratio of voltages.
-        # So, we must normalize our (now generalized) S-parameters.
-        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])
+        _z = ch_s2p.s21.z0.flatten()
+        if len(_z) == 1:
+            _z = _z * np.ones(len(w))
+        # `calc_G()` returns the channel's transfer function referenced to the
+        # driver's open-circuit (EMF) amplitude. The `(Rs + RL) / RL` factor
+        # accounts for the natural voltage divider formed by the Tx output and
+        # Rx input resistances, so that `chnl_h` alone captures its effect,
+        # keeping it consistent w/ all the other (derived) pulse responses
+        # (`tx_p`, `ffe_out_p`, `dfe_out_p`, etc.), which are computed from it.
+        chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
         if self.use_window:
             chnl_h = irfft(raised_cosine(chnl_H))
         else:
