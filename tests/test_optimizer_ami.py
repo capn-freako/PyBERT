@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pybert.pybert import PyBERT, _mk_ami_tap_tuners
+from pybert.pybert import PyBERT
 from pybert.threads.optimization import coopt
 from pyibisami.ami.parser import AMIParamConfigurator
 
@@ -97,7 +97,7 @@ class TestRxAmiOptimizer:
         # Winning values must already be committed into the live `_rx_cfg` (this *is* the
         # "Use EQ" step, for AMI parameters) -- re-derive tuners from `_rx_cfg`'s current
         # state (handles Range/Boolean/List-format params uniformly) and compare.
-        committed_tuners = _mk_ami_tap_tuners(dut._rx_cfg)
+        committed_tuners = dut._rx_cfg.mk_tap_tuners()
         for tuner, val, committed in zip(dut.rx_ami_tap_tuners, rx_ami_best, committed_tuners):
             assert val == committed.value
             if not tuner.enabled:
@@ -134,7 +134,7 @@ class TestTxAmiOptimizer:
         pcfg = AMIParamConfigurator(TX_AMI_CONTENT)
         dut._tx_cfg = pcfg
         dut.tx_dll_file = str(TX_SO_PATH)
-        dut.tx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)
+        dut.tx_ami_tap_tuners = pcfg.mk_tap_tuners()
         dut.tx_use_ami = True
         for tuner in dut.tx_ami_tap_tuners:
             tuner.enabled = True
@@ -162,7 +162,7 @@ class TestTxAmiOptimizer:
         pcfg = AMIParamConfigurator(getwave_only_content)
         dut._tx_cfg = pcfg
         dut.tx_dll_file = str(TX_SO_PATH)
-        dut.tx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)
+        dut.tx_ami_tap_tuners = pcfg.mk_tap_tuners()
         dut.tx_use_ami = True
         for tuner in dut.tx_ami_tap_tuners:
             tuner.enabled = True
@@ -183,7 +183,7 @@ class TestTxAmiOptimizer:
         pcfg = AMIParamConfigurator(TX_AMI_CONTENT)
         dut._tx_cfg = pcfg
         dut.tx_dll_file = str(TX_SO_PATH)
-        dut.tx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)  # All disabled by default.
+        dut.tx_ami_tap_tuners = pcfg.mk_tap_tuners()  # All disabled by default.
         dut.tx_use_ami = True
         dut.ctle_enable_tune = False  # Zero out the native Rx-side dimension too.
 

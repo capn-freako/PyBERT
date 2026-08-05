@@ -59,6 +59,7 @@ from scipy.interpolate import interp1d
 
 from pyibisami import __version__ as PyAMI_VERSION  # type: ignore
 from pyibisami.ami.model import AMIModel
+from pyibisami.ami.parameter import AmiParamTuner
 from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
@@ -68,7 +69,6 @@ from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots
-from pybert.models.ami_param import AmiParamTuner
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
 from pybert.models.fec import FEC_Encoder
@@ -93,44 +93,6 @@ gPeakFreq    =     5.0  # CTLE peaking frequency (GHz)
 gPeakMag     =     1.7  # CTLE peaking magnitude (dB)
 gCTLEOffset  =     0.0  # CTLE d.c. offset (dB)
 gNtaps       =     5
-
-
-def _mk_ami_tap_tuners(pcfg: AMIParamConfigurator) -> list:
-    """Build a fresh list of `AmiParamTuner`s from an AMI model's tunable
-    Model_Specific parameters (see `AMIParamConfigurator.tunable_params` for
-    exactly which ones qualify: Range-format, Boolean, and contiguous
-    Integer/List "mode selector" parameters)."""
-    tuners = []
-    for branch_names, param in pcfg.tunable_params:
-        tname = "_".join(branch_names[1:])  # Drop the "Model_Specific" root.
-        if param.pformat == "Range":
-            pmin, pmax = float(param.pmin), float(param.pmax)
-            step = (pmax - pmin) / 10 or 1.0
-            is_int = param.ptype == "Integer"
-            value = float(param.pvalue)
-        elif param.pformat == "Value" and param.ptype == "Boolean":
-            pmin, pmax, step, is_int = 0.0, 1.0, 1.0, True
-            value = float(param.pvalue)
-        else:  # List-format Integer "mode selector" (contiguous legal values).
-            vals = [float(v) for v in param.pvalue]
-            pmin, pmax, step, is_int = min(vals), max(vals), 1.0, True
-            # `pvalue`, for 'List' format, is the list of *legal* values, not the
-            # current one -- that lives on the Trait `make_gui_items()` registered.
-            try:
-                value = float(pcfg.trait_get(tname + "_")[tname + "_"])
-            except Exception:  # pylint: disable=broad-exception-caught
-                value = float(pcfg.trait_get(tname)[tname])
-        tuners.append(AmiParamTuner(
-            name=tname,
-            branch_names=branch_names,
-            enabled=False,
-            min_val=pmin,
-            max_val=pmax,
-            step=step,
-            value=value,
-            is_int=is_int,
-        ))
-    return tuners
 
 
 class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
@@ -1217,7 +1179,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.tx_has_ts4 = False
                 self._tx_cfg = pcfg
-                self.tx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)
+                self.tx_ami_tap_tuners = pcfg.mk_tap_tuners()
                 self.tx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
@@ -1296,7 +1258,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.rx_has_ts4 = False
                 self._rx_cfg = pcfg
-                self.rx_ami_tap_tuners = _mk_ami_tap_tuners(pcfg)
+                self.rx_ami_tap_tuners = pcfg.mk_tap_tuners()
                 self.rx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
