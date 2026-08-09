@@ -140,6 +140,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     if not self.seed:
         self.run_count += 1  # Force regeneration of bit stream.
 
+    # Seed NumPy's global RNG, so that noise generation (below) is reproducible run-to-run,
+    # matching the semantics already used for LFSR bit-stream generation (`self.seed == 0`
+    # means the user wants fresh randomness each run). Without this, the noise realization
+    # depends on however many random draws unrelated code/tests happened to make beforehand,
+    # making simulation results (and any tests asserting on them) order-dependent/flaky.
+    np.random.seed(self.seed if self.seed else None)
+
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
     t_irfft = self.t_irfft
@@ -687,7 +694,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             path = decoder.decode(list(sig_samps), dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states
             symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
-            bits_out_viterbi = sum(list(map(lambda ss: dfe.decide(ss)[1], symbols_viterbi)), [])
+            # `symbols_viterbi` values are on the Viterbi decoder's normalized
+            # (i.e. - unit amplitude) scale, while `dfe.decide()`'s thresholds
+            # are set relative to `dfe.decision_scaler` (the DFE's actual
+            # adapted slicer level). Rescale before slicing, so inner/outer
+            # PAM-4 levels are classified correctly.
+            bits_out_viterbi = sum(
+                list(map(lambda ss: dfe.decide(ss * dfe.decision_scaler)[1], symbols_viterbi)), [])
 
         n_errs_viterbi, bit_errs_viterbi = calc_ber(bits_out_viterbi)
 

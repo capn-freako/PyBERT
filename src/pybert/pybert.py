@@ -59,7 +59,6 @@ from scipy.interpolate import interp1d
 
 from pyibisami import __version__ as PyAMI_VERSION  # type: ignore
 from pyibisami.ami.model import AMIModel
-from pyibisami.ami.parameter import AmiParamTuner
 from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
@@ -75,6 +74,7 @@ from pybert.models.fec import FEC_Encoder
 from pybert.results import PyBertData
 from pybert.threads.optimization import OptThread
 from pybert.utility import (
+    calc_G,
     calc_gamma,
     import_channel,
     import_fext,
@@ -93,6 +93,43 @@ gPeakFreq    =     5.0  # CTLE peaking frequency (GHz)
 gPeakMag     =     1.7  # CTLE peaking magnitude (dB)
 gCTLEOffset  =     0.0  # CTLE d.c. offset (dB)
 gNtaps       =     5
+RX_FFE_TAPS  =   100    # Number of taps in Rx FFE, including cursor.
+
+
+def _make_rx_ffe_tap_tuners() -> list:
+    """
+    Build a fresh list of ``TxTapTuner`` objects for the Rx FFE tap optimizer/filter.
+
+    Note:
+        This is a factory function, rather than a module-level constant, so that
+        every ``PyBERT`` instance gets its own independent set of ``TxTapTuner``
+        objects. (Otherwise, mutating one instance's tap values -- e.g. via the
+        EQ optimizer -- would corrupt every other instance's taps, since they'd
+        all be referencing the very same ``TxTapTuner`` objects.)
+    """
+
+    tuners = [
+        TxTapTuner(
+            name="Pre-tap1", pos=-1, enabled=False,
+            min_val=-1.0, max_val=1.0, step=0.1, value=0.0
+        ),
+        TxTapTuner(
+            name="Cursor", pos=0, enabled=True,
+            min_val=-1.0, max_val=1.0, step=0.1, value=1.0
+        ),
+        TxTapTuner(
+            name="Post-tap1", pos=1, enabled=False,
+            min_val=-1.0, max_val=1.0, step=0.1, value=0.0
+        ),
+    ]
+    for n in range(RX_FFE_TAPS - 3):
+        tuners.append(
+            TxTapTuner(
+                name=f"Post-tap{n + 2}", pos=(n + 2), enabled=False,
+                min_val=-1.0, max_val=1.0, step=0.1, value=0.0
+            )
+        )
+    return tuners
 
 
 class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
@@ -153,8 +190,16 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     use_window = Bool(False)  #: Apply raised cosine to frequency response before FFT()-ing? (Default = False)
 
     # - EQ Tune
-    tx_tap_tuners = List(  # type: ignore
-        [                  # type: ignore
+    # Note: These `List` traits are given empty defaults here and populated,
+    # per-instance, by the `_default` factory methods below. (Providing a
+    # literal list of `TxTapTuner` objects here, instead, would cause every
+    # `PyBERT` instance to share the very same `TxTapTuner` objects, so that
+    # mutating one instance's tap values -- e.g. via the EQ optimizer -- would
+    # corrupt every other instance's taps.)
+    tx_tap_tuners: List = List()  #: EQ optimizer list of TxTapTuner objects.
+
+    def _tx_tap_tuners_default(self):
+        return [
             TxTapTuner(name="Pre-tap3",  pos=-3, enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
             TxTapTuner(name="Pre-tap2",  pos=-2, enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
             TxTapTuner(name="Pre-tap1",  pos=-1, enabled=True, min_val=-0.2,  max_val=0.2,  step=0.1),
@@ -162,7 +207,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             TxTapTuner(name="Post-tap2", pos=2,  enabled=False, min_val=-0.1,  max_val=0.1,  step=0.05),
             TxTapTuner(name="Post-tap3", pos=3,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
         ]
-    )  #: EQ optimizer list of TxTapTuner objects.
+
     rx_bw_tune = Float(12.0)  #: EQ optimizer CTLE bandwidth (GHz).
     peak_freq_tune = Float(gPeakFreq)  #: EQ optimizer CTLE peaking freq. (GHz).
     peak_mag_tune = Float(gPeakMag)  #: EQ optimizer CTLE peaking mag. (dB).
@@ -170,62 +215,40 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     max_mag_tune = Float(12)  #: EQ optimizer CTLE peaking mag. max. (dB).
     step_mag_tune = Float(1)  #: EQ optimizer CTLE peaking mag. step (dB).
     ctle_enable_tune = Bool(True)  #: EQ optimizer CTLE enable
-    dfe_tap_tuners = List(  # type: ignore
-        [TxTapTuner(name="Tap1",  enabled=True,  min_val=-0.2,  max_val=0.4,  value=0.0),  # type: ignore
-         TxTapTuner(name="Tap2",  enabled=True,  min_val=-0.15, max_val=0.15, value=0.0),
-         TxTapTuner(name="Tap3",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap4",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap5",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap6",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap7",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap8",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap9",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap10", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap11", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap12", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap13", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap14", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap15", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap16", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap17", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap18", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap19", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
-         TxTapTuner(name="Tap20", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),]
-    )  #: EQ optimizer list of DFE tap tuner objects.
-    ffe_tap_tuners = List(  # type: ignore
-        [
-            TxTapTuner(name="Pre-tap5",   pos=-5,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),  # type: ignore
-            TxTapTuner(name="Pre-tap4",   pos=-4,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Pre-tap3",   pos=-3,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Pre-tap2",   pos=-2,  enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
-            TxTapTuner(name="Pre-tap1",   pos=-1,  enabled=True, min_val=-0.2,  max_val=0.2,  step=0.1),
-            TxTapTuner(name="Cursor",     pos=0,   enabled=True, min_val=0.2,   max_val=1.0,  step=0.1),
-            TxTapTuner(name="Post-tap1",  pos=1,   enabled=True, min_val=-0.2,  max_val=0.2,  step=0.1),
-            TxTapTuner(name="Post-tap2",  pos=2,   enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
-            TxTapTuner(name="Post-tap3",  pos=3,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap4",  pos=4,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap5",  pos=5,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap6",  pos=6,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap7",  pos=7,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap8",  pos=8,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap9",  pos=9,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap10", pos=10,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap11", pos=11,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap12", pos=12,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap13", pos=13,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap14", pos=14,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
+    dfe_tap_tuners: List = List()  #: EQ optimizer list of DFE tap tuner objects.
+
+    def _dfe_tap_tuners_default(self):
+        return [
+            TxTapTuner(name="Tap1",  enabled=True,  min_val=-0.2,  max_val=0.4,  value=0.0),
+            TxTapTuner(name="Tap2",  enabled=True,  min_val=-0.15, max_val=0.15, value=0.0),
+            TxTapTuner(name="Tap3",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap4",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap5",  enabled=True,  min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap6",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap7",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap8",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap9",  enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap10", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap11", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap12", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap13", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap14", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap15", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap16", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap17", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap18", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap19", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
+            TxTapTuner(name="Tap20", enabled=False, min_val=-0.05, max_val=0.1,  value=0.0),
         ]
-    )  #: EQ optimizer list of RxTapTuner objects.
-    tx_ami_tap_tuners = List(Instance(AmiParamTuner), [])  # type: ignore
-    #: EQ optimizer list of Tx IBIS-AMI Model_Specific parameter tuner objects.
-    rx_ami_tap_tuners = List(Instance(AmiParamTuner), [])  # type: ignore
-    #: EQ optimizer list of Rx IBIS-AMI Model_Specific parameter tuner objects.
+
+    # Rx FFE tap optimization tuners.
+    ffe_tap_tuners = List()  # type: ignore
+
+    def _ffe_tap_tuners_default(self):
+        return _make_rx_ffe_tap_tuners()
+
     opt_thread = Instance(OptThread)  #: EQ optimization thread.
     use_mmse = Bool(True)
-    ami_opt_trials = Int(100)
-    #: Number of TPE-guided (Optuna) trials to run against the real AMI model(s),
-    #: when Tx and/or Rx equalization is IBIS-AMI. Each trial invokes a real
-    #: `AMI_Init()` DLL call, so this is a much smaller number than a native grid search.
 
     # - Tx
     tx_sel = Enum("native", "ibis")
@@ -237,16 +260,17 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     pn_mag = Float(0.01)  #: Periodic noise magnitude (V).
     pn_freq = Float(11)  #: Periodic noise frequency (MHz).
     rn = Float(0.01)  #: Standard deviation of Gaussian random noise (V).
-    tx_taps = List(  # type: ignore
-        [
-            TxTapTuner(name="Pre-tap3",  pos=-3, enabled=False, min_val=-0.05, max_val=0.05),  # type: ignore
+    tx_taps: List = List()  #: List of Tx deemphasis tap tuner objects.
+
+    def _tx_taps_default(self):
+        return [
+            TxTapTuner(name="Pre-tap3",  pos=-3, enabled=False, min_val=-0.05, max_val=0.05),
             TxTapTuner(name="Pre-tap2",  pos=-2, enabled=True, min_val=-0.1,  max_val=0.1),
             TxTapTuner(name="Pre-tap1",  pos=-1, enabled=True, min_val=-0.2,  max_val=0.2),
             TxTapTuner(name="Post-tap1", pos=1,  enabled=False, min_val=-0.2,  max_val=0.2),
             TxTapTuner(name="Post-tap2", pos=2,  enabled=False, min_val=-0.1,  max_val=0.1),
             TxTapTuner(name="Post-tap3", pos=3,  enabled=False, min_val=-0.05, max_val=0.05),
         ]
-    )  #: List of Tx deemphasis tap tuner objects.
     rel_power = Float(1.0)  #: Tx power dissipation (W).
     # -- ibis
     tx_use_ami = Bool(False)  #: (Bool)
@@ -312,32 +336,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     lock_sustain = Int(500)  #: CDR hysteresis to use in determining lock.
 
     # - Rx FFE
+    rx_taps: List = List()
+
+    def _rx_taps_default(self):
+        return _make_rx_ffe_tap_tuners()
+
     rx_n_taps = Int(15)  #: Total number of taps in Rx FFE.
-    rx_n_pre = Int(5)  #: Number of pre-cursor taps in Rx FFE.
-    rx_taps = List(  # type: ignore
-        [
-            TxTapTuner(name="Pre-tap5",   pos=-5,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),  # type: ignore
-            TxTapTuner(name="Pre-tap4",   pos=-4,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Pre-tap3",   pos=-3,  enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Pre-tap2",   pos=-2,  enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
-            TxTapTuner(name="Pre-tap1",   pos=-1,  enabled=True, min_val=-0.2,  max_val=0.2,  step=0.1),
-            TxTapTuner(name="Cursor",     pos=0,   enabled=True, min_val=0.2,  max_val=1.0,  step=0.1, value=1.0),
-            TxTapTuner(name="Post-tap1",  pos=1,   enabled=True, min_val=-0.2,  max_val=0.2,  step=0.1),
-            TxTapTuner(name="Post-tap2",  pos=2,   enabled=True, min_val=-0.1,  max_val=0.1,  step=0.05),
-            TxTapTuner(name="Post-tap3",  pos=3,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap4",  pos=4,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap5",  pos=5,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap6",  pos=6,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap7",  pos=7,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap8",  pos=8,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap9",  pos=9,   enabled=True, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap10", pos=10,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap11", pos=11,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap12", pos=12,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap13", pos=13,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-            TxTapTuner(name="Post-tap14", pos=14,  enabled=False, min_val=-0.05, max_val=0.05, step=0.025),
-        ]
-    )  #: List of Rx FFE tap tuner objects.
+    rx_n_pre = Int(4)  #: Number of pre-cursor taps in Rx FFE.
 
     # Misc.
     #: PyBERT configuration data storage file (File).
@@ -485,6 +490,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.plotdata.set_data("p_tx_out", zeros(INIT_LEN))
         self.plotdata.set_data("curs_ix", [0, 0])
         self.plotdata.set_data("curs_amp", [0, 0])
+
+        self.rx_n_pre = 5  # To trigger adjustment of Rx FFE taps, both actual and tuner.
 
         if run_simulation:
             self.simulate(initial_run=True)
@@ -1161,7 +1168,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _tx_ami_file_changed(self, new_value):
         try:
             self.tx_ami_valid = False
-            self.tx_ami_tap_tuners = []
             if new_value:
                 self.log(f"Parsing Tx AMI file, '{new_value}'...")
                 with open(new_value, mode="r", encoding="utf-8") as pfile:
@@ -1179,7 +1185,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.tx_has_ts4 = False
                 self._tx_cfg = pcfg
-                self.tx_ami_tap_tuners = pcfg.mk_tap_tuners()
                 self.tx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
@@ -1240,7 +1245,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def _rx_ami_file_changed(self, new_value):
         try:
             self.rx_ami_valid = False
-            self.rx_ami_tap_tuners = []
             if new_value:
                 with open(new_value, mode="r", encoding="utf-8") as pfile:
                     pcfg = AMIParamConfigurator(pfile.read())
@@ -1258,7 +1262,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.rx_has_ts4 = False
                 self._rx_cfg = pcfg
-                self.rx_ami_tap_tuners = pcfg.mk_tap_tuners()
                 self.rx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
@@ -1388,8 +1391,6 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 file = self.ch_file
                 if not file:
                     raise RuntimeError("'single' is selected but no channel file is specified!")
-                ch_s2p_pre_noninterp = import_freq(file, renumber=self.renumber)
-                self.ch_s2p_pre_noninterp = ch_s2p_pre_noninterp
                 ch_s2p_pre = import_channel(file, ts, f, renumber=self.renumber, lane=self.lane_sel)
                 self.log(str(ch_s2p_pre))
                 H = ch_s2p_pre.s21.s.flatten()
@@ -1462,19 +1463,16 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.ch_s2p = ch_s2p
 
         # Calculate channel impulse response.
-        Zs = Rs / (1 + 1j * w * Rs * Cs)  # Tx termination impedance
-        Zt = RL / (1 + 1j * w * RL * Cp)  # Rx termination impedance
-        ch_s2p_term = ch_s2p.copy()
-        ch_s2p_term_z0 = ch_s2p.z0.copy()
-        ch_s2p_term_z0[:, 0] = Zs
-        ch_s2p_term_z0[:, 1] = Zt
-        ch_s2p_term.renormalize(ch_s2p_term_z0)
-        ch_s2p_term.name = "ch_s2p_term"
-        self.ch_s2p_term = ch_s2p_term
-
-        # We take the transfer function, H, to be a ratio of voltages.
-        # So, we must normalize our (now generalized) S-parameters.
-        chnl_H = ch_s2p_term.s21.s.flatten() * np.sqrt(ch_s2p_term.z0[:, 1] / ch_s2p_term.z0[:, 0])
+        _z = ch_s2p.s21.z0.flatten()
+        if len(_z) == 1:
+            _z = _z * np.ones(len(w))
+        # `calc_G()` returns the channel's transfer function referenced to the
+        # driver's open-circuit (EMF) amplitude. The `(Rs + RL) / RL` factor
+        # accounts for the natural voltage divider formed by the Tx output and
+        # Rx input resistances, so that `chnl_h` alone captures its effect,
+        # keeping it consistent w/ all the other (derived) pulse responses
+        # (`tx_p`, `ffe_out_p`, `dfe_out_p`, etc.), which are computed from it.
+        chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
         if self.use_window:
             chnl_h = irfft(raised_cosine(chnl_H))
         else:
