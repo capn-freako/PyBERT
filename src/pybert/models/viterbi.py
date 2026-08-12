@@ -17,7 +17,8 @@ and follow the example given by the ``ViterbiDecoder_ISI`` class definition, bel
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Optional, Sequence, TypeAlias, TypeVar
+from typing import Any, Generic, Optional, TypeAlias, TypeVar
+from collections.abc import Sequence
 
 import numpy as np
 import scipy as sp
@@ -45,9 +46,9 @@ class ViterbiDecoder(ABC, Generic[S, X]):
             1. This is sometimes referred to as the "emission probability" in the literature.
         """
 
-    _states: list[S] = []
-    _expecteds: Sequence[X] = []
-    _trans: Rmat = np.array([np.array([]),])
+    _states: list[S]
+    _expecteds: Sequence[X]
+    _trans: Rmat
     _trellis: list[list[tuple[float, int]]]
 
     log_msg: str = ""
@@ -99,7 +100,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         trellis_depth = len(trellis)
 
         # Starting with highest probability final state, backtrack through trellis.
-        prevs = [trellis[-1][np.argmax(list(map(lambda pr: pr[0], trellis[-1])))][1]]
+        prevs = [trellis[-1][np.argmax([pr[0] for pr in trellis[-1]])][1]]
         for ix in range(2, trellis_depth + 1):
             prevs.append(trellis[-ix][prevs[-1]][1])
         prevs.reverse()
@@ -204,7 +205,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         if dbg_dict is not None:
             probs: list[list[float]] = []
             prevs: list[list[int]]   = []
-            (probs, prevs) = zip(*list(map(lambda x: zip(*x), probs_prevs)))
+            (probs, prevs) = zip(*[zip(*x) for x in probs_prevs])
             dbg_dict["probs"] = probs
             dbg_dict["prevs"] = prevs
             dbg_dict["log"] = self.log_msg

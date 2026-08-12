@@ -76,8 +76,7 @@ def csdf_data():
     nms = yield sig_names
     wvs = yield many1(wave_samps)
     return CSDF(
-        dict(map(lambda pr: (pr[0], "".join(pr[1])), hdr)),
-        # list(map(lambda cs: "".join(cs), nms)),
+        {pr[0]: "".join(pr[1]) for pr in hdr},
         list(reduce("".join, nms)),
-        list(map(lambda pr: (float(pr[0]), pr[1]), wvs)),
+        [(float(pr[0]), pr[1]) for pr in wvs],
     )

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pipbert"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "10.1.0"
+version = "10.2.0"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           ]
 readme = "README.md"
@@ -21,7 +21,7 @@ dependencies = [
     "parsec==3.17",
     "pychopmarg==3.1.2",
     "pyface==8.0.0",
-    "pyibis-ami==9.2.0",
+    "pyibis-ami==9.3.0",
     "pyside6==6.10.2",
     "pyyaml==6.0.3",
     "scikit-rf==2.0.1",
@@ -102,6 +102,18 @@ max-line-length = 119
 ignore = [
     "D105", # Missing docstring in magic method
     "D107", # Missing docstring in __init__
+]
+
+[tool.ruff]
+exclude = [
+    "*.ipynb"
+]
+lint.ignore = [
+    "UP045",    # "Optional[X] -> "X | None"
+    "I001",     # import formatting
+    "BLE001",   # blind exceptions
+    "UP031",    # format specifiers instead of '%'
+    "RUF022",   # unsorted all
 ]
 
 [[tool.mypy.overrides]]

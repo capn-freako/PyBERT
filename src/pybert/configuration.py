@@ -14,7 +14,6 @@ Copyright (c) 2017 by David Banas; All rights reserved World wide.
 import pickle
 import warnings
 from pathlib import Path
-from typing import Union
 
 import yaml
 
@@ -26,7 +25,7 @@ class InvalidFileType(Exception):
 
 # These are different for now to allow users to "upgrade" their configuration file.
 
-CONFIG_LOAD_WILDCARD = "|".join(
+CONFIG_LOAD_WILDCARD = "|".join(  # noqa: FLY002
     [
         "Yaml Config (*.yaml;*.yml)|*.yaml;*.yml",
         "Pickle Config (*.pybert_cfg)|*.pybert_cfg",
@@ -35,7 +34,7 @@ CONFIG_LOAD_WILDCARD = "|".join(
 )
 """This sets the supported file types in the GUI's loading dialog."""
 
-CONFIG_SAVE_WILDCARD = "|".join(
+CONFIG_SAVE_WILDCARD = "|".join(  # noqa: FLY002
     [
         "Yaml Config (*.yaml;*.yml)|*.yaml;*.yml",
         "All files (*)|*",
@@ -170,7 +169,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             self.dfe_tap_tuners.append((tap.enabled, tap.min_val, tap.max_val))
 
     @staticmethod
-    def load_from_file(filepath: Union[str, Path], pybert):  # pylint: disable=too-many-branches
+    def load_from_file(filepath: str | Path, pybert):  # pylint: disable=too-many-branches
         """Apply all of the configuration settings to the pybert instance.
 
         Confirms that the file actually exists, is the correct extension and
@@ -179,6 +178,9 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         Args:
             filepath: The full filepath including the extension to save too.
             pybert: instance of the main app
+
+        Raises:
+            TypeError: If the data structure read in is not of type: ``PyBertCfg``.
         """
         filepath = Path(filepath)  # incase a string was passed convert to a path.
 
@@ -202,28 +204,28 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
 
         # Right now the loads deserialize back into a `PyBertCfg` class.
         if not isinstance(user_config, PyBertCfg):
-            raise ValueError("The data structure read in is NOT of type: PyBertCfg!")
+            raise TypeError("The data structure read in is NOT of type: PyBertCfg!")
 
         # Actually load values back into pybert using `setattr`.
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
                 for count, (enabled, val, min_val, max_val) in enumerate(value):
-                    setattr(pybert.tx_taps[count], "enabled", enabled)
-                    setattr(pybert.tx_taps[count], "value", val)
-                    setattr(pybert.tx_taps[count], "min_val", min_val)
-                    setattr(pybert.tx_taps[count], "max_val", max_val)
+                    pybert.tx_taps[count].enabled = enabled
+                    pybert.tx_taps[count].value = val
+                    pybert.tx_taps[count].min_val = min_val
+                    pybert.tx_taps[count].max_val = max_val
             elif prop == "tx_tap_tuners":
                 for count, (enabled, pos, min_val, max_val, step) in enumerate(value):
-                    setattr(pybert.tx_tap_tuners[count], "enabled", enabled)
-                    setattr(pybert.tx_tap_tuners[count], "pos", pos)
-                    setattr(pybert.tx_tap_tuners[count], "min_val", min_val)
-                    setattr(pybert.tx_tap_tuners[count], "max_val", max_val)
-                    setattr(pybert.tx_tap_tuners[count], "step", step)
+                    pybert.tx_tap_tuners[count].enabled = enabled
+                    pybert.tx_tap_tuners[count].pos = pos
+                    pybert.tx_tap_tuners[count].min_val = min_val
+                    pybert.tx_tap_tuners[count].max_val = max_val
+                    pybert.tx_tap_tuners[count].step = step
             elif prop == "dfe_tap_tuners":
                 for count, (enabled, min_val, max_val) in enumerate(value):
-                    setattr(pybert.dfe_tap_tuners[count], "enabled", enabled)
-                    setattr(pybert.dfe_tap_tuners[count], "min_val", min_val)
-                    setattr(pybert.dfe_tap_tuners[count], "max_val", max_val)
+                    pybert.dfe_tap_tuners[count].enabled = enabled
+                    pybert.dfe_tap_tuners[count].min_val = min_val
+                    pybert.dfe_tap_tuners[count].max_val = max_val
             elif prop in ("tx_eq_sel", "rx_eq_sel"):
                 lower_map = {"native": "Native", "ibis-ami": "IBIS-AMI"}
                 setattr(pybert, prop, lower_map.get(str(value).lower(), value))
@@ -235,7 +237,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             elif prop == "use_ch_file":
                 # Renamed to inter_sel in v3.x; map old bool to new enum.
                 if value:
-                    setattr(pybert, "inter_sel", "single")
+                    pybert.inter_sel = "single"
             elif prop in ("tx_use_ibis", "rx_use_ibis"):
                 # Renamed to tx_sel/rx_sel; map old bool to new enum.
                 sel_attr = prop.replace("use_ibis", "sel")
@@ -243,7 +245,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             else:
                 setattr(pybert, prop, value)
 
-    def save(self, filepath: Union[str, Path]):
+    def save(self, filepath: str | Path):
         """Save out pybert's current configuration to a file.
 
         The extension must match a yaml file extension or it will still raise

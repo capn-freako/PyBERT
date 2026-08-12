@@ -10,8 +10,10 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 
 # pylint: disable=too-many-lines
 
+from collections.abc import Callable
+from itertools import pairwise
 from time import perf_counter
-from typing import Any, Callable, Optional, TypeAlias
+from typing import Any, Optional, TypeAlias
 
 import numpy        as np
 import numpy.typing as npt
@@ -50,7 +52,9 @@ from ..utility import (
     calc_eye,
     calc_jitter,
     calc_resps,
+    concat_lists,
     find_crossings,
+    fir_tap_weights_to_imp_resp,
     fst, snd,
     import_channel,
     make_bathtub,
@@ -294,7 +298,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     ctle_s = None
     dfe_out: Rvec = array([])
-    tap_weights: list[list[float]] = []
+    tap_weightss: list[list[float]] = []
     ui_ests: Rvec = array([])
     clocks: Rvec = array([])
     lockeds: list[bool] = []
@@ -346,8 +350,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 self.log(f"Tx IBIS-AMI model initialization results:\n{msg}")
                 rx_in += noise
             else:                # Tx is PyBERT native.
-                # Using `sum` to concatenate:
-                tx_h = array(sum([[x] + list(zeros(nspui - 1)) for x in ffe], []))
+                tx_h = fir_tap_weights_to_imp_resp(ffe, nspui)
                 tx_h = resize_zero_pad(tx_h, len_h)
                 tx_out_h = convolve(tx_h, chnl_h)[:len_h]
                 rx_in = convolve(x, tx_out_h)[:len(x)] + noise
@@ -396,7 +399,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
                 dfe_tap_keys.sort()
                 for dfe_tap_key in dfe_tap_keys:
                     _tap_weights.append(param_vals[dfe_tap_key])
-                tap_weights = list(array(_tap_weights).transpose())
+                tap_weightss = list(array(_tap_weights).transpose())
                 if "cdr_locked" in param_vals:
                     _lockeds: npt.NDArray[np.float64] = array(param_vals[AmiName("cdr_locked")])
                     _lockeds = _lockeds.repeat(len_t // len(_lockeds))
@@ -479,10 +482,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     # Run the Rx FFE if appropriate.
     self.status = "Running FFE..."
     ffe_h = array([1] + [0] * (nspui - 1))  # i.e. - no FFE, by default
-    if not self.rx_use_ami:  # Using PyBERT native Rx model. So, check for FFE.
-        if any(tap.enabled for tap in self.rx_taps):
-            # Using `sum` to concatenate:
-            ffe_h = array(sum([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps], []))
+    # If using PyBERT native Rx model, check for FFE.
+    if not self.rx_use_ami and any(tap.enabled for tap in self.rx_taps):
+        ffe_h = array(concat_lists([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps]))
     ffe_h = resize_zero_pad(ffe_h, len_h)
     ffe_out_h = convolve(ffe_h, ctle_out_h)[:len_h]
     ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
@@ -523,17 +525,16 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     # Only make a "real" DFE if we're not running AMI_GetWave() w/ clocks.
     ami_getwave_clocks: bool = (  # "len(clock_times) > 1" because `ui_ests` relies on `diff()`.
         self.rx_use_ami and self.rx_use_getwave and self.rx_use_clocks and len(clock_times) > 1 and clock_times[0] != -1)
-    if not ami_getwave_clocks:
-        if any(tap.enabled for tap in dfe_tap_tuners):
-            _gain = gain
-            _ideal = self.sum_ideal
-            _n_taps = 0
-            for tuner in dfe_tap_tuners:
-                if tuner.enabled:
-                    limits.append((tuner.min_val, tuner.max_val))
-                    _n_taps += 1
-                else:
-                    break  # We're not yet supporting floating taps.
+    if not ami_getwave_clocks and any(tap.enabled for tap in dfe_tap_tuners):
+        _gain = gain
+        _ideal = self.sum_ideal
+        _n_taps = 0
+        for tuner in dfe_tap_tuners:
+            if tuner.enabled:
+                limits.append((tuner.min_val, tuner.max_val))
+                _n_taps += 1
+            else:
+                break  # We're not yet supporting floating taps.
     dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
@@ -548,7 +549,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         lockeds = []
         locked = False
         dfe_out = ffe_out
-        for n_clks, (clock_time, next_clock_time) in enumerate(zip(clock_times, clock_times[1:])):
+        for n_clks, (clock_time, next_clock_time) in enumerate(pairwise((clock_times, clock_times[1:]))):
             if clock_time == -1:  # "-1" is used to flag "no more valid clock times".
                 break
             sample_time = clock_time + ui / 2  # IBIS-AMI clock times are edge aligned.
@@ -567,11 +568,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             decisions = append(decisions, decision)
             clocks[t_ix] = 1
             sig_samps = append(sig_samps, sig_samp)
-        tap_weights = []
+        tap_weightss = []
     else:  # all other cases
         dbg_dict: dict[str, Any] = {}
         (dfe_out,
-         tap_weights,
+         tap_weightss,
          ui_ests,
          clocks,
          lockeds,
@@ -626,12 +627,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Calculate DFE responses.
     # - First, calculate the impulse responses.
-    if len(tap_weights) > 0:
-        dfe_h = array(
-            [1.0] + list(zeros(nspui - 1)) +  # noqa: W504
-            sum([[-x] + list(zeros(nspui - 1)) for x in tap_weights[-1]], []))  # sum as concat
-    else:
-        dfe_h = array([1.0] + list(zeros(nspui - 1)))
+    if not tap_weightss:
+        tap_weightss = [[]]
+    dfe_h = fir_tap_weights_to_imp_resp([1.0] + tap_weightss[-1], nspui)
     dfe_out_h = convolve(ffe_out_h, dfe_h)[: len_h]
     dfe_h = resize_zero_pad(dfe_h, len(ctle_out_h))
     # - Then, calculate the remaining responses from the impulse responses.
@@ -669,7 +667,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             decoder_fec: FEC_Decoder = FEC_Decoder(N)
             path = decoder_fec.decode(list(zip(bits_out_dfe[0::2], bits_out_dfe[1::2])), dbg_dict=self.dbg_dict_viterbi)
             _states = decoder_fec.states
-            bits_out_viterbi = list(map(lambda ix: _states[ix][0], path))
+            bits_out_viterbi = [_states[ix][0] for ix in path]
             if self.debug:  # Regenerate the observed symbols.
                 encoder = FEC_Encoder()
                 gbitss = encoder.encode(bits_out_viterbi)
@@ -693,14 +691,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
             path = decoder.decode(list(sig_samps), dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states
-            symbols_viterbi = list(map(lambda ix: _states[ix][-1], path))
+            symbols_viterbi = [_states[ix][-1] for ix in path]
             # `symbols_viterbi` values are on the Viterbi decoder's normalized
             # (i.e. - unit amplitude) scale, while `dfe.decide()`'s thresholds
             # are set relative to `dfe.decision_scaler` (the DFE's actual
             # adapted slicer level). Rescale before slicing, so inner/outer
             # PAM-4 levels are classified correctly.
-            bits_out_viterbi = sum(
-                list(map(lambda ss: dfe.decide(ss * dfe.decision_scaler)[1], symbols_viterbi)), [])
+            bits_out_viterbi = concat_lists([dfe.decide(ss * dfe.decision_scaler)[1] for ss in symbols_viterbi])
 
         n_errs_viterbi, bit_errs_viterbi = calc_ber(bits_out_viterbi)
 
@@ -741,7 +738,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     _check_sim_status()
 
     # Save local variables to class instance for state preservation, performing unit conversion where necessary.
-    self.adaptation = tap_weights
+    self.adaptation = tap_weightss
     self.ui_ests = ui_ests * 1.0e12  # (ps)
     self.clocks = clocks
     self.clock_times = clock_times
@@ -1106,9 +1103,9 @@ def update_results(self) -> None:
         padding_left=PLOT_PADDING, padding_bottom=PLOT_PADDING_BOT,
     )
     # - Create a trace for each active DFE tap.
-    tap_weights = transpose(array(self.adaptation))
+    tap_weightss = transpose(array(self.adaptation))
     line_styles = ["line", "dash"]
-    for i, tap_weight in enumerate(tap_weights):  # pylint: disable=undefined-loop-variable
+    for i, tap_weight in enumerate(tap_weightss):  # pylint: disable=undefined-loop-variable
         name = f"tap{int(i + 1)}"
         trace_name = name + "_weights"
         self.plotdata.set_data(trace_name, tap_weight)
@@ -1316,15 +1313,15 @@ def update_results(self) -> None:
 
         # Construct a sorted list of pairs for each trellis column, keeping only the 3 most probable.
         # - `enumerate()` provides correct state index, which survives sorting/pruning.
-        prob_prev_pairss = list(map(lambda probs_prevs: list(enumerate(zip(*probs_prevs))), probss_prevss))
+        prob_prev_pairss = [list(enumerate(zip(*probs_prevs))) for probs_prevs in probss_prevss]
         for prob_prev_pairs in prob_prev_pairss:
             prob_prev_pairs.sort(key=lambda x: x[1][0], reverse=True)  # Sort on state probability.
             del prob_prev_pairs[3:]                                    # Keep only 3 most probable.
 
         # Draw all possible transitions, weighted according to probability.
         trans_prob_mat = self.dbg_dict_viterbi["decoder"].trans
-        point: TypeAlias = tuple[int, int]
-        paths: list[tuple[point, point, float]] = []  # (src, dst, prob)
+        Point: TypeAlias = tuple[int, int]
+        paths: list[tuple[Point, Point, float]] = []  # (src, dst, prob)
         for col, row__prob_prevs in enumerate(prob_prev_pairss[:-1]):
             for row__prob_prev in row__prob_prevs:
                 row, _ = row__prob_prev

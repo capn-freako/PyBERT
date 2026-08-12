@@ -5,7 +5,7 @@
 #
 # Copyright (c) 2015 David Banas; all rights reserved World wide.
 
-.PHONY: dflt help check tox format lint flake8 type-check docs upload test clean distclean
+.PHONY: dflt help check tox format lint lint-fix flake8 type-check docs upload test clean distclean
 
 SRC_DIR := src/pybert
 DOCS_DIR := docs
@@ -30,6 +30,10 @@ format:
 
 lint:
 	${UVX_EXEC} ruff check ${SRC_DIR}
+	${UVX_EXEC} flake8 --ignore=E501,E272,E241,E222,E221,F401,F403 ${SRC_DIR}
+
+lint-fix:
+	${UVX_EXEC} ruff check --fix ${SRC_DIR}
 	${UVX_EXEC} flake8 --ignore=E501,E272,E241,E222,E221 ${SRC_DIR}
 
 type-check:
@@ -66,6 +70,7 @@ help:
 	@echo "\tcheck: Validate the 'pyproject.toml' file."
 	@echo "\tformat: Reformats all Python source code. USE CAUTION!"
 	@echo "\tlint: Run 'ruff' and 'flake8' over the source code."
+	@echo "\tlint-fix: As above, but run 'ruff' with the '--fix' option."
 	@echo "\ttype-check: Run type checking, via 'mypy', on the source code."
 	@echo "\tdocs: Run 'sphinx' on the source code, to generate documentation."
 	@echo "\t\tTo view the resultant API documentation, open 'docs/build/index.html' in a browser."

@@ -24,7 +24,7 @@ ToDo:
 import platform
 import time
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from os.path import dirname, join
 from pathlib import Path
 
@@ -78,7 +78,6 @@ from pybert.utility import (
     calc_gamma,
     import_channel,
     import_fext,
-    import_freq,
     lfsr_bits,
     raised_cosine,
     safe_log10,
@@ -246,6 +245,17 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _ffe_tap_tuners_default(self):
         return _make_rx_ffe_tap_tuners()
+
+    # IBIS-AMI Model_Specific parameter tuners, auto-populated by the
+    # `_tx_ami_file_changed`/`_rx_ami_file_changed` handlers, below, from
+    # whichever AMI file was just parsed. (Same empty-default-plus-`_default`-
+    # factory pattern as `tx_tap_tuners`, above, for the same reason.)
+    tx_ami_tap_tuners: List = List()  #: EQ optimizer list of Tx AmiParamTuner objects.
+    rx_ami_tap_tuners: List = List()  #: EQ optimizer list of Rx AmiParamTuner objects.
+
+    #: Number of TPE (Optuna) trials to run against the real AMI model(s),
+    #: when Tx and/or Rx equalization is IBIS-AMI.
+    ami_opt_trials = Int(100)
 
     opt_thread = Instance(OptThread)  #: EQ optimization thread.
     use_mmse = Bool(True)
@@ -431,7 +441,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     def log(self, msg, alert=False, exception=None):
         """Log a message to the console and, optionally, to terminal and/or pop-up dialog."""
         _msg = msg.strip()
-        txt = f"[{datetime.now()}]: PyBERT: {_msg}"
+        txt = f"[{datetime.now(tz=timezone(timedelta(hours=0)))}]: PyBERT: {_msg}"
         if self.debug:
             # In case PyBERT crashes, before we can read this in its `Console` tab:
             print(txt, flush=True)
@@ -1185,6 +1195,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.tx_has_ts4 = False
                 self._tx_cfg = pcfg
+                self.tx_ami_tap_tuners = pcfg.mk_tap_tuners()
                 self.tx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
@@ -1262,6 +1273,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.rx_has_ts4 = False
                 self._rx_cfg = pcfg
+                self.rx_ami_tap_tuners = pcfg.mk_tap_tuners()
                 self.rx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
@@ -1288,7 +1300,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         taps = self.pattern_
         pat_len = 2 * pow(2, max(taps))  # "2 *", to accommodate PAM-4.
         if self.eye_bits < 5 * pat_len:
-            self.log("\n".join([
+            self.log("\n".join([  # noqa: FLY002
                 "Accurate jitter decomposition may not be possible with the current configuration!",
                 "Try to keep `EyeBits` > 10 * 2^n, where `n` comes from `PRBS-n`.",]),
                 alert=True,
@@ -1515,8 +1527,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             for fext_ntwk in import_fext(self.ch_file, f, self.lane_sel, renumber=self.renumber):
                 fext_term = fext_ntwk.copy()
                 fext_z0 = fext_term.z0.copy()
-                fext_z0[:, 0] = Zs
-                fext_z0[:, 1] = Zt
+                fext_z0[:, 0] = Rs
+                fext_z0[:, 1] = RL
                 fext_term.renormalize(fext_z0)
                 fext_H = fext_term.s21.s.flatten() * np.sqrt(fext_term.z0[:, 1] / fext_term.z0[:, 0])
                 if self.use_window:
