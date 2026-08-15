@@ -206,7 +206,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         if not isinstance(user_config, PyBertCfg):
             raise TypeError("The data structure read in is NOT of type: PyBertCfg!")
 
-        # Actually load values back into pybert using `setattr`.
+        # Actually load values back into pybert.
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
                 for count, (enabled, val, min_val, max_val) in enumerate(value):
