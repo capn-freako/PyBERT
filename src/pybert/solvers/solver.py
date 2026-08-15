@@ -13,7 +13,6 @@ Copyright (c) 2019 by David Banas; all rights reserved World wide.
 """
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Tuple
 
 ChType = Enum("ChType", "microstrip_se microstrip_diff stripline_se stripline_diff")
 
@@ -34,11 +33,11 @@ class Solver(ABC):  # pylint: disable=too-few-public-methods
         height: float = 0.127,  #: Trace height above/below ground plane (mm).
         separation: float = 0.508,  #: Trace separation (mm).
         roughness: float = 0.004,  #: Trace surface roughness (mm-rms).
-        fs: List[float] = [],  #: Angular frequency sample points (Hz).  # pylint: disable=dangerous-default-value
+        fs: list[float] = [],  #: Angular frequency sample points (Hz).  # noqa: B006
         lic_path: str = "",  #: Path to license file.
         lic_name: str = "",  #: Name of license type (if needed by solver).
         prj_name: str = "",  #: Name of project (if needed by solver).
-    ) -> Tuple[List[complex], List[complex], List[float]]:
+    ) -> tuple[list[complex], list[complex], list[float]]:
         """Solves a particular channel cross-section.
 
         Returns:

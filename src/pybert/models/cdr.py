@@ -10,7 +10,6 @@ integration into the larger *PyBERT* framework.
 
 Copyright (c) 2019 by David Banas; All rights reserved World wide.
 """
-from typing import List
 
 from numpy import array, mean, sign, where
 import numpy as np
@@ -58,8 +57,8 @@ class CDR:  # pylint: disable=too-many-instance-attributes
         self._locked = False
         self.lock_sustain = lock_sustain
         self.integral_corrections = [0.0]
-        self.proportional_corrections: List = []
-        self.lockeds: List = []
+        self.proportional_corrections: list = []
+        self.lockeds: list = []
 
     @property
     def ui(self) -> float:

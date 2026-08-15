@@ -312,7 +312,6 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         agc_n_ave = self.agc_n_ave
 
         clk_cntr = 0
-        smpl_cntr = 0
         filter_out = 0.0
         nxt_filter_out = 0.0
         last_clock_sample = 0.0
@@ -335,7 +334,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         slicer_samps = zeros(agc_n_ave)
         ave_samps = zeros(agc_n_ave)
         scalar_values = [decision_scaler]
-        for t, x in zip(sample_times, signal):
+        for smpl_cntr, (t, x) in enumerate(zip(sample_times, signal)):
             if not ideal:
                 sum_out = summing_filter.step(x - filter_out)
             else:
@@ -405,7 +404,6 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                             self.update_thresholds()
             ui_ests.append(ui)
             lockeds.append(locked)
-            smpl_cntr += 1
 
         self.ui = ui
         if dbg_dict is not None:

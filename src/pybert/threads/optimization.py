@@ -23,8 +23,16 @@ from pychopmarg.noise import NoiseCalc
 from pybert.common import Rvec
 from pybert.models.tx_tap import TxTapTuner
 from pybert.threads.stoppable import StoppableThread
-from pybert.utility import make_ctle, calc_resps, add_ffe_dfe, get_dfe_weights, resize_zero_pad, safe_log10
-from pybert.utility.ibisami import run_ami_model
+from ..utility import (
+    add_ffe_dfe,
+    calc_resps,
+    fir_tap_weights_to_imp_resp,
+    get_dfe_weights,
+    make_ctle,
+    resize_zero_pad,
+    run_ami_model,
+    safe_log10,
+)
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)  # PyBERT drives its own status/log reporting.
 
@@ -280,14 +288,16 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
             )
             mmse_rslts = mmse(
                 noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
-                array(list(map(lambda t: t.min_val, dfe_taps[:n_dfe_taps]))), array(list(map(lambda t: t.max_val, dfe_taps[:n_dfe_taps]))),
-                array(list(map(lambda t: t.min_val, rx_taps[:rx_n_taps]))), array(list(map(lambda t: t.max_val, rx_taps[:rx_n_taps]))))
+                array([t.min_val for t in dfe_taps[:n_dfe_taps]]), array([t.max_val for t in dfe_taps[:n_dfe_taps]]),
+                array([t.min_val for t in rx_taps[:rx_n_taps]]), array([t.max_val for t in rx_taps[:rx_n_taps]]))
             rx_weights_better = mmse_rslts["rx_taps"]
             dfe_weights_better = mmse_rslts["dfe_tap_weights"]
             fom_better = mmse_rslts["fom"]
             try:
-                p_tot = resize_zero_pad(add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
-                                         nspui * (n_rx_weights + 5))
+                p_tot = resize_zero_pad(
+                    add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
+                    nspui * (n_rx_weights + 5)
+                )
             except ValueError:  # Flags obviously non-optimum case.
                 return -1000., zeros(n_rx_weights), zeros(len(dfe_taps)), p_tx
             return fom_better, rx_weights_better, dfe_weights_better, p_tot
@@ -348,11 +358,10 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
                     "Sorry, that's more Tx tap weight combinations than I can handle.",
                     "I had to abort the EQ optimization in your stead.",
                 ])) from err
-        tx_weightss = list(map(lambda ws: insert(ws, tx_curs_pos, 1 - sum(abs(ws))), tx_weightss))
+        tx_weightss = [insert(ws, tx_curs_pos, 1 - sum(abs(ws))) for ws in tx_weightss]
         tx_candidates = []
         for tx_weights in tx_weightss:
-            # sum = concatenate
-            h_tx = array(sum([[tx_weight] + [0] * (nspui - 1) for tx_weight in tx_weights], []))
+            h_tx = fir_tap_weights_to_imp_resp(tx_weights, nspui)
             tx_candidates.append((tx_weights, h_tx))
 
         n_enabled_tx = len(list(filter(lambda t: t.enabled, tx_taps)))
@@ -461,14 +470,13 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
 
         fom_max = -1000.
         peak_mag_best = 0.
-        trials_run = 0
         rx_weights_best = zeros(n_rx_weights)
         dfe_weights_best = zeros(len(dfe_taps))
-        tx_weights_best: list = []
-        tx_ami_best: Rvec = array([])
-        rx_ami_best: Rvec = array([])
+        tx_weights_best = []
+        tx_ami_best = array([])
+        rx_ami_best = array([])
         trials_run_inc = n_trials // 100 or 1
-        for _ in range(n_trials):
+        for trials_run in range(n_trials):
             trial = study.ask() if study is not None else None
 
             # --- Tx side: real AMI_Init(), or native FFE tap synthesis. ---
@@ -490,7 +498,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
             else:
                 ws = array([_suggest(trial, "tx", tuner) if tuner.enabled else 0.0 for tuner in tx_taps])
                 ws_full = insert(ws, tx_curs_pos, 1 - sum(abs(ws)))
-                h_tx = array(sum([[tw] + [0] * (nspui - 1) for tw in ws_full], []))
+                h_tx = fir_tap_weights_to_imp_resp(ws_full, nspui)
                 tx_weights = ws
                 tx_ami_vals = array([])
 
@@ -521,7 +529,6 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
             fom, rx_weights, dfe_weights_c, p_tot = score_candidate(p_ctle_out, ctle_H, h_tx)
             if study is not None:
                 study.tell(trial, fom)
-            trials_run += 1
             _report_progress(pybert, trials_run, n_trials, trials_run_inc)
             if fom > fom_max:
                 rx_weights_best = rx_weights.copy()
@@ -583,4 +590,3 @@ def _update_plotdata(pybert, p_tot: Rvec, nspui: int) -> None:
     pybert.plotdata.set_data("curs_amp", [0, curs_amp])
     curs_time = pybert.t_ns[curs_ix]
     pybert.plotdata.set_data("curs_ix", [curs_time, curs_time])
-

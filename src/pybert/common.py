@@ -9,7 +9,7 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 """
 
 from typing import Any, Optional, TypeAlias, TypeVar  # pylint: disable=unused-import  # noqa: F401
-import numpy as np  # pylint: disable=unused-import  # noqa: F401
+import numpy as np  # pylint: disable=unused-import
 import numpy.typing as npt
 
 # Type variables, used to support generics.
@@ -24,7 +24,7 @@ Comp = TypeVar('Comp', np.complex64, np.complex128)		#: Complex scalar
 # in order to explicitly state the 1-D nature of `Rvec`.
 # However, doing so breaks a LOT, all having the form:
 #   Incompatible return value type (got "ndarray[tuple[int, ...], dtype[float64]]", expected "ndarray[tuple[int], dtype[float64]]")
-Rvec: TypeAlias = npt.NDArray[Real]						#: Complex valued vector
+Rvec: TypeAlias = npt.NDArray[Real]						#: Real valued vector
 Cvec: TypeAlias = npt.NDArray[Comp]                     #: Complex valued vector
 Rmat: TypeAlias = npt.NDArray[Real]						#: Real valued matrix
 Cmat: TypeAlias = npt.NDArray[Comp]						#: Complex valued matrix

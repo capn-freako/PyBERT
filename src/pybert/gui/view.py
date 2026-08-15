@@ -11,7 +11,8 @@ Copyright (c) 2014 David Banas; all rights reserved World wide.
 # pylint: disable=too-many-lines
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from enable.component_editor import ComponentEditor
 from pyface.image_resource import ImageResource
@@ -78,7 +79,7 @@ def fname_formatter(
         rslt = fpath.name if include_ext else fpath.stem
         last_rslt = rslt
         while parts and len(rslt) < max_width:
-            rslt = "/".join([parts.pop(), rslt])
+            rslt = "/".join([parts.pop(), rslt])  # noqa: FLY002
             last_rslt = rslt
         if len(rslt) > max_width:
             if partial_dirname_ok:
@@ -261,10 +262,10 @@ traits_view = View(
                             Item(name="btn_view_tx", show_label=False),
                             enabled_when="tx_ibis_valid",
                         ),
-                        Item(name="tx_use_ts4", label="Use on-die S-parameters.",
-                             enabled_when="tx_ibis_valid and tx_has_ts4",
+                        Item(
+                            name="tx_use_ts4", label="Use on-die S-parameters.",
+                            enabled_when="tx_ibis_valid and tx_has_ts4",
                         ),
-                        # label="IBIS",
                         visible_when="tx_sel == 'ibis'",
                     ),
                     spring,
@@ -445,10 +446,10 @@ traits_view = View(
                             Item(name="btn_view_rx", show_label=False),
                             enabled_when="rx_ibis_valid",
                         ),
-                        Item(name="rx_use_ts4", label="Use on-die S-parameters.",
-                             enabled_when="rx_ibis_valid and rx_has_ts4",
+                        Item(
+                            name="rx_use_ts4", label="Use on-die S-parameters.",
+                            enabled_when="rx_ibis_valid and rx_has_ts4",
                         ),
-                        # label="IBIS",
                         visible_when="rx_sel == 'ibis'",
                     ),
                     spring,

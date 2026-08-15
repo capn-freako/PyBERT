@@ -12,10 +12,12 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 
 import re
 
+from functools import reduce
 from typing import Any, Optional
+from collections.abc import Sequence
 
 from numpy import (
-    arange, argmax, array, convolve, cos, cumsum, diff, maximum,
+    arange, argmax, array, concatenate, convolve, cos, cumsum, diff, maximum,
     mean, minimum, ones, pad, pi, roll, sign, where, zeros, floating
 )
 from numpy.fft import rfft
@@ -23,7 +25,7 @@ from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
 
-from ..common import Rvec, Cvec
+from ..common import Rvec, Cvec, T
 from ..models.tx_tap import TxTapTuner
 
 
@@ -129,7 +131,7 @@ def import_time(filename: str, sample_per: float) -> Rvec:
                 tmp = list(map(float, vals[0:2]))
                 ts.append(tmp[0])
                 xs.append(tmp[1])
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception:  # noqa: S112
                 continue
 
     return interp_time(array(ts), array(xs), sample_per)
@@ -179,8 +181,8 @@ def raised_cosine(x: Cvec) -> Cvec:
 
 
 # pylint: disable=too-many-locals
-def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,  # noqa: F405
-               eps: float = 1e-18) -> tuple[Rvec, Rvec, Cvec]:  # noqa: F405
+def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,
+               eps: float = 1e-18) -> tuple[Rvec, Rvec, Cvec]:
     """
     From a uniformly sampled impulse response,
     calculate the: step, pulse, and frequency responses.
@@ -308,7 +310,7 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000, front_porch:
     return (_g[ix_beg:ix_end], ix_beg - half_len)
 
 
-def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments  # noqa: F405
+def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments
     """
     Generate the frequency response of a continuous time linear equalizer (CTLE), given the:
 
@@ -459,7 +461,6 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
 
 
 def add_ffe_dfe(
-    # ffe_weights: Sequence[float], dfe_weights: Sequence[float], nspui: int, pr_ctle_out: Rvec
     ffe_weights: Rvec, dfe_weights: Rvec, nspui: int, pr_ctle_out: Rvec
 ) -> Rvec:
     """
@@ -479,9 +480,9 @@ def add_ffe_dfe(
             (Used to improve overall performance of exhaustive optimization.)
     """
 
-    # Add the effect of FFE. (`sum()` is used to concatenate.)
+    # Add the effect of FFE.
     if len(ffe_weights) and ffe_weights.any():
-        h_ffe = array(sum([[ffe_weight] + [0] * (nspui - 1) for ffe_weight in ffe_weights], []))
+        h_ffe = fir_tap_weights_to_imp_resp(list(ffe_weights), nspui)
         p_tot = convolve(pr_ctle_out, h_ffe)[:len(pr_ctle_out)]
     else:
         p_tot = pr_ctle_out.copy()
@@ -494,7 +495,7 @@ def add_ffe_dfe(
         raise ValueError("Main peak occurs in right half of waveform!")
 
     # Add the effect of DFE.
-    h_dfe = array(sum([[-dfe_weight] + [0] * (nspui - 1) for dfe_weight in ([-1.0] + list(dfe_weights))], []))
+    h_dfe = fir_tap_weights_to_imp_resp(list(dfe_weights), nspui)
     p_tot = convolve(p_tot, h_dfe)[:len(p_tot)]
 
     return p_tot
@@ -514,8 +515,8 @@ def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int) -> Rvec:
     """
 
     n_taps = len(dfe_taps)
-    min_weights = array(list(map(lambda t: t.min_val, dfe_taps)))
-    max_weights = array(list(map(lambda t: t.max_val, dfe_taps)))
+    min_weights = array([t.min_val for t in dfe_taps])
+    max_weights = array([t.max_val for t in dfe_taps])
 
     curs_ix = where(pr == max(pr))[0][0]
     curs_amp = pr[curs_ix]
@@ -545,3 +546,40 @@ def get_peak_info(t: Rvec, y: Rvec) -> tuple[int, float, float]:
     pk_time: float = t[pk_ix]
     pk_amp: float  = y[pk_ix]
     return (pk_ix, pk_time, pk_amp)
+
+
+def concat_lists(ls: Sequence[list[T]]) -> list[T]:
+    """
+    Concatenate a sequence of like-typed lists.
+
+    Args:
+        ls: The lists to concatenate.
+
+    Returns:
+        The concatenated list.
+    """
+
+    return reduce(lambda l1, l2: l1 + l2, ls)
+
+
+def fir_tap_weights_to_imp_resp(
+    tap_weights: Sequence[float],
+    nspui: int
+) -> Rvec:
+    """
+    Convert the tap weights of a _finite impulse response_ (FIR) filter
+    to an equivalent _impulse response_, by zero padding each weight out
+    to the length of the unit interval.
+
+    Args:
+        tap_weights: The FIR tap weights.
+        nspui: Number of samples per unit interval.
+
+    Returns:
+        The impulse response of the filter.
+    """
+
+    return concatenate([
+        resize_zero_pad(tap_weight * ones(1), nspui)
+        for tap_weight in tap_weights
+    ])

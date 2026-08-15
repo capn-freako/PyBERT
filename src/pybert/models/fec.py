@@ -21,13 +21,13 @@ X = TypeVar('X')                # generic observation type
 SQRT2: float = np.sqrt(2.0)
 
 
-class FEC_Encoder():
+class FEC_Encoder:
     """
     Model of a simple FEC encoder, ala TI DN504
     """
 
     def __init__(self, init_state: tuple[int, int, int] = (0, 0, 0)):
-        self._state = tuple(map(lambda x: x % 2, init_state))
+        self._state = tuple(x % 2 for x in init_state)
 
     def step(self, x: int) -> tuple[int, int]:
         """
@@ -97,9 +97,9 @@ class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
 
         # Build state vectors, along with their expected observations.
         states = all_combs([[0, 1],] * 4)
-        expecteds = list(map(lambda s: ((s[0] + s[1] + s[2] + s[3]) % 2,   # g0
-                                        (s[0]        + s[2] + s[3]) % 2),  # g1
-                             states))
+        expecteds = [((s[0] + s[1] + s[2] + s[3]) % 2,   # g0
+                      (s[0]        + s[2] + s[3]) % 2)   # g1
+                     for s in states]
 
         # Build state transition probability matrix.
         num_states = len(states)
@@ -118,7 +118,7 @@ class FEC_Decoder(ViterbiDecoder[Delay3Tap, BitPair]):
             [np.zeros(num_states), np.zeros(num_states)]]
         for g0 in range(2):
             for g1 in range(2):
-                pvec = np.array(list(map(lambda gs: float(2 - (abs(g0 - gs[0]) + abs(g1 - gs[1]))), expecteds)))  # pylint: disable=cell-var-from-loop
+                pvec = np.array([float(2 - (abs(g0 - gs[0]) + abs(g1 - gs[1]))) for gs in expecteds])
                 pvec /= pvec.sum()  # Enforce PMF.
                 probs[g0][g1] = pvec.copy()
 

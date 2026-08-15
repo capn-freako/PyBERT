@@ -305,7 +305,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         if i == len(actual_xings):  # We've exhausted the list of actual crossings; we're done.
             break
         if actual_xings[i] > max_t:  # Means the xing we're looking for didn't occur, in the actual signal.
-            jitterL.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.  # noqa: E201
+            jitterL.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.  # noqa: E201,RUF100
             jitterL.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
             skip_next_ideal_xing = True  # If we missed one, we missed two.
         else:  # Noise may produce several crossings.

@@ -13,7 +13,7 @@ Copyright (c) 2017 by David Banas; All rights reserved World wide.
 """
 import pickle
 from pathlib import Path
-from typing import Union
+from typing import ClassVar
 
 from chaco.api import ArrayPlotData
 
@@ -29,7 +29,7 @@ class PyBertData:
     "Save Results" button.
     """
 
-    _item_names = [
+    _item_names: ClassVar = [
         "chnl_h",
         "tx_out_h",
         "ctle_out_h",
@@ -83,7 +83,7 @@ class PyBertData:
 
     # pylint: disable=too-many-branches
     @staticmethod
-    def load_from_file(filepath: Union[str, Path], pybert):
+    def load_from_file(filepath: str | Path, pybert):
         """Recall all the results from a file and load them as reference plots.
 
         Confirms that the file actually exists and attempts to load back the
@@ -102,7 +102,7 @@ class PyBertData:
         with open(filepath, "rb") as the_file:
             user_results = pickle.load(the_file)
         if not isinstance(user_results, PyBertData):
-            raise ValueError("The data structure read in is NOT of type: ArrayPlotData!")
+            raise TypeError("The data structure read in is NOT of type: ArrayPlotData!")
 
         # Load the reference plots.
         for prop, value in user_results.the_data.arrays.items():  # type: ignore

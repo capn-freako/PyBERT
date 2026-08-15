@@ -11,7 +11,7 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
 from functools import reduce
-from typing import Iterator
+from collections.abc import Iterator
 
 from numpy import (
     append, array, cumsum, exp, log10,
