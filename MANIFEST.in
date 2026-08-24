@@ -8,6 +8,7 @@ include docs/source/*
 prune docs/build
 include tests/*.py
 prune tests/__pycache__
+include examples/*.py
 include tox.ini
 recursive-include type_stubs *
 global-exclude *.swp
