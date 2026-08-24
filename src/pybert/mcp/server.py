@@ -58,7 +58,15 @@ def _apply_config(pybert: PyBERT, config: dict) -> None:
     Round-trips through a temp YAML file and `PyBERT.load_configuration()` so that
     `PyBertCfg.load_from_file`'s existing special-casing (tap-tuple lists, legacy field
     renames) is reused rather than reimplemented here.
+
+    Raises:
+        ValueError: If `config` contains a key that isn't a real PyBERT config attribute.
     """
+    valid_keys = set(vars(PyBertCfg(pybert, time.asctime(), VERSION)))
+    unknown = set(config) - valid_keys
+    if unknown:
+        raise ValueError(f"Unknown configuration key(s): {sorted(unknown)}")
+
     cfg = PyBertCfg.__new__(PyBertCfg)  # bypass __init__; it requires a live PyBERT to copy from
     cfg.__dict__.update(config)
 
@@ -95,11 +103,6 @@ def set_config(overrides: dict, out_file: str, base_config_file: str | None = No
     if base_config_file:
         pybert.load_configuration(Path(base_config_file))
 
-    valid_keys = set(vars(PyBertCfg(pybert, time.asctime(), VERSION)))
-    unknown = set(overrides) - valid_keys
-    if unknown:
-        raise ValueError(f"Unknown configuration key(s): {sorted(unknown)}")
-
     _apply_config(pybert, overrides)
     pybert.save_configuration(Path(out_file))
     return {"saved": out_file, "config": _config_dict(pybert)}
@@ -115,7 +118,8 @@ def run_simulation(config: dict, results_file: str | None = None) -> dict:
     """
     pybert = PyBERT(run_simulation=False, gui=False)
     _apply_config(pybert, config)
-    pybert.simulate(initial_run=True)  # update_plots=True (default) is required for save_results()
+    # update_plots populates pybert.plotdata, which save_results() needs; skip it otherwise.
+    pybert.simulate(initial_run=True, update_plots=bool(results_file))
 
     if results_file:
         pybert.save_results(Path(results_file))
@@ -194,8 +198,3 @@ def build_server():
     ):
         server.add_tool(tool)
     return server
-
-
-def main():
-    """Entry point used by `pybert mcp`: start the server over stdio."""
-    build_server().run()

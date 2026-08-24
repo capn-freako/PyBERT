@@ -1,5 +1,6 @@
 """Unit test coverage for the `pybert.mcp` tool implementations."""
 
+import asyncio
 import math
 
 import pytest
@@ -61,6 +62,14 @@ def test_set_config_rejects_unknown_key(tmp_path):
         set_config({"not_a_real_key": 1}, str(tmp_path / "config.yaml"))
 
 
+def test_run_simulation_rejects_unknown_key():
+    """A typo in `config` (e.g. from an LLM caller) fails loudly rather than being ignored."""
+    config = _fast_config()
+    config["bit_rat"] = 25  # typo of "bit_rate"
+    with pytest.raises(ValueError, match="bit_rat"):
+        run_simulation(config)
+
+
 def test_list_ibis_models():
     """`list_ibis_models` reports the components/models parsed out of an IBIS file."""
     info = list_ibis_models(IBIS_FILE)
@@ -77,7 +86,6 @@ def test_inspect_ibis_model():
 
 def test_build_server_registers_all_tools():
     """The MCP server exposes every tool function."""
-    asyncio = pytest.importorskip("asyncio")
     pytest.importorskip("mcp")
     from pybert.mcp.server import build_server
 

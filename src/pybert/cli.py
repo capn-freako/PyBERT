@@ -52,6 +52,6 @@ def mcp():
     """Start the PyBERT MCP server over stdio."""
     try:
         from pybert.mcp.server import build_server
+        build_server().run()
     except ImportError as err:
         raise click.ClickException("MCP support requires: pip install 'pipbert[mcp]'") from err
-    build_server().run()
