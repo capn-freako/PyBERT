@@ -111,6 +111,10 @@ parsec.py/
 # Temporary files
 .*
 !.*.yaml
+!.mcp.json
+!.claude/
+.claude/*
+!.claude/skills/
 dummy*
 
 # Debugging output

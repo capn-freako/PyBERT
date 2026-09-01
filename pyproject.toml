@@ -71,7 +71,7 @@ mcp = ["mcp>=2.0"]
 where = ["src"]
 
 [tool.setuptools.data-files]
-examples = ["examples/mcp_client.py"]
+examples = ["examples/mcp_client.py", "examples/mcp_notebook.ipynb"]
 
 [tool.black]
 line-length = 119

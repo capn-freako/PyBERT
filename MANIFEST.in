@@ -9,6 +9,7 @@ prune docs/build
 include tests/*.py
 prune tests/__pycache__
 include examples/*.py
+include examples/*.ipynb
 include tox.ini
 recursive-include type_stubs *
 global-exclude *.swp
