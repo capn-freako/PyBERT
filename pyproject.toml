@@ -146,6 +146,7 @@ pychopmarg = { workspace = true, editable = true }
 [dependency-groups]
 dev = [
     "m2r2>=0.3.4",
+    "mcp>=2.0.0",
     "mypy>=1.19.1",
     "pip>=25.3",
     "pytest>=9.0.2",
