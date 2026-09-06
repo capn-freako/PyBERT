@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "pybert": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "pybert", "mcp"]
+    }
+  }
+}

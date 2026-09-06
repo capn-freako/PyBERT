@@ -25,6 +25,9 @@ make type-check
 
 # Build package
 make build
+
+# Start the MCP server (requires: uv sync --extra mcp)
+uv run pybert mcp
 ```
 
 ## Architecture
@@ -50,6 +53,19 @@ PyBERT is a serial-link BERT simulator built on the Enthought Traits/TraitsUI st
 | `src/pybert/utility/sparam.py` | S-parameter helpers: `import_channel`, `import_freq`, `sdd_21`, `interp_s2p` |
 | `src/pybert/utility/ibisami.py` | `run_ami_model()` — drives pyibisami DLL/SO |
 | `src/pybert/utility/sigproc.py` | Signal processing: `import_time`, `trim_impulse`, `raised_cosine` |
+| `src/pybert/mcp/server.py` | MCP server (`pybert mcp`, needs the `mcp` extra): tools for running simulations, reading/writing config, browsing saved results, and inspecting IBIS-AMI models |
+
+### MCP server (`src/pybert/mcp/`)
+
+`pybert mcp` starts a stdio MCP server (built on the `mcp` package, an optional extra —
+`pip install "pipbert[mcp]"` / `uv sync --extra mcp`). `src/pybert/mcp/server.py` exposes plain,
+directly-testable functions (`run_simulation`, `get_config`/`set_config`, `inspect_results_file`,
+`list_ibis_models`/`inspect_ibis_model`) and wraps them as MCP tools in `build_server()`. Each call
+constructs its own fresh `PyBERT(gui=False)` instance; nothing is cached across calls.
+`_apply_config()` round-trips config dicts through a temp YAML file and `PyBERT.load_configuration()`
+so `PyBertCfg`'s existing tap-tuple/legacy-rename handling is reused rather than duplicated. Note:
+`.pybert_data` files only ever hold waveform arrays, never scalar performance metrics — those are
+only available live, right after `simulate()`, which is why `run_simulation` returns them directly.
 
 ### Submodule: PyAMI (`PyAMI/`)
 

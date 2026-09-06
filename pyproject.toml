@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pipbert"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "10.2.1"
+version = "11.0.0"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           ]
 readme = "README.md"
@@ -64,8 +64,14 @@ PyPi = "https://pypi.org/project/PipBERT/"
 [project.scripts]
 pybert = "pybert.cli:cli"
 
+[project.optional-dependencies]
+mcp = ["mcp>=2.0"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+examples = ["examples/mcp_client.py", "examples/mcp_notebook.ipynb"]
 
 [tool.black]
 line-length = 119

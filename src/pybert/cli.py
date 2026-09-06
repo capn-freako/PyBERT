@@ -45,3 +45,13 @@ def sim(config_file, results):
     if not results:
         results = Path(config_file).with_suffix(".pybert_data")
     pybert.save_results(results)
+
+
+@cli.command(context_settings={"help_option_names": ['-h', '--help']})
+def mcp():
+    """Start the PyBERT MCP server over stdio."""
+    try:
+        from pybert.mcp.server import build_server
+        build_server().run()
+    except ImportError as err:
+        raise click.ClickException("MCP support requires: pip install 'pipbert[mcp]'") from err
