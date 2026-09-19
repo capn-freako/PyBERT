@@ -80,7 +80,10 @@ side's available parameter names/ranges so callers know what to pass. Note also 
 `rx_ibis_file` resets `rx_use_ami` to `False` as part of (re-)parsing it; the actual switch is
 `rx_eq_sel = "IBIS-AMI"` (mirror on Tx), applied once the file's parsed valid (see
 `_rx_ibis_file_changed`/`_rx_eq_sel_changed` in `pybert.py`) — the same trap a caller hits trying
-to enable AMI in `config` for `run_simulation`, not just for `optimize_eq()`. Note that DFE and
+to enable AMI in `config` for `run_simulation`, not just for `optimize_eq()`. Similarly,
+`ch_files` alone does nothing — it's read only when `inter_sel` is also set to `"multiple"`
+(or `ch_file`/`"single"` for one file); `inter_sel` defaults to `"native"` (the analytic Howard
+Johnson model), which silently ignores `ch_files`/`ch_file` if left unset. Note that DFE and
 native Rx-FFE tap *weights* aren't part of the persisted config schema either (only their
 enabled/min/max bounds
 are) — both adapt fresh inside every `run_simulation()` call. Each call
