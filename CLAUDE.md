@@ -53,14 +53,37 @@ PyBERT is a serial-link BERT simulator built on the Enthought Traits/TraitsUI st
 | `src/pybert/utility/sparam.py` | S-parameter helpers: `import_channel`, `import_freq`, `sdd_21`, `interp_s2p` |
 | `src/pybert/utility/ibisami.py` | `run_ami_model()` — drives pyibisami DLL/SO |
 | `src/pybert/utility/sigproc.py` | Signal processing: `import_time`, `trim_impulse`, `raised_cosine` |
-| `src/pybert/mcp/server.py` | MCP server (`pybert mcp`, needs the `mcp` extra): tools for running simulations, reading/writing config, browsing saved results, and inspecting IBIS-AMI models |
+| `src/pybert/mcp/server.py` | MCP server (`pybert mcp`, needs the `mcp` extra): tools for running simulations, co-optimizing Tx/Rx EQ, listing IBIS-AMI optimizer parameters, reading/writing config, browsing saved results, and inspecting IBIS-AMI models |
 
 ### MCP server (`src/pybert/mcp/`)
 
 `pybert mcp` starts a stdio MCP server (built on the `mcp` package, an optional extra —
 `pip install "pipbert[mcp]"` / `uv sync --extra mcp`). `src/pybert/mcp/server.py` exposes plain,
-directly-testable functions (`run_simulation`, `get_config`/`set_config`, `inspect_results_file`,
-`list_ibis_models`/`inspect_ibis_model`) and wraps them as MCP tools in `build_server()`. Each call
+directly-testable functions (`run_simulation`, `optimize_eq`, `list_ami_params`,
+`get_config`/`set_config`, `inspect_results_file`, `list_ibis_models`/`inspect_ibis_model`) and
+wraps them as MCP tools in `build_server()`. `optimize_eq()` drives
+`pybert.threads.optimization.coopt()` — the same TPE(Optuna)/closed-form-MMSE search behind the
+GUI's "Optimize EQ" button — against a headless `PyBERT` instance, scored by a cheap
+pulse-response figure of merit (not a full bit-level sim); its returned `config` carries the
+winning Tx-FFE/CTLE/AMI values forward (replicating the GUI's "Use EQ" commit step,
+`MyHandler.do_use_eq`), ready to pass straight to `run_simulation`. An optional `max_trials` arg
+caps the Optuna trial budget on the AMI path (each trial is a real `AMI_Init()` call, so runtime
+scales with it) by overriding `ami_opt_trials` directly on the headless instance —
+`ami_opt_trials` isn't part of the persisted config schema, so this is a call-level override, not
+something carried in `config`. `tx_ami_params`/`rx_ami_params` (lists of parameter names) pick
+which IBIS-AMI `Model_Specific` parameters actually get searched — enabled-state for
+`tx_ami_tap_tuners`/`rx_ami_tap_tuners` isn't in the persisted config schema either and defaults
+to all-disabled (opt-in only), so without these an AMI-active `optimize_eq()` call degenerates to
+a single fixed evaluation; `list_ami_params(config)` (no simulation/optimization run) reports each
+side's available parameter names/ranges so callers know what to pass. Note also that a config's
+`rx_use_ami`/`tx_use_ami` fields are read-only side effects, not real switches — setting
+`rx_ibis_file` resets `rx_use_ami` to `False` as part of (re-)parsing it; the actual switch is
+`rx_eq_sel = "IBIS-AMI"` (mirror on Tx), applied once the file's parsed valid (see
+`_rx_ibis_file_changed`/`_rx_eq_sel_changed` in `pybert.py`) — the same trap a caller hits trying
+to enable AMI in `config` for `run_simulation`, not just for `optimize_eq()`. Note that DFE and
+native Rx-FFE tap *weights* aren't part of the persisted config schema either (only their
+enabled/min/max bounds
+are) — both adapt fresh inside every `run_simulation()` call. Each call
 constructs its own fresh `PyBERT(gui=False)` instance; nothing is cached across calls.
 `_apply_config()` round-trips config dicts through a temp YAML file and `PyBERT.load_configuration()`
 so `PyBertCfg`'s existing tap-tuple/legacy-rename handling is reused rather than duplicated. Note:

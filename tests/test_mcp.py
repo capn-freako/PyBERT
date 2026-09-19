@@ -10,12 +10,15 @@ from pybert.mcp.server import (
     get_default_config,
     inspect_ibis_model,
     inspect_results_file,
+    list_ami_params,
     list_ibis_models,
+    optimize_eq,
     run_simulation,
     set_config,
 )
 
 IBIS_FILE = "models/ibisami/example_rx.ibs"
+CHANNEL_FILE = "dummy.s4p"
 
 
 def _fast_config() -> dict:
@@ -70,6 +73,98 @@ def test_run_simulation_rejects_unknown_key():
         run_simulation(config)
 
 
+def test_optimize_eq_updates_config():
+    """`optimize_eq` returns Tx-FFE/CTLE values already baked into a `config` that
+    `run_simulation` can consume directly."""
+    cfg = _fast_config()
+    cfg["ch_files"] = [CHANNEL_FILE]
+    cfg["ch_file"] = ""
+
+    result = optimize_eq(cfg)
+    assert math.isfinite(result["fom"])
+    assert len(result["tx_weights"]) == len(cfg["tx_taps"])
+    assert result["config"]["peak_mag"] == result["rx_peaking"]
+
+    sim = run_simulation(result["config"])
+    assert sim["status"]
+
+
+def test_optimize_eq_rejects_unknown_key():
+    """Same guardrail as `run_simulation`: a typo in `config` fails loudly."""
+    cfg = _fast_config()
+    cfg["ch_files"] = [CHANNEL_FILE]
+    cfg["bit_rat"] = 25  # typo of "bit_rate"
+    with pytest.raises(ValueError, match="bit_rat"):
+        optimize_eq(cfg)
+
+
+def test_optimize_eq_accepts_max_trials():
+    """`max_trials` is accepted (and, on the native-EQ path exercised here, simply
+    irrelevant -- native EQ is an exact solve, not a trial search)."""
+    cfg = _fast_config()
+    cfg["ch_files"] = [CHANNEL_FILE]
+    cfg["ch_file"] = ""
+    result = optimize_eq(cfg, max_trials=3)
+    assert math.isfinite(result["fom"])
+
+
+def test_optimize_eq_rejects_bad_max_trials():
+    """`max_trials` must be a positive integer."""
+    cfg = _fast_config()
+    cfg["ch_files"] = [CHANNEL_FILE]
+    with pytest.raises(ValueError, match="max_trials"):
+        optimize_eq(cfg, max_trials=0)
+
+
+def _rx_ami_config() -> dict:
+    """A fast config with the repo-bundled example Rx IBIS-AMI model selected.
+
+    Note: Rx-AMI activation goes through `rx_eq_sel = "IBIS-AMI"`, not `rx_use_ami`
+    directly -- `_rx_ibis_file_changed` resets `rx_use_ami` to False as a side effect
+    of (re-)parsing the IBIS file, and it's `_rx_eq_sel_changed` that turns it back on
+    once the file's parsed valid (see `src/pybert/pybert.py`).
+    """
+    cfg = _fast_config()
+    cfg["ch_files"] = [CHANNEL_FILE]
+    cfg["ch_file"] = ""
+    cfg["rx_ibis_file"] = IBIS_FILE
+    cfg["rx_sel"] = "ibis"
+    cfg["rx_eq_sel"] = "IBIS-AMI"
+    return cfg
+
+
+def test_list_ami_params_reports_rx_model_specific_params():
+    """`list_ami_params` surfaces the Rx AMI model's declared parameter names, all
+    disabled by default (opt-in only), and nothing on the (native) Tx side."""
+    info = list_ami_params(_rx_ami_config())
+    names = {p["name"] for p in info["rx"]}
+    assert {"ctle_mag", "ctle_mode", "dfe_gain"} <= names
+    assert all(not p["enabled"] for p in info["rx"])
+    assert info["tx"] == []
+
+
+def test_optimize_eq_rx_ami_params_selects_search_space():
+    """`rx_ami_params` enables exactly the named AMI parameters for the search; a real
+    optimum is found for the known-good `ctle_mode`/`ctle_mag` combo (mirrors
+    `tests/test_optimizer_ami.py::TestRxAmiOptimizer::test_mode_selector_gates_sibling_range_param`)."""
+    cfg = _rx_ami_config()
+    result = optimize_eq(cfg, max_trials=15, rx_ami_params=["ctle_mode", "ctle_mag"])
+
+    names = [p["name"] for p in list_ami_params(cfg)["rx"]]
+    ctle_mode_val = result["rx_ami_vals"][names.index("ctle_mode")]
+    ctle_mag_val = result["rx_ami_vals"][names.index("ctle_mag")]
+    assert ctle_mode_val == 1.0  # "Manual" -- CTLE actually engaged.
+    assert ctle_mag_val > 0.0  # A genuine, non-trivial optimum was found.
+    assert result["config"]["rx_eq_sel"] == "IBIS-AMI"
+
+
+def test_optimize_eq_rejects_unknown_ami_param_name():
+    """A typo in `rx_ami_params` fails loudly, listing the real available names."""
+    cfg = _rx_ami_config()
+    with pytest.raises(ValueError, match="not_a_real_param"):
+        optimize_eq(cfg, rx_ami_params=["not_a_real_param"])
+
+
 def test_list_ibis_models():
     """`list_ibis_models` reports the components/models parsed out of an IBIS file."""
     info = list_ibis_models(IBIS_FILE)
@@ -96,6 +191,8 @@ def test_build_server_registers_all_tools():
         "get_default_config",
         "get_config",
         "set_config",
+        "list_ami_params",
+        "optimize_eq",
         "run_simulation",
         "inspect_results_file",
         "list_ibis_models",

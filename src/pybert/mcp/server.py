@@ -16,6 +16,7 @@ import yaml
 from pybert import __version__ as VERSION
 from pybert.configuration import PyBertCfg
 from pybert.pybert import PyBERT
+from pybert.threads.optimization import coopt
 from pyibisami.ibis.file import IBISModel
 
 RESULT_TRAIT_NAMES = [
@@ -108,6 +109,147 @@ def set_config(overrides: dict, out_file: str, base_config_file: str | None = No
     return {"saved": out_file, "config": _config_dict(pybert)}
 
 
+def _describe_ami_tuners(tuners: list) -> list[dict]:
+    return [
+        {
+            "name": t.name,
+            "min_val": t.min_val,
+            "max_val": t.max_val,
+            "step": t.step,
+            "is_int": t.is_int,
+            "enabled": t.enabled,
+        }
+        for t in tuners
+    ]
+
+
+def list_ami_params(config: dict) -> dict:
+    """List the Tx/Rx IBIS-AMI ``Model_Specific`` parameters available for EQ optimization
+    -- i.e. the names ``optimize_eq``'s ``tx_ami_params``/``rx_ami_params`` accept -- given a
+    configuration's Tx/Rx IBIS/AMI file selections. Cheap: no simulation or optimization runs.
+
+    Args:
+        config: A configuration dict, as returned by ``get_config``/``get_default_config``.
+
+    Returns:
+        ``{"tx": [...], "rx": [...]}``, each a list of per-parameter dicts (``name``,
+        ``min_val``, ``max_val``, ``step``, ``is_int``, ``enabled``). ``enabled`` reflects
+        each side's IBIS-AMI file default (normally all ``False``: opt-in only), before any
+        ``optimize_eq`` call. Empty on a side that isn't IBIS-AMI-active (``tx_use_ami``/
+        ``rx_use_ami`` false) or has no ``Model_Specific`` "Range"-format parameters.
+    """
+    pybert = PyBERT(run_simulation=False, gui=False)
+    _apply_config(pybert, config)
+    return {
+        "tx": _describe_ami_tuners(pybert.tx_ami_tap_tuners),
+        "rx": _describe_ami_tuners(pybert.rx_ami_tap_tuners),
+    }
+
+
+def _select_ami_params(tuners: list, names: list[str], side: str) -> None:
+    "Enable exactly the named tuners (by `.name`), disabling the rest; reject unknown names."
+    tuner_names = {t.name for t in tuners}
+    unknown = set(names) - tuner_names
+    if unknown:
+        raise ValueError(
+            f"Unknown {side} AMI parameter name(s): {sorted(unknown)}. "
+            f"Available: {sorted(tuner_names)}"
+        )
+    wanted = set(names)
+    for tuner in tuners:
+        tuner.enabled = tuner.name in wanted
+
+
+def optimize_eq(
+    config: dict,
+    max_trials: int | None = None,
+    tx_ami_params: list[str] | None = None,
+    rx_ami_params: list[str] | None = None,
+) -> dict:
+    """Co-optimize Tx/Rx linear equalization for a given architecture, and return the result.
+
+    Runs the same search `coopt()` drives for the GUI's "Optimize EQ" button (a TPE/Optuna
+    search when Tx and/or Rx is IBIS-AMI, since each trial is a real ``AMI_Init()`` call;
+    exact closed-form MMSE or a small exhaustive grid otherwise) -- scored by a cheap
+    pulse-response figure of merit, not a full bit-level simulation. Call ``run_simulation``
+    afterward, on this call's returned ``config``, to get the real BER/jitter metrics for
+    the winning EQ. Architecture (tap counts, CTLE enable, etc.) should already be set in
+    ``config``; this only searches EQ *values*.
+
+    Note: DFE and native Rx-FFE tap *weights* are trained adaptively inside every
+    ``run_simulation()`` call and aren't part of the persisted configuration schema (only
+    their enabled/min/max bounds are) -- unlike Tx-FFE weights, CTLE peaking, and AMI
+    parameter values, which this function's returned ``config`` does carry forward. They're
+    still reported below, for visibility into what this search found.
+
+    Args:
+        config: A configuration dict, as returned by ``get_config``/``get_default_config``,
+            optionally with overrides applied.
+        max_trials: Override the number of Optuna trials run when Tx and/or Rx is IBIS-AMI
+            (each trial invokes a real ``AMI_Init()`` call, so runtime scales with this);
+            PyBERT's own ``ami_opt_trials`` default (normally 100) otherwise. Not part of
+            the persisted config schema, so it isn't carried in ``config`` -- pass it fresh
+            on every call. Ignored when neither side is AMI-active (native EQ is an exact
+            closed-form/grid solve, not a trial search).
+        tx_ami_params: Names (from ``list_ami_params``) of Tx IBIS-AMI parameters to include
+            in the search; every other Tx AMI parameter is disabled. ``None`` (default)
+            leaves each parameter's enabled state as the IBIS-AMI file set it (normally all
+            disabled -- opt-in only), which usually means nothing is actually searched.
+            Ignored when Tx isn't IBIS-AMI-active.
+        rx_ami_params: Same as ``tx_ami_params``, for the Rx side.
+
+    Returns:
+        A dict with the winning Tx/Rx tap weights, CTLE peaking, AMI parameter values, the
+        figure of merit, and ``config``: the input config updated with the winning native
+        Tx-FFE/CTLE/AMI values, ready to pass to ``run_simulation``.
+
+    Raises:
+        ValueError: If `max_trials` isn't a positive integer, or `tx_ami_params`/
+            `rx_ami_params` names a parameter that side's IBIS-AMI file doesn't declare.
+        RuntimeError: If the optimization fails to converge.
+    """
+    if max_trials is not None and max_trials < 1:
+        raise ValueError(f"max_trials must be a positive integer, not {max_trials!r}")
+
+    pybert = PyBERT(run_simulation=False, gui=False)
+    _apply_config(pybert, config)
+    if max_trials is not None:
+        pybert.ami_opt_trials = max_trials
+    if tx_ami_params is not None:
+        _select_ami_params(pybert.tx_ami_tap_tuners, tx_ami_params, "Tx")
+    if rx_ami_params is not None:
+        _select_ami_params(pybert.rx_ami_tap_tuners, rx_ami_params, "Rx")
+
+    tx_weights, rx_peaking, rx_weights, fom, valid, tx_ami_vals, rx_ami_vals = coopt(pybert)
+    if not valid:
+        raise RuntimeError("EQ optimization failed to converge.")
+
+    # coopt() already commits DFE tap weights and, when AMI-active, the winning AMI
+    # parameter values onto the live traits `run_simulation` reads. Native Tx/Rx linear
+    # EQ needs the same "Use EQ" commit the GUI's Ctrl+U action performs (see
+    # `MyHandler.do_use_eq` in src/pybert/gui/handler.py).
+    if not pybert.tx_use_ami:
+        for i, weight in enumerate(tx_weights):
+            pybert.tx_taps[i].value = weight
+    if not pybert.rx_use_ami:
+        pybert.peak_mag = rx_peaking
+        pybert.peak_freq = pybert.peak_freq_tune
+        pybert.rx_bw = pybert.rx_bw_tune
+        pybert.ctle_enable = pybert.ctle_enable_tune
+        for i, weight in enumerate(rx_weights):
+            pybert.rx_taps[i].value = weight
+
+    return {
+        "fom": fom,
+        "tx_weights": _jsonify(tx_weights),
+        "rx_peaking": rx_peaking,
+        "rx_weights": _jsonify(rx_weights),
+        "tx_ami_vals": _jsonify(tx_ami_vals),
+        "rx_ami_vals": _jsonify(rx_ami_vals),
+        "config": _config_dict(pybert),
+    }
+
+
 def run_simulation(config: dict, results_file: str | None = None) -> dict:
     """Run a headless PyBERT simulation and return its summary performance metrics.
 
@@ -191,6 +333,8 @@ def build_server():
         get_default_config,
         get_config,
         set_config,
+        list_ami_params,
+        optimize_eq,
         run_simulation,
         inspect_results_file,
         list_ibis_models,
