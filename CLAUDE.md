@@ -37,7 +37,7 @@ PyBERT is a serial-link BERT simulator built on the Enthought Traits/TraitsUI st
 ### Simulation data flow
 
 1. **Entry**: `PyBERT.simulate()` → `my_run_simulation()` in `src/pybert/models/bert.py`. In GUI mode this runs in a background `RunSimThread` (see `src/pybert/threads/sim.py`).
-2. **Channel construction** (`bert.py` ~line 1300): Either uses Howard Johnson's UTP model (default) or imports a channel from file(s) via `import_channel()` in `src/pybert/utility/sparam.py`. When multiple files are listed in `self.ch_files`, they are cascaded using `skrf`'s `**` (network cascade) operator.
+2. **Channel construction** (`bert.py` ~line 1300): Either uses Howard Johnson's UTP model (default) or imports a channel from file(s) via `import_channel()` in `src/pybert/utility/sparam.py`. When multiple files are listed in `self.ch_files`, they are cascaded using `skrf`'s `**` (network cascade) operator. `import_channel()`/`import_freq()` accept 1/2/4/8/12-port Touchstone files natively; a VITA 68.x reference-model segment (Module or Backplane) instead bundles both link directions per lane into an 8-port block (e.g. 32 ports for 4 lanes) — pass `vita_end="tx"` or `"rx"` to select the right 4-port sub-network per lane (every segment in a cascade uses `"tx"` except the terminal Rx-side Module, which uses `"rx"` — see `import_freq()`'s docstring for the full port-offset derivation, verified against real VITA68.3 reference files).
 3. **IBIS-AMI integration**: `src/pybert/utility/ibisami.py::run_ami_model()` wraps `pyibisami.ami.model.AMIModel`. The response dict returned by `AMIModel.get_responses()` is keyed with `AmiModelResponseKey` objects (frozen dataclass) — always use the exported constants `IMP_RESP_INIT`, `IMP_RESP_GETW`, `OUT_RESP_INIT`, `OUT_RESP_GETW` when accessing it, not plain strings.
 4. **Output**: Results are stored as Traits attributes on the `PyBERT` instance; Chaco plots are updated via `plotdata` (an `ArrayPlotData`).
 
@@ -50,7 +50,7 @@ PyBERT is a serial-link BERT simulator built on the Enthought Traits/TraitsUI st
 | `src/pybert/gui/view.py` | TraitsUI view definition (`traits_view`) |
 | `src/pybert/gui/handler.py` | `MyHandler` — toolbar/menu actions (save/load config, run/stop sim) |
 | `src/pybert/configuration.py` | `PyBertCfg` — YAML/pickle config serialisation |
-| `src/pybert/utility/sparam.py` | S-parameter helpers: `import_channel`, `import_freq`, `sdd_21`, `interp_s2p` |
+| `src/pybert/utility/sparam.py` | S-parameter helpers: `import_channel`, `import_freq` (incl. VITA 68.x `vita_end` lane extraction), `sdd_21`, `interp_s2p` |
 | `src/pybert/utility/ibisami.py` | `run_ami_model()` — drives pyibisami DLL/SO |
 | `src/pybert/utility/sigproc.py` | Signal processing: `import_time`, `trim_impulse`, `raised_cosine` |
 | `src/pybert/mcp/server.py` | MCP server (`pybert mcp`, needs the `mcp` extra): tools for running simulations, co-optimizing Tx/Rx EQ, listing IBIS-AMI optimizer parameters, reading/writing config, browsing saved results, and inspecting IBIS-AMI models |

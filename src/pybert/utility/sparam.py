@@ -223,7 +223,26 @@ def H_2_s2p(H: Cvec, Zc: Cvec, fs: Rvec, Zref: float = 50) -> Network:
     return Network(s=tmp, f=fs / 1e9, z0=[Zref, Zref])  # `f` is presumed to have units: GHz.
 
 
-def import_freq(filename: str, renumber: bool = False, lane: int = 0) -> Network:
+# VITA 68.x reference-model convention: each lane occupies an 8-port block (not the
+# plain 4-port "(+A,+B,-A,-B)" block `import_freq()` otherwise assumes), because a VITA
+# Module or Backplane segment carries *both* directions of traffic for that connector
+# position bundled into one file -- e.g. a Module's ports are labeled
+# P(die/package-ball side)/C(VPX-connector side) x RX/TX, a Backplane's L(left)/R(right)
+# x RX/TX -- see a real VITA68.3 reference file's own header comments for the exact
+# per-file labels. Regardless of the file's own label vocabulary, the *offsets* below
+# (0-indexed, within each lane's 8-port block) are consistent across every VITA
+# reference file inspected: selecting "tx" always yields the differential path carrying
+# data in the Tx-to-Rx link direction *through this segment* (near-side "TX"-labeled
+# ports as the pair driving in, far-side "RX"-labeled ports as the pair driving out);
+# "rx" yields the complementary (return-direction) path. In a Module+Backplane+Module
+# cascade, every segment uses "tx" *except* the terminal Rx-side Module, which uses
+# "rx" to get its own connector-to-die receive path.
+_VITA_LANE_PORTS_PER_LANE = 8
+_VITA_END_OFFSETS = {"tx": (4, 6, 5, 7), "rx": (1, 3, 0, 2)}
+
+
+def import_freq(filename: str, renumber: bool = False, lane: int = 0,
+                 vita_end: "str | None" = None) -> Network:
     """
     Read in a 1, 2, 4, 8, or 12-port Touchstone file, and return an equivalent 2-port network.
 
@@ -233,23 +252,30 @@ def import_freq(filename: str, renumber: bool = False, lane: int = 0) -> Network
     Keyword Args:
         renumber: Automatically detect/fix "1=>3/2=>4" port numbering, when True.
             Default = False
-        lane: 0-based lane index, used only for 8- and 12-port files.
+        lane: 0-based lane index, used only for 8- and 12-port files (or for a VITA-style
+            file, when ``vita_end`` is given).
             Default = 0
+        vita_end: ``"tx"`` or ``"rx"``, to instead use the VITA 68.x reference-model port
+            convention (8 ports per lane, not 4 -- see module-level notes above), or
+            ``None`` for the plain (existing) convention.
+            Default = None
 
     Returns:
         2-port differential network.
 
     Raises:
-        ValueError: If Touchstone file is not 1, 2, 4, 8, or 12-port.
+        ValueError: If Touchstone file is not 1, 2, 4, 8, or 12-port (``vita_end=None``),
+            or not a multiple of 8 ports (``vita_end`` given).
         ValueError: If ``lane`` is out of range for the given port count.
+        ValueError: If ``vita_end`` is given and isn't ``"tx"`` or ``"rx"``.
 
     Notes:
         1. A 4-port Touchstone file is assumed single-ended,
         and the "DD" quadrant of its mixed-mode equivalent gets returned.
-        2. An 8- or 12-port file is assumed to contain L = N/4 differential lanes,
-        with ports ordered as **(+A, +B, −A, −B)** for each lane in groups of four:
-        Lane k occupies single-ended ports [4k, 4k+1, 4k+2, 4k+3] (0-indexed),
-        mapped to the 4-port sub-network as [4k, 4k+2, 4k+1, 4k+3] so that
+        2. An 8- or 12-port file (``vita_end=None``) is assumed to contain L = N/4
+        differential lanes, with ports ordered as **(+A, +B, −A, −B)** for each lane in
+        groups of four: Lane k occupies single-ended ports [4k, 4k+1, 4k+2, 4k+3]
+        (0-indexed), mapped to the 4-port sub-network as [4k, 4k+2, 4k+1, 4k+3] so that
         ``sdd_21()`` receives them in (+A, −A, +B, −B) order.
     """
     # Import and sanity check the Touchstone file.
@@ -257,6 +283,22 @@ def import_freq(filename: str, renumber: bool = False, lane: int = 0) -> Network
     (_, rs, cs) = ntwk.s.shape
     if rs != cs:
         raise ValueError("Non-square Touchstone file S-matrix!")
+
+    if vita_end is not None:
+        if vita_end not in _VITA_END_OFFSETS:
+            raise ValueError(f"vita_end must be 'tx' or 'rx', not {vita_end!r}")
+        if rs % _VITA_LANE_PORTS_PER_LANE != 0:
+            raise ValueError(
+                f"VITA-style port mapping requires a multiple of {_VITA_LANE_PORTS_PER_LANE} "
+                f"ports, not {rs}"
+            )
+        L = rs // _VITA_LANE_PORTS_PER_LANE
+        if not (0 <= lane < L):
+            raise ValueError(f"lane={lane} out of range for {rs}-port VITA file (valid: 0..{L - 1})")
+        base = _VITA_LANE_PORTS_PER_LANE * lane
+        ports = [base + off for off in _VITA_END_OFFSETS[vita_end]]
+        return sdd_21(ntwk.subnetwork(ports), renumber=renumber)
+
     if rs not in (1, 2, 4, 8, 12):
         raise ValueError(f"Touchstone file must have 1, 2, 4, 8, or 12 ports!\n{ntwk}")
 
@@ -330,7 +372,8 @@ def import_fext(filename: str, fs: Rvec, victim_lane: int, renumber: bool = Fals
 
 
 def import_channel(filename: str, sample_per: float, fs: Rvec,
-                   zref: float = 100, renumber: bool = False, lane: int = 0) -> Network:
+                   zref: float = 100, renumber: bool = False, lane: int = 0,
+                   vita_end: "str | None" = None) -> Network:
     """
     Read in a channel description file.
 
@@ -344,8 +387,13 @@ def import_channel(filename: str, sample_per: float, fs: Rvec,
             Default: 100
         renumber: Automatically fix "1=>3/2=>4" port numbering when True.
             Default: False
-        lane: 0-based lane index for 8- and 12-port Touchstone files.
+        lane: 0-based lane index for 8- and 12-port Touchstone files (or a VITA-style
+            file, when ``vita_end`` is given).
             Default: 0
+        vita_end: ``"tx"`` or ``"rx"``, to import a VITA 68.x reference-model segment
+            file (8 ports per lane) instead of the plain 1/2/4/8/12-port convention --
+            see ``import_freq()``.
+            Default: None
 
     Returns:
         2-port network description of channel.
@@ -365,7 +413,7 @@ def import_channel(filename: str, sample_per: float, fs: Rvec,
     """
     extension = os.path.splitext(filename)[1][1:]
     if re.search(r"^s\d+p$", extension, re.ASCII | re.IGNORECASE):  # Touchstone file?
-        ts2N = interp_s2p(import_freq(filename, renumber=renumber, lane=lane), fs)
+        ts2N = interp_s2p(import_freq(filename, renumber=renumber, lane=lane, vita_end=vita_end), fs)
     else:  # simple 2-column time domain description (impulse or step).
         h = import_time(filename, sample_per)
         # Fixme: an a.c. coupled channel breaks this naive approach!  # pylint: disable=fixme
