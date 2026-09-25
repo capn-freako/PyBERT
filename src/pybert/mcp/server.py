@@ -15,8 +15,10 @@ import yaml
 
 from pybert import __version__ as VERSION
 from pybert.configuration import PyBertCfg
+from pybert.models.bert import MIN_BATHTUB_VAL
 from pybert.pybert import PyBERT
 from pybert.threads.optimization import coopt
+from pybert.utility.math import make_bathtub, make_vert_bathtubs
 from pyibisami.ibis.file import IBISModel
 
 RESULT_TRAIT_NAMES = [
@@ -30,6 +32,8 @@ RESULT_TRAIT_NAMES = [
     "dcd_dfe",
     "pj_dfe",
     "rj_dfe",
+    "pjDD_dfe",
+    "rjDD_dfe",
     "perf_info",
     "jitter_info",
 ]
@@ -176,11 +180,15 @@ def optimize_eq(
     the winning EQ. Architecture (tap counts, CTLE enable, etc.) should already be set in
     ``config``; this only searches EQ *values*.
 
-    Note: DFE and native Rx-FFE tap *weights* are trained adaptively inside every
-    ``run_simulation()`` call and aren't part of the persisted configuration schema (only
-    their enabled/min/max bounds are) -- unlike Tx-FFE weights, CTLE peaking, and AMI
-    parameter values, which this function's returned ``config`` does carry forward. They're
-    still reported below, for visibility into what this search found.
+    Note: native Rx-FFE is a *static* filter (`rx_taps[k].value`, applied as-is -- it does
+    not adapt inside `run_simulation()`), so this function's returned `config` does carry
+    its winning weights forward, just like Tx-FFE weights, CTLE peaking, and AMI parameter
+    values. DFE, by contrast, *is* trained adaptively (LMS) inside every `run_simulation()`
+    call, starting fresh from zero each time regardless of any prior value -- so its tap
+    weights aren't part of the persisted configuration schema (only their enabled/min/max
+    bounds are), and this function's committed `dfe_tap_tuners[k].value` has no effect on
+    a later `run_simulation()` call. Both are still reported below, for visibility into
+    what this search found.
 
     Args:
         config: A configuration dict, as returned by ``get_config``/``get_default_config``,
@@ -250,23 +258,86 @@ def optimize_eq(
     }
 
 
-def run_simulation(config: dict, results_file: str | None = None) -> dict:
+def _bathtub_eye_margin_ui(pybert: PyBERT, target_ber: float) -> float | None:
+    """Real post-DFE eye opening at `target_ber` (fraction of a UI), via PyBERT's own
+    dual-Dirac-extrapolated bathtub curve (`make_bathtub()`) over its own measured
+    jitter histogram -- the same computation and the same data (`jitter_bins`,
+    `jitter_dfe`, `rjDD_dfe`, `mu_pos_dfe`, `mu_neg_dfe`, `ui`) the GUI's own bathtub
+    plot uses, not a hand-rolled jitter-budget approximation. Requires the preceding
+    `pybert.simulate()` call to have used `update_plots=True` (that's what populates
+    the jitter-histogram traits this reads).
+
+    Returns None if the eye doesn't reach `target_ber` anywhere (fully closed at the
+    measured resolution) -- there's no meaningful "how negative" a bathtub crossing
+    can report once the curve's whole center sits above `target_ber`.
+    """
+    bathtub = make_bathtub(
+        pybert.jitter_bins, pybert.jitter_dfe, min_val=0.1 * MIN_BATHTUB_VAL,
+        rj=pybert.rjDD_dfe, mu_r=pybert.mu_pos_dfe, mu_l=pybert.mu_neg_dfe, extrap=True,
+    )
+    bins = np.asarray(pybert.jitter_bins)
+    bt = np.asarray(bathtub)
+    center = len(bt) // 2
+    if bt[center] > target_ber:
+        return None
+
+    # bt is monotonically decreasing left-of-center, increasing right-of-center (a real
+    # bathtub shape); np.interp needs an ascending x, hence the reversal on the left half.
+    left_cross = np.interp(target_ber, bt[:center + 1][::-1], bins[:center + 1][::-1])
+    right_cross = np.interp(target_ber, bt[center:], bins[center:])
+    return float((right_cross - left_cross) / pybert.ui)
+
+
+def _vert_eye_heights_v(pybert: PyBERT, target_ber: float) -> list[float | None]:
+    """Real post-DFE vertical eye openings at `target_ber` (V), one per eye, lowest eye
+    first, via PyBERT's own vertical bathtub curves (`make_vert_bathtubs()`) over the DFE
+    slicer input samples PyBERT itself took at its recovered clock instants.
+
+    An eye that doesn't reach `target_ber` anywhere reports None (as `eye_margin_ui` does).
+    """
+    heights: list[float | None] = []
+    for v, bt in make_vert_bathtubs(pybert.dfe_slicer_samps, pybert.dfe_slicer_decisions,
+                                    min_val=0.1 * MIN_BATHTUB_VAL):
+        best = int(np.argmin(bt))
+        if bt[best] > target_ber:
+            heights.append(None)
+            continue
+        # bt falls from the lower level's mean to its minimum, then rises to the upper level's.
+        lo_cross = np.interp(target_ber, bt[:best + 1][::-1], v[:best + 1][::-1])
+        hi_cross = np.interp(target_ber, bt[best:], v[best:])
+        heights.append(float(hi_cross - lo_cross))
+    return heights
+
+
+def run_simulation(config: dict, results_file: str | None = None,
+                    target_ber: float | None = None) -> dict:
     """Run a headless PyBERT simulation and return its summary performance metrics.
 
     Args:
         config: A configuration dict, as returned by ``get_config``/``get_default_config``,
             optionally with overrides applied.
         results_file: If given, also save the waveform results to this path (``.pybert_data``).
+        target_ber: If given, also compute the real post-DFE bathtub-curve eye opening
+            at this BER (see `_bathtub_eye_margin_ui`) and return it as
+            ``eye_margin_ui`` -- ``None`` if the eye doesn't reach `target_ber` at all --
+            along with the vertical opening of each eye (V, lowest eye first; see
+            `_vert_eye_heights_v`) at that BER, as ``eye_heights_v``.
     """
     pybert = PyBERT(run_simulation=False, gui=False)
     _apply_config(pybert, config)
-    # update_plots populates pybert.plotdata, which save_results() needs; skip it otherwise.
-    pybert.simulate(initial_run=True, update_plots=bool(results_file))
+    # update_plots populates pybert.plotdata (needed by save_results()) and the jitter
+    # histogram traits (needed for target_ber's bathtub margin); skip it otherwise.
+    update_plots = bool(results_file) or target_ber is not None
+    pybert.simulate(initial_run=True, update_plots=update_plots)
 
     if results_file:
         pybert.save_results(Path(results_file))
 
-    return {name: _jsonify(getattr(pybert, name)) for name in RESULT_TRAIT_NAMES}
+    result = {name: _jsonify(getattr(pybert, name)) for name in RESULT_TRAIT_NAMES}
+    if target_ber is not None:
+        result["eye_margin_ui"] = _bathtub_eye_margin_ui(pybert, target_ber)
+        result["eye_heights_v"] = _vert_eye_heights_v(pybert, target_ber)
+    return result
 
 
 def inspect_results_file(results_file: str) -> dict:

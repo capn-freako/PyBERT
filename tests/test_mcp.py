@@ -82,6 +82,46 @@ def test_run_simulation_multi_segment_channel(channel_segment):
     assert result["chnl_dly"] > 0
 
 
+def test_run_simulation_target_ber_reports_eye_margin(channel_segment):
+    """`target_ber` requests the real bathtub-curve eye opening (`eye_margin_ui`) --
+    computed from PyBERT's own jitter histogram via `make_bathtub()`, not a hand-rolled
+    approximation -- not just the raw jitter component scalars alone."""
+    cfg = _with_channel(_fast_config(), channel_segment)
+    result = run_simulation(cfg, target_ber=1e-2)
+    assert result["eye_margin_ui"] is not None
+    assert 0.0 < result["eye_margin_ui"] <= 1.0
+
+
+def test_run_simulation_target_ber_reports_vert_eye_heights():
+    """`target_ber` also reports each eye's vertical opening (V), from PyBERT's own DFE
+    slicer samples via `make_vert_bathtubs()` -- one eye for NRZ, three for PAM-4.
+    (Default, native channel: error-free, so its NRZ eye is genuinely open at the slicer.)"""
+    cfg = _fast_config()
+    result = run_simulation(cfg, target_ber=1e-2)
+    assert len(result["eye_heights_v"]) == 1
+    assert result["eye_heights_v"][0] > 0
+
+    cfg.update(mod_type="PAM-4", nbits=4000, eye_bits=2000)  # PAM-4 needs >= 1 full pattern repetition.
+    result = run_simulation(cfg, target_ber=1e-2)
+    assert len(result["eye_heights_v"]) == 3
+
+
+def test_run_simulation_target_ber_none_when_eye_fully_closed(channel_segment):
+    """An absurdly strict target_ber (below the bathtub curve's own floor value)
+    reports None, not a nonsensical crossing point."""
+    cfg = _with_channel(_fast_config(), channel_segment)
+    result = run_simulation(cfg, target_ber=1e-20)
+    assert result["eye_margin_ui"] is None
+
+
+def test_run_simulation_without_target_ber_omits_eye_margin(channel_segment):
+    """Without target_ber, eye_margin_ui isn't computed at all -- run_simulation()
+    doesn't pay update_plots' cost unless the caller actually asked for a margin."""
+    cfg = _with_channel(_fast_config(), channel_segment)
+    result = run_simulation(cfg)
+    assert "eye_margin_ui" not in result
+
+
 def test_run_simulation_saves_results(tmp_path):
     """`results_file`, when given, is written and can be inspected afterward."""
     results_file = tmp_path / "results.pybert_data"

@@ -2,6 +2,39 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Trust and reuse PyBERT's own calculations
+
+When a task needs a derived quantity (margin, BER, jitter decomposition, eye opening,
+channel delay, ...), check whether PyBERT already computes it before writing a new formula
+or approximation for it. PyBERT's own signal-processing code (`src/pybert/utility/math.py`,
+`src/pybert/models/bert.py`) reflects real domain expertise and is validated against this
+project's own GUI and test suite; a hand-rolled approximation written from outside that code
+is a second, unverified implementation that can silently diverge from the real answer by a
+large margin — not a shortcut. Concrete case from this project's own history: an
+`eye_margin_ui()` helper (in the local architecture-search driver) approximated eye margin as
+a simple additive dual-Dirac jitter budget, computed from PyBERT's raw jitter scalars.
+It reported a badly closed eye (-1.155 UI) for a configuration that PyBERT's own GUI
+confirmed produces zero real bit errors and, via its actual bathtub-curve extrapolation, a
+genuinely open +0.15 UI eye at the same target BER — a wrong-sign, not just imprecise,
+result. Replacing it with a function that calls PyBERT's own `make_bathtub()` over PyBERT's
+own measured jitter histogram (`src/pybert/mcp/server.py`'s `run_simulation(...,
+target_ber=...)`) matched the verified GUI result almost exactly.
+
+Apply this at all costs when working in this repo:
+
+- Before computing something PyBERT already exposes as a trait (`pybert.ui`, `pybert.chnl_dly`,
+  `pybert.n_errs_dfe`, `pybert.isi_dfe`/`dcd_dfe`/`pj_dfe`/`rj_dfe`/`pjDD_dfe`/`rjDD_dfe`, ...),
+  read the trait — don't re-derive it independently.
+- Before writing a formula that approximates something PyBERT already computes exactly
+  (jitter budgets, bathtub curves, BER, channel responses), call PyBERT's own function on
+  PyBERT's own data instead.
+- If a needed value isn't currently exposed via the MCP server or elsewhere, the right fix is
+  usually to expose it (add the trait to `RESULT_TRAIT_NAMES`, or add a small new MCP tool
+  that wraps PyBERT's own computation) — not to write an external approximation of it.
+- Don't re-run a simulation to obtain a value derivable from a simulation already run; fold
+  additional requested outputs (e.g. a margin at some `target_ber`) into the *same*
+  `run_simulation()` call rather than issuing a second one.
+
 ## Commands
 
 All non-`make` commands must be prefixed with `uv run`.
@@ -83,15 +116,41 @@ side's available parameter names/ranges so callers know what to pass. Note also 
 to enable AMI in `config` for `run_simulation`, not just for `optimize_eq()`. Similarly,
 `ch_files` alone does nothing — it's read only when `inter_sel` is also set to `"multiple"`
 (or `ch_file`/`"single"` for one file); `inter_sel` defaults to `"native"` (the analytic Howard
-Johnson model), which silently ignores `ch_files`/`ch_file` if left unset. Note that DFE and
-native Rx-FFE tap *weights* aren't part of the persisted config schema either (only their
-enabled/min/max bounds
-are) — both adapt fresh inside every `run_simulation()` call. Each call
+Johnson model), which silently ignores `ch_files`/`ch_file` if left unset. Native Rx-FFE
+(`rx_taps`) is a *static* filter — it never adapts inside `run_simulation()`, unlike DFE
+(LMS-adaptive, always starting fresh from zero regardless of any prior value) — so `rx_taps`
+*is* part of the persisted config schema (`(enabled, value, min_val, max_val)` per tap,
+mirroring `tx_taps`; `ffe_tap_tuners`, its EQ-tune-tab counterpart, round-trips too), while
+DFE tap *weights* deliberately aren't (only their enabled/min/max bounds are — a `value`
+would be silently ignored anyway). Getting native Rx-FFE weights into a config — via
+`optimize_eq()`, `coopt()` + `save_configuration()`, or hand-editing — is required for a
+realistic `run_simulation()`/GUI result: with no such weights set, `rx_taps` defaults to a
+trivial identity pass-through (one unity-gain tap, everything else zero), which can look
+like a channel/architecture failure that's actually just an unequalized Rx path. Each call
 constructs its own fresh `PyBERT(gui=False)` instance; nothing is cached across calls.
 `_apply_config()` round-trips config dicts through a temp YAML file and `PyBERT.load_configuration()`
 so `PyBertCfg`'s existing tap-tuple/legacy-rename handling is reused rather than duplicated. Note:
 `.pybert_data` files only ever hold waveform arrays, never scalar performance metrics — those are
 only available live, right after `simulate()`, which is why `run_simulation` returns them directly.
+`run_simulation`'s optional `target_ber` returns the *real* post-DFE bathtub-curve eye opening
+at that BER as `eye_margin_ui` (`None` if the eye doesn't reach it at all) — computed by calling
+PyBERT's own `make_bathtub()` (`src/pybert/utility/math.py`) over its own measured jitter
+histogram (`jitter_bins`/`jitter_dfe`/`rjDD_dfe`/`mu_pos_dfe`/`mu_neg_dfe`), the same computation
+and data the GUI's own bathtub plot uses — not a hand-rolled jitter-budget approximation (see
+"Trust and reuse PyBERT's own calculations", above). Passing `target_ber` makes this call use
+`update_plots=True` internally (needed to populate the jitter-histogram traits), same as passing
+`results_file`. The same call also returns `eye_heights_v`: each eye's vertical opening (V, lowest
+eye first; `None` per closed eye) at `target_ber`, from `make_vert_bathtubs()` over the DFE slicer
+input samples PyBERT took at its own recovered clock instants (`dfe_slicer_samps`/
+`dfe_slicer_decisions`, stored by `my_run_simulation()` over the same `eye_uis` window
+`calc_ber()` checks). Each level's tail is measured where >= 10 samples lie beyond, and
+extrapolated past that with a Gaussian fit to its 100 most extreme samples on the
+normal-probability (Q) scale -- *not* by `calc_jitter()`'s histogram `curve_fit(gaus_pdf, ...)`,
+nor by a fit over the whole tail: residual ISI makes level distributions sub-Gaussian (bounded)
+in their tails, and both of those overstated them badly, falsely closing eyes that a
+600k-symbol run measured open. With short runs (~1k samples per level) the extrapolation is
+still conservative, since the tail's steepening toward the ISI bound isn't yet visible;
+it converges on the measured openings as `nbits`/`eye_bits` grow.
 
 ### Submodule: PyAMI (`PyAMI/`)
 

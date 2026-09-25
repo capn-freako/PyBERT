@@ -584,6 +584,10 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
 
+    # Slicer input samples and their decisions, over the same window `calc_ber()` checks.
+    self.dfe_slicer_samps = array(sig_samps[-eye_uis:])
+    self.dfe_slicer_decisions = array(decisions[-eye_uis:])
+
     # Determine post-DFE BER.
     def calc_ber(bits_out):
         """
