@@ -357,7 +357,11 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                     else:
                         samples -= thresholds[1]
                 elif mod_type == 2:  # PAM-4
-                    pass
+                    # Only transitions symmetric about 0V (-1<->+1, -1/3<->+1/3) cross it mid-UI;
+                    # the others' early/late votes are set by the data, not the clock phase,
+                    # and can walk the CDR off by a whole UI. Present those as "no transition".
+                    if self.decide(last_clock_sample)[0] != -self.decide(current_clock_sample)[0]:
+                        samples[0] = samples[2]
                 else:
                     raise RuntimeError("ERROR: DFE.run(): Unrecognized modulation type!")
                 ui, locked = self.cdr.adapt(samples)
