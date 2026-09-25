@@ -136,6 +136,12 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_viterbi_symbols = the_PyBERT.rx_viterbi_symbols
         self.rx_n_taps = the_PyBERT.rx_n_taps
         self.rx_n_pre = the_PyBERT.rx_n_pre
+        self.rx_taps = []
+        for tap in the_PyBERT.rx_taps:
+            self.rx_taps.append((tap.enabled, tap.value, tap.min_val, tap.max_val))
+        self.ffe_tap_tuners = []
+        for tap in the_PyBERT.ffe_tap_tuners:
+            self.ffe_tap_tuners.append((tap.enabled, tap.pos, tap.min_val, tap.max_val, tap.step))
 
         # DFE
         self.sum_ideal = the_PyBERT.sum_ideal
@@ -226,6 +232,19 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
                     pybert.dfe_tap_tuners[count].enabled = enabled
                     pybert.dfe_tap_tuners[count].min_val = min_val
                     pybert.dfe_tap_tuners[count].max_val = max_val
+            elif prop == "rx_taps":
+                for count, (enabled, val, min_val, max_val) in enumerate(value):
+                    pybert.rx_taps[count].enabled = enabled
+                    pybert.rx_taps[count].value = val
+                    pybert.rx_taps[count].min_val = min_val
+                    pybert.rx_taps[count].max_val = max_val
+            elif prop == "ffe_tap_tuners":
+                for count, (enabled, pos, min_val, max_val, step) in enumerate(value):
+                    pybert.ffe_tap_tuners[count].enabled = enabled
+                    pybert.ffe_tap_tuners[count].pos = pos
+                    pybert.ffe_tap_tuners[count].min_val = min_val
+                    pybert.ffe_tap_tuners[count].max_val = max_val
+                    pybert.ffe_tap_tuners[count].step = step
             elif prop in ("tx_eq_sel", "rx_eq_sel"):
                 lower_map = {"native": "Native", "ibis-ami": "IBIS-AMI"}
                 setattr(pybert, prop, lower_map.get(str(value).lower(), value))

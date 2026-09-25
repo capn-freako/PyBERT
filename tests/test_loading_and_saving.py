@@ -104,7 +104,10 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
     # All items should exist in both, so fail if one isn't found.
     for name in user_config.__dict__.keys():
         # These are handled differently so skip them.
-        if name not in ["tx_taps", "tx_tap_tuners", "dfe_tap_tuners", "version", "date_created"]:
+        if name not in [
+            "tx_taps", "tx_tap_tuners", "dfe_tap_tuners", "rx_taps", "ffe_tap_tuners",
+            "version", "date_created",
+        ]:
             # Test the values
             assert getattr(user_config, name) == getattr(dut, name)
 
@@ -144,6 +147,51 @@ def test_load_config_from_invalid(dut, tmp_path: Path):
 
     assert "PyBERT does not support this file type." in str(excinfo.value)
     assert "This filetype is not currently supported." in dut.console_log
+
+
+@pytest.mark.usefixtures("dut")
+def test_rx_taps_and_ffe_tap_tuners_round_trip(dut, tmp_path: Path):
+    """`rx_taps` (the static Rx-FFE filter `run_simulation()`/`my_run_simulation()`
+    actually convolves) and `ffe_tap_tuners` (its EQ-tune-tab counterpart) survive a
+    yaml save/load round-trip -- unlike DFE, native Rx-FFE never adapts on its own, so
+    without this its tap *values* (as opposed to just enabled/min/max bounds) were
+    silently dropped on save, defaulting to a trivial identity pass-through on load."""
+    for i, val in enumerate((0.1, 0.2, 0.3, 0.4, 0.5)):
+        dut.rx_taps[i].value = val
+        dut.rx_taps[i].enabled = True
+        dut.ffe_tap_tuners[i].pos = i - 2
+        dut.ffe_tap_tuners[i].step = 0.05
+
+    save_file = tmp_path / "rx_taps.yaml"
+    dut.save_configuration(save_file)
+
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+
+    for i, val in enumerate((0.1, 0.2, 0.3, 0.4, 0.5)):
+        assert dut2.rx_taps[i].value == val, f"rx_taps[{i}].value"
+        assert dut2.rx_taps[i].enabled is True, f"rx_taps[{i}].enabled"
+        assert dut2.ffe_tap_tuners[i].pos == i - 2, f"ffe_tap_tuners[{i}].pos"
+        assert dut2.ffe_tap_tuners[i].step == 0.05, f"ffe_tap_tuners[{i}].step"
+
+
+def test_old_config_without_rx_taps_still_loads(tmp_path: Path):
+    """A config saved before rx_taps/ffe_tap_tuners were persisted (no such keys in the
+    file) still loads without error, falling back to rx_taps' own trait default."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    config = PyBertCfg(dut, "string_time", "test.test.test")
+    config.__dict__.pop("rx_taps", None)
+    config.__dict__.pop("ffe_tap_tuners", None)
+
+    save_file = tmp_path / "old_style.yaml"
+    with open(save_file, "w", encoding="UTF-8") as f:
+        yaml.dump(config, f)
+
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)  # must not raise
+
+    fresh = PyBERT(run_simulation=False, gui=False)
+    assert [(t.enabled, t.value) for t in dut2.rx_taps] == [(t.enabled, t.value) for t in fresh.rx_taps]
 
 
 @pytest.mark.usefixtures("dut")
