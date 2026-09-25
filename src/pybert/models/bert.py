@@ -172,9 +172,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     peak_freq = self.peak_freq * 1.0e9
     peak_mag = self.peak_mag
     ctle_enable = self.ctle_enable
-    delta_t = self.delta_t * 1.0e-12
-    alpha = self.alpha
     ui = self.ui
+    delta_t = self.delta_t_ui * ui
+    alpha = self.alpha
     gain = self.gain
     n_ave = self.n_ave
     decision_scaler = self.decision_scaler

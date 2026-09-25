@@ -169,7 +169,7 @@ A git submodule (also a `uv` workspace member). Contains the `pyibisami` package
 
 ### Configuration persistence
 
-`PyBertCfg` (in `configuration.py`) is pickled/YAML-dumped. `load_from_file` iterates `vars(user_config)` and calls `setattr(pybert, prop, value)` for most props. Special-cased props (tap lists) are handled explicitly. Old configs without `ch_files` fall back gracefully: the simulation reads `self.ch_file` (single path) when `self.ch_files` is empty.
+`PyBertCfg` (in `configuration.py`) is pickled/YAML-dumped. `load_from_file` iterates `vars(user_config)` and calls `setattr(pybert, prop, value)` for most props. Special-cased props (tap lists) are handled explicitly. Old configs without `ch_files` fall back gracefully: the simulation reads `self.ch_file` (single path) when `self.ch_files` is empty. The CDR's proportional step is `delta_t_ui` (in UI, so loop dynamics don't change with data rate); old configs' absolute `delta_t` (ps) is converted on load using that config's own UI.
 
 ### CLI entry point
 

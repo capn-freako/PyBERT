@@ -93,7 +93,7 @@ def test_load_config_from_yaml(dut, filepath_converter, tmp_path: Path):
         user_config.Rdc = 2  # Normally 0.1876
         user_config.rin = 85  # Normally 100
         user_config.n_taps = 2  # Normally 5
-        user_config.delta_t = 0.01  # Normally 0.1
+        user_config.delta_t_ui = 0.002  # Normally 0.001
         user_config.thresh = 5  # Normally 6
     with open(save_file, "w", encoding="UTF-8") as saved_config_file:
         yaml.dump(user_config, saved_config_file)
@@ -276,3 +276,21 @@ def test_load_results_from_pickle(dut, tmp_path: Path):
     # pybert doesn't directly reload the waveform back into the same plot.
     # instead if creates a reference plot to compare old vs. new.
     assert dut.plotdata.get_data("chnl_h_ref").size == 4
+
+
+def test_legacy_delta_t_ps_converts_to_ui(tmp_path: Path):
+    """An old config's absolute CDR step (`delta_t`, ps) loads as the equivalent `delta_t_ui`,
+    using that config's own UI -- so it simulates exactly as it did before the change."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    config = PyBertCfg(dut, "string_time", "test.test.test")
+    config.__dict__.pop("delta_t_ui")
+    config.delta_t = 0.1  # ps
+    config.bit_rate = 200  # PAM-4 at 200 Gb/s: 10 ps UI
+    config.mod_type = "PAM-4"
+    save_file = tmp_path / "legacy_delta_t.yaml"
+    with open(save_file, "w", encoding="UTF-8") as f:
+        yaml.dump(config, f)
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+    assert dut2.ui == pytest.approx(10e-12)
+    assert dut2.delta_t_ui == pytest.approx(0.01)

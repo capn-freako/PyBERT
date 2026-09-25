@@ -152,7 +152,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.use_agc = the_PyBERT.use_agc
 
         # CDR
-        self.delta_t = the_PyBERT.delta_t
+        self.delta_t_ui = the_PyBERT.delta_t_ui
         self.alpha = the_PyBERT.alpha
         self.n_lock_ave = the_PyBERT.n_lock_ave
         self.rel_lock_tol = the_PyBERT.rel_lock_tol
@@ -213,6 +213,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             raise TypeError("The data structure read in is NOT of type: PyBertCfg!")
 
         # Actually load values back into pybert.
+        legacy_delta_t_ps = None
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
                 for count, (enabled, val, min_val, max_val) in enumerate(value):
@@ -261,8 +262,15 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
                 # Renamed to tx_sel/rx_sel; map old bool to new enum.
                 sel_attr = prop.replace("use_ibis", "sel")
                 setattr(pybert, sel_attr, "ibis" if value else "native")
+            elif prop == "delta_t":
+                legacy_delta_t_ps = value  # Converted below, once the config's own UI is known.
             else:
                 setattr(pybert, prop, value)
+
+        # Replaced by `delta_t_ui`, so the CDR's loop dynamics no longer depend on data rate;
+        # an old config's absolute step (ps) is converted exactly, preserving its behavior.
+        if legacy_delta_t_ps is not None and "delta_t_ui" not in vars(user_config):
+            pybert.delta_t_ui = legacy_delta_t_ps * 1.0e-12 / pybert.ui
 
     def save(self, filepath: str | Path):
         """Save out pybert's current configuration to a file.

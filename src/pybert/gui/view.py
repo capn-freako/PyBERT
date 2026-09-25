@@ -595,11 +595,11 @@ traits_view = View(
                         VGroup(  # CDR
                             HGroup(
                                 Item(
-                                    name="delta_t",
+                                    name="delta_t_ui",
                                     label="Delta-t",
                                     tooltip="magnitude of CDR proportional branch",
                                 ),
-                                Item(label="ps"),
+                                Item(label="UI"),
                             ),
                             Item(name="alpha", label="Alpha", tooltip="relative magnitude of CDR integral branch"),
                             Item(

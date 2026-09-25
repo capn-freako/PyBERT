@@ -339,7 +339,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     use_agc = Bool(True)  #: Continuously adjust ``decision_scalar`` when True.
 
     # - CDR
-    delta_t = Float(0.1)  #: CDR proportional branch magnitude (ps).
+    delta_t_ui = Float(0.001)  #: CDR proportional branch magnitude (UI).
     alpha = Float(0.01)  #: CDR integral branch magnitude (unitless).
     n_lock_ave = Int(500)  #: CDR # of averages to take in determining lock.
     rel_lock_tol = Float(0.1)  #: CDR relative tolerance to use in determining lock.
