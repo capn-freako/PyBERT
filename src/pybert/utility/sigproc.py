@@ -20,7 +20,7 @@ from numpy import (
     arange, argmax, array, concatenate, convolve, cos, cumsum, diff, maximum,
     mean, minimum, ones, pad, pi, roll, sign, where, zeros, floating
 )
-from numpy.fft import rfft
+from numpy.fft import irfft, rfft
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
@@ -310,13 +310,14 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000, front_porch:
     return (_g[ix_beg:ix_end], ix_beg - half_len)
 
 
-def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments
+def make_ctle(
+    rx_bw: float,
+    peak_freq: float,
+    peak_mag: float,
+    w: Rvec
+) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments
     """
-    Generate the frequency response of a continuous time linear equalizer (CTLE), given the:
-
-        - signal path bandwidth,
-        - peaking specification, and
-        - list of frequencies of interest.
+    Generate the frequency response of a continuous time linear equalizer (CTLE).
 
     Args:
         rx_bw: The natural (or, unequalized) signal path bandwidth (Hz).
@@ -342,6 +343,9 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
                 - the user specified peaking frequency.
 
             - The zero location is chosen, so as to provide the desired degree of peaking.
+
+        2. For the impulse response, use ``make_ctle_h()``, rather than ``irfft()`` of this over a
+        frequency grid that may end too close to ``rx_bw``.
     """
 
     p2 = -2.0 * pi * rx_bw
@@ -358,6 +362,33 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
     H /= max(abs(H))
 
     return (w, H)
+
+
+def make_ctle_h(rx_bw: float, peak_freq: float, peak_mag: float, t: Rvec) -> Rvec:
+    """
+    Generate the impulse response of the CTLE described by ``make_ctle()``.
+
+    The frequency response is sampled out to 100x its highest pole frequency (-40 dB, at 20 dB/dec.),
+    independent of any simulation frequency grid, which may end too close to ``rx_bw``
+    to represent the CTLE's roll-off (e.g. - ``f_max`` = ``rx_bw`` gives a distorted, ringing impulse response).
+
+    Args:
+        rx_bw: The natural (or, unequalized) signal path bandwidth (Hz).
+        peak_freq: The location of the desired peak in the frequency response (Hz).
+        peak_mag: The desired relative magnitude of the peak (dB).
+        t: Uniformly spaced sample times (s).
+
+    Returns:
+        The impulse response, sampled at ``t``, normalized so that its sum is the CTLE's d.c. gain.
+    """
+
+    f_max = 100 * max(rx_bw, peak_freq)
+    f = arange(0, f_max + 10e6, 10e6)  # 10 MHz resolution, including `f_max`.
+    _, H = make_ctle(rx_bw, peak_freq, peak_mag, 2 * pi * f)
+    _h = irfft(H)
+    t_h = arange(len(_h)) * 0.5 / f[-1]
+    h = interp1d(t_h, _h, bounds_error=False, fill_value=0)(t)
+    return h * _h.sum() / h.sum()
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments

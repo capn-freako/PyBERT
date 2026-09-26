@@ -37,7 +37,7 @@ from numpy import (
     where,
     zeros,
 )
-from numpy.fft import rfft, irfft
+from numpy.fft import rfft
 from numpy.random import normal
 from numpy.typing import NDArray
 from scipy.signal import iirfilter, lfilter
@@ -58,7 +58,7 @@ from ..utility import (
     fst, snd,
     import_channel,
     make_bathtub,
-    make_ctle,
+    make_ctle_h,
     resize_zero_pad,
     run_ami_model,
     safe_log10,
@@ -153,9 +153,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
-    t_irfft = self.t_irfft
     f = self.f
-    w = self.w
     bits = self.bits
     symbols = self.symbols
     ffe = self.ffe
@@ -283,14 +281,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             else:
                 ctle_h *= ts  # Normalize to (V/sample)
             ctle_h = resize_zero_pad(ctle_h, len_t)
-            ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.
         else:
             if ctle_enable:
-                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w)
-                _ctle_h = irfft(ctle_H)
-                krnl = interp1d(t_irfft, _ctle_h, bounds_error=False, fill_value=0)
-                ctle_h = krnl(t)
-                ctle_h *= sum(_ctle_h) / sum(ctle_h)
+                ctle_h = make_ctle_h(rx_bw, peak_freq, peak_mag, t)
                 ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
             else:
                 ctle_h = array([1.] + [0. for _ in range(min_len - 1)])

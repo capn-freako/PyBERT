@@ -67,3 +67,18 @@ def test_disabled_rx_ffe_taps_not_applied():
     p.simulate(initial_run=True, update_plots=False)
     assert not p.rx_taps[7].enabled
     assert p.ffe_h[7 * p.nspui] == 0.0
+
+
+
+def test_ctle_impulse_not_limited_by_sim_frequency_grid():
+    """A 0 dB CTLE is a plain `rx_bw` low-pass; with `f_max` no higher than `rx_bw`, the simulation's
+    CTLE impulse response must still not ring (it used to, from `irfft()` over the truncated grid)."""
+    from pybert.pybert import PyBERT
+
+    p = PyBERT(run_simulation=False, gui=False)
+    p.nbits, p.eye_bits = 1000, 500
+    p.f_max, p.rx_bw, p.peak_mag, p.ctle_enable = 40.0, 40.0, 0.0, True
+    p.simulate(initial_run=True, update_plots=False)
+    step = np.cumsum(p.ctle_h)
+    assert step.max() / step[-1] - 1 < 1e-3
+    assert p.ctle_h.min() > -1e-3 * p.ctle_h.max()

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from pybert.utility.sigproc import (
-    add_ffe_dfe, get_dfe_weights, moving_average, raised_cosine, resize_zero_pad, trim_impulse,
+    add_ffe_dfe, get_dfe_weights, make_ctle, make_ctle_h, moving_average, raised_cosine, resize_zero_pad, trim_impulse,
 )
 
 
@@ -179,3 +179,24 @@ class TestAddFfeDfe:
                           pr[ts], curs_ix=ts)
         assert out[ts + NSPUI] == pytest.approx(0.0)
         assert out[ts] == pytest.approx(pr[ts])
+
+
+
+class TestMakeCtleH:
+    def test_zero_peaking_is_single_pole_lowpass(self):
+        """0 dB peaking leaves just the `rx_bw` pole: unit d.c. gain, no overshoot, 0.35/`rx_bw` rise time."""
+        rx_bw = 100e9
+        t = np.arange(3200) * 10e-12 / 32
+        h = make_ctle_h(rx_bw, 50e9, 0.0, t)
+        step = np.cumsum(h)
+        rise = (np.argmax(step >= 0.9) - np.argmax(step >= 0.1)) * (t[1] - t[0])
+        assert h.sum() == pytest.approx(1.0)
+        assert step.max() == pytest.approx(1.0, abs=1e-3)
+        assert rise == pytest.approx(0.35 / rx_bw, rel=0.1)
+
+    @pytest.mark.parametrize("peak_mag", [0.0, 3.0, 6.0])
+    def test_sum_is_ctle_dc_gain(self, peak_mag):
+        """The impulse response's sum is the (peak-normalized) CTLE's own d.c. gain."""
+        t = np.arange(3200) * 10e-12 / 32
+        _, H = make_ctle(100e9, 50e9, peak_mag, 2 * np.pi * np.linspace(0, 10e12, 100_001))  # must cover the peak
+        assert make_ctle_h(100e9, 50e9, peak_mag, t).sum() == pytest.approx(abs(H[0]), rel=1e-3)

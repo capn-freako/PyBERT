@@ -13,8 +13,8 @@ TX, RX or co optimization are run in a separate thread to keep the gui responsiv
 import time
 
 import optuna
-from numpy import arange, array, convolve, delete, insert, ones, pi, prod, where, zeros
-from numpy.fft import irfft, rfft
+from numpy import arange, array, convolve, delete, insert, ones, prod, where, zeros
+from numpy.fft import rfft
 from scipy.interpolate import interp1d
 
 from pychopmarg.optimize import mmse
@@ -28,7 +28,7 @@ from ..utility import (
     calc_resps,
     fir_tap_weights_to_imp_resp,
     get_dfe_weights,
-    make_ctle,
+    make_ctle_h,
     resize_zero_pad,
     run_ami_model,
     safe_log10,
@@ -214,13 +214,6 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
     dfe_tap_mins = array([t.min_val for t in dfe_taps[:n_dfe_taps]])
     dfe_tap_maxs = array([t.max_val for t in dfe_taps[:n_dfe_taps]])
 
-    # Calculate time/frequency vectors for CTLE.
-    ctle_fmax = 100 * rx_bw  # Should give -40dB at truncation, assuming 20 dB/dec. roll-off.
-    f_ctle = arange(0, ctle_fmax + 10e6, 10e6)  # 10 MHz freq. step & includes `ctle_fmax` (i.e. - fNyquist)
-    w_ctle = 2 * pi * f_ctle
-    ts_ctle = 0.5 / ctle_fmax
-    t_ctle = [n * ts_ctle for n in range(2 * (len(f_ctle) - 1))]  # Presumes use of `rfft()`/`irfft()`.
-
     # Calculate unequalized channel pulse response.
     h_chnl = pybert.calc_chnl_h()
     t = pybert.t
@@ -354,11 +347,11 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
 
     def native_ctle_candidate(peak_mag: float):
         "Build (p_ctle_out, ctle_H) for one native CTLE peaking-magnitude value."
-        _, H_ctle = make_ctle(rx_bw, peak_freq, peak_mag, w_ctle)
-        _h_ctle = irfft(H_ctle)
-        krnl_ctle = interp1d(t_ctle, _h_ctle, bounds_error=False, fill_value=0)
-        h_ctle = krnl_ctle(t[:max_len])
-        h_ctle *= sum(_h_ctle) / sum(h_ctle)  # type: ignore
+        if pybert.ctle_enable_tune:
+            h_ctle = make_ctle_h(rx_bw, peak_freq, peak_mag, t[:max_len])
+        else:  # "Use EQ" commits `ctle_enable = ctle_enable_tune`, so the simulation will have no CTLE at all.
+            h_ctle = zeros(max_len)
+            h_ctle[0] = 1.0
         p_ctle_out = convolve(p_chnl, h_ctle)[:len(p_chnl)]
         ctle_H = rfft(resize_zero_pad(h_ctle, len(_t)))
         return p_ctle_out, ctle_H
