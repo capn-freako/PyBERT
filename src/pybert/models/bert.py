@@ -484,7 +484,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ffe_h = array([1] + [0] * (nspui - 1))  # i.e. - no FFE, by default
     # If using PyBERT native Rx model, check for FFE.
     if not self.rx_use_ami and any(tap.enabled for tap in self.rx_taps):
-        ffe_h = array(concat_lists([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps]))
+        ffe_h = array(concat_lists([[x.value if x.enabled else 0.0] + list(zeros(nspui - 1)) for x in self.rx_taps]))
     ffe_h = resize_zero_pad(ffe_h, len_h)
     ffe_out_h = convolve(ffe_h, ctle_out_h)[:len_h]
     ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
