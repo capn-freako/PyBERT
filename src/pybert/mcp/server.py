@@ -260,10 +260,11 @@ def optimize_eq(
 
 def _bathtub_eye_margin_ui(pybert: PyBERT, target_ber: float) -> float | None:
     """Real post-DFE eye opening at `target_ber` (fraction of a UI), via PyBERT's own
-    dual-Dirac-extrapolated bathtub curve (`make_bathtub()`) over its own measured
-    jitter histogram -- the same computation and the same data (`jitter_bins`,
-    `jitter_dfe`, `rjDD_dfe`, `mu_pos_dfe`, `mu_neg_dfe`, `ui`) the GUI's own bathtub
-    plot uses, not a hand-rolled jitter-budget approximation. Requires the preceding
+    bathtub curve (`make_bathtub()`) over its own measured jitter histogram, its tails
+    extrapolated with the separated Rj from the bounded jitter's extent -- the same
+    computation and the same data (`jitter_bins`, `jitter_dfe`, `rj_dfe`, `dj_pos_dfe`,
+    `dj_neg_dfe`, `ui`) the GUI's own bathtub plot uses, not a hand-rolled jitter-budget
+    approximation. (The dual-Dirac fit's values are for reference only.) Requires the preceding
     `pybert.simulate()` call to have used `update_plots=True` (that's what populates
     the jitter-histogram traits this reads).
 
@@ -273,7 +274,7 @@ def _bathtub_eye_margin_ui(pybert: PyBERT, target_ber: float) -> float | None:
     """
     bathtub = make_bathtub(
         pybert.jitter_bins, pybert.jitter_dfe, min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=pybert.rjDD_dfe, mu_r=pybert.mu_pos_dfe, mu_l=pybert.mu_neg_dfe, extrap=True,
+        rj=pybert.rj_dfe, mu_r=pybert.dj_pos_dfe, mu_l=pybert.dj_neg_dfe, extrap=True,
     )
     bins = np.asarray(pybert.jitter_bins)
     bt = np.asarray(bathtub)

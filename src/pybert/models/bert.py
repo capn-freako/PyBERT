@@ -823,6 +823,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
+            dj_pos,
+            dj_neg,
         ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.t_jitter  = t_jitter
         self.isi_chnl  = isi
@@ -833,6 +835,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rjDD_chnl = rjDD
         self.mu_pos_chnl = mu_pos
         self.mu_neg_chnl = mu_neg
+        self.dj_pos_chnl = dj_pos
+        self.dj_neg_chnl = dj_neg
         self.thresh_chnl = thresh
         self.jitter_chnl = hist
         self.jitter_ext_chnl = hist_synth
@@ -868,6 +872,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
+            dj_pos,
+            dj_neg,
         ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.isi_tx  = isi
         self.dcd_tx  = dcd
@@ -877,6 +883,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rjDD_tx = rjDD
         self.mu_pos_tx = mu_pos
         self.mu_neg_tx = mu_neg
+        self.dj_pos_tx = dj_pos
+        self.dj_neg_tx = dj_neg
         self.thresh_tx = thresh
         self.jitter_tx = hist
         self.jitter_ext_tx = hist_synth
@@ -912,6 +920,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
+            dj_pos,
+            dj_neg,
         ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.isi_ctle  = isi
         self.dcd_ctle  = dcd
@@ -921,6 +931,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rjDD_ctle = rjDD
         self.mu_pos_ctle = mu_pos
         self.mu_neg_ctle = mu_neg
+        self.dj_pos_ctle = dj_pos
+        self.dj_neg_ctle = dj_neg
         self.thresh_ctle = thresh
         self.jitter_ctle = hist
         self.jitter_ext_ctle = hist_synth
@@ -953,6 +965,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
+            dj_pos,
+            dj_neg,
         ) = calc_jitter(
             ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self, xing_mask=xing_mask)
         self.isi_dfe  = isi
@@ -964,6 +978,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rjDD_dfe = rjDD
         self.mu_pos_dfe = mu_pos
         self.mu_neg_dfe = mu_neg
+        self.dj_pos_dfe = dj_pos
+        self.dj_neg_dfe = dj_neg
         self.thresh_dfe = thresh
         self.jitter_dfe = hist
         self.jitter_ext_dfe = hist_synth
@@ -1249,19 +1265,20 @@ def update_results(self) -> None:
     self.plotdata.set_data("thresh_dfe", 10.0 * (safe_log10(self.thresh_dfe[1:]) - log10_ui))
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
-    # Bathtubs
+    # Bathtubs: tails extrapolated with the separated Rj, from the bounded jitter's extent.
+    # (The dual-Dirac fit's values are for reference only.)
     bathtub_chnl = make_bathtub(
         jitter_bins, jitter_chnl, min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_chnl, mu_r=self.mu_pos_chnl, mu_l=self.mu_neg_chnl, extrap=True)
+        rj=self.rj_chnl, mu_r=self.dj_pos_chnl, mu_l=self.dj_neg_chnl, extrap=True)
     bathtub_tx = make_bathtub(
         jitter_bins, jitter_tx,   min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_tx, mu_r=self.mu_pos_tx, mu_l=self.mu_neg_tx, extrap=True)
+        rj=self.rj_tx, mu_r=self.dj_pos_tx, mu_l=self.dj_neg_tx, extrap=True)
     bathtub_ctle = make_bathtub(
         jitter_bins, jitter_ctle, min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_ctle, mu_r=self.mu_pos_ctle, mu_l=self.mu_neg_ctle, extrap=True)
+        rj=self.rj_ctle, mu_r=self.dj_pos_ctle, mu_l=self.dj_neg_ctle, extrap=True)
     bathtub_dfe = make_bathtub(
         jitter_bins, jitter_dfe,  min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_dfe, mu_r=self.mu_pos_dfe, mu_l=self.mu_neg_dfe, extrap=True)
+        rj=self.rj_dfe, mu_r=self.dj_pos_dfe, mu_l=self.dj_neg_dfe, extrap=True)
     self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))
     self.plotdata.set_data("bathtub_tx",   safe_log10(bathtub_tx))
     self.plotdata.set_data("bathtub_ctle", safe_log10(bathtub_ctle))

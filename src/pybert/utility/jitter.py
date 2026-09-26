@@ -215,7 +215,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     zero_mean: bool = True, dbg_obj: Optional[object] = None, smooth_width: int = 5,
     xing_mask: Optional[Rvec] = None
 ) -> tuple[Rvec, Rvec, float, float, float, float, float, float,
-           Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, float, float]:
+           Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, float, float, float, float]:
     """
     Calculate the jitter in a set of actual zero crossings,
     given the ideal crossings and unit interval.
@@ -267,6 +267,10 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             - The bin center values for both histograms.
             - The mean of the Gaussian distribution best fitted to the right tail.
             - The mean of the Gaussian distribution best fitted to the left tail.
+            - The latest time (relative to ideal) of the bounded (data dependent + periodic) jitter.
+            - The earliest time (relative to ideal) of the bounded (data dependent + periodic) jitter.
+            (The dual-Dirac values -- pjDD, rjDD, and the fitted tail means -- are for reference only;
+            for extrapolating jitter tails, use Rj's Gaussian, starting from the bounded jitter's extent.)
 
     Raises:
         ValueError: If input checking fails, or curve fitting goes awry.
@@ -341,17 +345,17 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     # - Use averaging over the pattern period to remove the uncorrelated components,
     #   before calculating data dependent components (from measured crossings only).
     def pattern_ave(x: Rvec, ok: Rvec, n_per: int) -> tuple[Rvec, Rvec]:
-        "Average `x` over the pattern repetitions, using only `ok` entries; also flag positions with any."
+        "Average `x` over the pattern repetitions, using only `ok` entries; also count them, per position."
         _x = reshape(resize_zero_pad(where(ok, x, 0.0), num_patterns * n_per), (num_patterns, n_per))
         _n = reshape(resize_zero_pad(ok.astype(float), num_patterns * n_per), (num_patterns, n_per)).sum(axis=0)
-        return _x.sum(axis=0) / maximum(_n, 1), _n > 0
+        return _x.sum(axis=0) / maximum(_n, 1), _n
 
     # - Separate the rising and falling edges.
     tie_risings_ave, risings_ok = pattern_ave(jitter[0::2], found[0::2], xings_per_pattern // 2)
     tie_fallings_ave, fallings_ok = pattern_ave(jitter[1::2], found[1::2], xings_per_pattern // 2)
     # (The ideal crossings repeat with the pattern, so the first pattern's flags hold for all.)
-    risings_ave  = tie_risings_ave[mask[0:xings_per_pattern:2] & risings_ok]
-    fallings_ave = tie_fallings_ave[mask[1:xings_per_pattern:2] & fallings_ok]
+    risings_ave  = tie_risings_ave[mask[0:xings_per_pattern:2] & (risings_ok > 0)]
+    fallings_ave = tie_fallings_ave[mask[1:xings_per_pattern:2] & (fallings_ok > 0)]
     isi = float(max(np.ptp(risings_ave) if len(risings_ave) else 0.0,
                     np.ptp(fallings_ave) if len(fallings_ave) else 0.0))
     isi = min(isi, ui)  # Cap the ISI at the unit interval.
@@ -359,11 +363,17 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # - Subtract the data dependent jitter (the pattern average, repeated for every pattern)
     #   from the original TIE track, in order to yield the data independent jitter.
-    ave, _ = pattern_ave(jitter, found, xings_per_pattern)
-    tie_ave = tile(ave, len(jitter) // xings_per_pattern + 1)[:len(jitter)]
-    tie_ind = jitter - tie_ave
-    if zero_mean and measured.any():
-        tie_ind -= mean(tie_ind[measured])
+    ave, n_ave = pattern_ave(jitter, found, xings_per_pattern)
+    n_reps = int(len(jitter) // xings_per_pattern + 1)
+    tie_ave = tile(ave, n_reps)[:len(jitter)]
+    n_xing = tile(n_ave, n_reps)[:len(jitter)]
+    # A pattern average over `n` repetitions includes 1/n of each one's own data independent jitter,
+    # leaving only (1 - 1/n) of its variance in the difference; undo that. With `n` = 1, nothing is left:
+    # such crossings carry no data independent information, and are left out of its statistics.
+    usable = measured & (n_xing >= 2)
+    tie_ind = (jitter - tie_ave) * sqrt(n_xing / maximum(n_xing - 1, 1))
+    if zero_mean and usable.any():
+        tie_ind -= mean(tie_ind[usable])
 
     # - Calculate the total and data-independent jitter spectrums, for display purposes only.
     # -- Calculate the relevant time/frequency vectors.
@@ -391,7 +401,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # -- Repeat for data-independent jitter.
     try:
-        spl = interp1d(t_jitter, where(found, tie_ind, 0.0), bounds_error=False, fill_value="extrapolate")
+        spl = interp1d(array(t_jitter)[usable], tie_ind[usable], bounds_error=False, fill_value="extrapolate")
         tie_ind_interp = spl(t)
         y = fft(tie_ind_interp)
         y_mag = abs(y)
@@ -400,8 +410,8 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         print(f"t_jitter: {t_jitter}")
         print(f"tie_ind: {tie_ind}")
         print(f"Error calculating data independent TIE: {err}", flush=True)
-        y = zeros(half_len)  # type: ignore
-        y_mag = zeros(half_len)
+        y = zeros(len(t))  # type: ignore
+        y_mag = zeros(len(t))
         tie_ind_spectrum = zeros(half_len)
 
     # -- Perform spectral extraction of Pj from the data independent jitter,
@@ -412,11 +422,18 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     y_sigma   = sqrt(y_var)
     thresh    = y_mean + rel_thresh * y_sigma
     y_per     = where(y_mag > thresh, y, zeros(len(y)))  # Periodic components are those lying above the threshold.
-    y_rnd     = where(y_mag > thresh, zeros(len(y)), y)  # Random components are those lying below.
     tie_per   = real(ifft(y_per))
     pj        = np.ptp(tie_per)
-    tie_rnd   = real(ifft(y_rnd))
-    rj        = sqrt(mean((tie_rnd - tie_rnd.mean())**2))
+    # Rj is measured at the crossings themselves: the uniformly resampled track used for the spectrum
+    # interpolates between them, which understates the variance of what's left once Pj is removed.
+    # (No usable crossings -- e.g. fewer than two pattern repetitions -- leaves no data independent information.)
+    tie_per_x = np.interp(array(t_jitter)[usable], t, tie_per) if usable.any() else zeros(0)
+    tie_rnd_x = tie_ind[usable] - tie_per_x
+    rj        = float(tie_rnd_x.std()) if len(tie_rnd_x) else 0.0
+    # The bounded (data dependent + periodic) jitter's extent: where Rj's Gaussian tails start.
+    bounded   = tie_ave[usable] + tie_per_x
+    dj_pos    = float(bounded.max()) if len(bounded) else 0.0
+    dj_neg    = float(bounded.min()) if len(bounded) else 0.0
 
     # -- Do dual Dirac fitting of the data-independent jitter histogram, to determine Pj/Rj.
     # --- Generate a smoothed version of the TIE histogram, for better peak identification.
@@ -440,11 +457,11 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         return (hist, bin_centers, bin_edges)
 
     if use_my_hist:
-        hist_ind, centers, edges = my_hist(tie_ind[measured], density=True)
+        hist_ind, centers, edges = my_hist(tie_ind[usable], density=True)
         hist_tot, _, _ = my_hist(jitter[mask],  density=True)
         centers = array(centers)
     else:
-        hist_ind, edges = histogram(tie_ind[measured], bins=num_bins, density=True)
+        hist_ind, edges = histogram(tie_ind[usable], bins=num_bins, density=True)
         hist_tot, _     = histogram(jitter[mask],  bins=num_bins, density=True)
         centers         = (edges[:-1] + edges[1:]) / 2
     hist_ind_smooth = array(moving_average(hist_ind, n=smooth_width))
@@ -544,5 +561,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         hist_ind_smooth,
         centers,  # Returning just one requires `use_my_hist` True.
         mu_pos,
-        mu_neg
+        mu_neg,
+        dj_pos,
+        dj_neg,
     )

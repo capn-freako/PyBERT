@@ -11,6 +11,7 @@ A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
 from functools import reduce
+from itertools import pairwise
 from collections.abc import Iterator
 
 from numpy import (
@@ -105,7 +106,7 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
         # which can occur in closed eye situations, due to slight mis-centering of the jitter PDF.
         jit_pmf = [(jit_pdf[0] + jit_pdf[-1]) * half_ui] + list(array(jit_pdf[1:-1]) * dt) + [0]
     else:
-        if extrap:
+        if extrap and rj > 0:  # (No Rj, e.g. - too few pattern repetitions to separate it: no extrapolation.)
             # The weird scaling is meant to improve numerical precision through `gaus_pdf()`.
             gaus_fit  = append(gaus_pdf(centers[:half_len] * 1e12, mu_l * 1e12, rj * 1e12),
                                gaus_pdf(centers[half_len:] * 1e12, mu_r * 1e12, rj * 1e12)) * 1e-12
@@ -153,9 +154,9 @@ def make_vert_bathtubs(samps: Rvec, decisions: Rvec, n_bins: int = 200,
 
     The vertical counterpart of `make_bathtub()`: each signal level's measured sample distribution,
     extended beyond the measured data by a Gaussian fit to its eye-facing tail.
-    (The fit is made on the normal-probability scale, rather than to the histogram as `calc_jitter()` does,
-    because residual ISI makes level distributions markedly sub-Gaussian in their tails,
-    and a histogram fit then overstates them badly, even within the measured range.)
+    (The fit is made on the normal-probability scale, to only the most extreme samples, because residual ISI
+    makes level distributions markedly sub-Gaussian in their tails: a Gaussian fitted to the histogram
+    (tried, in volts) overstated them badly, even within the measured range.)
 
     Args:
         samps: Slicer input voltages, sampled at the recovered clock instants.
@@ -182,7 +183,7 @@ def make_vert_bathtubs(samps: Rvec, decisions: Rvec, n_bins: int = 200,
     levels = [x for x in levels if len(x) >= min_samps]
 
     eyes = []
-    for lo, hi in zip(levels, levels[1:]):
+    for lo, hi in pairwise(levels):
         v = linspace(lo.mean(), hi.mean(), n_bins + 1)
         bathtub = _tail_prob(hi, v, beyond_above=False) + _tail_prob(lo, v, beyond_above=True)
         eyes.append((v, maximum(min_val, bathtub)))

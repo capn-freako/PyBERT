@@ -100,9 +100,9 @@ class TestCalcJitterFixes:
         actual = ideal + rng.choice([-dj / 2, dj / 2], len(ideal)) + rng.normal(0, rj, len(ideal))
         rslt = calc_jitter(self.UI, nui, self.PATTERN_LEN, ideal, actual)
         rjDD, mu_pos, mu_neg = rslt[7], rslt[16], rslt[17]
-        assert rjDD == pytest.approx(rj, rel=0.3)
-        assert mu_pos == pytest.approx(dj / 2, abs=0.3e-12)
-        assert mu_neg == pytest.approx(-dj / 2, abs=0.3e-12)
+        assert rjDD * 1e12 == pytest.approx(rj * 1e12, rel=0.3)  # in ps: approx()'s default abs tol is 1e-12
+        assert mu_pos * 1e12 == pytest.approx(dj / 2 * 1e12, abs=0.3)
+        assert mu_neg * 1e12 == pytest.approx(-dj / 2 * 1e12, abs=0.3)
 
     def test_missed_crossing_does_not_pad_its_neighbor(self):
         """A crossing missing from its [-UI/2, +UI/2] window is flagged on its own; the next one is still measured
@@ -125,3 +125,41 @@ class TestCalcJitterFixes:
         actual = ideal + per_position[np.arange(len(ideal)) % self.PATTERN_LEN]
         tie_ind = np.asarray(calc_jitter(self.UI, nui, self.PATTERN_LEN, ideal, actual)[8])
         assert np.abs(tie_ind).max() < 1e-3 * self.UI
+
+
+class TestCalcJitterRj:
+    """Rj from the jitter separation (used for tail extrapolation), against known inputs."""
+
+    UI = 10e-12
+    PATTERN_LEN = 2048
+    SIGMA = 0.3e-12
+
+    def _xings(self, density, n_pat, seed=0, sigma_unmasked=None):
+        rng = np.random.default_rng(seed)
+        pos = np.sort(rng.choice(np.arange(1, self.PATTERN_LEN), size=int(density * (self.PATTERN_LEN - 1)) // 2 * 2,
+                                 replace=False))
+        ideal = np.concatenate([pos + k * self.PATTERN_LEN for k in range(n_pat)]) * self.UI
+        ddj = np.tile(rng.uniform(-0.05, 0.05, len(pos)) * self.UI, n_pat)
+        mask = np.tile((np.arange(len(pos)) // 2) % 2 == 0, n_pat)
+        sigma = np.where(mask, self.SIGMA, sigma_unmasked or self.SIGMA)
+        return ideal, ideal + ddj + rng.normal(0, 1, len(ideal)) * sigma, mask
+
+    def test_rj_unbiased_with_few_repetitions_and_sparse_crossings(self):
+        """Neither few pattern repetitions nor sparse crossings bias Rj low (it read ~50% low here)."""
+        ideal, actual, _ = self._xings(density=0.25, n_pat=2)
+        rj = calc_jitter(self.UI, 2 * self.PATTERN_LEN, self.PATTERN_LEN, ideal, actual)[5]
+        assert rj * 1e12 == pytest.approx(self.SIGMA * 1e12, rel=0.1)  # in ps: approx()'s default abs tol is 1e-12
+
+    def test_rj_ignores_unflagged_crossings(self):
+        """Crossings outside `xing_mask` (e.g. PAM-4 lopsided ones) don't inflate Rj."""
+        ideal, actual, mask = self._xings(density=0.5, n_pat=8, sigma_unmasked=3 * self.SIGMA)
+        rj = calc_jitter(self.UI, 8 * self.PATTERN_LEN, self.PATTERN_LEN, ideal, actual, xing_mask=mask)[5]
+        assert rj * 1e12 == pytest.approx(self.SIGMA * 1e12, rel=0.1)
+
+    def test_bounded_extent_contains_bounded_jitter(self):
+        """The bounded jitter's extent (where Rj's tails are anchored) contains the true data dependent jitter."""
+        ideal, actual, _ = self._xings(density=0.5, n_pat=8)
+        rslt = calc_jitter(self.UI, 8 * self.PATTERN_LEN, self.PATTERN_LEN, ideal, actual)
+        dj_pos, dj_neg = rslt[18], rslt[19]
+        assert dj_neg < -0.04 * self.UI and dj_pos > 0.04 * self.UI
+        assert dj_neg > -0.15 * self.UI and dj_pos < 0.15 * self.UI

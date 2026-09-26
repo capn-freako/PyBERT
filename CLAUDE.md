@@ -135,9 +135,15 @@ only available live, right after `simulate()`, which is why `run_simulation` ret
 `run_simulation`'s optional `target_ber` returns the *real* post-DFE bathtub-curve eye opening
 at that BER as `eye_margin_ui` (`None` if the eye doesn't reach it at all) — computed by calling
 PyBERT's own `make_bathtub()` (`src/pybert/utility/math.py`) over its own measured jitter
-histogram (`jitter_bins`/`jitter_dfe`/`rjDD_dfe`/`mu_pos_dfe`/`mu_neg_dfe`), the same computation
-and data the GUI's own bathtub plot uses — not a hand-rolled jitter-budget approximation (see
-"Trust and reuse PyBERT's own calculations", above). Passing `target_ber` makes this call use
+histogram (`jitter_bins`/`jitter_dfe`), its tails extrapolated with the separated Rj (`rj_dfe`)
+from the bounded jitter's extent (`dj_pos_dfe`/`dj_neg_dfe`) — the same computation and data the
+GUI's own bathtub plot uses — not a hand-rolled jitter-budget approximation (see
+"Trust and reuse PyBERT's own calculations", above). The dual-Dirac values (`pjDD_*`, `rjDD_*`,
+`mu_pos_*`/`mu_neg_*`) are for reference only: don't build further calculations on them. The
+separated Rj needs at least two pattern repetitions in the `eye_bits` window (e.g. PAM-4 PRBS-15 is
+65,534 UI long; PRBS-13 is 16,382 UI); with fewer, it reads 0 and bathtubs aren't extrapolated.
+For PAM-4, jitter statistics use only transitions symmetric about 0 V (see `calc_jitter()`'s
+`xing_mask`). Passing `target_ber` makes this call use
 `update_plots=True` internally (needed to populate the jitter-histogram traits), same as passing
 `results_file`. The same call also returns `eye_heights_v`: each eye's vertical opening (V, lowest
 eye first; `None` per closed eye) at `target_ber`, from `make_vert_bathtubs()` over the DFE slicer
@@ -145,10 +151,11 @@ input samples PyBERT took at its own recovered clock instants (`dfe_slicer_samps
 `dfe_slicer_decisions`, stored by `my_run_simulation()` over the same `eye_uis` window
 `calc_ber()` checks). Each level's tail is measured where >= 10 samples lie beyond, and
 extrapolated past that with a Gaussian fit to its 100 most extreme samples on the
-normal-probability (Q) scale -- *not* by `calc_jitter()`'s histogram `curve_fit(gaus_pdf, ...)`,
-nor by a fit over the whole tail: residual ISI makes level distributions sub-Gaussian (bounded)
-in their tails, and both of those overstated them badly, falsely closing eyes that a
-600k-symbol run measured open. With short runs (~1k samples per level) the extrapolation is
+normal-probability (Q) scale -- *not* by a Gaussian fitted to each level's histogram
+(`curve_fit(gaus_pdf, ...)` over its below-half-maximum region, in volts), nor by a fit over
+the whole tail: residual ISI makes level distributions sub-Gaussian (bounded) in their tails,
+and both of those overstated them badly, falsely closing eyes that a 600k-symbol run
+measured open. With short runs (~1k samples per level) the extrapolation is
 still conservative, since the tail's steepening toward the ISI bound isn't yet visible;
 it converges on the measured openings as `nbits`/`eye_bits` grow.
 
