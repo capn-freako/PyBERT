@@ -15,8 +15,8 @@ from typing import Optional
 import numpy as np
 from numpy import (
     argmax, array, concatenate, diag, diff, flip,
-    histogram, mean, ones, real, reshape, sign,
-    sort, sqrt, where, zeros
+    histogram, maximum, mean, ones, real, reshape, sign,
+    sort, sqrt, tile, where, zeros
 )
 from numpy.fft import fft, ifft
 from scipy.interpolate import interp1d
@@ -293,43 +293,38 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             f"xings_per_pattern: {xings_per_pattern}",
             f"min(ideal_xings): {min(ideal_xings)}",]))
 
-    # Assemble the TIE track.
+    # Assemble the TIE track: one entry per ideal crossing, each matched on its own to the actual
+    # crossings within [-UI/2, +UI/2] of it (averaged, since noise may produce several).
     i = 0
     jitterL = []
     t_jitter = []
-    skip_next_ideal_xing = False
+    foundL = []
     for ideal_xing in ideal_xings:
-        if skip_next_ideal_xing:
-            t_jitter.append(ideal_xing)
-            skip_next_ideal_xing = False
-            continue
-        # Confine our attention to those actual crossings occuring
-        # within the interval [-UI/2, +UI/2] centered around the
-        # ideal crossing.
         min_t = ideal_xing - ui / 2.0
         max_t = ideal_xing + ui / 2.0
         while i < len(actual_xings) and actual_xings[i] < min_t:
             i += 1
         if i == len(actual_xings):  # We've exhausted the list of actual crossings; we're done.
             break
-        if actual_xings[i] > max_t:  # Means the xing we're looking for didn't occur, in the actual signal.
-            jitterL.append( 3.0 * ui / 4.0)  # Pad the jitter w/ alternating +/- 3UI/4.  # noqa: E201,RUF100
-            jitterL.append(-3.0 * ui / 4.0)  # (Will get pulled into [-UI/2, UI/2], later.
-            skip_next_ideal_xing = True  # If we missed one, we missed two.
-        else:  # Noise may produce several crossings.
-            xings = []  # We find all those within the interval [-UI/2, +UI/2]
-            j = i  # centered around the ideal crossing, and take the average.
-            while j < len(actual_xings) and actual_xings[j] <= max_t:
-                xings.append(actual_xings[j])
-                j += 1
-            tie = mean(xings) - ideal_xing
-            jitterL.append(tie)
+        xings = []
+        j = i
+        while j < len(actual_xings) and actual_xings[j] <= max_t:
+            xings.append(actual_xings[j])
+            j += 1
+        if xings:
+            jitterL.append(mean(xings) - ideal_xing)
+            foundL.append(True)
+        else:  # It didn't cross within [-UI/2, +UI/2]: +/-3UI/4 lands in the histogram's end bins.
+            jitterL.append(3.0 * ui / 4.0 if len(jitterL) % 2 == 0 else -3.0 * ui / 4.0)
+            foundL.append(False)
         t_jitter.append(ideal_xing)
     jitter = array(jitterL)
+    found = array(foundL, dtype=bool)
     if xing_mask is None:
         mask = ones(len(jitter), dtype=bool)
     else:
         mask = array(xing_mask, dtype=bool)[:len(jitter)]
+    measured = mask & found  # informative crossings with a real measured TIE
 
     # ToDo: Report this in the status bar.
     if len(jitter) == 0 or len(t_jitter) == 0:
@@ -339,35 +334,36 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         print("mean(jitter):", mean(jitter))
         print("len(jitter):", len(jitter))
 
-    if zero_mean:
-        jitter -= mean(jitter[mask])
+    if zero_mean and measured.any():
+        jitter[found] -= mean(jitter[measured])
 
     # Do the jitter decomposition.
-    # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
-    tie_risings  = jitter.take(list(range(0, len(jitter), 2)))
-    tie_fallings = jitter.take(list(range(1, len(jitter), 2)))
-    tie_risings  = resize_zero_pad(tie_risings,  num_patterns * xings_per_pattern // 2)
-    tie_fallings = resize_zero_pad(tie_fallings, num_patterns * xings_per_pattern // 2)
-    tie_risings  = reshape(tie_risings, (num_patterns, xings_per_pattern // 2))
-    tie_fallings = reshape(tie_fallings, (num_patterns, xings_per_pattern // 2))
+    # - Use averaging over the pattern period to remove the uncorrelated components,
+    #   before calculating data dependent components (from measured crossings only).
+    def pattern_ave(x: Rvec, ok: Rvec, n_per: int) -> tuple[Rvec, Rvec]:
+        "Average `x` over the pattern repetitions, using only `ok` entries; also flag positions with any."
+        _x = reshape(resize_zero_pad(where(ok, x, 0.0), num_patterns * n_per), (num_patterns, n_per))
+        _n = reshape(resize_zero_pad(ok.astype(float), num_patterns * n_per), (num_patterns, n_per)).sum(axis=0)
+        return _x.sum(axis=0) / maximum(_n, 1), _n > 0
 
-    # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
-    tie_risings_ave  = tie_risings.mean(axis=0)
-    tie_fallings_ave = tie_fallings.mean(axis=0)
+    # - Separate the rising and falling edges.
+    tie_risings_ave, risings_ok = pattern_ave(jitter[0::2], found[0::2], xings_per_pattern // 2)
+    tie_fallings_ave, fallings_ok = pattern_ave(jitter[1::2], found[1::2], xings_per_pattern // 2)
     # (The ideal crossings repeat with the pattern, so the first pattern's flags hold for all.)
-    risings_ave  = tie_risings_ave[mask[0:xings_per_pattern:2]]
-    fallings_ave = tie_fallings_ave[mask[1:xings_per_pattern:2]]
+    risings_ave  = tie_risings_ave[mask[0:xings_per_pattern:2] & risings_ok]
+    fallings_ave = tie_fallings_ave[mask[1:xings_per_pattern:2] & fallings_ok]
     isi = float(max(np.ptp(risings_ave) if len(risings_ave) else 0.0,
                     np.ptp(fallings_ave) if len(fallings_ave) else 0.0))
     isi = min(isi, ui)  # Cap the ISI at the unit interval.
     dcd = abs(mean(risings_ave) - mean(fallings_ave)) if len(risings_ave) and len(fallings_ave) else 0.0
 
-    # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
-    _jitter = resize_zero_pad(jitter, num_patterns * xings_per_pattern)
-    tie_ave = resize_zero_pad(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
+    # - Subtract the data dependent jitter (the pattern average, repeated for every pattern)
+    #   from the original TIE track, in order to yield the data independent jitter.
+    ave, _ = pattern_ave(jitter, found, xings_per_pattern)
+    tie_ave = tile(ave, len(jitter) // xings_per_pattern + 1)[:len(jitter)]
     tie_ind = jitter - tie_ave
-    if zero_mean:
-        tie_ind -= mean(tie_ind[mask])
+    if zero_mean and measured.any():
+        tie_ind -= mean(tie_ind[measured])
 
     # - Calculate the total and data-independent jitter spectrums, for display purposes only.
     # -- Calculate the relevant time/frequency vectors.
@@ -382,7 +378,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     # -- Make TIE vector uniformly sampled in time, via interpolation, for use as input to `fft()`.
     # spl = UnivariateSpline(t_jitter, jitter)  # Way of the future, but does funny things. :(
     try:
-        spl = interp1d(t_jitter, jitter, bounds_error=False, fill_value="extrapolate")
+        spl = interp1d(t_jitter, where(found, jitter, 0.0), bounds_error=False, fill_value="extrapolate")
         tie_interp = spl(t)
         y = fft(tie_interp)
         jitter_spectrum = abs(y[:half_len])
@@ -395,7 +391,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
 
     # -- Repeat for data-independent jitter.
     try:
-        spl = interp1d(t_jitter, tie_ind, bounds_error=False, fill_value="extrapolate")
+        spl = interp1d(t_jitter, where(found, tie_ind, 0.0), bounds_error=False, fill_value="extrapolate")
         tie_ind_interp = spl(t)
         y = fft(tie_ind_interp)
         y_mag = abs(y)
@@ -444,11 +440,11 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         return (hist, bin_centers, bin_edges)
 
     if use_my_hist:
-        hist_ind, centers, edges = my_hist(tie_ind[mask], density=True)
+        hist_ind, centers, edges = my_hist(tie_ind[measured], density=True)
         hist_tot, _, _ = my_hist(jitter[mask],  density=True)
         centers = array(centers)
     else:
-        hist_ind, edges = histogram(tie_ind[mask], bins=num_bins, density=True)
+        hist_ind, edges = histogram(tie_ind[measured], bins=num_bins, density=True)
         hist_tot, _     = histogram(jitter[mask],  bins=num_bins, density=True)
         centers         = (edges[:-1] + edges[1:]) / 2
     hist_ind_smooth = array(moving_average(hist_ind, n=smooth_width))
@@ -491,10 +487,16 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         neg_tail_ix = neg_tail_ixs[-1]                # index of last piece of left tail
         dd_soltn[0].append(pos_tail_ix)
         dd_soltn[0].append(neg_tail_ix)
+        # Fit in (ps), and densities per (ps): in (s), `curve_fit()` can't move from its default starting point.
+        # Start each fit from its peak location, and the peak-to-half-maximum distance (~1.2 sigma).
+        x_ps = centers * 1e12
+        y_ps = hist_dd * 1e-12
+        dx_ps = x_ps[2] - x_ps[1]
         # Don't send first or last histogram elements to curve fitter, due to their special nature.
         try:
-            popt, pcov = curve_fit(gaus_pdf, centers[pos_tail_ix:-1], hist_dd[pos_tail_ix:-1])
-            mu_pos, sigma_pos = popt
+            popt, pcov = curve_fit(gaus_pdf, x_ps[pos_tail_ix:-1], y_ps[pos_tail_ix:-1],
+                                   p0=(x_ps[pos_peak_loc], max(x_ps[pos_tail_ix] - x_ps[pos_peak_loc], dx_ps)))
+            mu_pos, sigma_pos = popt[0], abs(popt[1])
             mu_pos    *= 1e-12  # back to (s)
             sigma_pos *= 1e-12
             err_pos    = sqrt(diag(pcov)) * 1e-12
@@ -504,8 +506,9 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             sigma_pos = 0
             dd_soltn += [[err],]
         try:
-            popt, pcov = curve_fit(gaus_pdf, centers[1: neg_tail_ix + 1], hist_dd[1: neg_tail_ix + 1])
-            mu_neg, sigma_neg = popt
+            popt, pcov = curve_fit(gaus_pdf, x_ps[1: neg_tail_ix + 1], y_ps[1: neg_tail_ix + 1],
+                                   p0=(x_ps[neg_peak_loc], max(x_ps[neg_peak_loc] - x_ps[neg_tail_ix], dx_ps)))
+            mu_neg, sigma_neg = popt[0], abs(popt[1])
             mu_neg    *= 1e-12  # back to (s)
             sigma_neg *= 1e-12
             err_neg    = sqrt(diag(pcov)) * 1e-12

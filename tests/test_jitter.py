@@ -85,3 +85,43 @@ class TestCalcJitterXingMask:
         rslt = calc_jitter(self.UI, self.NUI, self.PATTERN_LEN, ideal, actual, xing_mask=mask)
         hist, centers = np.asarray(rslt[13]), np.asarray(rslt[15])
         assert hist[np.abs(centers) > 0.2 * self.UI].sum() == pytest.approx(0.0)
+
+
+class TestCalcJitterFixes:
+    UI = 10e-12
+    PATTERN_LEN = 64
+
+    def test_dual_dirac_fit_recovers_rj_and_dj(self):
+        """The dual-Dirac tail fits recover a known Rj and Dirac spacing (they used to return their starting guess)."""
+        rng = np.random.default_rng(1)
+        nui = 128 * self.PATTERN_LEN
+        ideal = np.arange(1, nui) * self.UI
+        dj, rj = 2e-12, 0.3e-12
+        actual = ideal + rng.choice([-dj / 2, dj / 2], len(ideal)) + rng.normal(0, rj, len(ideal))
+        rslt = calc_jitter(self.UI, nui, self.PATTERN_LEN, ideal, actual)
+        rjDD, mu_pos, mu_neg = rslt[7], rslt[16], rslt[17]
+        assert rjDD == pytest.approx(rj, rel=0.3)
+        assert mu_pos == pytest.approx(dj / 2, abs=0.3e-12)
+        assert mu_neg == pytest.approx(-dj / 2, abs=0.3e-12)
+
+    def test_missed_crossing_does_not_pad_its_neighbor(self):
+        """A crossing missing from its [-UI/2, +UI/2] window is flagged on its own; the next one is still measured
+        (it used to be padded too: "if we missed one, we missed two")."""
+        nui = 8 * self.PATTERN_LEN
+        ideal = np.arange(1, nui) * self.UI
+        actual = np.delete(ideal, 101)  # crossing 101 never happens
+        mask = np.ones(len(ideal), dtype=bool)
+        mask[101] = False
+        rslt = calc_jitter(self.UI, nui, self.PATTERN_LEN, ideal, actual, xing_mask=mask)
+        tie, hist = np.asarray(rslt[0]), np.asarray(rslt[13])
+        assert tie[102] == pytest.approx(0.0, abs=1e-15)
+        assert hist[0] == 0 and hist[-1] == 0
+
+    def test_data_independent_jitter_removes_pattern_average_everywhere(self):
+        """Purely pattern-periodic (data dependent) jitter leaves no data-independent jitter, in any pattern."""
+        nui = 8 * self.PATTERN_LEN
+        ideal = np.arange(1, nui) * self.UI
+        per_position = np.linspace(-0.1, 0.1, self.PATTERN_LEN) * self.UI
+        actual = ideal + per_position[np.arange(len(ideal)) % self.PATTERN_LEN]
+        tie_ind = np.asarray(calc_jitter(self.UI, nui, self.PATTERN_LEN, ideal, actual)[8])
+        assert np.abs(tie_ind).max() < 1e-3 * self.UI
