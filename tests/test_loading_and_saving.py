@@ -294,3 +294,22 @@ def test_legacy_delta_t_ps_converts_to_ui(tmp_path: Path):
     dut2.load_configuration(save_file)
     assert dut2.ui == pytest.approx(10e-12)
     assert dut2.delta_t_ui == pytest.approx(0.01)
+
+
+def test_rx_n_taps_disables_restored_taps_beyond_it(tmp_path: Path):
+    """A config edited only to shorten the Rx FFE (`rx_n_taps`) must not simulate the
+    left-over taps beyond it, even though their saved tuples say "enabled"."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.rx_n_taps = 20
+    for tap in dut.rx_taps:
+        tap.value = 0.1
+    config = PyBertCfg(dut, "string_time", "test.test.test")
+    config.rx_n_taps = 10
+    save_file = tmp_path / "shortened_ffe.yaml"
+    with open(save_file, "w", encoding="UTF-8") as f:
+        yaml.dump(config, f)
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+    assert [t.enabled for t in dut2.rx_taps[:10]] == [True] * 10
+    assert not any(t.enabled for t in dut2.rx_taps[10:])
+    assert not any(t.enabled for t in dut2.ffe_tap_tuners[10:])

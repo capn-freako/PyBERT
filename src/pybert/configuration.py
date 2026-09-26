@@ -272,6 +272,12 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         if legacy_delta_t_ps is not None and "delta_t_ui" not in vars(user_config):
             pybert.delta_t_ui = legacy_delta_t_ps * 1.0e-12 / pybert.ui
 
+        # `rx_n_taps` decides how many Rx FFE taps exist; restoring the saved tap tuples (above)
+        # mustn't re-enable taps beyond it, e.g. in a config edited only to shorten the FFE.
+        for n, (tap, tuner) in enumerate(zip(pybert.rx_taps, pybert.ffe_tap_tuners)):
+            if n >= pybert.rx_n_taps:
+                tap.enabled = tuner.enabled = False
+
     def save(self, filepath: str | Path):
         """Save out pybert's current configuration to a file.
 
