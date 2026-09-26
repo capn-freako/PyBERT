@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pybert.utility.jitter import find_crossing_times
+from pybert.utility.jitter import calc_jitter, find_crossing_times
 
 
 class TestFindCrossingTimes:
@@ -54,3 +54,34 @@ class TestFindCrossingTimes:
         result = find_crossing_times(t, x, rising_first=False)
         if len(result) > 1:
             assert np.all(np.diff(result) > 0)
+
+
+class TestCalcJitterXingMask:
+    """`xing_mask` confines ISI/DCD and the jitter histograms to the flagged crossings (e.g. - PAM-4's
+    symmetric transitions), while every crossing still takes part in the TIE track."""
+
+    UI = 10e-12
+    PATTERN_LEN = 64
+    NUI = 8 * PATTERN_LEN
+
+    def _xings(self):
+        rng = np.random.default_rng(0)
+        ideal = np.arange(1, self.NUI) * self.UI
+        k = np.arange(len(ideal))
+        mask = (k // 2) % 2 == 0  # periodic in the pattern; includes both rising and falling edges
+        offset = np.where(mask, 0.0, np.where(k % 2, -0.3, 0.3) * self.UI)  # data-set offsets on the rest
+        actual = ideal + offset + rng.normal(0, 0.01 * self.UI, len(ideal))
+        return ideal, actual, mask
+
+    def test_isi_excludes_unflagged_crossings(self):
+        ideal, actual, mask = self._xings()
+        isi_all = calc_jitter(self.UI, self.NUI, self.PATTERN_LEN, ideal, actual)[2]
+        isi_masked = calc_jitter(self.UI, self.NUI, self.PATTERN_LEN, ideal, actual, xing_mask=mask)[2]
+        assert isi_all > 0.25 * self.UI  # the unflagged edges sit 0.3 UI from the flagged ones
+        assert isi_masked < 0.1 * self.UI
+
+    def test_histogram_excludes_unflagged_crossings(self):
+        ideal, actual, mask = self._xings()
+        rslt = calc_jitter(self.UI, self.NUI, self.PATTERN_LEN, ideal, actual, xing_mask=mask)
+        hist, centers = np.asarray(rslt[13]), np.asarray(rslt[15])
+        assert hist[np.abs(centers) > 0.2 * self.UI].sum() == pytest.approx(0.0)

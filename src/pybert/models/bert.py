@@ -792,6 +792,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         ideal_xings = find_crossings(t, ideal_signal, decision_scaler, mod_type=mod_type)
         self.ideal_xings = ideal_xings
         ideal_xings_jit = eye_xings(ideal_xings)
+        # For PAM-4, only transitions symmetric about 0V cross it mid-UI (see `calc_jitter()`'s `xing_mask`).
+        xing_mask = None
+        if mod_type == 2:
+            before = np.interp(ideal_xings - ui / 2, t, ideal_signal)
+            after = np.interp(ideal_xings + ui / 2, t, ideal_signal)
+            symmetric = abs(before + after) < 0.1 * max(abs(ideal_signal))
+            xing_mask = symmetric[ideal_xings > xing_min_t]
 
         # - channel output
         ofst = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
@@ -816,7 +823,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.t_jitter  = t_jitter
         self.isi_chnl  = isi
         self.dcd_chnl  = dcd
@@ -861,7 +868,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.isi_tx  = isi
         self.dcd_tx  = dcd
         self.pj_tx   = pj
@@ -905,7 +912,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.isi_ctle  = isi
         self.dcd_ctle  = dcd
         self.pj_ctle   = pj
@@ -946,7 +953,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self)
+        ) = calc_jitter(
+            ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self, xing_mask=xing_mask)
         self.isi_dfe  = isi
         self.dcd_dfe  = dcd
         self.pj_dfe   = pj

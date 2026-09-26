@@ -212,7 +212,8 @@ def find_crossings(  # pylint: disable=too-many-arguments,too-many-positional-ar
 def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements,too-many-positional-arguments
     ui: float, nui: int, pattern_len: int, ideal_xings: Rvec, actual_xings: Rvec,
     rel_thresh: float = 3.0, num_bins: int = 101,
-    zero_mean: bool = True, dbg_obj: Optional[object] = None, smooth_width: int = 5
+    zero_mean: bool = True, dbg_obj: Optional[object] = None, smooth_width: int = 5,
+    xing_mask: Optional[Rvec] = None
 ) -> tuple[Rvec, Rvec, float, float, float, float, float, float,
            Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, Rvec, float, float]:
     """
@@ -237,6 +238,13 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             Default: None
         smooth_width: Width of smoothing window to use when calculating moving averages.
             Default: 5
+        xing_mask: One flag per ideal crossing, marking those that carry timing information.
+            ISI, DCD, and both jitter histograms (and so the dual-Dirac fit and bathtub built from them)
+            use only these; the rest still take part in the TIE track, its rising/falling pairing and
+            pattern averaging, and the jitter spectra. (e.g. - For PAM-4, only transitions symmetric about
+            the 0V threshold cross it mid-UI; the others cross early or late, by an amount set by the data
+            and the edge shape, not by the timing.)
+            Default: None (all crossings)
 
     Returns:
         A tuple containing
@@ -318,6 +326,10 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
             jitterL.append(tie)
         t_jitter.append(ideal_xing)
     jitter = array(jitterL)
+    if xing_mask is None:
+        mask = ones(len(jitter), dtype=bool)
+    else:
+        mask = array(xing_mask, dtype=bool)[:len(jitter)]
 
     # ToDo: Report this in the status bar.
     if len(jitter) == 0 or len(t_jitter) == 0:
@@ -328,7 +340,7 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         print("len(jitter):", len(jitter))
 
     if zero_mean:
-        jitter -= mean(jitter)
+        jitter -= mean(jitter[mask])
 
     # Do the jitter decomposition.
     # - Separate the rising and falling edges, shaped appropriately for averaging over the pattern period.
@@ -342,16 +354,20 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
     # - Use averaging to remove the uncorrelated components, before calculating data dependent components.
     tie_risings_ave  = tie_risings.mean(axis=0)
     tie_fallings_ave = tie_fallings.mean(axis=0)
-    isi = float(max(np.ptp(tie_risings_ave), np.ptp(tie_fallings_ave)))
+    # (The ideal crossings repeat with the pattern, so the first pattern's flags hold for all.)
+    risings_ave  = tie_risings_ave[mask[0:xings_per_pattern:2]]
+    fallings_ave = tie_fallings_ave[mask[1:xings_per_pattern:2]]
+    isi = float(max(np.ptp(risings_ave) if len(risings_ave) else 0.0,
+                    np.ptp(fallings_ave) if len(fallings_ave) else 0.0))
     isi = min(isi, ui)  # Cap the ISI at the unit interval.
-    dcd = abs(mean(tie_risings_ave) - mean(tie_fallings_ave))
+    dcd = abs(mean(risings_ave) - mean(fallings_ave)) if len(risings_ave) and len(fallings_ave) else 0.0
 
     # - Subtract the data dependent jitter from the original TIE track, in order to yield the data independent jitter.
     _jitter = resize_zero_pad(jitter, num_patterns * xings_per_pattern)
     tie_ave = resize_zero_pad(reshape(_jitter, (num_patterns, xings_per_pattern)).mean(axis=0), len(jitter))
     tie_ind = jitter - tie_ave
     if zero_mean:
-        tie_ind -= mean(tie_ind)
+        tie_ind -= mean(tie_ind[mask])
 
     # - Calculate the total and data-independent jitter spectrums, for display purposes only.
     # -- Calculate the relevant time/frequency vectors.
@@ -428,12 +444,12 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         return (hist, bin_centers, bin_edges)
 
     if use_my_hist:
-        hist_ind, centers, edges = my_hist(tie_ind, density=True)
-        hist_tot, _, _ = my_hist(jitter,  density=True)
+        hist_ind, centers, edges = my_hist(tie_ind[mask], density=True)
+        hist_tot, _, _ = my_hist(jitter[mask],  density=True)
         centers = array(centers)
     else:
-        hist_ind, edges = histogram(tie_ind, bins=num_bins, density=True)
-        hist_tot, _     = histogram(jitter,  bins=num_bins, density=True)
+        hist_ind, edges = histogram(tie_ind[mask], bins=num_bins, density=True)
+        hist_tot, _     = histogram(jitter[mask],  bins=num_bins, density=True)
         centers         = (edges[:-1] + edges[1:]) / 2
     hist_ind_smooth = array(moving_average(hist_ind, n=smooth_width))
     hist_tot_smooth = array(moving_average(hist_tot, n=smooth_width))
