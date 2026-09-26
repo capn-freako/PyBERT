@@ -204,12 +204,15 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
     tx_use_ami = pybert.tx_use_ami
     rx_use_ami = pybert.rx_use_ami
 
-    # Find number of enabled DFE taps. (No support for floating taps, yet.)
+    # Find number of enabled DFE taps and their allowed ranges.
+    # (No support for floating taps, yet.)
     n_dfe_taps = 0
     for tap in dfe_taps:
         if not tap.enabled:
             break
         n_dfe_taps += 1
+    dfe_tap_mins = array([t.min_val for t in dfe_taps[:n_dfe_taps]])
+    dfe_tap_maxs = array([t.max_val for t in dfe_taps[:n_dfe_taps]])
 
     # Calculate time/frequency vectors for CTLE.
     ctle_fmax = 100 * rx_bw  # Should give -40dB at truncation, assuming 20 dB/dec. roll-off.
@@ -278,6 +281,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
         """
         p_tx = convolve(p_ctle_out, h_tx)
         p_tx = resize_zero_pad(p_tx, len(_t))
+
         if effective_use_mmse:
             curs_ix = where(p_tx == max(p_tx))[0][0]
             tx_H = rfft(resize_zero_pad(h_tx, len(_t)))
@@ -288,25 +292,38 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
             )
             mmse_rslts = mmse(
                 noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
-                array([t.min_val for t in dfe_taps[:n_dfe_taps]]), array([t.max_val for t in dfe_taps[:n_dfe_taps]]),
+                dfe_tap_mins, dfe_tap_maxs,
                 array([t.min_val for t in rx_taps[:rx_n_taps]]), array([t.max_val for t in rx_taps[:rx_n_taps]]))
             rx_weights_better = mmse_rslts["rx_taps"]
             dfe_weights_better = mmse_rslts["dfe_tap_weights"]
             fom_better = mmse_rslts["fom"]
             try:
+                # MMSE's DFE weights are equalized post-cursors at its own sampling instant, where its
+                # FFE normalizes the cursor to exactly 1 (V); apply them there, at that scale.
                 p_tot = resize_zero_pad(
-                    add_ffe_dfe(rx_weights_better, dfe_weights_better, nspui, p_tx),
+                    add_ffe_dfe(
+                        rx_weights_better,
+                        dfe_weights_better,
+                        dfe_tap_maxs,
+                        dfe_tap_mins,
+                        nspui,
+                        p_tx,
+                        1.0,
+                        curs_ix=mmse_rslts["cursor_ix"] + rx_n_pre * nspui,
+                    ),
                     nspui * (n_rx_weights + 5)
                 )
             except ValueError:  # Flags obviously non-optimum case.
                 return -1000., zeros(n_rx_weights), zeros(len(dfe_taps)), p_tx
             return fom_better, rx_weights_better, dfe_weights_better, p_tot
+
         if rx_use_ami:  # Rx implements its own EQ internally; nothing left to design.
             curs_ix = where(p_tx == max(p_tx))[0][0]
             curs_amp = p_tx[curs_ix]
             n_pre_isi = curs_ix // nspui
             isi_sum = sum(abs(p_tx[curs_ix - n_pre_isi * nspui::nspui])) - abs(curs_amp)
             return curs_amp / isi_sum, zeros(rx_n_taps), zeros(len(dfe_taps)), p_tx
+
         # exhaustive sweep of Rx FFE tap weight combinations
         assert rx_weightss is not None  # Guaranteed by the `not rx_use_ami and not effective_use_mmse` setup, above.
         fom_better = -1000.
@@ -315,9 +332,14 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
         p_tot = p_tx
         for rx_weights in rx_weightss:
             try:
-                p_tot_cand = add_ffe_dfe(rx_weights, array(get_dfe_weights(dfe_taps, p_tx, nspui)), nspui, p_tx)
+                p_ffe = add_ffe_dfe(rx_weights, array([]), dfe_tap_maxs, dfe_tap_mins, nspui, p_tx)
             except ValueError:  # Flags obviously non-optimum case.
                 continue
+            # With AGC, the DFE's slicer level settles to the equalized cursor amplitude.
+            decision_scaler = max(p_ffe) if pybert.use_agc else pybert.decision_scaler
+            dfe_weights_cand = get_dfe_weights(dfe_taps, p_ffe, nspui, decision_scaler)
+            p_tot_cand = add_ffe_dfe(
+                array([]), dfe_weights_cand, dfe_tap_maxs, dfe_tap_mins, nspui, p_ffe, decision_scaler)
             curs_ix = where(p_tot_cand == max(p_tot_cand))[0][0]
             curs_amp = p_tot_cand[curs_ix]
             n_pre_isi = curs_ix // nspui
@@ -325,7 +347,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
             fom = curs_amp / isi_sum
             if fom > fom_better:
                 rx_weights_better = rx_weights
-                dfe_weights_better = dfe_weights
+                dfe_weights_better = dfe_weights_cand
                 fom_better = fom
                 p_tot = p_tot_cand
         return fom_better, rx_weights_better, dfe_weights_better, p_tot

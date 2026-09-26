@@ -461,7 +461,14 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
 
 
 def add_ffe_dfe(
-    ffe_weights: Rvec, dfe_weights: Rvec, nspui: int, pr_ctle_out: Rvec
+    ffe_weights: Rvec,
+    dfe_weights: Rvec,
+    dfe_maxs: Rvec,
+    dfe_mins: Rvec,
+    nspui: int,
+    pr_ctle_out: Rvec,
+    decision_scaler: float = 1.0,
+    curs_ix: Optional[int] = None
 ) -> Rvec:
     """
     Add the effects of the FFE and DFE to the cumulative system pulse response at the CTLE output.
@@ -469,8 +476,16 @@ def add_ffe_dfe(
     Args:
         ffe_weights: List of FFE tap weights.
         dfe_weights: List of DFE tap weights.
+        dfe_maxs: List of DFE maximum tap weight values.
+        dfe_mins: List of DFE minimum tap weight values.
         nspui: Number of vector samples per unit interval.
         pr_ctle_out: Cumulative system pulse response at CTLE output.
+
+    Keyword Args:
+        decision_scaler: Voltage magnitude of slicer output.
+            Default: 1.0
+        curs_ix: Index of the cursor sampling instant in the FFE output, which the DFE taps are timed from.
+            Default: the FFE output's peak.
 
     Returns:
         Complete system pulse response, including the effects of the Rx FFE and DFE.
@@ -486,44 +501,55 @@ def add_ffe_dfe(
         p_tot = convolve(pr_ctle_out, h_ffe)[:len(pr_ctle_out)]
     else:
         p_tot = pr_ctle_out.copy()
-    curs_ix = where(p_tot == max(p_tot))[0][0]
+    peak_ix = where(p_tot == max(p_tot))[0][0]
 
     # Test for obvious "to ignore" cases.
     if p_tot[argmax(abs(p_tot))] < 0:
         raise ValueError("Main peak is negative!")
-    if curs_ix > len(p_tot) // 2:
+    if peak_ix > len(p_tot) // 2:
         raise ValueError("Main peak occurs in right half of waveform!")
+    if curs_ix is None:
+        curs_ix = peak_ix
 
     # Add the effect of DFE.
-    h_dfe = fir_tap_weights_to_imp_resp(list(dfe_weights), nspui)
-    p_tot = convolve(p_tot, h_dfe)[:len(p_tot)]
+    for n, dfe_weight in enumerate(dfe_weights):
+        start = curs_ix + nspui // 2 + n * nspui  # Each tap only corrects its own UI.
+        p_tot[start:start + nspui] -= dfe_weight * decision_scaler
 
     return p_tot
 
 
-def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int) -> Rvec:
+def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int, decision_scaler: float) -> Rvec:
     """
     Get the ideal DFE tap weights, given the tap tuners and pulse response, using PRZF.
 
+    Weights are in the DFE's own units: the ISI each tap cancels, divided by its slicer level.
+
     Args:
         dfe_taps: List of ``TxTapTuners`` governing DFE tap weight ranges.
-        pr: Pulse response to be equalized.
+            Only the leading, contiguous enabled taps are used (no floating taps).
+        pr: Pulse response at the DFE input (i.e. - after any Rx FFE).
         nspui: Number of vector samples per unit interval.
+        decision_scaler: The DFE's slicer level.
 
     Returns:
-        List of ideal DFE tap weights.
+        List of ideal DFE tap weights, one per tuner (zero for unused taps).
     """
 
-    n_taps = len(dfe_taps)
-    min_weights = array([t.min_val for t in dfe_taps])
-    max_weights = array([t.max_val for t in dfe_taps])
+    n_taps = 0
+    for tap in dfe_taps:
+        if not tap.enabled:
+            break
+        n_taps += 1
+    min_weights = array([t.min_val for t in dfe_taps[:n_taps]])
+    max_weights = array([t.max_val for t in dfe_taps[:n_taps]])
 
     curs_ix = where(pr == max(pr))[0][0]
-    curs_amp = pr[curs_ix]
-    ideal_weights = pr[curs_ix + nspui: curs_ix + n_taps * nspui + 1: nspui] / curs_amp  # "+ 1" to ensure last one gets included.
-    actual_weights = minimum(max_weights, maximum(min_weights, ideal_weights))
+    isi = pr[curs_ix + nspui: curs_ix + n_taps * nspui + 1: nspui]  # "+ 1" to ensure last one gets included.
+    weights = zeros(len(dfe_taps))
+    weights[:len(isi)] = minimum(max_weights[:len(isi)], maximum(min_weights[:len(isi)], isi / decision_scaler))
 
-    return actual_weights
+    return weights
 
 
 def get_peak_info(t: Rvec, y: Rvec) -> tuple[int, float, float]:
