@@ -46,6 +46,7 @@ from scipy.interpolate import interp1d
 from chaco.api import Plot
 
 from pyibisami.ami.parser import AmiLeaf, AmiName, AmiNode, ami_parse
+from pychopmarg.utility import loc_curs
 
 from ..common import Rvec
 from ..utility import (
@@ -533,6 +534,20 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
 
+    # A Mueller-Muller CDR samples at a fixed phase: where the slicer-input pulse response meets the
+    # Mueller-Muller criterion, anticipating DFE tap 1 (within its limits) -- as COM locates its cursor.
+    clock_phase: Optional[float] = None
+    if self.cdr_type == "Mueller-Muller" and not ami_getwave_clocks:
+        dfe_max, dfe_min = (array([limits[0][1]]), array([limits[0][0]])) if limits else (zeros(1), zeros(1))
+        curs_ix = loc_curs(ffe_out_p, nspui, dfe_max, dfe_min)
+        clock_phase = (curs_ix % nspui - 0.5) * ts  # half a sample early, so the clock lands on sample `curs_ix`
+        # That lock point presumes DFE tap 1 has converged to the value it anticipates (93A-26); start it there.
+        # (From zero, the decision-directed LMS can't bootstrap when this phase's pre-DFE eye is closed.)
+        b_1 = float(min(dfe_max[0], max(dfe_min[0], ffe_out_p[curs_ix + nspui] / ffe_out_p[curs_ix])))
+        if limits:
+            dfe.tap_weights[0] = b_1
+        self.log(f"Mueller-Muller CDR sampling phase: {(curs_ix % nspui) / nspui:.3f} UI; initial DFE tap 1: {b_1:.3f}")
+
     self.decision_scaler = 0.0
     self.dfe_scalar_values = []
     if ami_getwave_clocks:  # Accommodate the singular special case.
@@ -573,7 +588,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
          bits_out_dfe,
          sig_samps,
          decisions
-         ) = dfe.run_dfe(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
+         ) = dfe.run_dfe(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict, clock_phase=clock_phase)
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
 

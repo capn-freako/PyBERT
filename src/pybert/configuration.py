@@ -152,6 +152,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.use_agc = the_PyBERT.use_agc
 
         # CDR
+        self.cdr_type = the_PyBERT.cdr_type
         self.delta_t_ui = the_PyBERT.delta_t_ui
         self.alpha = the_PyBERT.alpha
         self.n_lock_ave = the_PyBERT.n_lock_ave

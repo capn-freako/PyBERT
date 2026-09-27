@@ -118,7 +118,7 @@ to enable AMI in `config` for `run_simulation`, not just for `optimize_eq()`. Si
 (or `ch_file`/`"single"` for one file); `inter_sel` defaults to `"native"` (the analytic Howard
 Johnson model), which silently ignores `ch_files`/`ch_file` if left unset. Native Rx-FFE
 (`rx_taps`) is a *static* filter — it never adapts inside `run_simulation()`, unlike DFE
-(LMS-adaptive, always starting fresh from zero regardless of any prior value) — so `rx_taps`
+(LMS-adaptive, starting fresh from zero regardless of any prior value, except tap 1 under the Mueller-Muller CDR) — so `rx_taps`
 *is* part of the persisted config schema (`(enabled, value, min_val, max_val)` per tap,
 mirroring `tx_taps`; `ffe_tap_tuners`, its EQ-tune-tab counterpart, round-trips too), while
 DFE tap *weights* deliberately aren't (only their enabled/min/max bounds are — a `value`
@@ -176,7 +176,13 @@ A git submodule (also a `uv` workspace member). Contains the `pyibisami` package
 
 ### Configuration persistence
 
-`PyBertCfg` (in `configuration.py`) is pickled/YAML-dumped. `load_from_file` iterates `vars(user_config)` and calls `setattr(pybert, prop, value)` for most props. Special-cased props (tap lists) are handled explicitly. Old configs without `ch_files` fall back gracefully: the simulation reads `self.ch_file` (single path) when `self.ch_files` is empty. The CDR's proportional step is `delta_t_ui` (in UI, so loop dynamics don't change with data rate); old configs' absolute `delta_t` (ps) is converted on load using that config's own UI.
+`PyBertCfg` (in `configuration.py`) is pickled/YAML-dumped. `load_from_file` iterates `vars(user_config)` and calls `setattr(pybert, prop, value)` for most props. Special-cased props (tap lists) are handled explicitly. Old configs without `ch_files` fall back gracefully: the simulation reads `self.ch_file` (single path) when `self.ch_files` is empty. The CDR's proportional step is `delta_t_ui` (in UI, so loop dynamics don't change with data rate); old configs' absolute `delta_t` (ps) is converted on load using that config's own UI. `cdr_type` selects the CDR:
+`"Bang-Bang"` (default; the adaptive loop in `models/cdr.py`) or `"Mueller-Muller"`, which clocks the DFE at a fixed
+phase (nominal UI, locked from the start) found by PyChOpMarg's `loc_curs()` on the slicer-input pulse response
+(`ffe_out_p`), anticipating DFE tap 1 within its limits -- the same criterion COM uses to locate its cursor. It models
+the MM loop's lock point, not its dynamics; since that point presumes DFE tap 1 has converged to the anticipated value
+(93A-26), the MM case starts tap 1 there (the one exception to the DFE starting from zero) -- from zero, the
+decision-directed LMS can't bootstrap when the pre-DFE eye at that phase is closed (e.g. a 0.4 post-cursor on PAM-4).
 
 ### CLI entry point
 

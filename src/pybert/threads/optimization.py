@@ -233,6 +233,9 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
     _t = array([n * dt for n in range((len(f_t) - 1) * 2)])
     krnl = interp1d(f, pybert.chnl_H, bounds_error=False, fill_value=0)
     chnl_H = krnl(f_t)
+    # The simulation adds white Gaussian noise (std. dev. `rn`, sampled every `dt`) at the Rx input,
+    # i.e. - one-sided density `rn**2 / fN` over [0, fN]; `NoiseCalc` wants it in V^2/GHz.
+    eta0 = pybert.rn**2 / fN * 1e9
 
     # An AMI model's own Init()-returned impulse response slots directly into the same
     # convolution cascade used for native EQ (both are just LTI impulse responses), so a
@@ -281,7 +284,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
             noise_calc = NoiseCalc(
                 num_levels, ui, curs_ix, _t, p_tx, [], f_t,
                 tx_H, chnl_H, ones(len(f_t)), ctle_H,
-                0.0, 0.5, 25, 0.0, 0.0
+                eta0, 0.5, 25, 0.0, 0.0
             )
             mmse_rslts = mmse(
                 noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
