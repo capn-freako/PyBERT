@@ -641,7 +641,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     # - First, calculate the impulse responses.
     if not tap_weightss:
         tap_weightss = [[]]
-    dfe_h = fir_tap_weights_to_imp_resp([1.0] + tap_weightss[-1], nspui)
+    # The DFE subtracts its feedback (`sum_out = x - sum(w * decisions)`), with weights converging to +h(k)/h(0).
+    dfe_h = fir_tap_weights_to_imp_resp([1.0] + [-w for w in tap_weightss[-1]], nspui)
     dfe_out_h = convolve(ffe_out_h, dfe_h)[: len_h]
     dfe_h = resize_zero_pad(dfe_h, len(ctle_out_h))
     # - Then, calculate the remaining responses from the impulse responses.
