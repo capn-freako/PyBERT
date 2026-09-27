@@ -258,19 +258,21 @@ def optimize_eq(
     }
 
 
-def _bathtub_eye_margin_ui(pybert: PyBERT, target_ber: float) -> float | None:
-    """Real post-DFE eye opening at `target_ber` (fraction of a UI), via PyBERT's own
-    bathtub curve (`make_bathtub()`) over its own measured jitter histogram, its tails
-    extrapolated with the separated Rj from the bounded jitter's extent -- the same
-    computation and the same data (`jitter_bins`, `jitter_dfe`, `rj_dfe`, `dj_pos_dfe`,
-    `dj_neg_dfe`, `ui`) the GUI's own bathtub plot uses, not a hand-rolled jitter-budget
-    approximation. (The dual-Dirac fit's values are for reference only.) Requires the preceding
-    `pybert.simulate()` call to have used `update_plots=True` (that's what populates
+def _jitter_bathtub_width_ui(pybert: PyBERT, target_ber: float) -> float | None:
+    """Post-DFE *crossing-jitter* bathtub width at `target_ber` (fraction of a UI), via PyBERT's
+    own bathtub curve (`make_bathtub()`) over its own measured jitter histogram, its tails
+    extrapolated with the separated Rj from the bounded jitter's extent -- the same computation
+    and data (`jitter_bins`, `jitter_dfe`, `rj_dfe`, `dj_pos_dfe`, `dj_neg_dfe`, `ui`) the GUI's
+    own bathtub plot uses. (The dual-Dirac fit's values are for reference only.) Requires the
+    preceding `pybert.simulate()` call to have used `update_plots=True` (that's what populates
     the jitter-histogram traits this reads).
 
-    Returns None if the eye doesn't reach `target_ber` anywhere (fully closed at the
-    measured resolution) -- there's no meaningful "how negative" a bathtub crossing
-    can report once the curve's whole center sits above `target_ber`.
+    This is a timing-only measure: the spread of 0-V crossing times (for PAM-4, of the
+    transitions symmetric about 0 V only). It can't see voltage ISI or noise at the sampling
+    instant, symbols that never cross 0 V, or PAM-4's upper/lower eyes, so it can report an
+    open eye where the real eye is closed; `_eye_width_ui()` is the eye opening.
+
+    Returns None if the curve doesn't reach `target_ber` anywhere.
     """
     bathtub = make_bathtub(
         pybert.jitter_bins, pybert.jitter_dfe, min_val=0.1 * MIN_BATHTUB_VAL,
@@ -289,16 +291,13 @@ def _bathtub_eye_margin_ui(pybert: PyBERT, target_ber: float) -> float | None:
     return float((right_cross - left_cross) / pybert.ui)
 
 
-def _vert_eye_heights_v(pybert: PyBERT, target_ber: float) -> list[float | None]:
-    """Real post-DFE vertical eye openings at `target_ber` (V), one per eye, lowest eye
-    first, via PyBERT's own vertical bathtub curves (`make_vert_bathtubs()`) over the DFE
-    slicer input samples PyBERT itself took at its recovered clock instants.
-
-    An eye that doesn't reach `target_ber` anywhere reports None (as `eye_margin_ui` does).
+def _eye_heights_at(samps: np.ndarray, decisions: np.ndarray, target_ber: float) -> list[float | None]:
+    """Vertical opening (V) of each eye at `target_ber`, lowest eye first, via PyBERT's own vertical
+    bathtub curves (`make_vert_bathtubs()`) over the given slicer-input samples and the symbol
+    decisions labelling them. An eye that doesn't reach `target_ber` anywhere reports None.
     """
     heights: list[float | None] = []
-    for v, bt in make_vert_bathtubs(pybert.dfe_slicer_samps, pybert.dfe_slicer_decisions,
-                                    min_val=0.1 * MIN_BATHTUB_VAL):
+    for v, bt in make_vert_bathtubs(samps, decisions, min_val=0.1 * MIN_BATHTUB_VAL):
         best = int(np.argmin(bt))
         if bt[best] > target_ber:
             heights.append(None)
@@ -310,6 +309,55 @@ def _vert_eye_heights_v(pybert: PyBERT, target_ber: float) -> list[float | None]
     return heights
 
 
+def _vert_eye_heights_v(pybert: PyBERT, target_ber: float) -> list[float | None]:
+    """Real post-DFE vertical eye openings at `target_ber` (V), one per eye, lowest eye
+    first, via PyBERT's own vertical bathtub curves (`make_vert_bathtubs()`) over the DFE
+    slicer input samples PyBERT itself took at its recovered clock instants.
+
+    An eye that doesn't reach `target_ber` anywhere reports None (as `eye_margin_ui` does).
+    """
+    return _eye_heights_at(pybert.dfe_slicer_samps, pybert.dfe_slicer_decisions, target_ber)
+
+
+def _eye_width_ui(pybert: PyBERT, target_ber: float) -> float | None:
+    """Real post-DFE eye width at `target_ber` (fraction of a UI): the span of sampling offsets
+    around PyBERT's recovered clock over which *every* eye's vertical opening at `target_ber`
+    stays positive -- the 2-D eye's width at that BER.
+
+    At each offset, the DFE summing-node output is sampled at the slicer's own clock instants
+    shifted by that many time steps, those samples are labelled by the decisions made at the
+    clock, and their openings come from the same `make_vert_bathtubs()` computation
+    `eye_heights_v` uses (which is this at offset zero). Offsets stay within the slicer's own
+    UI (the DFE's feedback switches at its edges), so the resolution is ``1 / nspui`` UI and the
+    largest reportable width ``(nspui - 1) / nspui``.
+
+    Returns None if the eye is closed at the clock itself (the receiver samples a closed eye).
+    """
+    y = np.asarray(pybert.dfe_out)
+    decisions = np.asarray(pybert.dfe_slicer_decisions)
+    n_samps = len(decisions)
+    clock_ixs = np.where(np.asarray(pybert.clocks))[0][-n_samps:]
+    if len(clock_ixs) != n_samps or not np.allclose(y[clock_ixs], pybert.dfe_slicer_samps):
+        raise RuntimeError("DFE output at the recovered clock indices doesn't match the slicer's samples!")
+    nspui = pybert.nspui
+    half = nspui // 2
+
+    def is_open(ofst: int) -> bool:
+        ixs = clock_ixs + ofst
+        keep = (ixs >= 0) & (ixs < len(y))
+        return all(h is not None and h > 0 for h in _eye_heights_at(y[ixs[keep]], decisions[keep], target_ber))
+
+    if not is_open(0):
+        return None
+    lo = 0
+    while lo - 1 > -half and is_open(lo - 1):
+        lo -= 1
+    hi = 0
+    while hi + 1 < half and is_open(hi + 1):
+        hi += 1
+    return (hi - lo + 1) / nspui
+
+
 def run_simulation(config: dict, results_file: str | None = None,
                     target_ber: float | None = None) -> dict:
     """Run a headless PyBERT simulation and return its summary performance metrics.
@@ -318,16 +366,16 @@ def run_simulation(config: dict, results_file: str | None = None,
         config: A configuration dict, as returned by ``get_config``/``get_default_config``,
             optionally with overrides applied.
         results_file: If given, also save the waveform results to this path (``.pybert_data``).
-        target_ber: If given, also compute the real post-DFE bathtub-curve eye opening
-            at this BER (see `_bathtub_eye_margin_ui`) and return it as
-            ``eye_margin_ui`` -- ``None`` if the eye doesn't reach `target_ber` at all --
-            along with the vertical opening of each eye (V, lowest eye first; see
-            `_vert_eye_heights_v`) at that BER, as ``eye_heights_v``.
+        target_ber: If given, also return, at this BER, the real post-DFE eye width
+            (UI; see `_eye_width_ui`) as ``eye_margin_ui`` -- ``None`` if the eye is closed
+            at the recovered clock -- the vertical opening of each eye (V, lowest eye first;
+            see `_vert_eye_heights_v`) as ``eye_heights_v``, and the crossing-jitter bathtub
+            width (UI; timing only, see `_jitter_bathtub_width_ui`) as ``jitter_bathtub_width_ui``.
     """
     pybert = PyBERT(run_simulation=False, gui=False)
     _apply_config(pybert, config)
     # update_plots populates pybert.plotdata (needed by save_results()) and the jitter
-    # histogram traits (needed for target_ber's bathtub margin); skip it otherwise.
+    # histogram traits (needed for target_ber's jitter bathtub); skip it otherwise.
     update_plots = bool(results_file) or target_ber is not None
     pybert.simulate(initial_run=True, update_plots=update_plots)
 
@@ -336,8 +384,9 @@ def run_simulation(config: dict, results_file: str | None = None,
 
     result = {name: _jsonify(getattr(pybert, name)) for name in RESULT_TRAIT_NAMES}
     if target_ber is not None:
-        result["eye_margin_ui"] = _bathtub_eye_margin_ui(pybert, target_ber)
+        result["eye_margin_ui"] = _eye_width_ui(pybert, target_ber)
         result["eye_heights_v"] = _vert_eye_heights_v(pybert, target_ber)
+        result["jitter_bathtub_width_ui"] = _jitter_bathtub_width_ui(pybert, target_ber)
     return result
 
 

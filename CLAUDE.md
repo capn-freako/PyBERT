@@ -18,7 +18,10 @@ confirmed produces zero real bit errors and, via its actual bathtub-curve extrap
 genuinely open +0.15 UI eye at the same target BER — a wrong-sign, not just imprecise,
 result. Replacing it with a function that calls PyBERT's own `make_bathtub()` over PyBERT's
 own measured jitter histogram (`src/pybert/mcp/server.py`'s `run_simulation(...,
-target_ber=...)`) matched the verified GUI result almost exactly.
+target_ber=...)`) matched the verified GUI result almost exactly. (That crossing-jitter bathtub
+later proved to be timing-only -- blind to voltage ISI at the sampler, so it can call a closed
+PAM-4 eye open -- and `eye_margin_ui` is now the 2-D eye's width from PyBERT's own
+`make_vert_bathtubs()`; see the MCP section below.)
 
 Apply this at all costs when working in this repo:
 
@@ -132,19 +135,28 @@ constructs its own fresh `PyBERT(gui=False)` instance; nothing is cached across 
 so `PyBertCfg`'s existing tap-tuple/legacy-rename handling is reused rather than duplicated. Note:
 `.pybert_data` files only ever hold waveform arrays, never scalar performance metrics — those are
 only available live, right after `simulate()`, which is why `run_simulation` returns them directly.
-`run_simulation`'s optional `target_ber` returns the *real* post-DFE bathtub-curve eye opening
-at that BER as `eye_margin_ui` (`None` if the eye doesn't reach it at all) — computed by calling
-PyBERT's own `make_bathtub()` (`src/pybert/utility/math.py`) over its own measured jitter
-histogram (`jitter_bins`/`jitter_dfe`), its tails extrapolated with the separated Rj (`rj_dfe`)
-from the bounded jitter's extent (`dj_pos_dfe`/`dj_neg_dfe`) — the same computation and data the
-GUI's own bathtub plot uses — not a hand-rolled jitter-budget approximation (see
-"Trust and reuse PyBERT's own calculations", above). The dual-Dirac values (`pjDD_*`, `rjDD_*`,
+`run_simulation`'s optional `target_ber` returns the *real* post-DFE eye width at that BER as
+`eye_margin_ui` (UI; `None` if the eye is closed at the recovered clock): the span of sampling
+offsets around the clock over which *every* eye's vertical opening at `target_ber` stays positive,
+each offset scored by the same `make_vert_bathtubs()` computation as `eye_heights_v` (below), over
+the DFE summing-node output (`dfe_out`) at the slicer's own clock indices (`clocks`) shifted by
+that many time steps, labelled by the decisions made at the clock (resolution `1/nspui` UI, at most
+`(nspui - 1)/nspui`). It also returns `jitter_bathtub_width_ui`: the crossing-jitter bathtub's width,
+from PyBERT's own `make_bathtub()` (`src/pybert/utility/math.py`) over its measured jitter histogram
+(`jitter_bins`/`jitter_dfe`), tails extrapolated with the separated Rj (`rj_dfe`) from the bounded
+jitter's extent (`dj_pos_dfe`/`dj_neg_dfe`) -- what the GUI's bathtub plot shows. That one is
+timing-only (0-V crossing times; for PAM-4, symmetric transitions only), blind to voltage ISI/noise
+at the sampler and to PAM-4's upper/lower eyes: on li_dj with a bang-bang CDR it reported 0.36 UI
+open while the real eye was closed at every offset (96 errors), and it overstates even open eyes
+(0.28 UI vs. a measured 0.20 UI worst-case width). Use `eye_margin_ui`/`eye_heights_v` to judge an eye.
+The dual-Dirac values (`pjDD_*`, `rjDD_*`,
 `mu_pos_*`/`mu_neg_*`) are for reference only: don't build further calculations on them. The
 separated Rj needs at least two pattern repetitions in the `eye_bits` window (e.g. PAM-4 PRBS-15 is
 65,534 UI long; PRBS-13 is 16,382 UI); with fewer, it reads 0 and bathtubs aren't extrapolated.
 For PAM-4, jitter statistics use only transitions symmetric about 0 V (see `calc_jitter()`'s
 `xing_mask`). Passing `target_ber` makes this call use
-`update_plots=True` internally (needed to populate the jitter-histogram traits), same as passing
+`update_plots=True` internally (needed to populate the jitter-histogram traits for
+`jitter_bathtub_width_ui`), same as passing
 `results_file`. The same call also returns `eye_heights_v`: each eye's vertical opening (V, lowest
 eye first; `None` per closed eye) at `target_ber`, from `make_vert_bathtubs()` over the DFE slicer
 input samples PyBERT took at its own recovered clock instants (`dfe_slicer_samps`/

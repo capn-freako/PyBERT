@@ -83,13 +83,31 @@ def test_run_simulation_multi_segment_channel(channel_segment):
 
 
 def test_run_simulation_target_ber_reports_eye_margin(channel_segment):
-    """`target_ber` requests the real bathtub-curve eye opening (`eye_margin_ui`) --
-    computed from PyBERT's own jitter histogram via `make_bathtub()`, not a hand-rolled
-    approximation -- not just the raw jitter component scalars alone."""
-    cfg = _with_channel(_fast_config(), channel_segment)
-    result = run_simulation(cfg, target_ber=1e-2)
+    """`target_ber` requests the real eye width (`eye_margin_ui`) -- the span of sampling
+    offsets around the recovered clock over which every eye stays open at that BER, from
+    PyBERT's own slicer-input samples via `make_vert_bathtubs()` -- plus the crossing-jitter
+    bathtub width (`jitter_bathtub_width_ui`), from PyBERT's own jitter histogram via `make_bathtub()`.
+    (Default, native channel: error-free, so its eye is genuinely open. This short run over
+    `channel_segment` isn't -- it makes errors above 1e-2 -- which only the jitter bathtub misses.)"""
+    result = run_simulation(_fast_config(), target_ber=1e-2)
     assert result["eye_margin_ui"] is not None
-    assert 0.0 < result["eye_margin_ui"] <= 1.0
+    assert 0.0 < result["eye_margin_ui"] < 1.0
+    assert result["jitter_bathtub_width_ui"] is not None
+    assert 0.0 < result["jitter_bathtub_width_ui"] <= 1.0
+
+    result = run_simulation(_with_channel(_fast_config(), channel_segment), target_ber=1e-2)
+    assert result["n_errs_dfe"] > 1e-2 * _fast_config()["eye_bits"]
+    assert result["eye_margin_ui"] is None
+    assert result["jitter_bathtub_width_ui"] is not None
+
+
+def test_eye_margin_consistent_with_eye_heights():
+    """`eye_margin_ui` is open only if every eye's vertical opening at the clock is (it's
+    the width of the region where they all are), for NRZ and PAM-4 alike."""
+    for overrides in ({}, {"mod_type": "PAM-4", "nbits": 4000, "eye_bits": 2000}):
+        result = run_simulation(dict(_fast_config(), **overrides), target_ber=1e-2)
+        heights_open = all(h is not None and h > 0 for h in result["eye_heights_v"])
+        assert (result["eye_margin_ui"] is not None) == heights_open
 
 
 def test_run_simulation_target_ber_reports_vert_eye_heights():
@@ -107,11 +125,12 @@ def test_run_simulation_target_ber_reports_vert_eye_heights():
 
 
 def test_run_simulation_target_ber_none_when_eye_fully_closed(channel_segment):
-    """An absurdly strict target_ber (below the bathtub curve's own floor value)
+    """An absurdly strict target_ber (below the bathtub curves' own floor value)
     reports None, not a nonsensical crossing point."""
     cfg = _with_channel(_fast_config(), channel_segment)
     result = run_simulation(cfg, target_ber=1e-20)
     assert result["eye_margin_ui"] is None
+    assert result["jitter_bathtub_width_ui"] is None
 
 
 def test_run_simulation_without_target_ber_omits_eye_margin(channel_segment):
