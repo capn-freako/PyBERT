@@ -673,8 +673,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
         self.dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
-        pulse_resp_curs_ix = np.argmax(dfe_out_p)
-        pulse_resp_samps = np.array([dfe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
+        # The trellis' expected observations: the DFE output pulse response sampled at the recovered clock's
+        # phase (not at its peak, which can sit a fraction of a UI away), scaled to the transmitted symbol
+        # amplitude (`vod`), as `sig_samps` are.
+        clk_phase_ix = round(float(np.median(np.mod(np.asarray(_sample_times), ui))) / ts) % nspui
+        pk_ix = int(np.argmax(dfe_out_p))
+        pulse_resp_curs_ix = min((ix for ix in range(max(0, pk_ix - nspui), pk_ix + nspui) if ix % nspui == clk_phase_ix),
+                                 key=lambda ix: abs(ix - pk_ix))
+        pulse_resp_samps = self.vod * np.array([dfe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
             decoder_fec: FEC_Decoder = FEC_Decoder(N)
@@ -700,7 +706,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:
             self.status = "Running Viterbi..."
             L = self.L
-            sigma = self.rn
+            # Gaussian observation noise: the measured spread of the slicer samples about their (DFE) decided
+            # levels -- noise plus residual ISI, typically tens of mV -- rather than the Rx input noise `rn` alone
+            # (~1 mV), which drove every state's probability to zero on most symbols. (`rn` remains the floor.)
+            dec_lvls = array(decisions[-len(sig_samps):]) * dfe.decision_scaler
+            sigma = max(self.rn, float(np.std(sig_samps[-len(dec_lvls):] - dec_lvls))) if len(dec_lvls) else self.rn
             decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
             path = decoder.decode(list(sig_samps), dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states

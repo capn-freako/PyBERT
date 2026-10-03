@@ -106,6 +106,10 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         prevs.reverse()
         return prevs
 
+    def probs(self, x: X) -> Rvec:
+        """Probabilities of all states, given observation ``x``. (Override with a vectorized version for speed.)"""
+        return np.array([self.prob(s, x) for s in range(len(self.states))])
+
     def expectation(self, s: int) -> X:
         """Expected observation for state at index ``s``."""
         return self._expecteds[s]
@@ -132,22 +136,20 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         for col in range(len(trellis) - 1):
             trellis[col] = trellis[col + 1]
 
-        # Calculate maximum state probabilities, along w/ previous state, for new rightmost column.
-        probs = np.zeros(num_states)
-        prevs = np.arange(num_states)
-        for r in range(num_states):
-            new_probs = np.array(
-                [0 if self.trans[r][s] == 0
-                 else trellis[-1][r][0] * self.trans[r][s] * self.prob(s, x)
-                 for s in range(num_states)])
-            prevs = np.where(new_probs > probs, [r] * num_states, prevs)
-            probs = np.maximum(new_probs, probs)
+        # Calculate maximum state probabilities, along w/ previous state, for new rightmost column:
+        # for each new state s, the most probable predecessor r of prob(r) * trans[r, s] * prob(s | x).
+        # (`argmax` takes the first maximum, as the previous ascending-r loop with a strict `>` did.)
+        prev_probs = np.array([pr[0] for pr in trellis[-1]])
+        cand = prev_probs[:, None] * self.trans * self.probs(x)[None, :]
+        probs = cand.max(axis=0)
+        prevs = np.where(probs > 0, cand.argmax(axis=0), np.arange(num_states))  # (as before, for 0-prob states)
         # ToDo: Need to eliminate this possibility.
         if not probs.sum():  # Trap all zeros.
             self.log("WARNING: All probabilities zero while stepping trellis, using observation: {x}, and expected value: {s.expectation}!")
             probs = np.array(
-                [0.0 if self.trans[r][s] == 0 else 1.0
+                [0.0 if self.trans[num_states - 1][s] == 0 else 1.0
                  for s in range(num_states)])
+            prevs = np.arange(num_states)
         probs /= probs.sum()
         trellis[-1] = list(zip(probs, prevs))
 
@@ -177,7 +179,7 @@ class ViterbiDecoder(ABC, Generic[S, X]):
         num_states = len(trellis[-1])
 
         # Prime the trellis.
-        first_col = np.array([self.prob(s, samps[0]) for s in range(num_states)])
+        first_col = np.asarray(self.probs(samps[0]), dtype=float)
         if not first_col.sum():  # Trap all zeros and log the event.
             self.log("WARNING: All probabilities zero while priming first column, using observation: {samps[0]}!")
             first_col = (1.0 / num_states) * np.ones(num_states)
@@ -287,3 +289,7 @@ class ViterbiDecoder_ISI(ViterbiDecoder[State_ISI, float]):
         Probability of state at index ``s`` given observation ``x``.
         """
         return self.v_prob(x - self.expectation(s))
+
+    def probs(self, x: float) -> Rvec:
+        """Probabilities of all states, given observation ``x`` (vectorized)."""
+        return self.v_prob(x - np.asarray(self._expecteds))
