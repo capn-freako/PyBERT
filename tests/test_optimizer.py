@@ -76,3 +76,17 @@ class TestOptimizer(object):
         assert thePyBERT.status == "Ready.", "Status not 'Ready.'!"
         n_errs = thePyBERT.n_errs_viterbi
         assert n_errs == 0, f"{n_errs} bit errors from Viterbi decoder detected!"
+
+
+def test_coopt_respects_tx_c0_min():
+    """coopt() never picks a Tx tap combination whose cursor (1 - sum of the other taps' magnitudes) is below
+    `tx_c0_min` -- nor one at or below zero (an inverted pulse), which wide tap ranges would otherwise include."""
+    from pybert.pybert import PyBERT
+    from pybert.threads.optimization import coopt
+    dut = PyBERT(run_simulation=False, gui=False)
+    for tuner in dut.tx_tap_tuners[:4]:
+        tuner.enabled = True
+        tuner.min_val, tuner.max_val, tuner.step = -0.4, 0.0, 0.2
+    dut.tx_c0_min = 0.54
+    tx_weights, *_ = coopt(dut)
+    assert 1 - sum(abs(w) for w in tx_weights) >= 0.54 - 1e-9

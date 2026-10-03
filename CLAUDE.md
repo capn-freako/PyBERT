@@ -74,6 +74,17 @@ PyBERT is a serial-link BERT simulator built on the Enthought Traits/TraitsUI st
 
 1. **Entry**: `PyBERT.simulate()` → `my_run_simulation()` in `src/pybert/models/bert.py`. In GUI mode this runs in a background `RunSimThread` (see `src/pybert/threads/sim.py`).
 2. **Channel construction** (`bert.py` ~line 1300): Either uses Howard Johnson's UTP model (default) or imports a channel from file(s) via `import_channel()` in `src/pybert/utility/sparam.py`. When multiple files are listed in `self.ch_files`, they are cascaded using `skrf`'s `**` (network cascade) operator. `import_channel()`/`import_freq()` accept 1/2/4/8/12-port Touchstone files natively; a VITA 68.x reference-model segment (Module or Backplane) instead bundles both link directions per lane into an 8-port block (e.g. 32 ports for 4 lanes) — pass `vita_end="tx"` or `"rx"` to select the right 4-port sub-network per lane (every segment in a cascade uses `"tx"` except the terminal Rx-side Module, which uses `"rx"` — see `import_freq()`'s docstring for the full port-offset derivation, verified against real VITA68.3 reference files).
+   **P802.3dj device models (`pkg_enable`)**: with `pkg_enable` true, `calc_chnl_h()` replaces the lumped
+   `rs`/`cout` and `rin`/`cin` (applied by `utility/channel.py::calc_G()`, which ignores the channel's S11/S22) with
+   the P802.3dj/D3.3 Annex 178A transmitter/receiver models -- 3-stage C_d/L_s die ladder + C_b, package
+   transmission-line stages + C_p, optional partial host channel -- from PyChOpMarg (`pychopmarg.devmodel`,
+   per-group presets in `pychopmarg.config.ieee_8023dj_d3p3`): `calc_pkg_chnl_H()` renormalizes the channel to
+   2 x R0 (92.5 ohm), cascades Tx model ** channel ** Rx model, and terminates it in each device's R_d per (178A-3),
+   halved to keep `chnl_H`'s driver-open-circuit-voltage reference. `pkg_group` ("KR"/"C2C"/"CR"/"C2M") selects
+   the draft's table; `tx_pkg_case`/`rx_pkg_case` the package class + Test ("A1"/"A2"/"B1"/"B2"), CR host class
+   ("HL"/"HN"/"HH"), or C2M "host"/"module"; `pkg_include_host` adds the partial host PCB (leave off for channel
+   data that already includes it). Native Tx/Rx only (IBIS-AMI on-die additions are ignored on this path). A bare
+   matched termination reproduces `calc_G()` exactly (`tests/test_pkg_models.py`).
 3. **IBIS-AMI integration**: `src/pybert/utility/ibisami.py::run_ami_model()` wraps `pyibisami.ami.model.AMIModel`. The response dict returned by `AMIModel.get_responses()` is keyed with `AmiModelResponseKey` objects (frozen dataclass) — always use the exported constants `IMP_RESP_INIT`, `IMP_RESP_GETW`, `OUT_RESP_INIT`, `OUT_RESP_GETW` when accessing it, not plain strings.
 4. **Output**: Results are stored as Traits attributes on the `PyBERT` instance; Chaco plots are updated via `plotdata` (an `ArrayPlotData`).
 
@@ -106,7 +117,9 @@ winning Tx-FFE/CTLE/AMI values forward (replicating the GUI's "Use EQ" commit st
 caps the Optuna trial budget on the AMI path (each trial is a real `AMI_Init()` call, so runtime
 scales with it) by overriding `ami_opt_trials` directly on the headless instance —
 `ami_opt_trials` isn't part of the persisted config schema, so this is a call-level override, not
-something carried in `config`. `tx_ami_params`/`rx_ami_params` (lists of parameter names) pick
+something carried in `config`. `coopt()`'s native Tx search skips tap combinations whose cursor
+(1 - sum of the other taps' magnitudes) is <= 0 (an inverted pulse) or below the `tx_c0_min` trait (default 0;
+P802.3dj's reference transmitter uses 0.54). `tx_ami_params`/`rx_ami_params` (lists of parameter names) pick
 which IBIS-AMI `Model_Specific` parameters actually get searched — enabled-state for
 `tx_ami_tap_tuners`/`rx_ami_tap_tuners` isn't in the persisted config schema either and defaults
 to all-disabled (opt-in only), so without these an AMI-active `optimize_eq()` call degenerates to

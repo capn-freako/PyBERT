@@ -376,6 +376,12 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
                     "Sorry, that's more Tx tap weight combinations than I can handle.",
                     "I had to abort the EQ optimization in your stead.",
                 ])) from err
+        # The cursor is what's left of the unit sum of tap magnitudes; combinations that leave it at or below zero
+        # (an inverted pulse), or below `tx_c0_min`, aren't realizable Tx equalizer settings.
+        c0_min = max(pybert.tx_c0_min, 0.0)
+        tx_weightss = [ws for ws in tx_weightss if (1 - sum(abs(ws))) > 0 and (1 - sum(abs(ws))) >= c0_min]
+        if not tx_weightss:
+            raise RuntimeError(f"No Tx tap weight combination leaves a cursor of at least {c0_min}!")
         tx_weightss = [insert(ws, tx_curs_pos, 1 - sum(abs(ws))) for ws in tx_weightss]
         tx_candidates = []
         for tx_weights in tx_weightss:

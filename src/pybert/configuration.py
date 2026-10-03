@@ -116,6 +116,16 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         # Rx
         self.rin = the_PyBERT.rin
         self.cin = the_PyBERT.cin
+
+        # Minimum Tx FFE cursor for the EQ optimizer
+        self.tx_c0_min = the_PyBERT.tx_c0_min
+
+        # Tx/Rx device models (P802.3dj Annex 178A)
+        self.pkg_enable = the_PyBERT.pkg_enable
+        self.pkg_group = the_PyBERT.pkg_group
+        self.tx_pkg_case = the_PyBERT.tx_pkg_case
+        self.rx_pkg_case = the_PyBERT.rx_pkg_case
+        self.pkg_include_host = the_PyBERT.pkg_include_host
         self.cac = the_PyBERT.cac
         self.use_ctle_file = the_PyBERT.use_ctle_file
         self.ctle_sel = the_PyBERT.ctle_sel

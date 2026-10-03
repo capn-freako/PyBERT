@@ -63,6 +63,8 @@ from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
 from pychopmarg import __version__ as PyChOpMarg_VERSION  # type: ignore
+from pychopmarg.config.ieee_8023dj_d3p3 import R0 as DJ_R0, device_model  # type: ignore
+from pychopmarg.devmodel import gamma_term, renormalize_to, s_rx_model, s_tx_model, terminated_h21  # type: ignore
 
 from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
@@ -195,6 +197,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # `PyBERT` instance to share the very same `TxTapTuner` objects, so that
     # mutating one instance's tap values -- e.g. via the EQ optimizer -- would
     # corrupt every other instance's taps.)
+    tx_c0_min = Float(0.0)  #: Minimum Tx FFE cursor (1 - sum of other tap magnitudes) the EQ optimizer may use.
     tx_tap_tuners: List = List()  #: EQ optimizer list of TxTapTuner objects.
 
     def _tx_tap_tuners_default(self):
@@ -301,6 +304,14 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # -- native
     rin = Float(100)  #: Rx input impedance (Ohm)
     cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
+
+    # - Device termination, package, and partial host channel models (P802.3dj/D3.3 Annex 178A),
+    #   for native Tx and Rx. When enabled, they replace `rs`/`cout` and `rin`/`cin`.
+    pkg_enable = Bool(False)  #: Use the P802.3dj Annex 178A Tx/Rx device models.
+    pkg_group = Enum("KR", "C2C", "CR", "C2M")  #: Channel group, selecting the P802.3dj table used.
+    tx_pkg_case = String("A1")  #: Tx package case (KR/C2C: "A1"/"A2"/"B1"/"B2"; CR: "HL"/"HN"/"HH"; C2M: "host"/"module").
+    rx_pkg_case = String("A1")  #: Rx package case (as for `tx_pkg_case`).
+    pkg_include_host = Bool(True)  #: Include the partial host channel, where the case defines one (CR, C2M host).
     cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
     ctle_sel = Enum("Native", "File")
@@ -1347,6 +1358,31 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
     # pylint: disable=attribute-defined-outside-init
+    def calc_pkg_chnl_H(self, ch_s2p: rf.Network) -> np.ndarray:
+        """
+        Channel transfer function with the P802.3dj/D3.3 Annex 178A transmitter and receiver device models
+        (device termination, device package, and optional partial host channel), per (178A-2) and (178A-3).
+
+        The channel is renormalized to ``2 * R0`` (the differential-mode equivalent of 178A-4), cascaded between
+        the Tx and Rx models, and terminated in each device's ``Rd``. Like ``calc_G()``, the result is referenced
+        to the driver's open-circuit voltage: half of (178A-3)'s transfer function, which is referenced to the wave
+        launched into a matched line.
+
+        Args:
+            ch_s2p: The channel's differential-mode 2-port network, on the frequencies ``self.f``.
+
+        Returns:
+            The channel's transfer function, including the Tx and Rx device models, at ``self.f``.
+        """
+        f = self.f
+        tx_dev = device_model(self.pkg_group, self.tx_pkg_case, False, include_host=self.pkg_include_host)
+        rx_dev = device_model(self.pkg_group, self.rx_pkg_case, True, include_host=self.pkg_include_host)
+        R0 = DJ_R0
+        chnl = renormalize_to(rf.Network(s=ch_s2p.s, f=f, z0=ch_s2p.z0), 2 * R0)
+        total = s_tx_model(f, tx_dev, R0) ** chnl ** s_rx_model(f, rx_dev, R0)
+        self.pkg_s2p = total
+        return terminated_h21(total, gamma_term(tx_dev.Rd, R0), gamma_term(rx_dev.Rd, R0)) / 2
+
     def calc_chnl_h(self):
         """Calculates the channel impulse response.
 
@@ -1487,7 +1523,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         # Rx input resistances, so that `chnl_h` alone captures its effect,
         # keeping it consistent w/ all the other (derived) pulse responses
         # (`tx_p`, `ffe_out_p`, `dfe_out_p`, etc.), which are computed from it.
-        chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
+        if self.pkg_enable:
+            chnl_H = self.calc_pkg_chnl_H(ch_s2p_pre)
+        else:
+            chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
         if self.use_window:
             chnl_h = irfft(raised_cosine(chnl_H))
         else:

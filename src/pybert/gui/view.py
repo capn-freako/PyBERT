@@ -229,12 +229,14 @@ traits_view = View(
                     VGroup(
                         Item(
                             name="rs",
+                            enabled_when="not pkg_enable",
                             label="Tx_Rs",
                             tooltip="Tx differential source impedance",
                         ),
                         Item(label="Ohms"),
                         Item(
                             name="cout",
+                            enabled_when="not pkg_enable",
                             label="Tx_Cout",
                             tooltip="Tx parasitic output capacitance (each pin)",
                             editor=TextEditor(auto_set=False, enter_set=True, evaluate=float),
@@ -378,6 +380,25 @@ traits_view = View(
                         visible_when="inter_sel == 'multiple'",
                         show_border=True,
                     ),
+                    HGroup(  # P802.3dj Annex 178A device termination / package / partial host models
+                        Item(name="pkg_enable", label="Enable",
+                             tooltip="Add P802.3dj/D3.3 Annex 178A Tx and Rx device termination, package, and "
+                                     "partial host channel models (native Tx/Rx only); they replace Tx Rs/Cout "
+                                     "and Rx Rin/Cin."),
+                        Item(name="pkg_group", label="Group", enabled_when="pkg_enable",
+                             tooltip="Channel group: KR (Table 178-14), C2C (Table 176C-9), CR (Tables 179-22/23), "
+                                     "or C2M (Table 176D-6)"),
+                        Item(name="tx_pkg_case", label="Tx case", enabled_when="pkg_enable",
+                             tooltip="KR/C2C: package class and Test ('A1', 'A2', 'B1', 'B2'); "
+                                     "CR: host class ('HL', 'HN', 'HH'); C2M: 'host' or 'module'"),
+                        Item(name="rx_pkg_case", label="Rx case", enabled_when="pkg_enable",
+                             tooltip="As for Tx case."),
+                        Item(name="pkg_include_host", label="Partial host", enabled_when="pkg_enable",
+                             tooltip="Include the partial host channel PCB where the case defines one (CR host "
+                                     "classes, C2M host). Leave off for channel data that already includes it."),
+                        label="Tx/Rx Device Models (P802.3dj Annex 178A)",
+                        show_border=True,
+                    ),
                     spring,
                     label="Interconnect",
                     show_border=True,
@@ -388,6 +409,7 @@ traits_view = View(
                         HGroup(
                             Item(
                                 name="rin",
+                                enabled_when="not pkg_enable",
                                 label="Rx_Rin",
                                 tooltip="Rx differential input impedance",
                             ),
@@ -397,6 +419,7 @@ traits_view = View(
                         HGroup(
                             Item(
                                 name="cin",
+                                enabled_when="not pkg_enable",
                                 label="Rx_Cin",
                                 tooltip="Rx parasitic input capacitance (each pin)",
                                 editor=TextEditor(auto_set=False, enter_set=True, evaluate=float),
