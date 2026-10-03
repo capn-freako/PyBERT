@@ -85,6 +85,29 @@ def sdd_21(ntwk: Network, renumber: bool = False) -> Network:
     return Network(frequency=ntwk.f, s=mm.s[:, 0:2, 0:2], z0=mm.z0[:, 0:2])
 
 
+def thru_is_1to3(ntwk: Network) -> bool:
+    """
+    Whether 4-port single-ended ``ntwk`` uses "1 => 3 / 2 => 4" through paths, rather than "1 => 2 / 3 => 4".
+
+    Compares the two candidate through-path pairs, (|S31| + |S42|) vs. (|S21| + |S43|), averaged over 10 MHz to
+    1 GHz: there a real through path is near 1 and the other pair (coupling between the two legs of a differential
+    pair) near 0, while any AC-coupling corner lies far below. (At higher frequencies a long, lossy channel's
+    through path can fall below that coupling, so a single mid-band comparison can pick the wrong pair.) Falls back
+    to the lowest 5% of frequencies above 10 MHz, for data that doesn't reach down to 1 GHz.
+    """
+    f = ntwk.f
+    band = (f >= 10e6) & (f <= 1e9)
+    if not band.any():
+        above = f >= 10e6
+        if not above.any():
+            above = ones(len(f), dtype=bool)
+        band = above & (f <= f[above][0] + 0.05 * (f[-1] - f[above][0]))
+    s = ntwk.s
+    pair_12 = (abs(s[band, 1, 0]) + abs(s[band, 3, 2])).mean()
+    pair_13 = (abs(s[band, 2, 0]) + abs(s[band, 3, 1])).mean()
+    return bool(pair_13 > pair_12)
+
+
 def se2mm(ntwk: Network, scale: float = 0.5, renumber: bool = False) -> Network:
     r"""
     Given a 4-port single-ended network, return its mixed mode equivalent.
@@ -119,10 +142,8 @@ def se2mm(ntwk: Network, scale: float = 0.5, renumber: bool = False) -> Network:
         raise ValueError("Touchstone file must have 4 ports!")
 
     # Detect/correct "1 => 3" port numbering.
-    if renumber:
-        ix = ntwk.s.shape[0] // 20  # So as not to be fooled by d.c. blocking.
-        if abs(ntwk.s21.s[ix, 0, 0]) < abs(ntwk.s31.s[ix, 0, 0]):  # 1 ==> 3 port numbering?
-            ntwk.renumber((1, 2), (2, 1))
+    if renumber and thru_is_1to3(ntwk):
+        ntwk.renumber((1, 2), (2, 1))
 
     # Convert S-parameter data.
     s = zeros(ntwk.s.shape, dtype=complex)
