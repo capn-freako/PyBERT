@@ -38,6 +38,12 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)  # PyBERT drives its own st
 
 gDebugOptimize = False
 
+# Assumptions behind the noise model (`NoiseCalc`) that scores MMSE candidates.
+MMSE_TX_LEVEL_V = 0.5  # Victim Tx output drive level, A_v (V).
+MMSE_TX_SNR_DB = 25.0  # Tx output signal-to-noise ratio, SNR_TX (dB).
+MMSE_DJ_DUAL_DIRAC_UI = 0.0  # Dual-Dirac peak deterministic jitter, A_DD (UI): not modeled.
+MMSE_RJ_RMS_UI = 0.0  # Dual-Dirac random jitter standard deviation, sigma_RJ (UI): not modeled.
+
 
 def _suggest(trial: optuna.Trial, prefix: str, tuner) -> float:
     "Ask `trial` to suggest a value for `tuner`, dispatching on its declared type."
@@ -284,7 +290,7 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
             noise_calc = NoiseCalc(
                 num_levels, ui, curs_ix, _t, p_tx, [], f_t,
                 tx_H, chnl_H, ones(len(f_t)), ctle_H,
-                eta0, 0.5, 25, 0.0, 0.0
+                eta0, MMSE_TX_LEVEL_V, MMSE_TX_SNR_DB, MMSE_DJ_DUAL_DIRAC_UI, MMSE_RJ_RMS_UI
             )
             mmse_rslts = mmse(
                 noise_calc, rx_n_taps, rx_n_pre, n_dfe_taps, pybert.rlm, pybert.mod_type_ + 2,
