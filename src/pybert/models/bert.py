@@ -553,7 +553,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             dfe.tap_weights[0] = b_1
         self.log(f"Mueller-Muller CDR sampling phase: {(curs_ix % nspui) / nspui:.3f} UI; initial DFE tap 1: {b_1:.3f}")
 
-    self.decision_scaler = 0.0
     self.dfe_scalar_values = []
     if ami_getwave_clocks:  # Accommodate the singular special case.
         t_ix = 0
