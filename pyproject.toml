@@ -19,7 +19,7 @@ dependencies = [
     "optuna==4.9.0",
     "pandas>=2.0",
     "parsec==3.17",
-    "pychopmarg==3.1.2",
+    "pychopmarg==3.2.0",
     "pyface==8.0.0",
     "pyibis-ami==9.3.0",
     "pyside6==6.10.2",
