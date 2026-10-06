@@ -300,8 +300,6 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
                     add_ffe_dfe(
                         rx_weights_better,
                         dfe_weights_better,
-                        dfe_tap_maxs,
-                        dfe_tap_mins,
                         nspui,
                         p_tx,
                         1.0,
@@ -328,14 +326,13 @@ def coopt(pybert) -> tuple[list[float], float, list[float], float, bool, Rvec, R
         p_tot = p_tx
         for rx_weights in rx_weightss:
             try:
-                p_ffe = add_ffe_dfe(rx_weights, array([]), dfe_tap_maxs, dfe_tap_mins, nspui, p_tx)
+                p_ffe = add_ffe_dfe(rx_weights, array([]), nspui, p_tx)
             except ValueError:  # Flags obviously non-optimum case.
                 continue
             # With AGC, the DFE's slicer level settles to the equalized cursor amplitude.
             decision_scaler = max(p_ffe) if pybert.use_agc else pybert.decision_scaler
             dfe_weights_cand = get_dfe_weights(dfe_taps, p_ffe, nspui, decision_scaler)
-            p_tot_cand = add_ffe_dfe(
-                array([]), dfe_weights_cand, dfe_tap_maxs, dfe_tap_mins, nspui, p_ffe, decision_scaler)
+            p_tot_cand = add_ffe_dfe(array([]), dfe_weights_cand, nspui, p_ffe, decision_scaler)
             curs_ix = where(p_tot_cand == max(p_tot_cand))[0][0]
             curs_amp = p_tot_cand[curs_ix]
             n_pre_isi = curs_ix // nspui

@@ -153,7 +153,7 @@ class TestAddFfeDfe:
     def test_dfe_cancels_only_its_own_ui(self):
         """Each DFE tap removes its own post-cursor and nothing else -- no residual step in the tail."""
         pr = _pulse([0.0, 1.0, 0.3, 0.1, 0.0])
-        out = add_ffe_dfe(np.array([]), np.array([0.3, 0.1]), np.array([1, 1]), np.array([-1, -1]), NSPUI, pr.copy(), 1.0)
+        out = add_ffe_dfe(np.array([]), np.array([0.3, 0.1]), NSPUI, pr.copy(), 1.0)
         assert out[CURS] == pytest.approx(1.0)
         assert out[CURS + NSPUI] == pytest.approx(0.0)
         assert out[CURS + 2 * NSPUI] == pytest.approx(0.0)
@@ -165,7 +165,7 @@ class TestAddFfeDfe:
         tuners = _tuners((True, -1, 1), (True, -1, 1))
         for scaler in (1.5, 1.077):
             w = get_dfe_weights(tuners, pr, NSPUI, scaler)
-            out = add_ffe_dfe(np.array([]), w, np.array([1, 1]), np.array([-1, -1]), NSPUI, pr.copy(), scaler)
+            out = add_ffe_dfe(np.array([]), w, NSPUI, pr.copy(), scaler)
             assert out[CURS + NSPUI] == pytest.approx(0.0)
             assert out[CURS + 2 * NSPUI] == pytest.approx(0.0)
 
@@ -175,10 +175,26 @@ class TestAddFfeDfe:
         pr = _pulse([0.0, 1.0, 0.3, 0.1, 0.0])
         ts = CURS - 8  # a quarter UI before the peak
         post1 = pr[ts + NSPUI]
-        out = add_ffe_dfe(np.array([]), np.array([post1 / pr[ts]]), np.array([1]), np.array([-1]), NSPUI, pr.copy(),
+        out = add_ffe_dfe(np.array([]), np.array([post1 / pr[ts]]), NSPUI, pr.copy(),
                           pr[ts], curs_ix=ts)
         assert out[ts + NSPUI] == pytest.approx(0.0)
         assert out[ts] == pytest.approx(pr[ts])
+
+    @pytest.mark.parametrize("curs_ix", [-1, 4000, 5000])
+    def test_cursor_outside_pulse_response_raises(self, curs_ix):
+        """A cursor index outside the pulse response is a bug, not a non-optimum candidate: raise `IndexError`
+        (which `coopt()` doesn't swallow, unlike `ValueError`), rather than let NumPy slicing wrap or skip."""
+        pr = _pulse([0.0, 1.0, 0.3, 0.1, 0.0])
+        with pytest.raises(IndexError):
+            add_ffe_dfe(np.array([]), np.array([0.3]), NSPUI, pr.copy(), 1.0, curs_ix=curs_ix)
+
+    def test_dfe_past_end_of_pulse_response_raises(self):
+        """DFE taps reaching past the pulse response's end would be silently skipped or truncated: raise."""
+        pr = _pulse([0.0, 1.0, 0.3, 0.1, 0.0])
+        n_fit = (len(pr) - CURS - NSPUI // 2) // NSPUI  # The most taps that fit.
+        add_ffe_dfe(np.array([]), np.zeros(n_fit), NSPUI, pr.copy(), 1.0)
+        with pytest.raises(IndexError):
+            add_ffe_dfe(np.array([]), np.zeros(n_fit + 1), NSPUI, pr.copy(), 1.0)
 
 
 

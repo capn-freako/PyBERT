@@ -494,8 +494,6 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
 def add_ffe_dfe(
     ffe_weights: Rvec,
     dfe_weights: Rvec,
-    dfe_maxs: Rvec,
-    dfe_mins: Rvec,
     nspui: int,
     pr_ctle_out: Rvec,
     decision_scaler: float = 1.0,
@@ -507,8 +505,6 @@ def add_ffe_dfe(
     Args:
         ffe_weights: List of FFE tap weights.
         dfe_weights: List of DFE tap weights.
-        dfe_maxs: List of DFE maximum tap weight values.
-        dfe_mins: List of DFE minimum tap weight values.
         nspui: Number of vector samples per unit interval.
         pr_ctle_out: Cumulative system pulse response at CTLE output.
 
@@ -524,6 +520,9 @@ def add_ffe_dfe(
     Raises:
         ValueError: If given post-CTLE pulse response is clearly non-optimum.
             (Used to improve overall performance of exhaustive optimization.)
+        IndexError: If ``curs_ix`` lies outside the pulse response, or the DFE's taps extend past its end.
+            (A bug, not a non-optimum candidate: NumPy slicing would otherwise silently skip, truncate, or
+            -- for a negative index -- wrap around to the wrong end of the pulse response.)
     """
 
     # Add the effect of FFE.
@@ -541,6 +540,11 @@ def add_ffe_dfe(
         raise ValueError("Main peak occurs in right half of waveform!")
     if curs_ix is None:
         curs_ix = peak_ix
+    if not 0 <= curs_ix < len(p_tot):
+        raise IndexError(f"Cursor index {curs_ix} is outside the pulse response (length {len(p_tot)}).")
+    if curs_ix + nspui // 2 + len(dfe_weights) * nspui > len(p_tot):
+        raise IndexError(f"The DFE's last tap (of {len(dfe_weights)}) extends past the end of the pulse response "
+                         f"(length {len(p_tot)}).")
 
     # Add the effect of DFE.
     for n, dfe_weight in enumerate(dfe_weights):
