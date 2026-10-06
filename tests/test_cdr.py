@@ -30,3 +30,21 @@ class TestMuellerMuller:
         curs_ix = loc_curs(pdut.ffe_out_p, pdut.nspui, np.array([limits[0][1]]), np.array([limits[0][0]]))
         b_1 = min(limits[0][1], max(limits[0][0], pdut.ffe_out_p[curs_ix + pdut.nspui] / pdut.ffe_out_p[curs_ix]))
         assert pdut.adaptation[0][0] == pytest.approx(b_1), "DFE tap 1 didn't start at the anticipated value!"
+
+
+def test_mm_non_positive_cursor_doesnt_anticipate_tap_1(monkeypatch):
+    """A non-positive cursor sample (degenerate pulse response) mustn't seed DFE tap 1 from a ratio
+    that divides by it (0 -> inf/nan; negative -> sign-flipped): tap 1 starts at 0 instead."""
+    from pybert import pybert as pybert_mod
+    from pybert.models import bert
+
+    def zero_cursor(pulse_resp, nspui, dfe_max, dfe_min):  # pylint: disable=unused-argument
+        pulse_resp[100] = 0.0  # The pulse response at the "cursor" (`ffe_out_p` itself).
+        return 100
+
+    monkeypatch.setattr(bert, "loc_curs", zero_cursor)
+    dut = pybert_mod.PyBERT(run_simulation=False, gui=False)
+    dut.cdr_type = "Mueller-Muller"
+    dut.simulate(initial_run=True)
+    assert dut.adaptation[0][0] == 0.0
+    assert "not anticipating DFE tap 1" in dut.console_log

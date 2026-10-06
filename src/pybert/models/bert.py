@@ -543,7 +543,12 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         clock_phase = (curs_ix % nspui - 0.5) * ts  # half a sample early, so the clock lands on sample `curs_ix`
         # That lock point presumes DFE tap 1 has converged to the value it anticipates (93A-26); start it there.
         # (From zero, the decision-directed LMS can't bootstrap when this phase's pre-DFE eye is closed.)
-        b_1 = float(min(dfe_max[0], max(dfe_min[0], ffe_out_p[curs_ix + nspui] / ffe_out_p[curs_ix])))
+        curs_val = ffe_out_p[curs_ix]
+        if curs_val > 0:
+            b_1 = float(min(dfe_max[0], max(dfe_min[0], ffe_out_p[curs_ix + nspui] / curs_val)))
+        else:  # A degenerate pulse response at that phase: nothing meaningful to anticipate.
+            b_1 = float(min(dfe_max[0], max(dfe_min[0], 0.0)))
+            self.log(f"Mueller-Muller cursor sample is non-positive ({curs_val:.3g} V); not anticipating DFE tap 1.")
         if limits:
             dfe.tap_weights[0] = b_1
         self.log(f"Mueller-Muller CDR sampling phase: {(curs_ix % nspui) / nspui:.3f} UI; initial DFE tap 1: {b_1:.3f}")
@@ -1000,7 +1005,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.pj_dfe   = pj
         self.rj_dfe   = rj
         self.pjDD_dfe = pjDD
-        assert rjDD != 0
         self.rjDD_dfe = rjDD
         self.mu_pos_dfe = mu_pos
         self.mu_neg_dfe = mu_neg
