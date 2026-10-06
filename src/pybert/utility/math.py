@@ -94,6 +94,9 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
 
     Returns:
         The vector of probabilities forming the bathtub curve.
+
+    ToDo:
+        1. Log "rj == 0", so caller knows why bathtub edges are vertical.
     """
 
     half_len  = len(jit_pdf) // 2
