@@ -284,10 +284,15 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             pybert.delta_t_ui = legacy_delta_t_ps * 1.0e-12 / pybert.ui
 
         # `rx_n_taps` decides how many Rx FFE taps exist; restoring the saved tap tuples (above)
-        # mustn't re-enable taps beyond it, e.g. in a config edited only to shorten the FFE.
+        # mustn't override it, e.g. in a config edited only to change the FFE's length:
+        # - taps beyond it are disabled;
+        # - the EQ tuners (whose enabled state isn't user-editable) are enabled exactly up to it,
+        #   lengthening included -- they're what `coopt()` searches. Taps up to it keep their saved
+        #   enabled state (the user may have disabled one); "Use EQ" copies the tuners' state over.
         for n, (tap, tuner) in enumerate(zip(pybert.rx_taps, pybert.ffe_tap_tuners)):
+            tuner.enabled = n < pybert.rx_n_taps
             if n >= pybert.rx_n_taps:
-                tap.enabled = tuner.enabled = False
+                tap.enabled = False
 
     def save(self, filepath: str | Path):
         """Save out pybert's current configuration to a file.

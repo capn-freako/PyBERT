@@ -235,10 +235,13 @@ def optimize_eq(
     # coopt() already commits DFE tap weights and, when AMI-active, the winning AMI
     # parameter values onto the live traits `run_simulation` reads. Native Tx/Rx linear
     # EQ needs the same "Use EQ" commit the GUI's Ctrl+U action performs (see
-    # `MyHandler.do_use_eq` in src/pybert/gui/handler.py).
+    # `MyHandler.do_use_eq` in src/pybert/gui/handler.py): each tap takes its tuner's weight
+    # *and* enabled state, since the simulation ignores a disabled tap's weight -- coopt() searches
+    # the tuners' enabled taps, which needn't match the taps' own enabled flags.
     if not pybert.tx_use_ami:
         for i, weight in enumerate(tx_weights):
             pybert.tx_taps[i].value = weight
+            pybert.tx_taps[i].enabled = pybert.tx_tap_tuners[i].enabled
     if not pybert.rx_use_ami:
         pybert.peak_mag = rx_peaking
         pybert.peak_freq = pybert.peak_freq_tune
@@ -246,6 +249,7 @@ def optimize_eq(
         pybert.ctle_enable = pybert.ctle_enable_tune
         for i, weight in enumerate(rx_weights):
             pybert.rx_taps[i].value = weight
+            pybert.rx_taps[i].enabled = pybert.ffe_tap_tuners[i].enabled
 
     return {
         "fom": fom,

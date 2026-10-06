@@ -191,6 +191,23 @@ def test_optimize_eq_updates_config(channel_segment):
     assert sim["status"]
 
 
+def test_optimize_eq_commits_tap_enabled_states(channel_segment):
+    """Like the GUI's "Use EQ", `optimize_eq` commits each tuner's enabled state along with its
+    weight: a tap the tuners searched but the config had disabled would otherwise have its
+    optimized weight silently ignored by the simulation."""
+    cfg = _with_channel(_fast_config(), channel_segment)
+    tx_ix = next(i for i, tuner in enumerate(cfg["tx_tap_tuners"]) if tuner[0])
+    rx_ix = cfg["rx_n_pre"] + 1  # First post-cursor tap.
+    cfg["tx_taps"] = [(False, *tap[1:]) if i == tx_ix else tap for i, tap in enumerate(cfg["tx_taps"])]
+    cfg["rx_taps"] = [(False, *tap[1:]) if i == rx_ix else tap for i, tap in enumerate(cfg["rx_taps"])]
+
+    result = optimize_eq(cfg)
+    assert [t[0] for t in result["config"]["tx_taps"]] == [t[0] for t in result["config"]["tx_tap_tuners"]]
+    assert [t[0] for t in result["config"]["rx_taps"]] == [t[0] for t in result["config"]["ffe_tap_tuners"]]
+    assert result["config"]["tx_taps"][tx_ix][0]
+    assert result["config"]["rx_taps"][rx_ix][0]
+
+
 def test_optimize_eq_rejects_unknown_key(channel_segment):
     """Same guardrail as `run_simulation`: a typo in `config` fails loudly."""
     cfg = _with_channel(_fast_config(), channel_segment)

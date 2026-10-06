@@ -313,3 +313,24 @@ def test_rx_n_taps_disables_restored_taps_beyond_it(tmp_path: Path):
     assert [t.enabled for t in dut2.rx_taps[:10]] == [True] * 10
     assert not any(t.enabled for t in dut2.rx_taps[10:])
     assert not any(t.enabled for t in dut2.ffe_tap_tuners[10:])
+
+
+def test_rx_n_taps_enables_tuners_up_to_it_when_lengthened(tmp_path: Path):
+    """A config edited only to *lengthen* the Rx FFE must give `coopt()` (which searches the EQ
+    tuners) all `rx_n_taps` taps, even though the saved tuner tuples beyond the old length say
+    "disabled"; the taps themselves keep their saved enabled state (e.g. one the user disabled)."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.rx_n_taps = 10
+    dut.rx_taps[3].enabled = False  # Deliberately disabled by the user.
+    config = PyBertCfg(dut, "string_time", "test.test.test")
+    config.rx_n_taps = 13
+    save_file = tmp_path / "lengthened_ffe.yaml"
+    with open(save_file, "w", encoding="UTF-8") as f:
+        # Unsorted, as the MCP server writes configs: the tuner tuples then load *after* `rx_n_taps`.
+        yaml.dump(config, f, sort_keys=False)
+    dut2 = PyBERT(run_simulation=False, gui=False)
+    dut2.load_configuration(save_file)
+    assert [t.enabled for t in dut2.ffe_tap_tuners[:13]] == [True] * 13
+    assert not any(t.enabled for t in dut2.ffe_tap_tuners[13:])
+    assert not dut2.rx_taps[3].enabled
+    assert not any(t.enabled for t in dut2.rx_taps[13:])
