@@ -115,7 +115,7 @@ def make_bathtub(centers: Rvec, jit_pdf: Rvec, min_val: float = 0,
                                gaus_pdf(centers[half_len:] * 1e12, mu_r * 1e12, rj * 1e12)) * 1e-12
             jit_pdf_ext = moving_average(where(jit_pdf == 0, gaus_fit, jit_pdf), n=5)
         else:
-            jit_pdf_ext = jit_pdf
+            jit_pdf_ext = jit_pdf  # How to flag/log this for user?
         jit_pmf = array(jit_pdf_ext) * dt
 
     jit_cdf = cumsum(jit_pmf) * 2

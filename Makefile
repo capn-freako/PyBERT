@@ -5,7 +5,7 @@
 #
 # Copyright (c) 2015 David Banas; all rights reserved World wide.
 
-.PHONY: dflt help check tox format lint lint-fix flake8 type-check docs upload test clean distclean
+.PHONY: dflt help check format lint lint-fix type-check docs build upload upload_test test clean distclean
 
 SRC_DIR := src/pybert
 DOCS_DIR := docs
