@@ -71,7 +71,8 @@ only available live, right after `simulate()`, which is why `run_simulation` ret
 
 A git submodule (also a `uv` workspace member). Contains the `pyibisami` package. Its own `CLAUDE.md` at `PyAMI/CLAUDE.md` documents it in detail. Key invariants for PyBERT callers:
 
-- `IBISModel(ibis_file_name, debug=False, gui=True)` — **two-argument form only**; a removed third positional argument (`show_ui`) caused bugs; always pass `debug` and `gui` as keyword args.
+- `IBISModel(ibis_file_name)` — **one-argument form only** (pyibisami >= 10.0 removed `debug`/`gui`). It never opens dialogs itself; user-facing notices fire via its `alert` event (`Event(Str)`) and go to the `pyibisami` logger. `PyBERT` observes `alert` (`_log_ibis_alert`) and emits its own load notice (`_ibis_load_notice`), since notices fired during construction can't be observed.
+- PyBERT depends on `pyibis-ami[gui]`: `AMIParamConfigurator.open_gui()`, calling `IBISModel`/`Model` instances, and `Model.plot_iv` need the `gui` extra.
 - `AMIModel.get_responses()` returns `dict[AmiModelResponseKey, ...]` — access with the module-level constants, not strings.
 
 ### Traits/TraitsUI patterns

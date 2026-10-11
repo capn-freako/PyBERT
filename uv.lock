@@ -1269,15 +1269,6 @@ wheels = [
 ]
 
 [[package]]
-name = "importlib-resources"
-version = "7.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e4/06/b56dfa750b44e86157093bc8fca0ab81dccbf5260510de4eaf1cb69b5b99/importlib_resources-7.1.0.tar.gz", hash = "sha256:0722d4c6212489c530f2a145a34c0a7a3b4721bc96a15fada5930e2a0b760708", size = 44985, upload-time = "2026-04-12T16:36:09.232Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/db/55a262f3606bebcae07cc14095338471ad7c0bbcaa37707e6f0ee49725b7/importlib_resources-7.1.0-py3-none-any.whl", hash = "sha256:1bd7b48b4088eddb2cd16382150bb515af0bd2c70128194392725f82ad2c96a1", size = 37232, upload-time = "2026-04-12T16:36:08.219Z" },
-]
-
-[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3060,7 +3051,7 @@ dependencies = [
     { name = "parsec" },
     { name = "pychopmarg" },
     { name = "pyface" },
-    { name = "pyibis-ami" },
+    { name = "pyibis-ami", extra = ["gui"] },
     { name = "pyside6" },
     { name = "pyyaml" },
     { name = "scikit-rf" },
@@ -3110,7 +3101,7 @@ requires-dist = [
     { name = "parsec", specifier = "==3.17" },
     { name = "pychopmarg", editable = "PyChOpMarg" },
     { name = "pyface", specifier = "==8.0.0" },
-    { name = "pyibis-ami", editable = "PyAMI" },
+    { name = "pyibis-ami", extras = ["gui"], editable = "PyAMI" },
     { name = "pyside6", specifier = "==6.10.2" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "scikit-rf", specifier = "==2.0.1" },
@@ -3464,35 +3455,57 @@ wheels = [
 
 [[package]]
 name = "pyibis-ami"
-version = "9.3.1"
+version = "10.0.0.dev0"
 source = { editable = "PyAMI" }
 dependencies = [
-    { name = "chaco" },
     { name = "click" },
     { name = "empy" },
-    { name = "importlib-resources" },
-    { name = "jupyter" },
-    { name = "lxml-html-clean" },
-    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "papermill" },
     { name = "parsec" },
-    { name = "reportlab" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "traits" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "chaco" },
+    { name = "enable" },
+    { name = "jupyter" },
+    { name = "lxml-html-clean" },
+    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "papermill" },
+    { name = "reportlab" },
     { name = "traitsui" },
-    { name = "types-reportlab" },
+]
+gui = [
+    { name = "chaco" },
+    { name = "enable" },
+    { name = "traitsui" },
+]
+notebook = [
+    { name = "jupyter" },
+    { name = "lxml-html-clean" },
+    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "papermill" },
+]
+report = [
+    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "reportlab" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "m2r2" },
     { name = "mypy" },
+    { name = "pyibis-ami", extra = ["all"] },
+    { name = "pyside6" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
@@ -3500,37 +3513,43 @@ dev = [
     { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "sphinx", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "sphinx-rtd-theme" },
+    { name = "types-reportlab" },
     { name = "typing-extensions" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "chaco", specifier = "==6.1.1" },
+    { name = "chaco", marker = "extra == 'gui'", specifier = "==6.1.1" },
     { name = "click", specifier = "==8.4.2" },
     { name = "empy", specifier = "==4.2.1" },
-    { name = "importlib-resources", specifier = "==7.1.0" },
-    { name = "jupyter", specifier = "==1.1.1" },
-    { name = "lxml-html-clean", specifier = "==0.4.5" },
-    { name = "matplotlib", specifier = ">=3.6.1" },
+    { name = "enable", marker = "extra == 'gui'", specifier = "==6.1.0" },
+    { name = "jupyter", marker = "extra == 'notebook'", specifier = "==1.1.1" },
+    { name = "lxml-html-clean", marker = "extra == 'notebook'", specifier = "==0.4.5" },
+    { name = "matplotlib", marker = "extra == 'notebook'", specifier = ">=3.6.1" },
+    { name = "matplotlib", marker = "extra == 'report'", specifier = ">=3.6.1" },
     { name = "numpy", specifier = ">=1.26" },
-    { name = "papermill", specifier = "==2.7.0" },
+    { name = "papermill", marker = "extra == 'notebook'", specifier = "==2.7.0" },
     { name = "parsec", specifier = "==3.17" },
-    { name = "reportlab", specifier = "==5.0.0" },
+    { name = "pyibis-ami", extras = ["gui", "report", "notebook"], marker = "extra == 'all'", editable = "PyAMI" },
+    { name = "reportlab", marker = "extra == 'report'", specifier = "==5.0.0" },
     { name = "scipy", specifier = ">=1.15" },
     { name = "traits", specifier = "==7.1.0" },
-    { name = "traitsui", specifier = "==8.0.0" },
-    { name = "types-reportlab", specifier = "==4.5.1.20260712" },
+    { name = "traitsui", marker = "extra == 'gui'", specifier = "==8.0.0" },
 ]
+provides-extras = ["gui", "report", "notebook", "all"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "m2r2", specifier = ">=0.3.4" },
     { name = "mypy", specifier = ">=1.19.1" },
+    { name = "pyibis-ami", extras = ["all"], editable = "PyAMI" },
+    { name = "pyside6", specifier = "==6.10.2" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "sphinx", specifier = ">=8.1.3" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
+    { name = "types-reportlab", specifier = "==4.5.1.20260712" },
     { name = "typing-extensions", specifier = ">=4.15.0" },
 ]
 

@@ -1149,6 +1149,31 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             return
         self.tx_use_ami = new == "IBIS-AMI"
 
+    def _log_ibis_alert(self, event):
+        "Copy an ``IBISModel`` notice into the console log. (Its own GUI pops it up.)"
+        self.log(event.new)
+
+    def _ibis_load_notice(self, ibis):
+        "Tell the user whether the newly loaded IBIS model offers a usable AMI model."
+        if ibis.dll_file and ibis.ami_file:
+            msg = (
+                "There was an [Algorithmic Model] keyword in this model.\n"
+                "If you wish to use the AMI model associated with this IBIS model,\n"
+                "please, go to the 'Equalization' tab and enable it now."
+            )
+        elif ibis.model.is_ami:
+            msg = (
+                "There was an [Algorithmic Model] keyword for this model,\n"
+                "but no executable for your platform;\n"
+                "PyBERT native equalization modeling being used instead."
+            )
+        else:
+            msg = (
+                "There was no [Algorithmic Model] keyword for this model;\n"
+                "PyBERT native equalization modeling being used instead."
+            )
+        self.log(msg, alert=True)
+
     def _tx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
         dName = ""
@@ -1157,8 +1182,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.tx_use_ami = False
             self.tx_eq_sel = "Native"
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
+            ibis.observe(self._log_ibis_alert, "alert")
+            self._ibis_load_notice(ibis)
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
             dName = dirname(new_value)
@@ -1234,8 +1261,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.rx_use_ami = False
             self.rx_eq_sel = "Native"
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
+            ibis.observe(self._log_ibis_alert, "alert")
+            self._ibis_load_notice(ibis)
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
             dName = dirname(new_value)

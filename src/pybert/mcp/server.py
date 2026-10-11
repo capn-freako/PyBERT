@@ -148,7 +148,7 @@ def inspect_results_file(results_file: str) -> dict:
 
 def list_ibis_models(ibis_file: str) -> dict:
     """List the components and models defined in an IBIS file."""
-    model = IBISModel(ibis_file, debug=False, gui=False)
+    model = IBISModel(ibis_file)
     return {
         "components": list(model.model_dict["components"].keys()),
         "models": list(model.model_dict["models"].keys()),
@@ -167,7 +167,7 @@ def _safe_attr(obj: Any, name: str) -> Any:
 
 def inspect_ibis_model(ibis_file: str, model_name: str) -> dict:
     """Report the parameters of a single model from an IBIS file."""
-    ibis_model = IBISModel(ibis_file, debug=False, gui=False)
+    ibis_model = IBISModel(ibis_file)
     model = ibis_model.model_dict["models"][model_name]
     return {
         "type": model.mtype,
