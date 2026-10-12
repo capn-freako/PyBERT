@@ -188,7 +188,7 @@ it converges on the measured openings as `nbits`/`eye_bits` grow.
 
 A git submodule (also a `uv` workspace member). Contains the `pyibisami` package. Its own `CLAUDE.md` at `PyAMI/CLAUDE.md` documents it in detail. Key invariants for PyBERT callers:
 
-- `IBISModel(ibis_file_name, debug=False, gui=True)` — **two-argument form only**; a removed third positional argument (`show_ui`) caused bugs; always pass `debug` and `gui` as keyword args.
+- `IBISModel(ibis_file_name)` — the file name is its only argument (its old `debug`/`gui` arguments are gone). Parsing details log at `DEBUG` on the `pyibisami.ibis` logger; user-facing notices are logged and fired through its `alert` event, which `ibis()` (the model's own view) shows as pop-ups.
 - `AMIModel.get_responses()` returns `dict[AmiModelResponseKey, ...]` — access with the module-level constants, not strings.
 
 ### Traits/TraitsUI patterns

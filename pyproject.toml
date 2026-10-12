@@ -21,7 +21,7 @@ dependencies = [
     "parsec==3.17",
     "pychopmarg==3.2.0",
     "pyface==8.0.0",
-    "pyibis-ami==9.3.0",
+    "pyibis-ami[gui]==9.4.0",
     "pyside6==6.10.2",
     "pyyaml==6.0.3",
     "scikit-rf==2.0.1",

@@ -1171,7 +1171,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.tx_use_ami = False
             self.tx_eq_sel = "Native"
             self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._tx_ibis = ibis
             self.tx_ibis_valid = True
@@ -1248,7 +1248,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             self.rx_use_ami = False
             self.rx_eq_sel = "Native"
             self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
+            ibis = IBISModel(new_value)
             self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
             self._rx_ibis = ibis
             self.rx_ibis_valid = True
