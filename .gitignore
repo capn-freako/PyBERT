@@ -107,6 +107,7 @@ cython_debug/
 # Local files
 local/
 parsec.py/
+*.local.md
 
 # Temporary files
 .*

@@ -593,29 +593,41 @@ traits_view = View(
                             show_border=True,
                         ),
                         VGroup(  # CDR
+                            Item(
+                                name="cdr_type",
+                                label="Type",
+                                tooltip="Bang-Bang: adaptive edge-sampling loop (parameters below). "
+                                        "Mueller-Muller: fixed sampling phase, set by the Mueller-Muller criterion "
+                                        "on the slicer-input pulse response (as COM locates its cursor).",
+                            ),
                             HGroup(
                                 Item(
-                                    name="delta_t",
+                                    name="delta_t_ui",
                                     label="Delta-t",
                                     tooltip="magnitude of CDR proportional branch",
+                                    enabled_when="cdr_type == 'Bang-Bang'",
                                 ),
-                                Item(label="ps"),
+                                Item(label="UI"),
                             ),
-                            Item(name="alpha", label="Alpha", tooltip="relative magnitude of CDR integral branch"),
+                            Item(name="alpha", label="Alpha", tooltip="relative magnitude of CDR integral branch",
+                                 enabled_when="cdr_type == 'Bang-Bang'"),
                             Item(
                                 name="n_lock_ave",
                                 label="Lock Nave.",
                                 tooltip="# of UI estimates to average, when determining lock",
+                                enabled_when="cdr_type == 'Bang-Bang'",
                             ),
                             Item(
                                 name="rel_lock_tol",
                                 label="Lock Tol.",
                                 tooltip="relative tolerance for determining lock",
+                                enabled_when="cdr_type == 'Bang-Bang'",
                             ),
                             Item(
                                 name="lock_sustain",
                                 label="Lock Sus.",
                                 tooltip="length of lock determining hysteresis vector",
+                                enabled_when="cdr_type == 'Bang-Bang'",
                             ),
                             label="CDR",
                             show_border=True,

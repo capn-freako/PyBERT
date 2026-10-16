@@ -136,6 +136,12 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.rx_viterbi_symbols = the_PyBERT.rx_viterbi_symbols
         self.rx_n_taps = the_PyBERT.rx_n_taps
         self.rx_n_pre = the_PyBERT.rx_n_pre
+        self.rx_taps = []
+        for tap in the_PyBERT.rx_taps:
+            self.rx_taps.append((tap.enabled, tap.value, tap.min_val, tap.max_val))
+        self.ffe_tap_tuners = []
+        for tap in the_PyBERT.ffe_tap_tuners:
+            self.ffe_tap_tuners.append((tap.enabled, tap.pos, tap.min_val, tap.max_val, tap.step))
 
         # DFE
         self.sum_ideal = the_PyBERT.sum_ideal
@@ -146,7 +152,8 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.use_agc = the_PyBERT.use_agc
 
         # CDR
-        self.delta_t = the_PyBERT.delta_t
+        self.cdr_type = the_PyBERT.cdr_type
+        self.delta_t_ui = the_PyBERT.delta_t_ui
         self.alpha = the_PyBERT.alpha
         self.n_lock_ave = the_PyBERT.n_lock_ave
         self.rel_lock_tol = the_PyBERT.rel_lock_tol
@@ -207,6 +214,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
             raise TypeError("The data structure read in is NOT of type: PyBertCfg!")
 
         # Actually load values back into pybert.
+        legacy_delta_t_ps = None
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
                 for count, (enabled, val, min_val, max_val) in enumerate(value):
@@ -226,6 +234,19 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
                     pybert.dfe_tap_tuners[count].enabled = enabled
                     pybert.dfe_tap_tuners[count].min_val = min_val
                     pybert.dfe_tap_tuners[count].max_val = max_val
+            elif prop == "rx_taps":
+                for count, (enabled, val, min_val, max_val) in enumerate(value):
+                    pybert.rx_taps[count].enabled = enabled
+                    pybert.rx_taps[count].value = val
+                    pybert.rx_taps[count].min_val = min_val
+                    pybert.rx_taps[count].max_val = max_val
+            elif prop == "ffe_tap_tuners":
+                for count, (enabled, pos, min_val, max_val, step) in enumerate(value):
+                    pybert.ffe_tap_tuners[count].enabled = enabled
+                    pybert.ffe_tap_tuners[count].pos = pos
+                    pybert.ffe_tap_tuners[count].min_val = min_val
+                    pybert.ffe_tap_tuners[count].max_val = max_val
+                    pybert.ffe_tap_tuners[count].step = step
             elif prop in ("tx_eq_sel", "rx_eq_sel"):
                 lower_map = {"native": "Native", "ibis-ami": "IBIS-AMI"}
                 setattr(pybert, prop, lower_map.get(str(value).lower(), value))
@@ -242,8 +263,21 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
                 # Renamed to tx_sel/rx_sel; map old bool to new enum.
                 sel_attr = prop.replace("use_ibis", "sel")
                 setattr(pybert, sel_attr, "ibis" if value else "native")
+            elif prop == "delta_t":
+                legacy_delta_t_ps = value  # Converted below, once the config's own UI is known.
             else:
                 setattr(pybert, prop, value)
+
+        # Replaced by `delta_t_ui`, so the CDR's loop dynamics no longer depend on data rate;
+        # an old config's absolute step (ps) is converted exactly, preserving its behavior.
+        if legacy_delta_t_ps is not None and "delta_t_ui" not in vars(user_config):
+            pybert.delta_t_ui = legacy_delta_t_ps * 1.0e-12 / pybert.ui
+
+        # `rx_n_taps` decides how many Rx FFE taps exist; restoring the saved tap tuples (above)
+        # mustn't re-enable taps beyond it, e.g. in a config edited only to shorten the FFE.
+        for n, (tap, tuner) in enumerate(zip(pybert.rx_taps, pybert.ffe_tap_tuners)):
+            if n >= pybert.rx_n_taps:
+                tap.enabled = tuner.enabled = False
 
     def save(self, filepath: str | Path):
         """Save out pybert's current configuration to a file.

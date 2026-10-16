@@ -45,6 +45,7 @@ def sim(config_file, results):
     if not results:
         results = Path(config_file).with_suffix(".pybert_data")
     pybert.save_results(results)
+    print(pybert.status_str)
 
 
 @cli.command(context_settings={"help_option_names": ['-h', '--help']})

@@ -339,7 +339,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     use_agc = Bool(True)  #: Continuously adjust ``decision_scalar`` when True.
 
     # - CDR
-    delta_t = Float(0.1)  #: CDR proportional branch magnitude (ps).
+    #: CDR type: an adaptive bang-bang loop, or a Mueller-Muller clock, which samples at the
+    #: fixed phase where the slicer-input pulse response meets the Mueller-Muller criterion.
+    cdr_type = Enum("Bang-Bang", "Mueller-Muller")
+    delta_t_ui = Float(0.001)  #: CDR proportional branch magnitude (UI).
     alpha = Float(0.01)  #: CDR integral branch magnitude (unitless).
     n_lock_ave = Int(500)  #: CDR # of averages to take in determining lock.
     rel_lock_tol = Float(0.1)  #: CDR relative tolerance to use in determining lock.
