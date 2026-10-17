@@ -3493,7 +3493,7 @@ wheels = [
 
 [[package]]
 name = "pychopmarg"
-version = "3.3.0"
+version = "3.4.0"
 source = { editable = "PyChOpMarg" }
 dependencies = [
     { name = "click" },
