@@ -3258,6 +3258,7 @@ mcp = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "lxml-html-clean" },
     { name = "m2r2" },
     { name = "mcp" },
     { name = "mypy" },
@@ -3302,6 +3303,7 @@ provides-extras = ["mcp"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "lxml-html-clean", specifier = ">=0.4.5" },
     { name = "m2r2", specifier = ">=0.3.4" },
     { name = "mcp", specifier = ">=2.0.0" },
     { name = "mypy", specifier = ">=1.19.1" },

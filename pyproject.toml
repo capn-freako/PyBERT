@@ -145,6 +145,7 @@ pychopmarg = { workspace = true, editable = true }
 
 [dependency-groups]
 dev = [
+    "lxml-html-clean>=0.4.5",
     "m2r2>=0.3.4",
     "mcp>=2.0.0",
     "mypy>=1.19.1",
