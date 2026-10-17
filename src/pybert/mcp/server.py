@@ -156,27 +156,36 @@ def list_ibis_models(ibis_file: str) -> dict:
     }
 
 
-def _safe_attr(obj: Any, name: str) -> Any:
-    """`getattr`, tolerating attributes that only exist for some model types (e.g. `zout` is
-    driver-only, `zin` is receiver-only, on `pyibisami`'s `Model` class)."""
-    try:
-        return getattr(obj, name)
-    except AttributeError:
-        return None
+def _platform_ami_files(ibis_model: IBISModel, model: Any) -> tuple[Any, Any]:
+    """The model's executable and AMI files for this platform, resolved against the IBIS file's directory
+    (`None` if none). `I/O` models name them per direction, so they're given as `{"tx": ..., "rx": ...}`."""
+
+    def resolved(is_tx: bool | None) -> tuple[str | None, str | None]:
+        return tuple(  # type: ignore[return-value]
+            str(path) if (path := ibis_model.resolve_file(name)) else None for name in model.get_ami_files(is_tx)
+        )
+
+    if model.is_io:
+        (tx_dll, tx_ami), (rx_dll, rx_ami) = resolved(True), resolved(False)
+        return {"tx": tx_dll, "rx": rx_dll}, {"tx": tx_ami, "rx": rx_ami}
+    return resolved(None)
 
 
 def inspect_ibis_model(ibis_file: str, model_name: str) -> dict:
     """Report the parameters of a single model from an IBIS file."""
     ibis_model = IBISModel(ibis_file)
     model = ibis_model.model_dict["models"][model_name]
+    dll_file, ami_file = _platform_ami_files(ibis_model, model)
     return {
         "type": model.mtype,
         "is_ami": model.is_ami,
-        "zout": _jsonify(_safe_attr(model, "zout")),
-        "zin": _jsonify(_safe_attr(model, "zin")),
-        "ccomp": _jsonify(_safe_attr(model, "ccomp")),
-        "slew": _jsonify(_safe_attr(model, "slew")),
+        "zout": _jsonify(model.zout),  # `None` when not applicable (e.g. - `zout` of an `Input` model).
+        "zin": _jsonify(model.zin),
+        "ccomp": _jsonify(model.ccomp),
+        "slew": _jsonify(model.slew),
         "ami_files": model.ami_files,
+        "dll_file": dll_file,
+        "ami_file": ami_file,
         "test_configs": list(model.test_configs.keys()) if model.is_ami else [],
         "summary": str(model),
     }

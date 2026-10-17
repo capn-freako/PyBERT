@@ -116,6 +116,7 @@ parsec.py/
 .claude/*
 !.claude/skills/
 dummy*
+docs/plans/
 
 # Debugging output
 *_dbg.txt

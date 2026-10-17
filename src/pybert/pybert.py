@@ -25,7 +25,6 @@ import platform
 import time
 from copy import deepcopy
 from datetime import datetime, timezone, timedelta
-from os.path import dirname, join
 from pathlib import Path
 
 import numpy as np
@@ -83,6 +82,12 @@ from pybert.utility import (
     safe_log10,
     sdd_21,
     trim_impulse,
+)
+from pybert.utility.ibisami import (
+    PYBERT_RX_MODEL_TYPES,
+    PYBERT_TX_MODEL_TYPES,
+    resolve_ami_files,
+    set_pyibisami_logging,
 )
 
 gDebugStatus = False
@@ -481,6 +486,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         super().__init__()
 
         self.GUI = gui
+        set_pyibisami_logging(self.debug)
         self.log("Started.")
         self.log_information()
         if self.debug:
@@ -544,21 +550,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _btn_sel_tx_fired(self):
         self._tx_ibis()
-        if self._tx_ibis.dll_file and self._tx_ibis.ami_file:
-            self.tx_dll_file = join(self._tx_ibis_dir, self._tx_ibis.dll_file)
-            self.tx_ami_file = join(self._tx_ibis_dir, self._tx_ibis.ami_file)
-        else:
-            self.tx_dll_file = ""
-            self.tx_ami_file = ""
+        self.tx_dll_file, self.tx_ami_file = resolve_ami_files(self._tx_ibis, is_tx=True)
 
     def _btn_sel_rx_fired(self):
         self._rx_ibis()
-        if self._rx_ibis.dll_file and self._rx_ibis.ami_file:
-            self.rx_dll_file = join(self._rx_ibis_dir, self._rx_ibis.dll_file)
-            self.rx_ami_file = join(self._rx_ibis_dir, self._rx_ibis.ami_file)
-        else:
-            self.rx_dll_file = ""
-            self.rx_ami_file = ""
+        self.rx_dll_file, self.rx_ami_file = resolve_ami_files(self._rx_ibis, is_tx=False)
 
     def _btn_view_tx_fired(self):
         self._tx_ibis.model()
@@ -1149,13 +1145,17 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             return
         self.tx_use_ami = new == "IBIS-AMI"
 
+    def _debug_changed(self, new):
+        "Show pyibisami's debugging details on the terminal, too (e.g. - IBIS parsing, failed AMI calls)."
+        set_pyibisami_logging(new)
+
     def _log_ibis_alert(self, event):
         "Copy an ``IBISModel`` notice into the console log. (Its own GUI pops it up.)"
         self.log(event.new)
 
-    def _ibis_load_notice(self, ibis):
+    def _ibis_load_notice(self, ibis, has_ami_files):
         "Tell the user whether the newly loaded IBIS model offers a usable AMI model."
-        if ibis.dll_file and ibis.ami_file:
+        if has_ami_files:
             msg = (
                 "There was an [Algorithmic Model] keyword in this model.\n"
                 "If you wish to use the AMI model associated with this IBIS model,\n"
@@ -1164,7 +1164,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         elif ibis.model.is_ami:
             msg = (
                 "There was an [Algorithmic Model] keyword for this model,\n"
-                "but no executable for your platform;\n"
+                "but no executable for your platform and this direction (Tx/Rx);\n"
                 "PyBERT native equalization modeling being used instead."
             )
         else:
@@ -1174,32 +1174,44 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             )
         self.log(msg, alert=True)
 
+    def _load_ibis(self, ibis_file, is_tx):
+        """
+        Load an IBIS file for one side, offering only the ``Model_type`` s PyBERT can simulate there.
+
+        Returns:
+            The IBIS model, and its selected model's ``(dll, ami)`` files for that side
+            (``("", "")`` if it has none).
+
+        Raises:
+            ValueError: The file has no pin with a model PyBERT can simulate on that side.
+        """
+        side = "Tx" if is_tx else "Rx"
+        model_types = PYBERT_TX_MODEL_TYPES if is_tx else PYBERT_RX_MODEL_TYPES
+        self.log(f"Parsing {side} IBIS file, '{ibis_file}'...")
+        try:
+            ibis = IBISModel(ibis_file, model_types=model_types)
+        except ValueError as err:
+            raise ValueError(
+                f"No {side} model PyBERT can simulate (Model_type: {', '.join(sorted(model_types))}).\n{err}"
+            ) from err
+        self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
+        ibis.observe(self._log_ibis_alert, "alert")
+        ami_files = resolve_ami_files(ibis, is_tx)
+        self._ibis_load_notice(ibis, all(ami_files))
+        return ibis, ami_files
+
     def _tx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
-        dName = ""
         try:
             self.tx_ibis_valid = False
             self.tx_use_ami = False
             self.tx_eq_sel = "Native"
-            self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value)
-            self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
-            ibis.observe(self._log_ibis_alert, "alert")
-            self._ibis_load_notice(ibis)
-            self._tx_ibis = ibis
+            self._tx_ibis, (self.tx_dll_file, self.tx_ami_file) = self._load_ibis(new_value, is_tx=True)
             self.tx_ibis_valid = True
-            dName = dirname(new_value)
-            if self._tx_ibis.dll_file and self._tx_ibis.ami_file:
-                self.tx_dll_file = join(dName, self._tx_ibis.dll_file)
-                self.tx_ami_file = join(dName, self._tx_ibis.ami_file)
-            else:
-                self.tx_dll_file = ""
-                self.tx_ami_file = ""
         except Exception as err:  # pylint: disable=broad-exception-caught
             self.status = "IBIS file parsing error!"
             error_message = f"Failed to open and/or parse IBIS file!\n{err}"
             self.log(error_message, alert=True, exception=err)
-        self._tx_ibis_dir = dName
         self.status = "Done."
 
     def _tx_ami_file_changed(self, new_value):
@@ -1255,31 +1267,17 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _rx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
-        dName = ""
         try:
             self.rx_ibis_valid = False
             self.rx_use_ami = False
             self.rx_eq_sel = "Native"
-            self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value)
-            self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
-            ibis.observe(self._log_ibis_alert, "alert")
-            self._ibis_load_notice(ibis)
-            self._rx_ibis = ibis
+            self._rx_ibis, (self.rx_dll_file, self.rx_ami_file) = self._load_ibis(new_value, is_tx=False)
             self.rx_ibis_valid = True
-            dName = dirname(new_value)
-            if self._rx_ibis.dll_file and self._rx_ibis.ami_file:
-                self.rx_dll_file = join(dName, self._rx_ibis.dll_file)
-                self.rx_ami_file = join(dName, self._rx_ibis.ami_file)
-            else:
-                self.rx_dll_file = ""
-                self.rx_ami_file = ""
         except Exception as err:  # pylint: disable=broad-exception-caught
             self.status = "IBIS file parsing error!"
             error_message = f"Failed to open and/or parse IBIS file!\n{err}"
             self.log(error_message, alert=True)
             raise
-        self._rx_ibis_dir = dName
         self.status = "Done."
 
     def _rx_ami_file_changed(self, new_value):
@@ -1476,28 +1474,39 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 res = ntwk2**s2p
             return (res, ts4N, ntwk2)
 
+        def ibis_value(ibis, name):
+            "A value PyBERT needs from the selected IBIS model; pyibisami gives ``None`` when the model has none."
+            value = getattr(ibis.model, name)
+            if value is None:
+                raise ValueError(f"IBIS model `{ibis.mod}` (Model_type: {ibis.model.mtype}) has no `{name}` value.")
+            return value
+
+        def ts4_file(ibis, cfg):
+            "The AMI model's ``Ts4file``, resolved against the IBIS file's directory."
+            fname = cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"])
+            fpath = ibis.resolve_file(fname) if fname else None
+            if fpath is None:
+                raise ValueError(f"The AMI model of IBIS model `{ibis.mod}` has an empty `Ts4file`.")
+            return str(fpath)
+
         if self.tx_sel == "ibis":
-            model = self._tx_ibis.model
-            Rs = model.zout * 2
-            Cs = model.ccomp[0] / 2  # They're in series.
+            Rs = ibis_value(self._tx_ibis, "zout") * 2
+            Cs = ibis_value(self._tx_ibis, "ccomp")[0] / 2  # They're in series.
             self.Rs = Rs  # Primarily for debugging.
             self.Cs = Cs
             if self.tx_use_ts4:
-                fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]))
-                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
+                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, ts4_file(self._tx_ibis, self._tx_cfg))
                 self.ts4N = ts4N
                 self.ntwk = ntwk
         if self.rx_sel == "ibis":
-            model = self._rx_ibis.model
-            RL = model.zin * 2
-            Cp = model.ccomp[0] / 2
+            RL = ibis_value(self._rx_ibis, "zin") * 2
+            Cp = ibis_value(self._rx_ibis, "ccomp")[0] / 2
             self.RL = RL  # Primarily for debugging.
             self.Cp = Cp
             if self.debug:
                 self.log(f"RL: {RL}, Cp: {Cp}")
             if self.rx_use_ts4:
-                fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]))
-                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
+                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, ts4_file(self._rx_ibis, self._rx_cfg), isRx=True)
                 self.ts4N = ts4N
                 self.ntwk = ntwk
         ch_s2p.name = "ch_s2p"
@@ -1684,11 +1693,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.log(f"Kiva Backend: {ETSConfig.kiva_backend}")
 
     _tx_ibis = Instance(IBISModel)
-    _tx_ibis_dir = ""
     _tx_cfg = Instance(AMIParamConfigurator)
     _tx_model = Instance(AMIModel)
     _rx_ibis = Instance(IBISModel)
-    _rx_ibis_dir = ""
     _rx_cfg = Instance(AMIParamConfigurator)
     _rx_model = Instance(AMIModel)
 
