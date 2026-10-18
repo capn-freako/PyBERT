@@ -188,7 +188,8 @@ it converges on the measured openings as `nbits`/`eye_bits` grow.
 
 A git submodule (also a `uv` workspace member). Contains the `pyibisami` package. Its own `CLAUDE.md` at `PyAMI/CLAUDE.md` documents it in detail. Key invariants for PyBERT callers:
 
-- `IBISModel(ibis_file_name)` — the file name is its only argument (its old `debug`/`gui` arguments are gone). Parsing details log at `DEBUG` on the `pyibisami.ibis` logger; user-facing notices are logged and fired through its `alert` event, which `ibis()` (the model's own view) shows as pop-ups.
+- `IBISModel(ibis_file_name)` — **one-argument form only** (pyibisami >= 10.0 removed `debug`/`gui`). It never opens dialogs itself; user-facing notices fire via its `alert` event (`Event(Str)`) and go to the `pyibisami` logger. `PyBERT` observes `alert` (`_log_ibis_alert`) and emits its own load notice (`_ibis_load_notice`), since notices fired during construction can't be observed.
+- PyBERT depends on `pyibis-ami[gui]`: `AMIParamConfigurator.open_gui()`, calling `IBISModel`/`Model` instances, and `Model.plot_iv` need the `gui` extra.
 - `AMIModel.get_responses()` returns `dict[AmiModelResponseKey, ...]` — access with the module-level constants, not strings.
 
 ### Traits/TraitsUI patterns

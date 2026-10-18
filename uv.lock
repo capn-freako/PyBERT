@@ -1996,14 +1996,14 @@ wheels = [
 
 [[package]]
 name = "mako"
-version = "1.3.12"
+version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markupsafe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/62/791b31e69ae182791ec67f04850f2f062716bbd205483d63a215f3e062d3/mako-1.3.12.tar.gz", hash = "sha256:9f778e93289bd410bb35daadeb4fc66d95a746f0b75777b942088b7fd7af550a", size = 400219, upload-time = "2026-04-28T19:01:08.512Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/7f/0b891a82379ffd96d2d8cc6d435fb1055cdaed52829287f81d2a43fd71cb/mako-1.4.2.tar.gz", hash = "sha256:7227a060ee3af55a493af61d73d6beef13044b81dba9586736c13945f09464ce", size = 412231, upload-time = "2026-09-22T20:40:55.06Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/b1/a0ec7a5a9db730a08daef1fdfb8090435b82465abbf758a596f0ea88727e/mako-1.3.12-py3-none-any.whl", hash = "sha256:8f61569480282dbf557145ce441e4ba888be453c30989f879f0d652e39f53ea9", size = 78521, upload-time = "2026-04-28T19:01:10.393Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/bb/0e4c30a18858adebc75496ea8a8c3fb65cbf4b36ea1c5028ed8a0a5fa196/mako-1.4.2-py3-none-any.whl", hash = "sha256:e70a2a4308952b33a21208bfd6725da79fae5a8c224578f8cfdeb60e5ace03df", size = 80163, upload-time = "2026-09-22T20:40:56.423Z" },
 ]
 
 [[package]]
@@ -3703,7 +3703,7 @@ wheels = [
 
 [[package]]
 name = "pyibis-ami"
-version = "10.0.0.dev0"
+version = "10.0.0rc0"
 source = { editable = "PyAMI" }
 dependencies = [
     { name = "click" },
@@ -3775,7 +3775,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chaco", marker = "extra == 'gui'", specifier = "==6.1.1" },
-    { name = "click", specifier = "==8.4.2" },
+    { name = "click", specifier = ">=8.4.2,<9" },
     { name = "empy", specifier = "==4.2.1" },
     { name = "enable", marker = "extra == 'gui'", specifier = "==6.1.0" },
     { name = "jupyter", marker = "extra == 'notebook'", specifier = "==1.1.1" },
@@ -3786,9 +3786,9 @@ requires-dist = [
     { name = "parsec", specifier = "==3.17" },
     { name = "pyibis-ami", extras = ["gui", "report", "notebook"], marker = "extra == 'all'", editable = "PyAMI" },
     { name = "pyibis-ami", extras = ["report"], marker = "extra == 'notebook'", editable = "PyAMI" },
-    { name = "reportlab", marker = "extra == 'report'", specifier = "==5.0.0" },
+    { name = "reportlab", marker = "extra == 'report'", specifier = "==5.0.1" },
     { name = "scipy", marker = "extra == 'report'", specifier = ">=1.15" },
-    { name = "traits", specifier = "==7.1.0" },
+    { name = "traits", specifier = ">=7.1,<8" },
     { name = "traitsui", marker = "extra == 'gui'", specifier = "==8.0.0" },
 ]
 provides-extras = ["gui", "report", "notebook", "all"]
@@ -3804,20 +3804,20 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "sphinx", specifier = ">=8.1.3" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
-    { name = "types-reportlab", specifier = "==4.5.1.20260712" },
+    { name = "types-reportlab", specifier = "==5.0.0.20261008" },
     { name = "typing-extensions", specifier = ">=4.15.0" },
 ]
 
 [[package]]
 name = "pyjwt"
-version = "2.13.0"
+version = "2.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/81/58d0ac84e1ef3a3843791d6954d94c0b33d526c75eeb1efbce9d0a4c4077/pyjwt-2.13.0.tar.gz", hash = "sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423", size = 107515, upload-time = "2026-05-21T19:54:36.618Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/a5/5197bfd06417837ac079921c66fa6393f1dea3557272a263cebfef69e432/pyjwt-2.15.0.tar.gz", hash = "sha256:b11c5f9791d7bf51c2b39a81ed669f6b2dbbd669df2942f6c60167e9e3d1abe4", size = 120513, upload-time = "2026-09-23T16:56:00.689Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/5e/ecf12fdb62546d64385c158514e9b2b671f7832108ef2ecd2020ce0af2d1/pyjwt-2.13.0-py3-none-any.whl", hash = "sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728", size = 31274, upload-time = "2026-05-21T19:54:35.362Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/55/40e45bf052ee8ee12a4dfd785519660f8effa7b065442b91646ec6828619/pyjwt-2.15.0-py3-none-any.whl", hash = "sha256:7a3742debf6b879e912dbb9819ceec1594be812452b78c5f2e2dfc56564954f8", size = 33680, upload-time = "2026-09-23T16:55:59.241Z" },
 ]
 
 [package.optional-dependencies]
@@ -4129,15 +4129,15 @@ wheels = [
 
 [[package]]
 name = "reportlab"
-version = "5.0.0"
+version = "5.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "charset-normalizer" },
     { name = "pillow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/41/d6/4b7b0cf56880eb96533e607967be6a939e344675601e033d113a0bfa1f4e/reportlab-5.0.0.tar.gz", hash = "sha256:e4494a0c6623ae213bb856fba523171b2b54a7bf629fda02d5e525a7b899a784", size = 3701928, upload-time = "2026-06-18T11:34:31.145Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/51/dbe28534ae12c852f61be91f039f343305fd1f34f1c66b8de75afae7a525/reportlab-5.0.1.tar.gz", hash = "sha256:ebd13154be1c8515e665de70bd2d303ae9ddc3ef47e44afd5116441ca0283a26", size = 3945711, upload-time = "2026-08-20T13:48:16.461Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/07/70085c17a369605f15e301d10ab902115019b1126c7253d964afc230c7d6/reportlab-5.0.0-py3-none-any.whl", hash = "sha256:9d5a3affa84919e1111ede580031266a570e93b1ce388219621347965ff1d93c", size = 1956710, upload-time = "2026-06-18T11:34:29.07Z" },
+    { url = "https://files.pythonhosted.org/packages/db/cb/dacbc268cb68d0428ea2cbd85266195a9ab3e677449589ddae59bd7542ac/reportlab-5.0.1-py3-none-any.whl", hash = "sha256:1c36e6bb0e71780c72331eba60da7f602e8d4389a8723825af71342e49d791e8", size = 1957258, upload-time = "2026-08-20T13:48:14.026Z" },
 ]
 
 [[package]]
@@ -5101,11 +5101,11 @@ wheels = [
 
 [[package]]
 name = "types-reportlab"
-version = "4.5.1.20260712"
+version = "5.0.0.20261008"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/64/bc/cb7e7d7c4077216626791f094873a917ccfe31035daaa6d85d7aaf75bbc2/types_reportlab-4.5.1.20260712.tar.gz", hash = "sha256:7c7a64b21abfb811dd323e47d6be409666820dadb587d6c2e771237b99446ac1", size = 72451, upload-time = "2026-07-12T05:13:24.037Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/28/ea9ed246af4bfc37fa05e0df6e201c3099cba529dd7a09909ac84a781567/types_reportlab-5.0.0.20261008.tar.gz", hash = "sha256:d34b4d9147eed7facb04594fbae59ba3d49294f8b4267ff05bcefcce0c07f499", size = 73094, upload-time = "2026-10-08T08:06:32.478Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/2c/cc3702c5e34eca04e243fb31dbeeda444f087590c54a6b56e2ebb1d1401e/types_reportlab-4.5.1.20260712-py3-none-any.whl", hash = "sha256:11e6bc24576d2c9f935e419b299b609b6253a9caad475e7b775fe38ed426684a", size = 113013, upload-time = "2026-07-12T05:13:23.023Z" },
+    { url = "https://files.pythonhosted.org/packages/29/d1/5c6c28a4ea82b9bc30e9b4e103537251f180515e9d3775086fb1419a405e/types_reportlab-5.0.0.20261008-py3-none-any.whl", hash = "sha256:736b2edf636a624bd0989e058cbdee9575604cc80371549488fff40e27bb3b32", size = 113268, upload-time = "2026-10-08T08:06:31.446Z" },
 ]
 
 [[package]]
