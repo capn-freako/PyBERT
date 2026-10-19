@@ -3703,7 +3703,7 @@ wheels = [
 
 [[package]]
 name = "pyibis-ami"
-version = "10.0.0rc0"
+version = "10.0.0"
 source = { editable = "PyAMI" }
 dependencies = [
     { name = "click" },
