@@ -268,7 +268,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         sample_times: Rvec,
         signal: Rvec,
         use_agc: bool = False,
-        dbg_dict: Optional[dict[str, Any]] = None
+        dbg_dict: Optional[dict[str, Any]] = None,
+        clock_phase: Optional[float] = None,
     ) -> tuple[Rvec, list[list[float]], Rvec, Rvec, list[bool], Rvec, list[int], Rvec, Rvec]:
 
         """
@@ -282,6 +283,10 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             use_agc: Perform continuous adjustment of `decision_scaler` when True.
                 Default: False
             dbg_dict: Optional dictionary, for stashing debugging information at runtime.
+                Default: None
+            clock_phase: When given, clock at this fixed time (s) within each UI, at the nominal UI,
+                and consider the clock locked from the start, instead of running the bang-bang CDR.
+                (Used for the Mueller-Muller CDR type, whose lock phase is found from the pulse response.)
                 Default: None
 
         Returns:
@@ -316,8 +321,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         nxt_filter_out = 0.0
         last_clock_sample = 0.0
         next_boundary_time = 0.0
-        next_clock_time = ui / 2.0
-        locked = False
+        next_clock_time = ui / 2.0 if clock_phase is None else clock_phase
+        locked = clock_phase is not None
         n_slicer_samps = 0
         n_ave_samps = 0
 
@@ -357,10 +362,15 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                     else:
                         samples -= thresholds[1]
                 elif mod_type == 2:  # PAM-4
-                    pass
+                    # Only transitions symmetric about 0V (-1<->+1, -1/3<->+1/3) cross it mid-UI;
+                    # the others' early/late votes are set by the data, not the clock phase,
+                    # and can walk the CDR off by a whole UI. Present those as "no transition".
+                    if self.decide(last_clock_sample)[0] != -self.decide(current_clock_sample)[0]:
+                        samples[0] = samples[2]
                 else:
                     raise RuntimeError("ERROR: DFE.run(): Unrecognized modulation type!")
-                ui, locked = self.cdr.adapt(samples)
+                if clock_phase is None:
+                    ui, locked = self.cdr.adapt(samples)
                 decision, new_bits = self.decide(sum_out)
                 bits.extend(new_bits)
                 sig_samps.append(sum_out)

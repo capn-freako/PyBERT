@@ -3,8 +3,9 @@
 import numpy as np
 import pytest
 from scipy.integrate import quad
+from scipy.stats import norm
 
-from pybert.utility.math import all_combs, gaus_pdf, lfsr_bits, make_bathtub, safe_log10
+from pybert.utility.math import all_combs, gaus_pdf, lfsr_bits, make_bathtub, make_vert_bathtubs, safe_log10
 
 
 class TestSafeLog10:
@@ -103,3 +104,40 @@ class TestMakeBathtub:
         jit_pdf[n // 2] = 1.0 / (centers[2] - centers[1])
         result = make_bathtub(centers, jit_pdf, min_val=0)
         assert np.all(result >= 0)
+
+
+def _opening(v, bathtub, p):
+    best = int(np.argmin(bathtub))
+    lo = np.interp(p, bathtub[:best + 1][::-1], v[:best + 1][::-1])
+    hi = np.interp(p, bathtub[best:], v[best:])
+    return hi - lo
+
+
+class TestMakeVertBathtubs:
+    def test_one_eye_per_adjacent_level_pair(self):
+        rng = np.random.default_rng(0)
+        d = rng.choice([-1.0, -1 / 3, 1 / 3, 1.0], 4000)
+        eyes = make_vert_bathtubs(d + rng.normal(0, 0.02, len(d)), d)
+        assert len(eyes) == 3
+        assert all(v[0] < v[-1] for v, _ in eyes)
+
+    @pytest.mark.parametrize("ber", [1e-5, 1e-8])
+    def test_gaussian_levels_extrapolate_to_analytic_opening(self, ber):
+        """Levels at +/-1 with Gaussian noise (sigma = 0.1): at `ber`, each eye edge sits
+        where one level's tail alone reaches `ber`, i.e. 1 - sigma * Q^-1(ber) from center.
+        (Tolerance: half a sigma in total -- the fitted tail's own statistical uncertainty,
+        magnified by Q^-1(ber), when extrapolating decades beyond 10k samples.)"""
+        rng = np.random.default_rng(0)
+        d = rng.choice([-1.0, 1.0], 10000)
+        (v, bathtub), = make_vert_bathtubs(d + rng.normal(0, 0.1, len(d)), d)
+        assert _opening(v, bathtub, ber) == pytest.approx(2 * (1 - 0.1 * norm.isf(ber)), abs=0.05)
+
+    def test_bounded_tails_not_extrapolated_as_wide_gaussian(self):
+        """Uniform (hard-bounded) level spread, like residual ISI: the eye stays open well
+        beyond what a Gaussian with the same standard deviation would allow."""
+        rng = np.random.default_rng(0)
+        d = rng.choice([-1.0, 1.0], 10000)
+        s = d + rng.uniform(-0.5, 0.5, len(d))  # std = 0.289; Gaussian 1e-5 opening would be < 0
+        (v, bathtub), = make_vert_bathtubs(s, d)
+        assert bathtub.min() < 1e-5
+        assert _opening(v, bathtub, 1e-5) > 0.5

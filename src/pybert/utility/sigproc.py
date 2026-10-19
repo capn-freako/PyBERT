@@ -20,7 +20,7 @@ from numpy import (
     arange, argmax, array, concatenate, convolve, cos, cumsum, diff, maximum,
     mean, minimum, ones, pad, pi, roll, sign, where, zeros, floating
 )
-from numpy.fft import rfft
+from numpy.fft import irfft, rfft
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
@@ -310,13 +310,14 @@ def trim_impulse(g: Rvec, min_len: int = 0, max_len: int = 1000000, front_porch:
     return (_g[ix_beg:ix_end], ix_beg - half_len)
 
 
-def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments
+def make_ctle(
+    rx_bw: float,
+    peak_freq: float,
+    peak_mag: float,
+    w: Rvec
+) -> tuple[Rvec, Cvec]:  # pylint: disable=too-many-arguments
     """
-    Generate the frequency response of a continuous time linear equalizer (CTLE), given the:
-
-        - signal path bandwidth,
-        - peaking specification, and
-        - list of frequencies of interest.
+    Generate the frequency response of a continuous time linear equalizer (CTLE).
 
     Args:
         rx_bw: The natural (or, unequalized) signal path bandwidth (Hz).
@@ -342,6 +343,9 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
                 - the user specified peaking frequency.
 
             - The zero location is chosen, so as to provide the desired degree of peaking.
+
+        2. For the impulse response, use ``make_ctle_h()``, rather than ``irfft()`` of this over a
+        frequency grid that may end too close to ``rx_bw``.
     """
 
     p2 = -2.0 * pi * rx_bw
@@ -358,6 +362,33 @@ def make_ctle(rx_bw: float, peak_freq: float, peak_mag: float, w: Rvec) -> tuple
     H /= max(abs(H))
 
     return (w, H)
+
+
+def make_ctle_h(rx_bw: float, peak_freq: float, peak_mag: float, t: Rvec) -> Rvec:
+    """
+    Generate the impulse response of the CTLE described by ``make_ctle()``.
+
+    The frequency response is sampled out to 100x its highest pole frequency (-40 dB, at 20 dB/dec.),
+    independent of any simulation frequency grid, which may end too close to ``rx_bw``
+    to represent the CTLE's roll-off (e.g. - ``f_max`` = ``rx_bw`` gives a distorted, ringing impulse response).
+
+    Args:
+        rx_bw: The natural (or, unequalized) signal path bandwidth (Hz).
+        peak_freq: The location of the desired peak in the frequency response (Hz).
+        peak_mag: The desired relative magnitude of the peak (dB).
+        t: Uniformly spaced sample times (s).
+
+    Returns:
+        The impulse response, sampled at ``t``, normalized so that its sum is the CTLE's d.c. gain.
+    """
+
+    f_max = 100 * max(rx_bw, peak_freq)
+    f = arange(0, f_max + 10e6, 10e6)  # 10 MHz resolution, including `f_max`.
+    _, H = make_ctle(rx_bw, peak_freq, peak_mag, 2 * pi * f)
+    _h = irfft(H)
+    t_h = arange(len(_h)) * 0.5 / f[-1]
+    h = interp1d(t_h, _h, bounds_error=False, fill_value=0)(t)
+    return h * _h.sum() / h.sum()
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
@@ -461,7 +492,12 @@ def make_uniform(t: Rvec, jitter: Rvec, ui: float, nbits: int) -> tuple[Rvec, li
 
 
 def add_ffe_dfe(
-    ffe_weights: Rvec, dfe_weights: Rvec, nspui: int, pr_ctle_out: Rvec
+    ffe_weights: Rvec,
+    dfe_weights: Rvec,
+    nspui: int,
+    pr_ctle_out: Rvec,
+    decision_scaler: float = 1.0,
+    curs_ix: Optional[int] = None
 ) -> Rvec:
     """
     Add the effects of the FFE and DFE to the cumulative system pulse response at the CTLE output.
@@ -472,12 +508,21 @@ def add_ffe_dfe(
         nspui: Number of vector samples per unit interval.
         pr_ctle_out: Cumulative system pulse response at CTLE output.
 
+    Keyword Args:
+        decision_scaler: Voltage magnitude of slicer output.
+            Default: 1.0
+        curs_ix: Index of the cursor sampling instant in the FFE output, which the DFE taps are timed from.
+            Default: the FFE output's peak.
+
     Returns:
         Complete system pulse response, including the effects of the Rx FFE and DFE.
 
     Raises:
         ValueError: If given post-CTLE pulse response is clearly non-optimum.
             (Used to improve overall performance of exhaustive optimization.)
+        IndexError: If ``curs_ix`` lies outside the pulse response, or the DFE's taps extend past its end.
+            (A bug, not a non-optimum candidate: NumPy slicing would otherwise silently skip, truncate, or
+            -- for a negative index -- wrap around to the wrong end of the pulse response.)
     """
 
     # Add the effect of FFE.
@@ -486,44 +531,60 @@ def add_ffe_dfe(
         p_tot = convolve(pr_ctle_out, h_ffe)[:len(pr_ctle_out)]
     else:
         p_tot = pr_ctle_out.copy()
-    curs_ix = where(p_tot == max(p_tot))[0][0]
+    peak_ix = where(p_tot == max(p_tot))[0][0]
 
     # Test for obvious "to ignore" cases.
     if p_tot[argmax(abs(p_tot))] < 0:
         raise ValueError("Main peak is negative!")
-    if curs_ix > len(p_tot) // 2:
+    if peak_ix > len(p_tot) // 2:
         raise ValueError("Main peak occurs in right half of waveform!")
+    if curs_ix is None:
+        curs_ix = peak_ix
+    if not 0 <= curs_ix < len(p_tot):
+        raise IndexError(f"Cursor index {curs_ix} is outside the pulse response (length {len(p_tot)}).")
+    if curs_ix + nspui // 2 + len(dfe_weights) * nspui > len(p_tot):
+        raise IndexError(f"The DFE's last tap (of {len(dfe_weights)}) extends past the end of the pulse response "
+                         f"(length {len(p_tot)}).")
 
     # Add the effect of DFE.
-    h_dfe = fir_tap_weights_to_imp_resp(list(dfe_weights), nspui)
-    p_tot = convolve(p_tot, h_dfe)[:len(p_tot)]
+    for n, dfe_weight in enumerate(dfe_weights):
+        start = curs_ix + nspui // 2 + n * nspui  # Each tap only corrects its own UI.
+        p_tot[start:start + nspui] -= dfe_weight * decision_scaler
 
     return p_tot
 
 
-def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int) -> Rvec:
+def get_dfe_weights(dfe_taps: list[TxTapTuner], pr: Rvec, nspui: int, decision_scaler: float) -> Rvec:
     """
     Get the ideal DFE tap weights, given the tap tuners and pulse response, using PRZF.
 
+    Weights are in the DFE's own units: the ISI each tap cancels, divided by its slicer level.
+
     Args:
         dfe_taps: List of ``TxTapTuners`` governing DFE tap weight ranges.
-        pr: Pulse response to be equalized.
+            Only the leading, contiguous enabled taps are used (no floating taps).
+        pr: Pulse response at the DFE input (i.e. - after any Rx FFE).
         nspui: Number of vector samples per unit interval.
+        decision_scaler: The DFE's slicer level.
 
     Returns:
-        List of ideal DFE tap weights.
+        List of ideal DFE tap weights, one per tuner (zero for unused taps).
     """
 
-    n_taps = len(dfe_taps)
-    min_weights = array([t.min_val for t in dfe_taps])
-    max_weights = array([t.max_val for t in dfe_taps])
+    n_taps = 0
+    for tap in dfe_taps:
+        if not tap.enabled:
+            break
+        n_taps += 1
+    min_weights = array([t.min_val for t in dfe_taps[:n_taps]])
+    max_weights = array([t.max_val for t in dfe_taps[:n_taps]])
 
     curs_ix = where(pr == max(pr))[0][0]
-    curs_amp = pr[curs_ix]
-    ideal_weights = pr[curs_ix + nspui: curs_ix + n_taps * nspui + 1: nspui] / curs_amp  # "+ 1" to ensure last one gets included.
-    actual_weights = minimum(max_weights, maximum(min_weights, ideal_weights))
+    isi = pr[curs_ix + nspui: curs_ix + n_taps * nspui + 1: nspui]  # "+ 1" to ensure last one gets included.
+    weights = zeros(len(dfe_taps))
+    weights[:len(isi)] = minimum(max_weights[:len(isi)], maximum(min_weights[:len(isi)], isi / decision_scaler))
 
-    return actual_weights
+    return weights
 
 
 def get_peak_info(t: Rvec, y: Rvec) -> tuple[int, float, float]:

@@ -82,3 +82,15 @@ class TestViterbiPAM4(object):
         """Test simulation bit errors."""
         n_errs = pdut.n_errs_viterbi
         assert n_errs == 0, f"{n_errs} bit errors from Viterbi decoder detected!"
+
+
+@pytest.mark.parametrize("pdut", [{"mod_type": "PAM-4", "vod": 0.77, "rn": 0.001, "rx_use_viterbi": True,
+                                   "rx_viterbi_symbols": 2}], indirect=True)
+def test_viterbi_in_simulation_with_nonunity_vod(pdut):
+    """With a Tx output voltage other than 1 V, the Viterbi (MLSD) decoder's expected observations must be scaled to
+    the transmitted amplitude, and its noise model must reflect the real spread at the slicer: it once used unit-
+    amplitude expectations and sigma = `rn`, so (almost) every state had zero probability and it made ~40% bit
+    errors on channels the DFE path decodes error-free."""
+    assert pdut.n_errs_dfe == 0
+    assert pdut.n_errs_viterbi == 0
+    assert "WARNING" not in pdut.dbg_dict_viterbi.get("log", "")

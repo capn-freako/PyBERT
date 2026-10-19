@@ -37,7 +37,7 @@ from numpy import (
     where,
     zeros,
 )
-from numpy.fft import rfft, irfft
+from numpy.fft import rfft
 from numpy.random import normal
 from numpy.typing import NDArray
 from scipy.signal import iirfilter, lfilter
@@ -46,6 +46,7 @@ from scipy.interpolate import interp1d
 from chaco.api import Plot
 
 from pyibisami.ami.parser import AmiLeaf, AmiName, AmiNode, ami_parse
+from pychopmarg.utility import loc_curs
 
 from ..common import Rvec
 from ..utility import (
@@ -58,7 +59,7 @@ from ..utility import (
     fst, snd,
     import_channel,
     make_bathtub,
-    make_ctle,
+    make_ctle_h,
     resize_zero_pad,
     run_ami_model,
     safe_log10,
@@ -153,9 +154,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
     # Pull class variables into local storage, performing unit conversion where necessary.
     t = self.t
-    t_irfft = self.t_irfft
     f = self.f
-    w = self.w
     bits = self.bits
     symbols = self.symbols
     ffe = self.ffe
@@ -172,9 +171,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     peak_freq = self.peak_freq * 1.0e9
     peak_mag = self.peak_mag
     ctle_enable = self.ctle_enable
-    delta_t = self.delta_t * 1.0e-12
-    alpha = self.alpha
     ui = self.ui
+    delta_t = self.delta_t_ui * ui
+    alpha = self.alpha
     gain = self.gain
     n_ave = self.n_ave
     decision_scaler = self.decision_scaler
@@ -283,14 +282,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             else:
                 ctle_h *= ts  # Normalize to (V/sample)
             ctle_h = resize_zero_pad(ctle_h, len_t)
-            ctle_H = rfft(ctle_h)  # ToDo: This needs interpolation first.
         else:
             if ctle_enable:
-                _, ctle_H = make_ctle(rx_bw, peak_freq, peak_mag, w)
-                _ctle_h = irfft(ctle_H)
-                krnl = interp1d(t_irfft, _ctle_h, bounds_error=False, fill_value=0)
-                ctle_h = krnl(t)
-                ctle_h *= sum(_ctle_h) / sum(ctle_h)
+                ctle_h = make_ctle_h(rx_bw, peak_freq, peak_mag, t)
                 ctle_h, _ = trim_impulse(ctle_h, front_porch=False, min_len=min_len, max_len=max_len)
             else:
                 ctle_h = array([1.] + [0. for _ in range(min_len - 1)])
@@ -484,7 +478,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     ffe_h = array([1] + [0] * (nspui - 1))  # i.e. - no FFE, by default
     # If using PyBERT native Rx model, check for FFE.
     if not self.rx_use_ami and any(tap.enabled for tap in self.rx_taps):
-        ffe_h = array(concat_lists([[x.value] + list(zeros(nspui - 1)) for x in self.rx_taps]))
+        ffe_h = array(concat_lists([[x.value if x.enabled else 0.0] + list(zeros(nspui - 1)) for x in self.rx_taps]))
     ffe_h = resize_zero_pad(ffe_h, len_h)
     ffe_out_h = convolve(ffe_h, ctle_out_h)[:len_h]
     ffe_out = convolve(ctle_out, ffe_h)[:len(ctle_out)]
@@ -540,7 +534,25 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits)
 
-    self.decision_scaler = 0.0
+    # A Mueller-Muller CDR samples at a fixed phase: where the slicer-input pulse response meets the
+    # Mueller-Muller criterion, anticipating DFE tap 1 (within its limits) -- as COM locates its cursor.
+    clock_phase: Optional[float] = None
+    if self.cdr_type == "Mueller-Muller" and not ami_getwave_clocks:
+        dfe_max, dfe_min = (array([limits[0][1]]), array([limits[0][0]])) if limits else (zeros(1), zeros(1))
+        curs_ix = loc_curs(ffe_out_p, nspui, dfe_max, dfe_min)
+        clock_phase = (curs_ix % nspui - 0.5) * ts  # half a sample early, so the clock lands on sample `curs_ix`
+        # That lock point presumes DFE tap 1 has converged to the value it anticipates (93A-26); start it there.
+        # (From zero, the decision-directed LMS can't bootstrap when this phase's pre-DFE eye is closed.)
+        curs_val = ffe_out_p[curs_ix]
+        if curs_val > 0:
+            b_1 = float(min(dfe_max[0], max(dfe_min[0], ffe_out_p[curs_ix + nspui] / curs_val)))
+        else:  # A degenerate pulse response at that phase: nothing meaningful to anticipate.
+            b_1 = float(min(dfe_max[0], max(dfe_min[0], 0.0)))
+            self.log(f"Mueller-Muller cursor sample is non-positive ({curs_val:.3g} V); not anticipating DFE tap 1.")
+        if limits:
+            dfe.tap_weights[0] = b_1
+        self.log(f"Mueller-Muller CDR sampling phase: {(curs_ix % nspui) / nspui:.3f} UI; initial DFE tap 1: {b_1:.3f}")
+
     self.dfe_scalar_values = []
     if ami_getwave_clocks:  # Accommodate the singular special case.
         t_ix = 0
@@ -580,9 +592,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
          bits_out_dfe,
          sig_samps,
          decisions
-         ) = dfe.run_dfe(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict)
+         ) = dfe.run_dfe(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict, clock_phase=clock_phase)
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
+
+    # Slicer input samples and their decisions, over the same window `calc_ber()` checks.
+    self.dfe_slicer_samps = array(sig_samps[-eye_uis:])
+    self.dfe_slicer_decisions = array(decisions[-eye_uis:])
 
     # Determine post-DFE BER.
     def calc_ber(bits_out):
@@ -629,7 +645,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     # - First, calculate the impulse responses.
     if not tap_weightss:
         tap_weightss = [[]]
-    dfe_h = fir_tap_weights_to_imp_resp([1.0] + tap_weightss[-1], nspui)
+    # The DFE subtracts its feedback (`sum_out = x - sum(w * decisions)`), with weights converging to +h(k)/h(0).
+    dfe_h = fir_tap_weights_to_imp_resp([1.0] + [-w for w in tap_weightss[-1]], nspui)
     dfe_out_h = convolve(ffe_out_h, dfe_h)[: len_h]
     dfe_h = resize_zero_pad(dfe_h, len(ctle_out_h))
     # - Then, calculate the remaining responses from the impulse responses.
@@ -660,8 +677,14 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
 
         self.dbg_dict_viterbi = {}
         N = self.rx_viterbi_symbols
-        pulse_resp_curs_ix = np.argmax(dfe_out_p)
-        pulse_resp_samps = np.array([dfe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
+        # The trellis' expected observations: the DFE output pulse response sampled at the recovered clock's
+        # phase (not at its peak, which can sit a fraction of a UI away), scaled to the transmitted symbol
+        # amplitude (`vod`), as `sig_samps` are.
+        clk_phase_ix = round(float(np.median(np.mod(np.asarray(_sample_times), ui))) / ts) % nspui
+        pk_ix = int(np.argmax(dfe_out_p))
+        pulse_resp_curs_ix = min((ix for ix in range(max(0, pk_ix - nspui), pk_ix + nspui) if ix % nspui == clk_phase_ix),
+                                 key=lambda ix: abs(ix - pk_ix))
+        pulse_resp_samps = self.vod * np.array([dfe_out_p[pulse_resp_curs_ix + n * nspui] for n in range(N)])
         if self.rx_viterbi_fec:
             self.status = "Running FEC..."
             decoder_fec: FEC_Decoder = FEC_Decoder(N)
@@ -687,7 +710,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         else:
             self.status = "Running Viterbi..."
             L = self.L
-            sigma = self.rn
+            # Gaussian observation noise: the measured spread of the slicer samples about their (DFE) decided
+            # levels -- noise plus residual ISI, typically tens of mV -- rather than the Rx input noise `rn` alone
+            # (~1 mV), which drove every state's probability to zero on most symbols. (`rn` remains the floor.)
+            dec_lvls = array(decisions[-len(sig_samps):]) * dfe.decision_scaler
+            sigma = max(self.rn, float(np.std(sig_samps[-len(dec_lvls):] - dec_lvls))) if len(dec_lvls) else self.rn
             decoder = ViterbiDecoder_ISI(L, N, sigma, pulse_resp_samps)
             path = decoder.decode(list(sig_samps), dbg_dict=self.dbg_dict_viterbi)
             _states = decoder.states
@@ -795,6 +822,13 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         ideal_xings = find_crossings(t, ideal_signal, decision_scaler, mod_type=mod_type)
         self.ideal_xings = ideal_xings
         ideal_xings_jit = eye_xings(ideal_xings)
+        # For PAM-4, only transitions symmetric about 0V cross it mid-UI (see `calc_jitter()`'s `xing_mask`).
+        xing_mask = None
+        if mod_type == 2:
+            before = np.interp(ideal_xings - ui / 2, t, ideal_signal)
+            after = np.interp(ideal_xings + ui / 2, t, ideal_signal)
+            symmetric = abs(before + after) < 0.1 * max(abs(ideal_signal))
+            xing_mask = symmetric[ideal_xings > xing_min_t]
 
         # - channel output
         ofst = (argmax(sig.correlate(chnl_out, x)) - len_x_m1) * Ts
@@ -819,7 +853,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+            dj_pos,
+            dj_neg,
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.t_jitter  = t_jitter
         self.isi_chnl  = isi
         self.dcd_chnl  = dcd
@@ -829,6 +865,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rjDD_chnl = rjDD
         self.mu_pos_chnl = mu_pos
         self.mu_neg_chnl = mu_neg
+        self.dj_pos_chnl = dj_pos
+        self.dj_neg_chnl = dj_neg
         self.thresh_chnl = thresh
         self.jitter_chnl = hist
         self.jitter_ext_chnl = hist_synth
@@ -864,7 +902,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+            dj_pos,
+            dj_neg,
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.isi_tx  = isi
         self.dcd_tx  = dcd
         self.pj_tx   = pj
@@ -873,6 +913,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rjDD_tx = rjDD
         self.mu_pos_tx = mu_pos
         self.mu_neg_tx = mu_neg
+        self.dj_pos_tx = dj_pos
+        self.dj_neg_tx = dj_neg
         self.thresh_tx = thresh
         self.jitter_tx = hist
         self.jitter_ext_tx = hist_synth
@@ -908,7 +950,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh)
+            dj_pos,
+            dj_neg,
+        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, xing_mask=xing_mask)
         self.isi_ctle  = isi
         self.dcd_ctle  = dcd
         self.pj_ctle   = pj
@@ -917,6 +961,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.rjDD_ctle = rjDD
         self.mu_pos_ctle = mu_pos
         self.mu_neg_ctle = mu_neg
+        self.dj_pos_ctle = dj_pos
+        self.dj_neg_ctle = dj_neg
         self.thresh_ctle = thresh
         self.jitter_ctle = hist
         self.jitter_ext_ctle = hist_synth
@@ -949,16 +995,20 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             bin_centers,
             mu_pos,
             mu_neg,
-        ) = calc_jitter(ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self)
+            dj_pos,
+            dj_neg,
+        ) = calc_jitter(
+            ui, eye_uis, pattern_len, ideal_xings_jit, actual_xings_jit, rel_thresh, dbg_obj=self, xing_mask=xing_mask)
         self.isi_dfe  = isi
         self.dcd_dfe  = dcd
         self.pj_dfe   = pj
         self.rj_dfe   = rj
         self.pjDD_dfe = pjDD
-        assert rjDD != 0
         self.rjDD_dfe = rjDD
         self.mu_pos_dfe = mu_pos
         self.mu_neg_dfe = mu_neg
+        self.dj_pos_dfe = dj_pos
+        self.dj_neg_dfe = dj_neg
         self.thresh_dfe = thresh
         self.jitter_dfe = hist
         self.jitter_ext_dfe = hist_synth
@@ -1244,19 +1294,20 @@ def update_results(self) -> None:
     self.plotdata.set_data("thresh_dfe", 10.0 * (safe_log10(self.thresh_dfe[1:]) - log10_ui))
     self.plotdata.set_data("jitter_rejection_ratio", self.jitter_rejection_ratio[1:])
 
-    # Bathtubs
+    # Bathtubs: tails extrapolated with the separated Rj, from the bounded jitter's extent.
+    # (The dual-Dirac fit's values are for reference only.)
     bathtub_chnl = make_bathtub(
         jitter_bins, jitter_chnl, min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_chnl, mu_r=self.mu_pos_chnl, mu_l=self.mu_neg_chnl, extrap=True)
+        rj=self.rj_chnl, mu_r=self.dj_pos_chnl, mu_l=self.dj_neg_chnl, extrap=True)
     bathtub_tx = make_bathtub(
         jitter_bins, jitter_tx,   min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_tx, mu_r=self.mu_pos_tx, mu_l=self.mu_neg_tx, extrap=True)
+        rj=self.rj_tx, mu_r=self.dj_pos_tx, mu_l=self.dj_neg_tx, extrap=True)
     bathtub_ctle = make_bathtub(
         jitter_bins, jitter_ctle, min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_ctle, mu_r=self.mu_pos_ctle, mu_l=self.mu_neg_ctle, extrap=True)
+        rj=self.rj_ctle, mu_r=self.dj_pos_ctle, mu_l=self.dj_neg_ctle, extrap=True)
     bathtub_dfe = make_bathtub(
         jitter_bins, jitter_dfe,  min_val=0.1 * MIN_BATHTUB_VAL,
-        rj=self.rjDD_dfe, mu_r=self.mu_pos_dfe, mu_l=self.mu_neg_dfe, extrap=True)
+        rj=self.rj_dfe, mu_r=self.dj_pos_dfe, mu_l=self.dj_neg_dfe, extrap=True)
     self.plotdata.set_data("bathtub_chnl", safe_log10(bathtub_chnl))
     self.plotdata.set_data("bathtub_tx",   safe_log10(bathtub_tx))
     self.plotdata.set_data("bathtub_ctle", safe_log10(bathtub_ctle))

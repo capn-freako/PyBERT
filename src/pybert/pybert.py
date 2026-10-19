@@ -25,7 +25,6 @@ import platform
 import time
 from copy import deepcopy
 from datetime import datetime, timezone, timedelta
-from os.path import dirname, join
 from pathlib import Path
 
 import numpy as np
@@ -63,6 +62,8 @@ from pyibisami.ami.parser import AMIParamConfigurator
 from pyibisami.ibis.file import IBISModel
 
 from pychopmarg import __version__ as PyChOpMarg_VERSION  # type: ignore
+from pychopmarg.config.ieee_8023dj_d3p3 import R0 as DJ_R0, device_model  # type: ignore
+from pychopmarg.devmodel import gamma_term, renormalize_to, s_rx_model, s_tx_model, terminated_h21  # type: ignore
 
 from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
@@ -83,6 +84,12 @@ from pybert.utility import (
     safe_log10,
     sdd_21,
     trim_impulse,
+)
+from pybert.utility.ibisami import (
+    PYBERT_RX_MODEL_TYPES,
+    PYBERT_TX_MODEL_TYPES,
+    resolve_ami_files,
+    set_pyibisami_logging,
 )
 
 gDebugStatus = False
@@ -195,6 +202,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # `PyBERT` instance to share the very same `TxTapTuner` objects, so that
     # mutating one instance's tap values -- e.g. via the EQ optimizer -- would
     # corrupt every other instance's taps.)
+    tx_c0_min = Float(0.0)  #: Minimum Tx FFE cursor (1 - sum of other tap magnitudes) the EQ optimizer may use.
     tx_tap_tuners: List = List()  #: EQ optimizer list of TxTapTuner objects.
 
     def _tx_tap_tuners_default(self):
@@ -301,6 +309,14 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # -- native
     rin = Float(100)  #: Rx input impedance (Ohm)
     cin = Float(0.5)  #: Rx parasitic input capacitance (pF)
+
+    # - Device termination, package, and partial host channel models (P802.3dj/D3.3 Annex 178A),
+    #   for native Tx and Rx. When enabled, they replace `rs`/`cout` and `rin`/`cin`.
+    pkg_enable = Bool(False)  #: Use the P802.3dj Annex 178A Tx/Rx device models.
+    pkg_group = Enum("KR", "C2C", "CR", "C2M")  #: Channel group, selecting the P802.3dj table used.
+    tx_pkg_case = String("A1")  #: Tx package case (KR/C2C: "A1"/"A2"/"B1"/"B2"; CR: "HL"/"HN"/"HH"; C2M: "host"/"module").
+    rx_pkg_case = String("A1")  #: Rx package case (as for `tx_pkg_case`).
+    pkg_include_host = Bool(True)  #: Include the partial host channel, where the case defines one (CR, C2M host).
     cac = Float(1.0)  #: Rx a.c. coupling capacitance (uF)
     use_ctle_file = Bool(False)  #: For importing CTLE impulse/step response directly.
     ctle_sel = Enum("Native", "File")
@@ -339,7 +355,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     use_agc = Bool(True)  #: Continuously adjust ``decision_scalar`` when True.
 
     # - CDR
-    delta_t = Float(0.1)  #: CDR proportional branch magnitude (ps).
+    #: CDR type: an adaptive bang-bang loop, or a Mueller-Muller clock, which samples at the
+    #: fixed phase where the slicer-input pulse response meets the Mueller-Muller criterion.
+    cdr_type = Enum("Bang-Bang", "Mueller-Muller")
+    delta_t_ui = Float(0.001)  #: CDR proportional branch magnitude (UI).
     alpha = Float(0.01)  #: CDR integral branch magnitude (unitless).
     n_lock_ave = Int(500)  #: CDR # of averages to take in determining lock.
     rel_lock_tol = Float(0.1)  #: CDR relative tolerance to use in determining lock.
@@ -481,6 +500,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         super().__init__()
 
         self.GUI = gui
+        set_pyibisami_logging(self.debug)
         self.log("Started.")
         self.log_information()
         if self.debug:
@@ -544,21 +564,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _btn_sel_tx_fired(self):
         self._tx_ibis()
-        if self._tx_ibis.dll_file and self._tx_ibis.ami_file:
-            self.tx_dll_file = join(self._tx_ibis_dir, self._tx_ibis.dll_file)
-            self.tx_ami_file = join(self._tx_ibis_dir, self._tx_ibis.ami_file)
-        else:
-            self.tx_dll_file = ""
-            self.tx_ami_file = ""
+        self.tx_dll_file, self.tx_ami_file = resolve_ami_files(self._tx_ibis, is_tx=True)
 
     def _btn_sel_rx_fired(self):
         self._rx_ibis()
-        if self._rx_ibis.dll_file and self._rx_ibis.ami_file:
-            self.rx_dll_file = join(self._rx_ibis_dir, self._rx_ibis.dll_file)
-            self.rx_ami_file = join(self._rx_ibis_dir, self._rx_ibis.ami_file)
-        else:
-            self.rx_dll_file = ""
-            self.rx_ami_file = ""
+        self.rx_dll_file, self.rx_ami_file = resolve_ami_files(self._rx_ibis, is_tx=False)
 
     def _btn_view_tx_fired(self):
         self._tx_ibis.model()
@@ -1149,30 +1159,73 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
             return
         self.tx_use_ami = new == "IBIS-AMI"
 
+    def _debug_changed(self, new):
+        "Show pyibisami's debugging details on the terminal, too (e.g. - IBIS parsing, failed AMI calls)."
+        set_pyibisami_logging(new)
+
+    def _log_ibis_alert(self, event):
+        "Copy an ``IBISModel`` notice into the console log. (Its own GUI pops it up.)"
+        self.log(event.new)
+
+    def _ibis_load_notice(self, ibis, has_ami_files):
+        "Tell the user whether the newly loaded IBIS model offers a usable AMI model."
+        if has_ami_files:
+            msg = (
+                "There was an [Algorithmic Model] keyword in this model.\n"
+                "If you wish to use the AMI model associated with this IBIS model,\n"
+                "please, go to the 'Equalization' tab and enable it now."
+            )
+        elif ibis.model.is_ami:
+            msg = (
+                "There was an [Algorithmic Model] keyword for this model,\n"
+                "but no executable for your platform and this direction (Tx/Rx);\n"
+                "PyBERT native equalization modeling being used instead."
+            )
+        else:
+            msg = (
+                "There was no [Algorithmic Model] keyword for this model;\n"
+                "PyBERT native equalization modeling being used instead."
+            )
+        self.log(msg, alert=True)
+
+    def _load_ibis(self, ibis_file, is_tx):
+        """
+        Load an IBIS file for one side, offering only the ``Model_type`` s PyBERT can simulate there.
+
+        Returns:
+            The IBIS model, and its selected model's ``(dll, ami)`` files for that side
+            (``("", "")`` if it has none).
+
+        Raises:
+            ValueError: The file has no pin with a model PyBERT can simulate on that side.
+        """
+        side = "Tx" if is_tx else "Rx"
+        model_types = PYBERT_TX_MODEL_TYPES if is_tx else PYBERT_RX_MODEL_TYPES
+        self.log(f"Parsing {side} IBIS file, '{ibis_file}'...")
+        try:
+            ibis = IBISModel(ibis_file, model_types=model_types)
+        except ValueError as err:
+            raise ValueError(
+                f"No {side} model PyBERT can simulate (Model_type: {', '.join(sorted(model_types))}).\n{err}"
+            ) from err
+        self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
+        ibis.observe(self._log_ibis_alert, "alert")
+        ami_files = resolve_ami_files(ibis, is_tx)
+        self._ibis_load_notice(ibis, all(ami_files))
+        return ibis, ami_files
+
     def _tx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
-        dName = ""
         try:
             self.tx_ibis_valid = False
             self.tx_use_ami = False
             self.tx_eq_sel = "Native"
-            self.log(f"Parsing Tx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
-            self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
-            self._tx_ibis = ibis
+            self._tx_ibis, (self.tx_dll_file, self.tx_ami_file) = self._load_ibis(new_value, is_tx=True)
             self.tx_ibis_valid = True
-            dName = dirname(new_value)
-            if self._tx_ibis.dll_file and self._tx_ibis.ami_file:
-                self.tx_dll_file = join(dName, self._tx_ibis.dll_file)
-                self.tx_ami_file = join(dName, self._tx_ibis.ami_file)
-            else:
-                self.tx_dll_file = ""
-                self.tx_ami_file = ""
         except Exception as err:  # pylint: disable=broad-exception-caught
             self.status = "IBIS file parsing error!"
             error_message = f"Failed to open and/or parse IBIS file!\n{err}"
             self.log(error_message, alert=True, exception=err)
-        self._tx_ibis_dir = dName
         self.status = "Done."
 
     def _tx_ami_file_changed(self, new_value):
@@ -1228,29 +1281,17 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     def _rx_ibis_file_changed(self, new_value):
         self.status = f"Parsing IBIS file: {new_value}"
-        dName = ""
         try:
             self.rx_ibis_valid = False
             self.rx_use_ami = False
             self.rx_eq_sel = "Native"
-            self.log(f"Parsing Rx IBIS file, '{new_value}'...")
-            ibis = IBISModel(new_value, debug=self.debug, gui=self.GUI)
-            self.log(f"  Result:\n{ibis.ibis_parsing_errors}")
-            self._rx_ibis = ibis
+            self._rx_ibis, (self.rx_dll_file, self.rx_ami_file) = self._load_ibis(new_value, is_tx=False)
             self.rx_ibis_valid = True
-            dName = dirname(new_value)
-            if self._rx_ibis.dll_file and self._rx_ibis.ami_file:
-                self.rx_dll_file = join(dName, self._rx_ibis.dll_file)
-                self.rx_ami_file = join(dName, self._rx_ibis.ami_file)
-            else:
-                self.rx_dll_file = ""
-                self.rx_ami_file = ""
         except Exception as err:  # pylint: disable=broad-exception-caught
             self.status = "IBIS file parsing error!"
             error_message = f"Failed to open and/or parse IBIS file!\n{err}"
             self.log(error_message, alert=True)
             raise
-        self._rx_ibis_dir = dName
         self.status = "Done."
 
     def _rx_ami_file_changed(self, new_value):
@@ -1344,6 +1385,31 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # in order to more tightly control when it executes. I wasn't able to get truly lazy evaluation, and
     # this was causing noticeable GUI slowdown.
     # pylint: disable=attribute-defined-outside-init
+    def calc_pkg_chnl_H(self, ch_s2p: rf.Network) -> np.ndarray:
+        """
+        Channel transfer function with the P802.3dj/D3.3 Annex 178A transmitter and receiver device models
+        (device termination, device package, and optional partial host channel), per (178A-2) and (178A-3).
+
+        The channel is renormalized to ``2 * R0`` (the differential-mode equivalent of 178A-4), cascaded between
+        the Tx and Rx models, and terminated in each device's ``Rd``. Like ``calc_G()``, the result is referenced
+        to the driver's open-circuit voltage: half of (178A-3)'s transfer function, which is referenced to the wave
+        launched into a matched line.
+
+        Args:
+            ch_s2p: The channel's differential-mode 2-port network, on the frequencies ``self.f``.
+
+        Returns:
+            The channel's transfer function, including the Tx and Rx device models, at ``self.f``.
+        """
+        f = self.f
+        tx_dev = device_model(self.pkg_group, self.tx_pkg_case, False, include_host=self.pkg_include_host)
+        rx_dev = device_model(self.pkg_group, self.rx_pkg_case, True, include_host=self.pkg_include_host)
+        R0 = DJ_R0
+        chnl = renormalize_to(rf.Network(s=ch_s2p.s, f=f, z0=ch_s2p.z0), 2 * R0)
+        total = s_tx_model(f, tx_dev, R0) ** chnl ** s_rx_model(f, rx_dev, R0)
+        self.pkg_s2p = total
+        return terminated_h21(total, gamma_term(tx_dev.Rd, R0), gamma_term(rx_dev.Rd, R0)) / 2
+
     def calc_chnl_h(self):
         """Calculates the channel impulse response.
 
@@ -1447,28 +1513,39 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 res = ntwk2**s2p
             return (res, ts4N, ntwk2)
 
+        def ibis_value(ibis, name):
+            "A value PyBERT needs from the selected IBIS model; pyibisami gives ``None`` when the model has none."
+            value = getattr(ibis.model, name)
+            if value is None:
+                raise ValueError(f"IBIS model `{ibis.mod}` (Model_type: {ibis.model.mtype}) has no `{name}` value.")
+            return value
+
+        def ts4_file(ibis, cfg):
+            "The AMI model's ``Ts4file``, resolved against the IBIS file's directory."
+            fname = cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"])
+            fpath = ibis.resolve_file(fname) if fname else None
+            if fpath is None:
+                raise ValueError(f"The AMI model of IBIS model `{ibis.mod}` has an empty `Ts4file`.")
+            return str(fpath)
+
         if self.tx_sel == "ibis":
-            model = self._tx_ibis.model
-            Rs = model.zout * 2
-            Cs = model.ccomp[0] / 2  # They're in series.
+            Rs = ibis_value(self._tx_ibis, "zout") * 2
+            Cs = ibis_value(self._tx_ibis, "ccomp")[0] / 2  # They're in series.
             self.Rs = Rs  # Primarily for debugging.
             self.Cs = Cs
             if self.tx_use_ts4:
-                fname = join(self._tx_ibis_dir, self._tx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]))
-                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname)
+                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, ts4_file(self._tx_ibis, self._tx_cfg))
                 self.ts4N = ts4N
                 self.ntwk = ntwk
         if self.rx_sel == "ibis":
-            model = self._rx_ibis.model
-            RL = model.zin * 2
-            Cp = model.ccomp[0] / 2
+            RL = ibis_value(self._rx_ibis, "zin") * 2
+            Cp = ibis_value(self._rx_ibis, "ccomp")[0] / 2
             self.RL = RL  # Primarily for debugging.
             self.Cp = Cp
             if self.debug:
                 self.log(f"RL: {RL}, Cp: {Cp}")
             if self.rx_use_ts4:
-                fname = join(self._rx_ibis_dir, self._rx_cfg.fetch_param_val(["Reserved_Parameters", "Ts4file"]))
-                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, fname, isRx=True)
+                ch_s2p, ts4N, ntwk = add_ondie_s(ch_s2p, ts4_file(self._rx_ibis, self._rx_cfg), isRx=True)
                 self.ts4N = ts4N
                 self.ntwk = ntwk
         ch_s2p.name = "ch_s2p"
@@ -1484,7 +1561,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         # Rx input resistances, so that `chnl_h` alone captures its effect,
         # keeping it consistent w/ all the other (derived) pulse responses
         # (`tx_p`, `ffe_out_p`, `dfe_out_p`, etc.), which are computed from it.
-        chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
+        if self.pkg_enable:
+            chnl_H = self.calc_pkg_chnl_H(ch_s2p_pre)
+        else:
+            chnl_H = calc_G(ch_s2p.s21.s.flatten(), Rs, Cs, _z, RL, Cp, w)
         if self.use_window:
             chnl_h = irfft(raised_cosine(chnl_H))
         else:
@@ -1655,11 +1735,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         self.log(f"Kiva Backend: {ETSConfig.kiva_backend}")
 
     _tx_ibis = Instance(IBISModel)
-    _tx_ibis_dir = ""
     _tx_cfg = Instance(AMIParamConfigurator)
     _tx_model = Instance(AMIModel)
     _rx_ibis = Instance(IBISModel)
-    _rx_ibis_dir = ""
     _rx_cfg = Instance(AMIParamConfigurator)
     _rx_model = Instance(AMIModel)
 

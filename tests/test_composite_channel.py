@@ -399,3 +399,39 @@ class TestCompositeChannelIntegration:
         dut.ch_files = []
         with pytest.raises(RuntimeError, match="no channel files"):
             dut.simulate(initial_run=True)
+
+
+class TestPortRenumberLossy:
+    """renumber=True on a long, lossy channel whose intra-pair coupling exceeds its through path in mid-band."""
+
+    @staticmethod
+    def _lossy_coupled(freqs_hz: np.ndarray, convention: str) -> skrf.Network:
+        thru = np.exp(-20.0 * np.sqrt(freqs_hz / 1e9) * (np.log(10) / 20))  # 20 dB/m @ 1 GHz, 1 m
+        coup = np.minimum(0.4, 0.3 * freqs_hz / 2e9)                        # coupling between the pair's legs
+        s = np.zeros((len(freqs_hz), 4, 4), dtype=complex)
+        # (0-based) through pairs and same-end leg pairs: "1to2" = through 1->2 & 3->4, legs (1,3) & (2,4);
+        # "1to3" = through 1->3 & 2->4, legs (1,2) & (3,4).
+        if convention == "1to2":
+            thru_pairs, leg_pairs = ((1, 0), (3, 2)), ((2, 0), (3, 1))
+        else:
+            thru_pairs, leg_pairs = ((2, 0), (3, 1)), ((1, 0), (3, 2))
+        for (i, j), val in [(p, thru) for p in thru_pairs] + [(p, coup) for p in leg_pairs]:
+            s[:, i, j] = s[:, j, i] = val
+        return skrf.Network(f=freqs_hz, s=s, z0=50.0)
+
+    @pytest.mark.parametrize("convention", ["1to2", "1to3"])
+    def test_lossy_channel_detected_correctly(self, tmp_path, freq_grid, sample_period, convention):
+        """Both conventions import the true through path, although |coupling| > |through| at 5% of f_max --
+        which fooled the previous single-frequency check into renumbering a 1->2 file."""
+        fname = str(tmp_path / f"lossy_{convention}.s4p")
+        self._lossy_coupled(freq_grid, convention).write_touchstone(fname)
+        result = import_channel(fname, sample_period, freq_grid, renumber=True)
+        expected = np.exp(-20.0 * np.sqrt(freq_grid / 1e9) * (np.log(10) / 20))
+        np.testing.assert_allclose(np.abs(result.s21.s.flatten()), expected, rtol=1e-3)
+
+    @pytest.mark.parametrize("convention", ["1to2", "1to3"])
+    def test_detection_without_low_frequency_data(self, convention):
+        "Data starting above 1 GHz falls back to its lowest 5% of frequencies (and still detects correctly)."
+        from pybert.utility.sparam import thru_is_1to3
+        f = np.linspace(2e9, 40e9, 400)
+        assert thru_is_1to3(_make_4port_channel(f, 0.15, convention=convention)) == (convention == "1to3")

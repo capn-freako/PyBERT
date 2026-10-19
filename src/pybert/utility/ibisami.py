@@ -10,6 +10,8 @@ Copyright (c) 2024 David Banas; all rights reserved World wide.
 A partial extraction of the old `pybert/utility.py`, as part of a refactoring.
 """
 
+import logging
+
 import numpy as np
 from numpy import array, convolve
 
@@ -18,8 +20,57 @@ from pyibisami.ami.model import (
     IMP_RESP_GETW, IMP_RESP_INIT, OUT_RESP_GETW, OUT_RESP_INIT,
 )
 from pyibisami.ami.parser import AMIParamConfigurator
+from pyibisami.ibis.file import IBISModel
 
 from ..common import Rvec
+
+# The IBIS `Model_type`s PyBERT can simulate. PyBERT models the Tx as a series resistance (from `zout`)
+# and the Rx as a shunt resistance (from `zin`), which fits push-pull drivers and clamp-terminated receivers.
+# This is PyBERT's capability choice, narrower than the IBIS spec's driver/receiver sets (IBIS 8.0 Table 47).
+PYBERT_TX_MODEL_TYPES = frozenset({"output", "3-state", "i/o"})
+PYBERT_RX_MODEL_TYPES = frozenset({"input", "i/o"})
+
+
+PYIBISAMI_LOGGER = logging.getLogger("pyibisami")
+_pyibisami_handler: logging.Handler | None = None
+
+
+def set_pyibisami_logging(debug: bool) -> None:
+    """
+    Show pyibisami's log messages on the terminal (stderr): warnings always, and debugging details when ``debug``.
+
+    pyibisami, as a library, only logs (its ``NullHandler`` even stops Python's default printing of warnings),
+    so PyBERT attaches the handler. It's attached once per process; the level applies to every ``PyBERT`` instance.
+
+    Notes:
+        1. stderr, never stdout: the MCP server (``pybert mcp``) talks over stdout.
+        2. The root logger is left alone, as PyBERT is also used as a library.
+    """
+    global _pyibisami_handler  # pylint: disable=global-statement
+    if _pyibisami_handler is None:
+        _pyibisami_handler = logging.StreamHandler()  # stderr
+        _pyibisami_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        PYIBISAMI_LOGGER.addHandler(_pyibisami_handler)
+    PYIBISAMI_LOGGER.setLevel(logging.DEBUG if debug else logging.WARNING)
+
+
+def resolve_ami_files(ibis: IBISModel, is_tx: bool) -> tuple[str, str]:
+    """
+    The executable and AMI files of an IBIS model's selected model, for one direction and this platform.
+
+    Args:
+        ibis: The IBIS model, with the wanted model selected.
+        is_tx: ``True`` for the Tx side, ``False`` for the Rx side (matters for ``I/O`` models).
+
+    Returns:
+        The ``(dll, ami)`` file paths, resolved against the IBIS file's directory,
+        or ``("", "")`` unless both exist in the IBIS file.
+    """
+    dll_file, ami_file = ibis.model.get_ami_files(is_tx)
+    dll_path, ami_path = ibis.resolve_file(dll_file), ibis.resolve_file(ami_file)
+    if dll_path and ami_path:
+        return str(dll_path), str(ami_path)
+    return "", ""
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments

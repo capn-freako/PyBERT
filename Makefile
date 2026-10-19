@@ -5,7 +5,7 @@
 #
 # Copyright (c) 2015 David Banas; all rights reserved World wide.
 
-.PHONY: dflt help check tox format lint lint-fix flake8 type-check docs upload test clean distclean
+.PHONY: dflt help check format lint lint-fix type-check docs build upload upload_test test clean distclean
 
 SRC_DIR := src/pybert
 DOCS_DIR := docs
@@ -37,7 +37,7 @@ lint-fix:
 	${UVX_EXEC} flake8 --ignore=E501,E272,E241,E222,E221 ${SRC_DIR}
 
 type-check:
-	${UV_EXEC} run mypy --install-types --follow-untyped-imports ${SRC_DIR}
+	${UV_EXEC} run mypy --install-types --non-interactive --follow-untyped-imports ${SRC_DIR}
 
 docs:
 	pushd ${DOCS_DIR}; PROJ_VER=${PROJ_VER} ${UV_EXEC} run sphinx-build -j auto -b html source/ build/; popd
