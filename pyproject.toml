@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pipbert"
 description = "Serial communication link bit error rate tester simulator, written in Python."
-version = "11.0.0"
+version = "11.1.0"
 authors = [ {name = "David Banas",     email = "capn.freako@gmail.com"}
           ]
 readme = "README.md"
@@ -21,7 +21,7 @@ dependencies = [
     "parsec==3.17",
     "pychopmarg>=3.4.0,<4",
     "pyface==8.0.0",
-    "pyibis-ami[gui]>=10.0.0.dev0,<11",
+    "pyibis-ami[gui]>=10.0.0,<11",
     "pyside6==6.10.2",
     "pyyaml==6.0.3",
     "scikit-rf==2.0.1",
