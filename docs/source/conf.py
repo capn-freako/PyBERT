@@ -37,7 +37,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    "m2r2",
+    "myst_parser",
 ]
 autodoc_default_options = {
     "exclude-members": "default_traits_view",

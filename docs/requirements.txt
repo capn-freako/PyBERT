@@ -1,4 +1,4 @@
-m2r2
+myst-parser
 parsec
 sphinx
 sphinx_rtd_theme
