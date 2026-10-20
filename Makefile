@@ -54,7 +54,7 @@ upload_test: build
 test:
 	@for VERSION in $(PYVERS); do \
         $(UV_EXEC) run --python $$VERSION pytest -vv \
-            --cov=pyibisami --cov-report=html \
+            --cov=pybert --cov-report=html \
             --cov-report=term-missing $(TEST_EXP); \
     done
 
