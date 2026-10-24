@@ -694,9 +694,9 @@ traits_view = View(
                                 ),
                                 HGroup(
                                     Item(name="dfe_freeze", label="Freeze when stable",
-                                         tooltip="Stop adapting once each tap's pattern-length average stops changing."),
+                                         tooltip="Stop adapting taps (and AGC) once their pattern-length averages stop changing."),
                                     Item(name="dfe_freeze_tol", label="Tol.", format_str="%0.1e", enabled_when="dfe_freeze",
-                                         tooltip="largest spread in any tap's recent pattern-length averages still considered stable"),
+                                         tooltip="largest spread in any tap's (AGC level's, relative) recent pattern-length averages still considered stable"),
                                     Item(name="dfe_freeze_nwin", label="Nwin.", enabled_when="dfe_freeze",
                                          tooltip="# of consecutive pattern-length tap averages that must agree"),
                                 ),

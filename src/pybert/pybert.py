@@ -353,8 +353,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
     use_agc = Bool(True)  #: Continuously adjust ``decision_scalar`` when True.
-    dfe_freeze = Bool(False)  #: Freeze DFE tap weights, once their pattern-length averages stop changing, when True.
-    dfe_freeze_tol = Float(5.0e-4)  #: Largest spread in any tap's recent averages still considered stable (unitless).
+    dfe_freeze = Bool(False)  #: Freeze DFE tap weights (and AGC), once their pattern-length averages stop changing, when True.
+    dfe_freeze_tol = Float(5.0e-4)  #: Largest spread in any tap's (AGC: relative) recent averages still considered stable.
     dfe_freeze_nwin = Int(3)  #: Number of consecutive pattern-length tap averages that must agree, to freeze.
 
     # - CDR
@@ -403,7 +403,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
     n_errs_dfe = Int(0)  #: # of DFE bit errors observed in last run.
     n_errs_viterbi = Int(0)  #: # of Viterbi bit errors observed in last run.
-    dfe_freeze_ui = Int(-1)  #: UI at which DFE tap weights were frozen in last run; -1 means never.
+    dfe_freeze_ui = Int(-1)  #: UI at which DFE tap weights (and AGC) were frozen in last run; -1 means never.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # COM (Channel Operating Margin) — computed post-simulation via PyChOpMarg.
