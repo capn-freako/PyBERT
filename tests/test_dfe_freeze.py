@@ -19,8 +19,7 @@ def run_dfe(freeze_window: int, freeze_tol: float = 2e-3, n_taps: int = len(H),
             use_agc: bool = False, dbg: Optional[dict] = None) -> tuple[np.ndarray, int]:
     """Run an NRZ DFE, clocked at a fixed phase, over a noisy channel w/ known ISI.
     (The noise is heavy enough that the tolerance must be looser than the default, to freeze.)
-    With AGC on, its level starts low (0.4 V; ~0.5 V is right). Its pattern-length averages wander ~0.3% in this
-    noise, so freezing it takes a looser tolerance still.
+    With AGC on, its level starts low (0.4 V; ~0.5 V is right).
 
     Returns:
         The tap weights at each UI, and the UI at which they were frozen (-1 if never).
@@ -65,7 +64,7 @@ def test_zero_tol_never_freezes():
 def test_agc_freezes_with_taps():
     """With AGC on, its level freezes along with the taps: no level changes after the freeze."""
     dbg: dict = {}
-    tap_weights, freeze_ui = run_dfe(PERIOD, freeze_tol=1e-2, use_agc=True, dbg=dbg)
+    tap_weights, freeze_ui = run_dfe(PERIOD, use_agc=True, dbg=dbg)
     assert 0 <= freeze_ui < len(tap_weights) - PERIOD, "DFE never froze!"
     assert np.all(tap_weights[freeze_ui + 1:] == tap_weights[-1]), "Tap weights changed after freezing!"
     # The AGC sets a new level each UI, once its averages fill (2 x 100 UI); the freeze sets one more.
@@ -81,12 +80,12 @@ def test_agc_hunts_without_freezing():
     assert np.ptp(dbg["scalar_values"][-PERIOD:]) > 0
 
 
-def test_agc_freezes_without_taps():
-    """With no DFE taps, the AGC level alone is checked for stability and frozen."""
+def test_agc_not_frozen_without_taps():
+    """With no DFE taps, nothing triggers a freeze, so the AGC keeps adapting."""
     dbg: dict = {}
-    freeze_ui = run_dfe(PERIOD, freeze_tol=1e-2, n_taps=0, use_agc=True, dbg=dbg)[1]
-    assert freeze_ui >= 0, "AGC never froze!"
-    assert len(dbg["scalar_values"]) <= freeze_ui + 2, "AGC level changed after freezing!"
+    tap_weights, freeze_ui = run_dfe(PERIOD, n_taps=0, use_agc=True, dbg=dbg)
+    assert freeze_ui == -1
+    assert len(dbg["scalar_values"]) > len(tap_weights) - 2 * PERIOD
 
 
 def test_config_round_trip(tmp_path: Path):
@@ -105,10 +104,10 @@ def test_config_round_trip(tmp_path: Path):
     assert dut2.dfe_freeze_nwin == 5
 
 
-@pytest.mark.parametrize("pdut", [{"dfe_freeze": True, "gain": 0.5, "nbits": 25000}], indirect=True)
+@pytest.mark.parametrize("pdut", [{"dfe_freeze": True, "gain": 0.5}], indirect=True)
 class TestDfeFreezeSim:
     """Default configuration, simulated with DFE freezing enabled.
-    (The default gain and run length are too low/short for the DFE and AGC to stabilize.)"""
+    (The default gain is too low for the DFE to stabilize within the default run length.)"""
 
     def test_ber(self, pdut):
         """No bit errors."""

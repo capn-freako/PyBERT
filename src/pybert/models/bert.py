@@ -603,7 +603,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
         self.dfe_freeze_ui = dbg_dict["freeze_ui"]
-        if self.dfe_freeze and (_n_taps or self.use_agc):
+        if self.dfe_freeze and _n_taps:
             frozen_what = " and ".join((["tap weights"] if _n_taps else []) + (["AGC"] if self.use_agc else []))
             if self.dfe_freeze_ui >= 0:
                 self.log(f"DFE {frozen_what} frozen at UI {self.dfe_freeze_ui}: "

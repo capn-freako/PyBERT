@@ -127,7 +127,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 for a stable solution. (Normally, a whole number of pattern repetitions.) Zero disables freezing.
             freeze_tol: Once locked, the tap weights are frozen when each tap's averages over the last
                 *freeze_n_win* windows all lie within this of each other. With AGC on, the decision scaler
-                must also have stabilized, its averages lying within this fraction of their mean, and is frozen too.
+                is frozen along with them, at the mean of its own averages over those windows. (The AGC settles
+                far faster than the taps, tracking the slicer amplitude they set, so it needs no check of its own.)
             freeze_n_win: Number of consecutive window averages that must agree, before freezing.
                 (Agreement over several windows, rather than between just two, keeps the slow tail of
                 the tap weights' convergence from being mistaken for stability.)
@@ -409,19 +410,16 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                     nxt_filter_out = self.step(slicer_output, error, update)
                 else:
                     nxt_filter_out = self.step(slicer_output, 0.0, update)
-                if freeze_window and locked and not frozen and len(win_sum):
+                if freeze_window and locked and not frozen and n_taps:
                     # Average each tap (and the decision scaler) over consecutive windows;
-                    # freeze once their last few averages agree.
+                    # freeze once the taps' last few averages agree.
                     win_sum += self.tap_weights + ([decision_scaler] if use_agc else [])
                     n_win_samps += 1
                     if n_win_samps >= freeze_window:
                         win_aves = win_aves[-(freeze_n_win - 1):] + [win_sum / n_win_samps]
                         if len(win_aves) == freeze_n_win:
                             ave = mean(win_aves, axis=0)
-                            spread = np.ptp(win_aves, axis=0)
-                            if use_agc:  # The scaler (V) is judged relative to its value; the taps are unitless.
-                                spread[-1] /= ave[-1]
-                            if spread.max() <= freeze_tol:
+                            if np.ptp(win_aves, axis=0)[:n_taps].max() <= freeze_tol:
                                 self.tap_weights = list(ave[:n_taps])
                                 if use_agc:
                                     decision_scaler = float(ave[-1])

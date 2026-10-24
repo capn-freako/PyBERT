@@ -354,7 +354,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
     use_agc = Bool(True)  #: Continuously adjust ``decision_scalar`` when True.
     dfe_freeze = Bool(False)  #: Freeze DFE tap weights (and AGC), once their pattern-length averages stop changing, when True.
-    dfe_freeze_tol = Float(5.0e-4)  #: Largest spread in any tap's (AGC: relative) recent averages still considered stable.
+    dfe_freeze_tol = Float(5.0e-4)  #: Largest spread in any tap's recent averages still considered stable (unitless).
     dfe_freeze_nwin = Int(3)  #: Number of consecutive pattern-length tap averages that must agree, to freeze.
 
     # - CDR
