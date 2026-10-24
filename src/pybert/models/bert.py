@@ -198,6 +198,11 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     nspb = nspui
     if not self.rx_viterbi_fec and mod_type == 2:  # PAM-4, but not because we're using FEC
         nspb = nspui // 2
+    # The pattern length must be doubled in the duo-binary and PAM-4 cases anyway, because:
+    #  - in the duo-binary case, the XOR pre-coding can invert every other pattern rep., and
+    #  - in the PAM-4 case, the bits are taken in pairs to form the symbols and we start w/ an odd # of bits.
+    # So, while it isn't strictly necessary, doubling it in the NRZ case as well provides a certain consistency.
+    pattern_len = (pow(2, max(pattern)) - 1) * 2
 
     # Generate the ideal over-sampled signal.
     #
@@ -532,7 +537,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     dfe = DFE(_n_taps, _gain, delta_t, alpha, ui, nspui, decision_scaler, mod_type,
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
-              limits=limits)
+              limits=limits, freeze_window=pattern_len if self.dfe_freeze else 0,
+              freeze_tol=self.dfe_freeze_tol, freeze_n_win=self.dfe_freeze_nwin)
 
     # A Mueller-Muller CDR samples at a fixed phase: where the slicer-input pulse response meets the
     # Mueller-Muller criterion, anticipating DFE tap 1 (within its limits) -- as COM locates its cursor.
@@ -554,6 +560,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.log(f"Mueller-Muller CDR sampling phase: {(curs_ix % nspui) / nspui:.3f} UI; initial DFE tap 1: {b_1:.3f}")
 
     self.dfe_scalar_values = []
+    self.dfe_freeze_ui = -1
     if ami_getwave_clocks:  # Accommodate the singular special case.
         t_ix = 0
         clocks = zeros(len_t)
@@ -595,6 +602,12 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
          ) = dfe.run_dfe(t, ffe_out, use_agc=self.use_agc, dbg_dict=dbg_dict, clock_phase=clock_phase)
         self.decision_scaler = dfe.decision_scaler
         self.dfe_scalar_values = dbg_dict["scalar_values"]
+        self.dfe_freeze_ui = dbg_dict["freeze_ui"]
+        if self.dfe_freeze and _n_taps:
+            if self.dfe_freeze_ui >= 0:
+                self.log(f"DFE tap weights frozen at UI {self.dfe_freeze_ui}: {array(dfe.tap_weights).round(4)}")
+            else:
+                self.log("DFE tap weights never stabilized; not frozen.")
 
     # Slicer input samples and their decisions, over the same window `calc_ber()` checks.
     self.dfe_slicer_samps = array(sig_samps[-eye_uis:])
@@ -789,11 +802,6 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     self.f_MHz_dfe = array([])
     self.jitter_rejection_ratio = array([])
 
-    # The pattern length must be doubled in the duo-binary and PAM-4 cases anyway, because:
-    #  - in the duo-binary case, the XOR pre-coding can invert every other pattern rep., and
-    #  - in the PAM-4 case, the bits are taken in pairs to form the symbols and we start w/ an odd # of bits.
-    # So, while it isn't strictly necessary, doubling it in the NRZ case as well provides a certain consistency.
-    pattern_len = (pow(2, max(pattern)) - 1) * 2
     len_x_m1 = len(x) - 1
     xing_min_t = (nui - eye_uis) * ui
 
