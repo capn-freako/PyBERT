@@ -153,7 +153,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # - Simulation Control
     bit_rate = Range(low=0.1, high=250.0, value=10.0)    #: (Gbps)
-    nbits = Range(low=1000, high=10000000, value=15000)  #: Number of bits to simulate.
+    nbits = Range(low=1000, high=10000000, value=25000)  #: Number of bits to simulate.
     eye_bits = Int(10160)                                #: Number of bits used to form eye.
     pattern = Map(
         {
@@ -351,7 +351,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
     decision_scaler = Float(0.5)  #: DFE slicer output voltage (V).
-    gain = Float(0.1)  #: DFE error gain (unitless).
+    gain = Float(0.5)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
     use_agc = Bool(True)  #: Continuously adjust ``decision_scalar`` when True.

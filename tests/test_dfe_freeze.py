@@ -124,7 +124,7 @@ def test_config_round_trip(tmp_path: Path):
 @pytest.mark.parametrize("pdut", [{"dfe_freeze": True, "gain": 0.5, "nbits": 25000}], indirect=True)
 class TestDfeFreezeSim:
     """Default configuration, simulated with DFE freezing enabled.
-    (The default gain is too low, and the default pre-eye run too short, for the DFE to stabilize before the eye.)"""
+    (The gain and run length are pinned, since the DFE must stabilize before the eye for these tests.)"""
 
     def test_ber(self, pdut):
         """No bit errors."""
