@@ -58,12 +58,14 @@ from ..utility import (
     fir_tap_weights_to_imp_resp,
     fst, snd,
     import_channel,
+    jittered_waveform,
     make_bathtub,
     make_ctle_h,
     resize_zero_pad,
     run_ami_model,
     safe_log10,
     trim_impulse,
+    tx_jitter_offsets,
 )
 
 from .com     import calc_com
@@ -270,6 +272,17 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     # the noise here is the physical crosstalk in the received signal; the aggressors let the AMI model cancel it.
     for h_fext in getattr(self, "fext_h", []):
         noise = noise + convolve(x, h_fext)[: len(noise)]
+
+    # Add the Tx jitter to the stimulus, by moving its symbol boundaries. (Drawn after the noise, above,
+    # so that the noise is unchanged by it.) The channel's own output, above, and the aggressors' stay
+    # jitter-free, as does `ideal_signal`: the reference that measured jitter is taken against.
+    tx_jitter = tx_jitter_offsets(
+        len(symbols) + 1, ui, rj=self.tx_rj * ui, dj=self.tx_dj * ui, dcd=self.tx_dcd * ui,
+        sj=self.tx_sj * ui, sj_freq=self.tx_sj_freq * 1.0e6)
+    if any(tx_jitter):
+        x, n_clipped = jittered_waveform(symbols, nspui, tx_jitter / ui)
+        if n_clipped:
+            self.log(f"Tx jitter: {n_clipped} symbol boundaries moved by more than 0.5 UI were clipped to it.")
 
     # Tx and Rx modeling are not separable in all cases.
     # So, we model each of the 4 possible combinations explicitly.

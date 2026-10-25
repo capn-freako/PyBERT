@@ -140,6 +140,16 @@ def _make_rx_ffe_tap_tuners() -> list:
     return tuners
 
 
+# IBIS-AMI Tx jitter Reserved Parameters (IBIS 8.0 Sec. 10.6.1) and the traits they set.
+TX_JITTER_AMI_PARAMS = {
+    "Tx_Rj": "tx_rj",
+    "Tx_Dj": "tx_dj",
+    "Tx_DCD": "tx_dcd",
+    "Tx_Sj": "tx_sj",
+    "Tx_Sj_Frequency": "tx_sj_freq",
+}
+
+
 class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     """
     A serial communication link bit error rate tester (BERT) simulator with
@@ -280,6 +290,13 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     pn_mag = Float(0.01)  #: Periodic noise magnitude (V).
     pn_freq = Float(11)  #: Periodic noise frequency (MHz).
     rn = Float(0.01)  #: Standard deviation of Gaussian random noise (V).
+    # Tx jitter, applied to the stimulus as IBIS 8.0 defines its Tx jitter Reserved Parameters (Sec. 10.6.1);
+    # set from an IBIS-AMI Tx model's `Tx_Rj`/`Tx_Dj`/`Tx_DCD`/`Tx_Sj`/`Tx_Sj_Frequency`, when it has them.
+    tx_rj = Float(0.0)  #: Tx random jitter standard deviation (UI).
+    tx_dj = Float(0.0)  #: Tx bounded (uniform) jitter, half its peak-to-peak (UI).
+    tx_dcd = Float(0.0)  #: Tx clock duty cycle distortion, half its peak-to-peak (UI).
+    tx_sj = Float(0.0)  #: Tx sinusoidal jitter amplitude, half its peak-to-peak (UI).
+    tx_sj_freq = Float(0.0)  #: Tx sinusoidal jitter frequency (MHz); `tx_sj` is ignored when zero.
     tx_taps: List = List()  #: List of Tx deemphasis tap tuner objects.
 
     def _tx_taps_default(self):
@@ -1268,12 +1285,50 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
                 else:
                     self.tx_has_ts4 = False
                 self._tx_cfg = pcfg
+                self._set_tx_jitter_from_ami(pcfg)
                 self.tx_ami_tap_tuners = pcfg.mk_tap_tuners()
                 self.tx_ami_valid = True
         except Exception as err:  # pylint: disable=broad-exception-caught
             error_message = f"Failed to open and/or parse AMI file!\n{err}"
             self.log(error_message, alert=True)
             raise
+
+    def _set_tx_jitter_from_ami(self, pcfg: AMIParamConfigurator) -> None:
+        """Set the Tx jitter from those of the IBIS-AMI Tx jitter Reserved Parameters the model declares
+        (IBIS 8.0 Sec. 10.6.1); the others keep their current values.
+
+        Values of Type Float are in seconds, converted to UI at the current bit rate.
+        """
+        found = []
+        for pname, tname in TX_JITTER_AMI_PARAMS.items():
+            param = pcfg.fetch_param(["Reserved_Parameters", pname])
+            if param is None:
+                continue
+            value = float(pcfg.fetch_param_val(["Reserved_Parameters", pname]))
+            if pname == "Tx_Sj_Frequency":
+                value *= 1.0e-6  # Hz => MHz
+                found.append(f"{pname} = {value} MHz")
+            elif param.ptype == "UI":
+                found.append(f"{pname} = {value} UI")
+            else:
+                found.append(f"{pname} = {value} s ({value / self.ui} UI at {self.bit_rate} Gbps)")
+                value /= self.ui
+            setattr(self, tname, value)
+        if not found:
+            return
+        self.log("Tx jitter set from the IBIS-AMI model: " + ", ".join(found) + ".")
+        if self.tx_sj and not self.tx_sj_freq:
+            self.log("Tx_Sj is ignored, since no Tx_Sj_Frequency is set.")
+        try:
+            ami_version = float(pcfg.fetch_param_val(["Reserved_Parameters", "AMI_Version"]))
+        except (TypeError, ValueError):
+            ami_version = None
+        declared = [pname for pname in TX_JITTER_AMI_PARAMS
+                    if pcfg.fetch_param(["Reserved_Parameters", pname]) is not None]
+        late = [pname for pname in declared if pname != "Tx_DCD"]  # Tx_DCD dates from AMI_Version 5.0.
+        if ami_version is not None and ami_version < 6.0 and late:
+            self.log(f"Warning: {', '.join(late)} are illegal before AMI_Version 6.0 (the model declares "
+                     f"{ami_version}); using them anyway.")
 
     def _tx_dll_file_changed(self, new_value):
         try:
