@@ -538,7 +538,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits, freeze_window=pattern_len if self.dfe_freeze else 0,
-              freeze_tol=self.dfe_freeze_tol, freeze_n_win=self.dfe_freeze_nwin)
+              freeze_tol=self.dfe_freeze_tol, freeze_n_win=self.dfe_freeze_nwin,
+              freeze_min_ui=nui - eye_uis)  # Freezing is meant to hold the DFE steady while eye data is gathered.
 
     # A Mueller-Muller CDR samples at a fixed phase: where the slicer-input pulse response meets the
     # Mueller-Muller criterion, anticipating DFE tap 1 (within its limits) -- as COM locates its cursor.
@@ -606,7 +607,9 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         if self.dfe_freeze and _n_taps:
             frozen_what = " and ".join((["tap weights"] if _n_taps else []) + (["AGC"] if self.use_agc else []))
             if self.dfe_freeze_ui >= 0:
-                self.log(f"DFE {frozen_what} frozen at UI {self.dfe_freeze_ui}: "
+                late = (f", after eye data collection began (UI {nui - eye_uis})"
+                        if self.dfe_freeze_ui >= nui - eye_uis else "")
+                self.log(f"DFE {frozen_what} frozen at UI {self.dfe_freeze_ui}{late}: "
                          f"taps: {array(dfe.tap_weights).round(4)}; level: {dfe.decision_scaler:.4f} V")
             else:
                 self.log(f"DFE {frozen_what} never stabilized; not frozen.")

@@ -16,7 +16,7 @@ H = (0.3, 0.1)  # Post-cursor ISI, relative to the cursor.
 
 
 def run_dfe(freeze_window: int, freeze_tol: float = 2e-3, n_taps: int = len(H),
-            use_agc: bool = False, dbg: Optional[dict] = None) -> tuple[np.ndarray, int]:
+            use_agc: bool = False, dbg: Optional[dict] = None, freeze_min_ui: int = 0) -> tuple[np.ndarray, int]:
     """Run an NRZ DFE, clocked at a fixed phase, over a noisy channel w/ known ISI.
     (The noise is heavy enough that the tolerance must be looser than the default, to freeze.)
     With AGC on, its level starts low (0.4 V; ~0.5 V is right).
@@ -31,7 +31,7 @@ def run_dfe(freeze_window: int, freeze_tol: float = 2e-3, n_taps: int = len(H),
     sig = np.repeat(x, NSPUI)
     t = np.arange(len(sig)) * UI / NSPUI
     dfe = DFE(n_taps, 0.1, 1e-12, 0.01, UI, NSPUI, 0.4 if use_agc else 0.5, n_ave=10, bandwidth=10e9,
-              freeze_window=freeze_window, freeze_tol=freeze_tol)
+              freeze_window=freeze_window, freeze_tol=freeze_tol, freeze_min_ui=freeze_min_ui)
     if dbg is None:
         dbg = {}
     tap_weights = dfe.run_dfe(t, sig, use_agc=use_agc, dbg_dict=dbg, clock_phase=UI / 2)[1]
@@ -59,6 +59,23 @@ def test_zero_tol_never_freezes():
     tap_weights, freeze_ui = run_dfe(PERIOD, freeze_tol=0.0)
     assert freeze_ui == -1
     assert np.array_equal(tap_weights, run_dfe(0)[0])
+
+
+def test_min_ui_delays_freeze():
+    """An already stable solution freezes just in time to equalize UI `freeze_min_ui`, at the same values."""
+    tap_weights, freeze_ui = run_dfe(PERIOD)
+    min_ui = freeze_ui + 5 * PERIOD + 7  # Mid-window, well after the unconstrained freeze.
+    tap_weights_min, freeze_ui_min = run_dfe(PERIOD, freeze_min_ui=min_ui)
+    assert freeze_ui_min == min_ui - 1
+    assert np.all(tap_weights_min[min_ui:] == tap_weights_min[-1]), "Tap weights changed after freezing!"
+    assert np.any(tap_weights_min[freeze_ui + 1:min_ui] != tap_weights_min[-1]), "Froze before `freeze_min_ui`!"
+    assert tap_weights_min[-1] == pytest.approx(tap_weights[-1], abs=0.01)
+
+
+def test_min_ui_beyond_run():
+    """No freeze when `freeze_min_ui` lies beyond the end of the run."""
+    tap_weights, freeze_ui = run_dfe(PERIOD, freeze_min_ui=50 * PERIOD)
+    assert freeze_ui == -1
 
 
 def test_agc_freezes_with_taps():
@@ -104,10 +121,10 @@ def test_config_round_trip(tmp_path: Path):
     assert dut2.dfe_freeze_nwin == 5
 
 
-@pytest.mark.parametrize("pdut", [{"dfe_freeze": True, "gain": 0.5}], indirect=True)
+@pytest.mark.parametrize("pdut", [{"dfe_freeze": True, "gain": 0.5, "nbits": 25000}], indirect=True)
 class TestDfeFreezeSim:
     """Default configuration, simulated with DFE freezing enabled.
-    (The default gain is too low for the DFE to stabilize within the default run length.)"""
+    (The default gain is too low, and the default pre-eye run too short, for the DFE to stabilize before the eye.)"""
 
     def test_ber(self, pdut):
         """No bit errors."""
@@ -121,3 +138,12 @@ class TestDfeFreezeSim:
         tap_weights = np.array(pdut.adaptation)
         assert np.all(tap_weights[pdut.dfe_freeze_ui + 1:] == tap_weights[-1])
         assert len(pdut.dfe_scalar_values) <= pdut.dfe_freeze_ui + 2, "AGC level changed after freezing!"
+
+    def test_frozen_for_eye(self, pdut):
+        """Already stable, the DFE freezes just as eye data collection begins, holding steady across the eye."""
+        if not any(t.enabled for t in pdut.dfe_tap_tuners):
+            pytest.skip("No DFE taps enabled in the default configuration.")
+        assert pdut.dfe_freeze_ui == pdut.nui - pdut.eye_uis - 1
+        # `adaptation[k]` holds the tap weights used at clock `k`.
+        n_clocks = len(pdut.adaptation) - 1
+        assert pdut.dfe_freeze_ui + 1 <= n_clocks - pdut.eye_uis, "Tap weights changed during the eye window!"

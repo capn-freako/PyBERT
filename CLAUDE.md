@@ -136,7 +136,9 @@ Johnson model), which silently ignores `ch_files`/`ch_file` if left unset. Nativ
 (`rx_taps`) is a *static* filter — it never adapts inside `run_simulation()`, unlike DFE
 (LMS-adaptive, starting fresh from zero regardless of any prior value, except tap 1 under the Mueller-Muller CDR;
 with `dfe_freeze` set, adaptation stops once each tap's pattern-length (`pattern_len` UI) averages over the last
-`dfe_freeze_nwin` windows agree within `dfe_freeze_tol`, the taps frozen at those averages' mean; with `use_agc`, the
+`dfe_freeze_nwin` windows agree within `dfe_freeze_tol`, the taps frozen at those averages' mean -- but not before
+eye data collection starts (UI `nui - eye_uis`; averaging runs regardless, so an already stable DFE freezes just
+in time for it, while one that stabilizes later freezes mid-eye, which the log flags); with `use_agc`, the
 AGC level (`decision_scaler`) freezes with them, at its own window averages' mean, unchecked (it settles far faster); `dfe_freeze_ui`
 reports when, or -1 -- comparing just two consecutive windows froze slow-converging taps up to ~16% short) — so `rx_taps`
 *is* part of the persisted config schema (`(enabled, value, min_val, max_val)` per tap,
