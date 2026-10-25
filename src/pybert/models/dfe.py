@@ -95,6 +95,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         freeze_window: int = 0,
         freeze_tol: float = 5.0e-4,
         freeze_n_win: int = 3,
+        freeze_min_ui: int = 0,
     ):
         """
         Args:
@@ -126,10 +127,15 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             freeze_window: Length (UI) of the windows over which tap weights are averaged, when checking
                 for a stable solution. (Normally, a whole number of pattern repetitions.) Zero disables freezing.
             freeze_tol: Once locked, the tap weights are frozen when each tap's averages over the last
-                *freeze_n_win* windows all lie within this of each other.
+                *freeze_n_win* windows all lie within this of each other. With AGC on, the decision scaler
+                is frozen along with them, at the mean of its own averages over those windows. (The AGC settles
+                far faster than the taps, tracking the slicer amplitude they set, so it needs no check of its own.)
             freeze_n_win: Number of consecutive window averages that must agree, before freezing.
                 (Agreement over several windows, rather than between just two, keeps the slow tail of
                 the tap weights' convergence from being mistaken for stability.)
+            freeze_min_ui: Earliest UI to be equalized with frozen tap weights. (Normally, the start of eye
+                data collection.) Window averaging proceeds regardless, so if the averages already agree,
+                the freeze happens just in time for this UI.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -156,6 +162,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         self.freeze_window = freeze_window
         self.freeze_tol = freeze_tol
         self.freeze_n_win = max(2, freeze_n_win)
+        self.freeze_min_ui = freeze_min_ui
 
         # Misc. finalization
         self.update_thresholds()
@@ -317,7 +324,8 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 - "decisions": Symbol decisions made based on voltages sampled at clocking instants.
 
             If *dbg_dict* is given, its "freeze_ui" entry holds the index of the UI at which the tap weights
-            were frozen (at the mean of their last *freeze_n_win* window averages), or -1 if they never were.
+            (and, with *use_agc*, the decision scaler) were frozen (at the mean of their last *freeze_n_win*
+            window averages), or -1 if they never were.
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -334,6 +342,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         freeze_window = self.freeze_window
         freeze_tol = self.freeze_tol
         freeze_n_win = self.freeze_n_win
+        freeze_min_ui = self.freeze_min_ui
 
         clk_cntr = 0
         filter_out = 0.0
@@ -361,8 +370,10 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         frozen = False
         freeze_ui = -1
         n_win_samps = 0
-        win_sum = zeros(len(self.tap_weights))
+        n_taps = len(self.tap_weights)
+        win_sum = zeros(n_taps + (1 if use_agc else 0))  # The decision scaler, last, w/ AGC on.
         win_aves: list[Rvec] = []
+        stable_ave: Optional[Rvec] = None  # Mean of the last `freeze_n_win` window averages, when they agree.
         for smpl_cntr, (t, x) in enumerate(zip(sample_times, signal)):
             if not ideal:
                 sum_out = summing_filter.step(x - filter_out)
@@ -406,24 +417,36 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                     nxt_filter_out = self.step(slicer_output, error, update)
                 else:
                     nxt_filter_out = self.step(slicer_output, 0.0, update)
-                if freeze_window and locked and not frozen and self.tap_weights:
-                    # Average each tap over consecutive windows; freeze once its last few averages agree.
-                    win_sum += self.tap_weights
+                if freeze_window and locked and not frozen and n_taps:
+                    # Average each tap (and the decision scaler) over consecutive windows;
+                    # freeze once the taps' last few averages agree, but not before `freeze_min_ui`.
+                    # (The averaging runs regardless, so a freeze can happen as soon as that time arrives.)
+                    win_sum += self.tap_weights + ([decision_scaler] if use_agc else [])
                     n_win_samps += 1
                     if n_win_samps >= freeze_window:
                         win_aves = win_aves[-(freeze_n_win - 1):] + [win_sum / n_win_samps]
-                        if len(win_aves) == freeze_n_win and np.ptp(win_aves, axis=0).max() <= freeze_tol:
-                            self.tap_weights = list(mean(win_aves, axis=0))
-                            frozen = True
-                            freeze_ui = clk_cntr - 1
+                        stable_ave = None
+                        if len(win_aves) == freeze_n_win and np.ptp(win_aves, axis=0)[:n_taps].max() <= freeze_tol:
+                            stable_ave = mean(win_aves, axis=0)
                         win_sum = zeros(len(win_sum))
                         n_win_samps = 0
+                    if stable_ave is not None and clk_cntr >= freeze_min_ui:  # The next UI is `clk_cntr`.
+                        self.tap_weights = list(stable_ave[:n_taps])
+                        if use_agc:
+                            decision_scaler = float(stable_ave[-1])
+                            scalar_values.append(decision_scaler)
+                            self.decision_scaler = decision_scaler
+                            self.update_thresholds()
+                        # Have the next UI's feedback use the frozen weights.
+                        nxt_filter_out = sum(array(self.tap_weights) * array(self.tap_values))
+                        frozen = True
+                        freeze_ui = clk_cntr - 1
                 tap_weights.append(self.tap_weights)
                 last_clock_sample = sum_out
                 next_boundary_time = next_clock_time + ui / 2.0
                 next_clock_time += ui
                 clock_times.append(next_clock_time)
-                if use_agc:
+                if use_agc and not frozen:
                     # Shift in new sample.
                     slicer_samps[:-1] = slicer_samps[1:]
                     slicer_samps[-1] = sum_out

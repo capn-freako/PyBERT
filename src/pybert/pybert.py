@@ -22,6 +22,7 @@ ToDo:
 """
 
 import platform
+import threading
 import time
 from copy import deepcopy
 from datetime import datetime, timezone, timedelta
@@ -52,6 +53,7 @@ from traits.api import (
     cached_property,
     observe,
 )
+from pyface.api import GUI
 from traits.etsconfig.api import ETSConfig
 from traitsui.message import message, error
 from scipy.interpolate import interp1d
@@ -151,7 +153,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # - Simulation Control
     bit_rate = Range(low=0.1, high=250.0, value=10.0)    #: (Gbps)
-    nbits = Range(low=1000, high=10000000, value=15000)  #: Number of bits to simulate.
+    nbits = Range(low=1000, high=10000000, value=25000)  #: Number of bits to simulate.
     eye_bits = Int(10160)                                #: Number of bits used to form eye.
     pattern = Map(
         {
@@ -349,11 +351,11 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     # - DFE
     sum_ideal = Bool(True)  #: True = use an ideal (i.e. - infinite bandwidth) summing node (Bool).
     decision_scaler = Float(0.5)  #: DFE slicer output voltage (V).
-    gain = Float(0.1)  #: DFE error gain (unitless).
+    gain = Float(0.5)  #: DFE error gain (unitless).
     n_ave = Float(100)  #: DFE # of averages to take, before making tap corrections.
     sum_bw = Float(12.0)  #: DFE summing node bandwidth (Used when sum_ideal=False.) (GHz).
     use_agc = Bool(True)  #: Continuously adjust ``decision_scalar`` when True.
-    dfe_freeze = Bool(False)  #: Freeze DFE tap weights, once their pattern-length averages stop changing, when True.
+    dfe_freeze = Bool(False)  #: Freeze DFE tap weights (and AGC), once their pattern-length averages stop changing, when True.
     dfe_freeze_tol = Float(5.0e-4)  #: Largest spread in any tap's recent averages still considered stable (unitless).
     dfe_freeze_nwin = Int(3)  #: Number of consecutive pattern-length tap averages that must agree, to freeze.
 
@@ -403,7 +405,9 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     chnl_dly = Float(0.0)  #: Estimated channel delay (s).
     n_errs_dfe = Int(0)  #: # of DFE bit errors observed in last run.
     n_errs_viterbi = Int(0)  #: # of Viterbi bit errors observed in last run.
-    dfe_freeze_ui = Int(-1)  #: UI at which DFE tap weights were frozen in last run; -1 means never.
+    dfe_freeze_ui = Int(-1)  #: UI at which DFE tap weights (and AGC) were frozen in last run; -1 means never.
+    dfe_tau_ui = Float(0.0)  #: DFE adaptation time constant in last run (UI); 0 means no adapting DFE.
+    dfe_warning = String("")  #: Warning that the DFE couldn't converge before the eye, in last run; empty if none.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # COM (Channel Operating Margin) — computed post-simulation via PyChOpMarg.
@@ -472,7 +476,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if exception:
             raise exception
         if alert and self.GUI:
-            message(_msg, title="PyBERT Alert")
+            if threading.current_thread() is threading.main_thread():
+                message(_msg, title="PyBERT Alert")
+            else:  # e.g. - from the simulation thread; GUI calls must happen in the main thread.
+                GUI.invoke_later(message, _msg, title="PyBERT Alert")
 
     # User "yes"/"no" alert box.
     def alert(self, msg):

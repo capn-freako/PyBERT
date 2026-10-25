@@ -136,8 +136,14 @@ Johnson model), which silently ignores `ch_files`/`ch_file` if left unset. Nativ
 (`rx_taps`) is a *static* filter — it never adapts inside `run_simulation()`, unlike DFE
 (LMS-adaptive, starting fresh from zero regardless of any prior value, except tap 1 under the Mueller-Muller CDR;
 with `dfe_freeze` set, adaptation stops once each tap's pattern-length (`pattern_len` UI) averages over the last
-`dfe_freeze_nwin` windows agree within `dfe_freeze_tol`, the taps frozen at those averages' mean; `dfe_freeze_ui`
-reports when, or -1 -- comparing just two consecutive windows froze slow-converging taps up to ~16% short) — so `rx_taps`
+`dfe_freeze_nwin` windows agree within `dfe_freeze_tol`, the taps frozen at those averages' mean -- but not before
+eye data collection starts (UI `nui - eye_uis`; averaging runs regardless, so an already stable DFE freezes just
+in time for it, while one that stabilizes later freezes mid-eye, which the log flags); with `use_agc`, the
+AGC level (`decision_scaler`) freezes with them, at its own window averages' mean, unchecked (it settles far faster); `dfe_freeze_ui`
+reports when, or -1 -- comparing just two consecutive windows froze slow-converging taps up to ~16% short;
+`dfe_tau_ui` is the LMS adaptation time constant, `n_ave / (gain * decision_scaler^2 * E[d^2])` UI -- within ~2% of
+fitted tap trajectories for NRZ/PAM-4 -- and `dfe_warning` alerts the user, whatever `dfe_freeze`, when fewer than
+5 of them separate CDR lock from the eye: a gain set too low is reported, not compensated for) — so `rx_taps`
 *is* part of the persisted config schema (`(enabled, value, min_val, max_val)` per tap,
 mirroring `tx_taps`; `ffe_tap_tuners`, its EQ-tune-tab counterpart, round-trips too), while
 DFE tap *weights* deliberately aren't (only their enabled/min/max bounds are — a `value`

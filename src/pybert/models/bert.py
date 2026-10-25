@@ -538,7 +538,8 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
               n_ave=n_ave, n_lock_ave=n_lock_ave, rel_lock_tol=rel_lock_tol,
               lock_sustain=lock_sustain, bandwidth=bandwidth, ideal=_ideal,
               limits=limits, freeze_window=pattern_len if self.dfe_freeze else 0,
-              freeze_tol=self.dfe_freeze_tol, freeze_n_win=self.dfe_freeze_nwin)
+              freeze_tol=self.dfe_freeze_tol, freeze_n_win=self.dfe_freeze_nwin,
+              freeze_min_ui=nui - eye_uis)  # Freezing is meant to hold the DFE steady while eye data is gathered.
 
     # A Mueller-Muller CDR samples at a fixed phase: where the slicer-input pulse response meets the
     # Mueller-Muller criterion, anticipating DFE tap 1 (within its limits) -- as COM locates its cursor.
@@ -604,10 +605,32 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
         self.dfe_scalar_values = dbg_dict["scalar_values"]
         self.dfe_freeze_ui = dbg_dict["freeze_ui"]
         if self.dfe_freeze and _n_taps:
+            frozen_what = " and ".join((["tap weights"] if _n_taps else []) + (["AGC"] if self.use_agc else []))
             if self.dfe_freeze_ui >= 0:
-                self.log(f"DFE tap weights frozen at UI {self.dfe_freeze_ui}: {array(dfe.tap_weights).round(4)}")
+                late = (f", after eye data collection began (UI {nui - eye_uis})"
+                        if self.dfe_freeze_ui >= nui - eye_uis else "")
+                self.log(f"DFE {frozen_what} frozen at UI {self.dfe_freeze_ui}{late}: "
+                         f"taps: {array(dfe.tap_weights).round(4)}; level: {dfe.decision_scaler:.4f} V")
             else:
-                self.log("DFE tap weights never stabilized; not frozen.")
+                self.log(f"DFE {frozen_what} never stabilized; not frozen.")
+
+    # Warn if the DFE can't converge before eye data collection begins.
+    # Its LMS update moves each tap toward its target by `gain * level^2 * E[d^2] / n_ave` of the remaining
+    # distance per UI, giving this adaptation time constant (UI); after 5 of them, the taps are within ~1%.
+    self.dfe_tau_ui = 0.0
+    self.dfe_warning = ""
+    if not ami_getwave_clocks and _n_taps and len(decisions):
+        lock_ui = int(argmax(lockeds)) // nspui if any(lockeds) else nui
+        adapt_uis = nui - eye_uis - lock_ui
+        rate = _gain * dfe.decision_scaler ** 2 * float(mean(array(decisions) ** 2)) / n_ave
+        self.dfe_tau_ui = 1.0 / rate if rate > 0 else float("inf")
+        if adapt_uis < 5 * self.dfe_tau_ui:
+            self.dfe_warning = (
+                f"The DFE can't converge before eye data collection begins: its adaptation time constant is "
+                f"~{self.dfe_tau_ui:.0f} UI, but only {max(0, adapt_uis)} UI separate CDR lock from the eye "
+                f"(at least {5 * self.dfe_tau_ui:.0f} UI are needed). "
+                "Raise the DFE gain, or `Nbits` relative to `EyeBits`.")
+            self.log(self.dfe_warning, alert=True)
 
     # Slicer input samples and their decisions, over the same window `calc_ber()` checks.
     self.dfe_slicer_samps = array(sig_samps[-eye_uis:])
