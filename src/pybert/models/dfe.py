@@ -92,6 +92,9 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         ideal: bool = True,
         limits: Optional[list[tuple[float, float]]] = None,
         agc_n_ave: int = 100,
+        freeze_window: int = 0,
+        freeze_tol: float = 5.0e-4,
+        freeze_n_win: int = 3,
     ):
         """
         Args:
@@ -120,6 +123,13 @@ class DFE:  # pylint: disable=too-many-instance-attributes
             ideal: Boolean flag. When true, use an ideal summing node.
             limits: List of pairs containing min/max values per tap.
             agc_n_ave: Number of previous slicer sample to keep, for AGC operation.
+            freeze_window: Length (UI) of the windows over which tap weights are averaged, when checking
+                for a stable solution. (Normally, a whole number of pattern repetitions.) Zero disables freezing.
+            freeze_tol: Once locked, the tap weights are frozen when each tap's averages over the last
+                *freeze_n_win* windows all lie within this of each other.
+            freeze_n_win: Number of consecutive window averages that must agree, before freezing.
+                (Agreement over several windows, rather than between just two, keeps the slow tail of
+                the tap weights' convergence from being mistaken for stability.)
 
         Raises:
             RuntimeError: If the requested modulation type is unknown.
@@ -143,6 +153,9 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         self.ideal = ideal
         self.limits = limits
         self.agc_n_ave = agc_n_ave
+        self.freeze_window = freeze_window
+        self.freeze_tol = freeze_tol
+        self.freeze_n_win = max(2, freeze_n_win)
 
         # Misc. finalization
         self.update_thresholds()
@@ -303,6 +316,9 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 - "sig_samps": Samples of the summing node output, taken at the clocking instants.
                 - "decisions": Symbol decisions made based on voltages sampled at clocking instants.
 
+            If *dbg_dict* is given, its "freeze_ui" entry holds the index of the UI at which the tap weights
+            were frozen (at the mean of their last *freeze_n_win* window averages), or -1 if they never were.
+
         Raises:
             RuntimeError: If the requested modulation type is unknown.
         """
@@ -315,6 +331,9 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         mod_type = self.mod_type
         thresholds = self.thresholds
         agc_n_ave = self.agc_n_ave
+        freeze_window = self.freeze_window
+        freeze_tol = self.freeze_tol
+        freeze_n_win = self.freeze_n_win
 
         clk_cntr = 0
         filter_out = 0.0
@@ -339,6 +358,11 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         slicer_samps = zeros(agc_n_ave)
         ave_samps = zeros(agc_n_ave)
         scalar_values = [decision_scaler]
+        frozen = False
+        freeze_ui = -1
+        n_win_samps = 0
+        win_sum = zeros(len(self.tap_weights))
+        win_aves: list[Rvec] = []
         for smpl_cntr, (t, x) in enumerate(zip(sample_times, signal)):
             if not ideal:
                 sum_out = summing_filter.step(x - filter_out)
@@ -377,11 +401,23 @@ class DFE:  # pylint: disable=too-many-instance-attributes
                 decisions.append(decision)
                 slicer_output = decision * decision_scaler
                 error = sum_out - slicer_output
-                update = locked and (clk_cntr % n_ave) == 0
-                if locked:  # We only want error accumulation to happen, when we're locked.
+                update = locked and not frozen and (clk_cntr % n_ave) == 0
+                if locked and not frozen:  # We only want error accumulation to happen, when we're locked.
                     nxt_filter_out = self.step(slicer_output, error, update)
                 else:
                     nxt_filter_out = self.step(slicer_output, 0.0, update)
+                if freeze_window and locked and not frozen and self.tap_weights:
+                    # Average each tap over consecutive windows; freeze once its last few averages agree.
+                    win_sum += self.tap_weights
+                    n_win_samps += 1
+                    if n_win_samps >= freeze_window:
+                        win_aves = win_aves[-(freeze_n_win - 1):] + [win_sum / n_win_samps]
+                        if len(win_aves) == freeze_n_win and np.ptp(win_aves, axis=0).max() <= freeze_tol:
+                            self.tap_weights = list(mean(win_aves, axis=0))
+                            frozen = True
+                            freeze_ui = clk_cntr - 1
+                        win_sum = zeros(len(win_sum))
+                        n_win_samps = 0
                 tap_weights.append(self.tap_weights)
                 last_clock_sample = sum_out
                 next_boundary_time = next_clock_time + ui / 2.0
@@ -418,6 +454,7 @@ class DFE:  # pylint: disable=too-many-instance-attributes
         self.ui = ui
         if dbg_dict is not None:
             dbg_dict["scalar_values"] = scalar_values
+            dbg_dict["freeze_ui"] = freeze_ui
 
         return (
             array(res),

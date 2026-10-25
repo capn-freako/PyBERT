@@ -160,6 +160,9 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.n_ave = the_PyBERT.n_ave
         self.sum_bw = the_PyBERT.sum_bw
         self.use_agc = the_PyBERT.use_agc
+        self.dfe_freeze = the_PyBERT.dfe_freeze
+        self.dfe_freeze_tol = the_PyBERT.dfe_freeze_tol
+        self.dfe_freeze_nwin = the_PyBERT.dfe_freeze_nwin
 
         # CDR
         self.cdr_type = the_PyBERT.cdr_type

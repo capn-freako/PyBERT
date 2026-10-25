@@ -693,6 +693,14 @@ traits_view = View(
                                     Item(name="use_agc", label="Use AGC", tooltip="Continuously adjust `Level` automatically."),
                                 ),
                                 HGroup(
+                                    Item(name="dfe_freeze", label="Freeze when stable",
+                                         tooltip="Stop adapting once each tap's pattern-length average stops changing."),
+                                    Item(name="dfe_freeze_tol", label="Tol.", format_str="%0.1e", enabled_when="dfe_freeze",
+                                         tooltip="largest spread in any tap's recent pattern-length averages still considered stable"),
+                                    Item(name="dfe_freeze_nwin", label="Nwin.", enabled_when="dfe_freeze",
+                                         tooltip="# of consecutive pattern-length tap averages that must agree"),
+                                ),
+                                HGroup(
                                     Item(
                                         name="sum_bw",
                                         label="Bandwidth",

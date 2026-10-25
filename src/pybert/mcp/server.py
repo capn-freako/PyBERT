@@ -27,6 +27,7 @@ RESULT_TRAIT_NAMES = [
     "jitter_perf",
     "n_errs_dfe",
     "n_errs_viterbi",
+    "dfe_freeze_ui",
     "chnl_dly",
     "isi_dfe",
     "dcd_dfe",
