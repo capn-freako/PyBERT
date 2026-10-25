@@ -90,17 +90,18 @@ def test_gui_startup_without_simulation():
     """The GUI's plots exist before any simulation (none runs at start-up), and the first one fills them in."""
     from pybert.models.bert import my_run_simulation
 
-    from chaco.api import ArrayPlotData
-
-    from pybert.gui.plot import make_plots_without_data
-
     dut = PyBERT(run_simulation=False)
     assert dut.plots_eye is not None and dut.plot_h_tune is not None
-    # `plotdata` is shared by all `PyBERT` instances (a class-level default), so earlier tests may have filled it;
-    # rebuild the plots over an empty one, as at a fresh GUI start-up.
-    dut.plotdata = ArrayPlotData()
-    make_plots_without_data(dut, n_dfe_taps=dut.n_dfe_taps)
     assert dut.plotdata.get_data("eye_dfe").shape == (2, 2)  # Placeholder
     my_run_simulation(dut)  # As run by the GUI's "Run" button (`RunSimThread`).
     assert dut.plotdata.get_data("eye_dfe").shape != (2, 2)
     assert dut.n_errs_dfe == 0
+
+
+def test_plotdata_per_instance():
+    """Each `PyBERT` instance has its own plot data, so one's results never show up in another's plots."""
+    p1 = PyBERT(run_simulation=False, gui=False)
+    p2 = PyBERT(run_simulation=False, gui=False)
+    assert p1.plotdata is not p2.plotdata
+    p1.plotdata.set_data("probe", np.zeros(3))
+    assert p2.plotdata.get_data("probe") is None

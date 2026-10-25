@@ -385,7 +385,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     data_file = File("", entries=5, filter=["*.pybert_data"])  # type: ignore
 
     # Plots (plot containers, actually)
-    plotdata = ArrayPlotData()
+    plotdata = Instance(ArrayPlotData, ())  #: Plot data; each instance gets its own.
     plots_h = Instance(GridPlotContainer)
     plots_s = Instance(GridPlotContainer)
     plots_p = Instance(GridPlotContainer)
