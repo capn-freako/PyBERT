@@ -139,6 +139,11 @@ class TestDfeFreezeSim:
         assert np.all(tap_weights[pdut.dfe_freeze_ui + 1:] == tap_weights[-1])
         assert len(pdut.dfe_scalar_values) <= pdut.dfe_freeze_ui + 2, "AGC level changed after freezing!"
 
+    def test_no_gain_warning(self, pdut):
+        """With ample adaptation time before the eye, there's no DFE gain warning."""
+        assert pdut.dfe_tau_ui > 0
+        assert pdut.dfe_warning == ""
+
     def test_frozen_for_eye(self, pdut):
         """Already stable, the DFE freezes just as eye data collection begins, holding steady across the eye."""
         if not any(t.enabled for t in pdut.dfe_tap_tuners):
@@ -147,3 +152,33 @@ class TestDfeFreezeSim:
         # `adaptation[k]` holds the tap weights used at clock `k`.
         n_clocks = len(pdut.adaptation) - 1
         assert pdut.dfe_freeze_ui + 1 <= n_clocks - pdut.eye_uis, "Tap weights changed during the eye window!"
+
+
+def test_gain_warning():
+    """With too little time to adapt before the eye, the user is warned."""
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.gain = 0.01
+    dut.simulate(initial_run=True)
+    # Its LMS update gives a time constant of `n_ave / (gain * level^2 * E[d^2])`; NRZ: E[d^2] = 1.
+    # (Nearly: a few decisions, made before the signal arrives, are 0.)
+    assert dut.dfe_tau_ui == pytest.approx(dut.n_ave / (dut.gain * dut.decision_scaler**2), rel=1e-3)
+    assert "can't converge before eye data collection" in dut.dfe_warning
+    assert dut.dfe_warning in dut.console_log
+
+
+def test_alert_from_sim_thread(monkeypatch):
+    """An alert raised off the main thread (e.g. - by the simulation thread) is deferred to the GUI thread."""
+    import threading
+
+    from pybert import pybert as pybert_mod
+
+    calls: list = []
+    monkeypatch.setattr(pybert_mod, "message", lambda *args, **kwargs: calls.append("direct"))
+    monkeypatch.setattr(pybert_mod.GUI, "invoke_later", lambda *args, **kwargs: calls.append("deferred"))
+    dut = PyBERT(run_simulation=False, gui=False)
+    dut.GUI = True
+    thread = threading.Thread(target=dut.log, args=("Test alert.",), kwargs={"alert": True})
+    thread.start()
+    thread.join()
+    dut.log("Test alert.", alert=True)
+    assert calls == ["deferred", "direct"]

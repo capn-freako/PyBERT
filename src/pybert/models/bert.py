@@ -614,6 +614,24 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
             else:
                 self.log(f"DFE {frozen_what} never stabilized; not frozen.")
 
+    # Warn if the DFE can't converge before eye data collection begins.
+    # Its LMS update moves each tap toward its target by `gain * level^2 * E[d^2] / n_ave` of the remaining
+    # distance per UI, giving this adaptation time constant (UI); after 5 of them, the taps are within ~1%.
+    self.dfe_tau_ui = 0.0
+    self.dfe_warning = ""
+    if not ami_getwave_clocks and _n_taps and len(decisions):
+        lock_ui = int(argmax(lockeds)) // nspui if any(lockeds) else nui
+        adapt_uis = nui - eye_uis - lock_ui
+        rate = _gain * dfe.decision_scaler ** 2 * float(mean(array(decisions) ** 2)) / n_ave
+        self.dfe_tau_ui = 1.0 / rate if rate > 0 else float("inf")
+        if adapt_uis < 5 * self.dfe_tau_ui:
+            self.dfe_warning = (
+                f"The DFE can't converge before eye data collection begins: its adaptation time constant is "
+                f"~{self.dfe_tau_ui:.0f} UI, but only {max(0, adapt_uis)} UI separate CDR lock from the eye "
+                f"(at least {5 * self.dfe_tau_ui:.0f} UI are needed). "
+                "Raise the DFE gain, or `Nbits` relative to `EyeBits`.")
+            self.log(self.dfe_warning, alert=True)
+
     # Slicer input samples and their decisions, over the same window `calc_ber()` checks.
     self.dfe_slicer_samps = array(sig_samps[-eye_uis:])
     self.dfe_slicer_decisions = array(decisions[-eye_uis:])

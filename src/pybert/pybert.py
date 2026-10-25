@@ -22,6 +22,7 @@ ToDo:
 """
 
 import platform
+import threading
 import time
 from copy import deepcopy
 from datetime import datetime, timezone, timedelta
@@ -52,6 +53,7 @@ from traits.api import (
     cached_property,
     observe,
 )
+from pyface.api import GUI
 from traits.etsconfig.api import ETSConfig
 from traitsui.message import message, error
 from scipy.interpolate import interp1d
@@ -404,6 +406,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     n_errs_dfe = Int(0)  #: # of DFE bit errors observed in last run.
     n_errs_viterbi = Int(0)  #: # of Viterbi bit errors observed in last run.
     dfe_freeze_ui = Int(-1)  #: UI at which DFE tap weights (and AGC) were frozen in last run; -1 means never.
+    dfe_tau_ui = Float(0.0)  #: DFE adaptation time constant in last run (UI); 0 means no adapting DFE.
+    dfe_warning = String("")  #: Warning that the DFE couldn't converge before the eye, in last run; empty if none.
     run_count = Int(0)  # Used as a mechanism to force bit stream regeneration.
 
     # COM (Channel Operating Margin) — computed post-simulation via PyChOpMarg.
@@ -472,7 +476,10 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         if exception:
             raise exception
         if alert and self.GUI:
-            message(_msg, title="PyBERT Alert")
+            if threading.current_thread() is threading.main_thread():
+                message(_msg, title="PyBERT Alert")
+            else:  # e.g. - from the simulation thread; GUI calls must happen in the main thread.
+                GUI.invoke_later(message, _msg, title="PyBERT Alert")
 
     # User "yes"/"no" alert box.
     def alert(self, msg):

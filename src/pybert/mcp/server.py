@@ -28,6 +28,8 @@ RESULT_TRAIT_NAMES = [
     "n_errs_dfe",
     "n_errs_viterbi",
     "dfe_freeze_ui",
+    "dfe_tau_ui",
+    "dfe_warning",
     "chnl_dly",
     "isi_dfe",
     "dcd_dfe",
