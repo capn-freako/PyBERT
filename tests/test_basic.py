@@ -2,6 +2,8 @@
 import numpy as np
 import pytest
 
+from pybert.pybert import PyBERT
+
 
 @pytest.mark.usefixtures("dut")
 class TestBasic(object):
@@ -82,3 +84,23 @@ def test_ctle_impulse_not_limited_by_sim_frequency_grid():
     step = np.cumsum(p.ctle_h)
     assert step.max() / step[-1] - 1 < 1e-3
     assert p.ctle_h.min() > -1e-3 * p.ctle_h.max()
+
+
+def test_gui_startup_without_simulation():
+    """The GUI's plots exist before any simulation (none runs at start-up), and the first one fills them in."""
+    from pybert.models.bert import my_run_simulation
+
+    from chaco.api import ArrayPlotData
+
+    from pybert.gui.plot import make_plots_without_data
+
+    dut = PyBERT(run_simulation=False)
+    assert dut.plots_eye is not None and dut.plot_h_tune is not None
+    # `plotdata` is shared by all `PyBERT` instances (a class-level default), so earlier tests may have filled it;
+    # rebuild the plots over an empty one, as at a fresh GUI start-up.
+    dut.plotdata = ArrayPlotData()
+    make_plots_without_data(dut, n_dfe_taps=dut.n_dfe_taps)
+    assert dut.plotdata.get_data("eye_dfe").shape == (2, 2)  # Placeholder
+    my_run_simulation(dut)  # As run by the GUI's "Run" button (`RunSimThread`).
+    assert dut.plotdata.get_data("eye_dfe").shape != (2, 2)
+    assert dut.n_errs_dfe == 0

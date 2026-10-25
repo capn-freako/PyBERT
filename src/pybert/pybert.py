@@ -70,7 +70,7 @@ from pychopmarg.devmodel import gamma_term, renormalize_to, s_rx_model, s_tx_mod
 from pybert import __version__ as VERSION
 from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.gui.help import help_str
-from pybert.gui.plot import make_plots
+from pybert.gui.plot import make_plots, make_plots_without_data
 from pybert.models.bert import my_run_simulation
 from pybert.models.tx_tap import TxTapTuner
 from pybert.models.fec import FEC_Encoder
@@ -398,7 +398,14 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
     # Status
     status = String("Ready.")  #: PyBERT status (String).
+    channel_perf = Float(0.0)
+    tx_perf = Float(0.0)
+    ctle_perf = Float(0.0)
+    ffe_perf = Float(0.0)
+    dfe_perf = Float(0.0)
+    viterbi_perf = Float(0.0)
     jitter_perf = Float(0.0)
+    plotting_perf = Float(0.0)
     total_perf = Float(0.0)
     sweep_results = List()  # type: ignore
     len_h = Int(0)
@@ -536,6 +543,8 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
 
         if run_simulation:
             self.simulate(initial_run=True)
+        elif gui:  # The GUI needs its plots, even before a simulation has filled them in.
+            make_plots_without_data(self, n_dfe_taps=self.n_dfe_taps)
 
     def _btn_disable_fired(self):
         if self.opt_thread and self.opt_thread.is_alive():
@@ -1648,13 +1657,18 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         my_run_simulation(self, initial_run=initial_run, update_plots=update_plots)
         # Once the required data structure is filled in, we can create the plots.
         if update_plots:
-            n_dfe_taps = 0
-            for tap in self.dfe_tap_tuners:
-                if tap.enabled:
-                    n_dfe_taps += 1
-                else:
-                    break
-            make_plots(self, n_dfe_taps=n_dfe_taps)
+            make_plots(self, n_dfe_taps=self.n_dfe_taps)
+
+    @property
+    def n_dfe_taps(self) -> int:
+        """Number of DFE taps in use: those enabled, up to the first disabled one."""
+        n_dfe_taps = 0
+        for tap in self.dfe_tap_tuners:
+            if tap.enabled:
+                n_dfe_taps += 1
+            else:
+                break
+        return n_dfe_taps
 
     def load_configuration(self, filepath: Path):
         """Load in a configuration into pybert.

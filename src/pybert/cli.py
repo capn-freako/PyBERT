@@ -17,7 +17,7 @@ def cli(ctx, config_file, results):
     """Serial communication link bit error rate tester."""
 
     if ctx.invoked_subcommand is None:  # No sub-command like `sim` given open the GUI like default.
-        pybert = PyBERT()
+        pybert = PyBERT(run_simulation=False)
 
         # Load any user provided files before opening the GUI.
         if config_file:
