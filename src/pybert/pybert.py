@@ -19,6 +19,9 @@ Copyright (c) 2014 by David Banas; All rights reserved World wide.
 ToDo:
     1. Add optional AFE (4th-order Bessel-Thomson).
     2. Add eye contour plots.
+    3. Put a warning in the GUI, near the Tx IBIS model selection, that Tx jitter an IBIS-AMI model gives in
+       seconds (Type Float) is converted to UI at the bit rate set when the model loads; so, set the bit rate
+       first, or reload the model after changing it. (See `_set_tx_jitter_from_ami()`.)
 """
 
 import platform
