@@ -8,8 +8,10 @@ Original date:   February 21, 2015 (Copied from pybert.py, as part of a major co
 Copyright (c) 2015 David Banas; all rights reserved World wide.
 """
 
+from numpy import zeros
+
 from chaco.api import (
-    ColorBar, ColorMapper, GridPlotContainer,
+    ArrayPlotData, ColorBar, ColorMapper, GridPlotContainer,
     HPlotContainer, LogMapper, Plot, TransformColorMapper
 )
 from chaco.default_colormaps import viridis
@@ -70,13 +72,54 @@ seg_map = {
 }
 
 
+EYE_IMAGES = ("eye_chnl", "eye_tx", "eye_ctle", "eye_dfe")  # Plotted as images; their placeholders must be 2-D.
+
+
+class _PlaceholderPlotData(ArrayPlotData):
+    """Supplies (and records) an empty placeholder for each requested data name not yet holding data."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.placeholders: list[str] = []
+
+    def get_data(self, name):
+        value = super().get_data(name)
+        if value is None:
+            value = zeros((2, 2)) if name in EYE_IMAGES else zeros(2)
+            self.set_data(name, value)
+            self.placeholders.append(name)
+        return value
+
+
+def make_plots_without_data(self, n_dfe_taps):
+    """
+    Create the plots used by the PyBERT GUI before any simulation has filled in their data,
+    using empty placeholders for it, which the first simulation's results replace.
+    """
+
+    plotdata = self.plotdata
+    probe = _PlaceholderPlotData(**{name: plotdata.get_data(name) for name in plotdata.list_data()})
+    self.plotdata = probe
+    try:  # Discover the data names the plots need.
+        make_plots(self, n_dfe_taps, size_eyes=False)
+    finally:
+        self.plotdata = plotdata
+    for name in probe.placeholders:
+        plotdata.set_data(name, probe.get_data(name))
+    make_plots(self, n_dfe_taps, size_eyes=False)  # The first simulation sizes the eyes.
+
+
 # pylint: disable=too-many-locals,too-many-statements
-def make_plots(self, n_dfe_taps):
+def make_plots(self, n_dfe_taps, size_eyes=True):
     """
     Create the plots used by the PyBERT GUI.
 
     Args:
+        n_dfe_taps: Number of DFE taps to plot the adaptation of.
 
+    Keyword Args:
+        size_eyes: Size the eye diagrams' axes to the simulated signals. (Needs simulation results.)
+            Default: True
     """
 
     post_chnl_str = "Channel"
@@ -672,4 +715,5 @@ def make_plots(self, n_dfe_taps):
     container_bathtub.add(plot_bathtub_dfe)
     self.plots_bathtub = container_bathtub
 
-    update_eyes(self)
+    if size_eyes:
+        update_eyes(self)

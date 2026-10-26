@@ -2,6 +2,8 @@
 import numpy as np
 import pytest
 
+from pybert.pybert import PyBERT
+
 
 @pytest.mark.usefixtures("dut")
 class TestBasic(object):
@@ -82,3 +84,24 @@ def test_ctle_impulse_not_limited_by_sim_frequency_grid():
     step = np.cumsum(p.ctle_h)
     assert step.max() / step[-1] - 1 < 1e-3
     assert p.ctle_h.min() > -1e-3 * p.ctle_h.max()
+
+
+def test_gui_startup_without_simulation():
+    """The GUI's plots exist before any simulation (none runs at start-up), and the first one fills them in."""
+    from pybert.models.bert import my_run_simulation
+
+    dut = PyBERT(run_simulation=False)
+    assert dut.plots_eye is not None and dut.plot_h_tune is not None
+    assert dut.plotdata.get_data("eye_dfe").shape == (2, 2)  # Placeholder
+    my_run_simulation(dut)  # As run by the GUI's "Run" button (`RunSimThread`).
+    assert dut.plotdata.get_data("eye_dfe").shape != (2, 2)
+    assert dut.n_errs_dfe == 0
+
+
+def test_plotdata_per_instance():
+    """Each `PyBERT` instance has its own plot data, so one's results never show up in another's plots."""
+    p1 = PyBERT(run_simulation=False, gui=False)
+    p2 = PyBERT(run_simulation=False, gui=False)
+    assert p1.plotdata is not p2.plotdata
+    p1.plotdata.set_data("probe", np.zeros(3))
+    assert p2.plotdata.get_data("probe") is None

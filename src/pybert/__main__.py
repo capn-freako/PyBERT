@@ -9,7 +9,7 @@ from pybert.pybert import PyBERT
 
 def main():
     "Run the PyBERT GUI."
-    thePyBERT = PyBERT()
+    thePyBERT = PyBERT(run_simulation=False)
     thePyBERT.configure_traits(view=traits_view)
 
 

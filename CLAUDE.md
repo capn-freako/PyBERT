@@ -221,4 +221,6 @@ decision-directed LMS can't bootstrap when the pre-DFE eye at that phase is clos
 
 ### CLI entry point
 
-`pybert` CLI is defined in `src/pybert/cli.py`. `pybert` (no subcommand) opens the GUI; `pybert sim <config.yaml>` runs headless and writes `.pybert_data`.
+`pybert` CLI is defined in `src/pybert/cli.py`. `pybert` (no subcommand) opens the GUI, without simulating first
+(`PyBERT(run_simulation=False)` with `gui=True` builds the plots over empty placeholder data -- `make_plots_without_data()`
+in `gui/plot.py` -- which the first simulation's results replace); `pybert sim <config.yaml>` runs headless and writes `.pybert_data`.
