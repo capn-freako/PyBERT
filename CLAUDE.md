@@ -86,6 +86,18 @@ PyBERT is a serial-link BERT simulator built on the Enthought Traits/TraitsUI st
    data that already includes it). Native Tx/Rx only (IBIS-AMI on-die additions are ignored on this path). A bare
    matched termination reproduces `calc_G()` exactly (`tests/test_pkg_models.py`).
 3. **IBIS-AMI integration**: `src/pybert/utility/ibisami.py::run_ami_model()` wraps `pyibisami.ami.model.AMIModel`. The response dict returned by `AMIModel.get_responses()` is keyed with `AmiModelResponseKey` objects (frozen dataclass) — always use the exported constants `IMP_RESP_INIT`, `IMP_RESP_GETW`, `OUT_RESP_INIT`, `OUT_RESP_GETW` when accessing it, not plain strings.
+   **Tx jitter** (Issue #85): `tx_rj`/`tx_dj`/`tx_dcd`/`tx_sj` (UI) and `tx_sj_freq` (MHz) move the stimulus's symbol
+   boundaries per IBIS 8.0's Tx jitter Reserved Parameters (Sec. 10.6.1: `Time(n) = n*UI + Tx_DCD*(-1)^n +
+   2*Tx_Dj*uniform(+/-0.5) + Tx_Rj*gaussian + Tx_Sj*sin(2*pi*Tx_Sj_Frequency*n*UI)` -- all half peak-to-peak but Rj's
+   sigma; DCD alternates by clock index, not edge polarity), via `utility/jitter.py`'s `tx_jitter_offsets()` and
+   `jittered_waveform()` (each sample the time average over its period, so edges land between samples), ahead of all
+   three Tx paths (native, AMI Init, AMI GetWave). `chnl_out`, the FEXT aggressors and `ideal_signal` stay jitter-free.
+   Loading a Tx AMI file sets the traits the model declares (`_set_tx_jitter_from_ami()`; Type Float = seconds,
+   converted at the current bit rate); a saved config's values are applied after its AMI file, so they win.
+   Reading it back with `calc_jitter()`: `rj_tx` matches Tx Rj over a short channel (a lossy one amplifies it, e.g.
+   +15% on the default channel -- real), `pj_tx` (peak-to-peak) matches Sj only on a jitter-spectrum bin (spectral
+   leakage misreads it by up to ~+37% between bins, the rest landing in `rj_tx`), and Tx DCD shows up in `isi_tx`,
+   not `dcd_tx` (which is rising-vs-falling asymmetry).
 4. **Output**: Results are stored as Traits attributes on the `PyBERT` instance; Chaco plots are updated via `plotdata` (an `ArrayPlotData`).
 
 ### Key files
