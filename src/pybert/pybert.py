@@ -468,6 +468,7 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     f = Property(Array, depends_on=["f_step", "f_max"])
     w = Property(Array, depends_on=["f"])
     t_irfft = Property(Array, depends_on=["f"])
+    f_rfft = Property(Array, depends_on=["t"])
     L = Property(Int, depends_on=["mod_type"])
     bits = Property(Array, depends_on=["pattern", "nbits", "mod_type", "run_count", "rx_use_viterbi", "rx_viterbi_fec"])
     symbols = Property(Array, depends_on=["bits", "vod"])
@@ -668,6 +669,16 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
         tmax = 1 / f[1]
         tstep = 0.5 / f[-1]
         return arange(0, tmax, tstep)
+
+    @cached_property
+    def _get_f_rfft(self):
+        """
+        Calculate the frequency vector appropriate for indexing `rfft()` output.
+        """
+        t = self.t
+        len_t = len(t)
+        f0 = 1 / (t[1] * len_t)
+        return array([f0 * k for k in range(len_t // 2 + 1)])
 
     @cached_property
     def _get_bits(self):
