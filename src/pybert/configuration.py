@@ -42,6 +42,9 @@ CONFIG_SAVE_WILDCARD = "|".join(  # noqa: FLY002
 )
 """This sets the supported file types in the GUI's save-as dialog."""
 
+TX_JITTER_TRAITS = ("tx_rj", "tx_dj", "tx_dcd", "tx_sj", "tx_sj_freq")
+"""The Tx jitter traits, which a Tx IBIS-AMI model can also set."""
+
 
 class PyBertCfg:  # pylint: disable=too-many-instance-attributes
     """PyBERT simulation configuration data encapsulation class.
@@ -97,6 +100,11 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
         self.pn_mag = the_PyBERT.pn_mag
         self.pn_freq = the_PyBERT.pn_freq
         self.rn = the_PyBERT.rn
+        self.tx_rj = the_PyBERT.tx_rj
+        self.tx_dj = the_PyBERT.tx_dj
+        self.tx_dcd = the_PyBERT.tx_dcd
+        self.tx_sj = the_PyBERT.tx_sj
+        self.tx_sj_freq = the_PyBERT.tx_sj_freq
         tx_taps = []
         for tap in the_PyBERT.tx_taps:
             tx_taps.append((tap.enabled, tap.value, tap.min_val, tap.max_val))
@@ -228,6 +236,7 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
 
         # Actually load values back into pybert.
         legacy_delta_t_ps = None
+        tx_jitter = {}
         for prop, value in vars(user_config).items():
             if prop == "tx_taps":
                 for count, (enabled, val, min_val, max_val) in enumerate(value):
@@ -278,8 +287,14 @@ class PyBertCfg:  # pylint: disable=too-many-instance-attributes
                 setattr(pybert, sel_attr, "ibis" if value else "native")
             elif prop == "delta_t":
                 legacy_delta_t_ps = value  # Converted below, once the config's own UI is known.
+            elif prop in TX_JITTER_TRAITS:
+                tx_jitter[prop] = value  # Set below, so that loading a Tx IBIS-AMI model doesn't override it.
             else:
                 setattr(pybert, prop, value)
+
+        # The saved Tx jitter is what was simulated, whatever the Tx IBIS-AMI model (loaded above) declares.
+        for prop, value in tx_jitter.items():
+            setattr(pybert, prop, value)
 
         # Replaced by `delta_t_ui`, so the CDR's loop dynamics no longer depend on data rate;
         # an old config's absolute step (ps) is converted exactly, preserving its behavior.

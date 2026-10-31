@@ -565,3 +565,89 @@ def calc_jitter(  # pylint: disable=too-many-arguments,too-many-locals,too-many-
         dj_pos,
         dj_neg,
     )
+
+
+def tx_jitter_offsets(  # pylint: disable=too-many-arguments
+    n_clocks: int, ui: float, rj: float = 0.0, dj: float = 0.0, dcd: float = 0.0,
+    sj: float = 0.0, sj_freq: float = 0.0, rng: Optional[np.random.Generator] = None
+) -> Rvec:
+    """
+    Displacements of the Tx clock times from ideal, as defined by IBIS 8.0's Tx jitter
+    Reserved Parameters (Sec. 10.6.1): ``Time(n) = n * symbol_time + <displacement>``, where
+    the displacement is the sum of:
+
+    - ``Tx_DCD * (-1)^n``,
+    - ``2 * Tx_Dj * rand()``, ``rand()`` uniform over [-0.5, +0.5],
+    - ``Tx_Rj * gaussian_rand()``, ``gaussian_rand()`` standard normal, and
+    - ``Tx_Sj * sin(2 * pi * Tx_Sj_Frequency * n * symbol_time)``.
+
+    Args:
+        n_clocks: Number of clock times (i.e. - symbol boundaries).
+        ui: Unit interval (s).
+
+    Keyword Args:
+        rj: Random jitter standard deviation (s).
+            Default: 0
+        dj: Half the peak-to-peak bounded (uniform) jitter (s).
+            Default: 0
+        dcd: Half the peak-to-peak duty cycle distortion (s).
+            Default: 0
+        sj: Sinusoidal jitter amplitude (half its peak-to-peak) (s).
+            Default: 0
+        sj_freq: Sinusoidal jitter frequency (Hz); ``sj`` is ignored when zero, as the spec requires.
+            Default: 0
+        rng: Random number generator; NumPy's global one when ``None``.
+            Default: None
+
+    Returns:
+        The displacement of each clock time (s).
+
+    Notes:
+        1. Random numbers are drawn only for nonzero random components,
+            so that, with neither, the caller's random draws are unaffected.
+    """
+
+    n = np.arange(n_clocks)
+    offsets = zeros(n_clocks)
+    if dcd:
+        offsets += dcd * where(n % 2, -1.0, 1.0)
+    if dj:
+        offsets += dj * (rng.uniform(-1.0, 1.0, n_clocks) if rng else np.random.uniform(-1.0, 1.0, n_clocks))
+    if rj:
+        offsets += rj * (rng.standard_normal(n_clocks) if rng else np.random.standard_normal(n_clocks))
+    if sj and sj_freq:
+        offsets += sj * np.sin(2 * np.pi * sj_freq * n * ui)
+    return offsets
+
+
+def jittered_waveform(symbols: Rvec, nspui: int, offsets: Rvec) -> tuple[Rvec, int]:
+    """
+    The over-sampled waveform carrying ``symbols``, with its symbol boundaries moved by ``offsets``.
+
+    Each sample holds the time average of the waveform over its own sample period,
+    so edges falling between samples are placed to a small fraction of a sample;
+    rounding them to the nearest sample would quantize the jitter to ``1/nspui`` UI.
+    With all ``offsets`` zero, this matches ``numpy.repeat(symbols, nspui)``.
+
+    Args:
+        symbols: Symbol values.
+        nspui: Samples per unit interval.
+        offsets: Displacement of each symbol boundary (UI); ``len(symbols) + 1`` of them,
+            the first and last being the waveform's own start and end, which stay put.
+
+    Returns:
+        The waveform, and the number of boundaries whose displacements were clipped to
+        just under +/-0.5 UI, to keep consecutive boundaries in order.
+    """
+
+    n_syms = len(symbols)
+    if len(offsets) != n_syms + 1:
+        raise ValueError(f"Need one offset per symbol boundary ({n_syms + 1}), not {len(offsets)}!")
+    max_offset = 0.5 - 1.0e-6
+    n_clipped = int(np.count_nonzero(abs(offsets[1:-1]) > max_offset))
+    offsets = np.clip(offsets, -max_offset, max_offset)
+    edges = (np.arange(n_syms + 1) + offsets) * nspui  # (samples)
+    edges[0], edges[-1] = 0, n_syms * nspui
+    # The waveform's running integral is piecewise linear between the edges.
+    integral = concatenate([[0.0], np.cumsum(symbols * diff(edges))])
+    return diff(np.interp(np.arange(n_syms * nspui + 1), edges, integral)), n_clipped
