@@ -186,7 +186,7 @@ def my_run_simulation(self, initial_run: bool = False, update_plots: bool = True
     bandwidth = self.sum_bw * 1.0e9
     rel_thresh = self.thresh
     mod_type = self.mod_type_
-    impulse_length = self.impulse_length
+    impulse_length = self.impulse_length * 1.0e-9  # (ns) -> (s), as in PyBERT.calc_chnl_h()
 
     # Calculate misc. values.
     len_t = len(t)
