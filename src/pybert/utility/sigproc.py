@@ -20,7 +20,7 @@ from numpy import (
     arange, argmax, array, concatenate, convolve, cos, cumsum, diff, maximum,
     mean, minimum, ones, pad, pi, roll, sign, where, zeros, floating
 )
-from numpy.fft import irfft, rfft
+from numpy.fft import irfft, rfft, rfftfreq
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 from scipy.signal      import freqs, invres
@@ -234,8 +234,7 @@ def calc_resps(t: Rvec, h: Rvec, ui: float, f: Rvec,
     n_samps = int(tmax / ts + 0.5)
     _h = resize_zero_pad(h, n_samps)
     H = rfft(_h)
-    fmax = 0.5 / ts
-    _f = arange(0, fmax + f[1], f[1])
+    _f = rfftfreq(n_samps, ts)  # true bin frequencies of `H`; arange(0, 0.5/ts + f[1], f[1]) gives one extra point when 1/(f[1]*ts) is not an integer
     krnl = interp1d(_f, H, kind="linear", assume_sorted=True)  # type: ignore
     _H = krnl(f)
 
