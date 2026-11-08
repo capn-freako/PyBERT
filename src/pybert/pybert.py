@@ -71,6 +71,7 @@ from pychopmarg.config.ieee_8023dj_d3p3 import R0 as DJ_R0, device_model  # type
 from pychopmarg.devmodel import gamma_term, renormalize_to, s_rx_model, s_tx_model, terminated_h21  # type: ignore
 
 from pybert import __version__ as VERSION
+from pybert.common import Rvec
 from pybert.configuration import InvalidFileType, PyBertCfg
 from pybert.gui.help import help_str
 from pybert.gui.plot import make_plots, make_plots_without_data
@@ -1859,3 +1860,14 @@ class PyBERT(HasTraits):  # pylint: disable=too-many-instance-attributes
     rj_dfe = 0
     pjDD_dfe = 0
     rjDD_dfe = 0
+
+    # Simulation results read by the MCP server. `my_run_simulation()` assigns these from outside
+    # the class, where type checkers can't see them; the bare annotations only declare them.
+    jitter_bins: Rvec
+    jitter_dfe: Rvec
+    dj_pos_dfe: float
+    dj_neg_dfe: float
+    dfe_slicer_samps: Rvec
+    dfe_slicer_decisions: Rvec
+    dfe_out: Rvec
+    clocks: Rvec
