@@ -80,7 +80,7 @@ class _PlaceholderPlotData(ArrayPlotData):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.placeholders: list[str] = []
+        self.placeholders = []
 
     def get_data(self, name):
         value = super().get_data(name)
